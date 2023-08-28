@@ -2,7 +2,7 @@
 pub(crate) struct CMAP {
   pub(crate) version: u16,
   pub(crate) num_tables: u16,
-  pub(crate) encoding_records: Box<Vec<EncodingRecord>>,
+  pub(crate) encoding_records: Vec<Box<EncodingRecord>>,
 }
 
 
@@ -276,28 +276,28 @@ pub(crate) fn load_cmap_table(font_buffer: &[u8],offset: u32 , length: u32) -> C
         let encoding_id = u16::from_be_bytes([buffer[offset + 2], buffer[offset + 3]]);
         let subtable_offset = u32::from_be_bytes([buffer[offset + 4], buffer[offset + 5], buffer[offset + 6], buffer[offset + 7]]);
         offset += 8;
-        encoding_records.push(EncodingRecord {
+        encoding_records.push(Box::new(EncodingRecord {
             platform_id,
             encoding_id,
             offset: subtable_offset,
-        });
+        }));
     }
 
     CMAP {
         version,
         num_tables,
-        encoding_records: Box::new(encoding_records),
+        encoding_records: encoding_records,
     }
 }
 
 #[derive(Debug, Clone)]
 pub(crate) struct EncodingRecordPriority {
-  pub(crate) records: Vec<EncodingRecord>,
-  pub(crate) uvs: Vec<EncodingRecord>,
-  pub(crate) substitute: Vec<EncodingRecord>,
+  pub(crate) records: Vec<Box<EncodingRecord>>,
+  pub(crate) uvs: Vec<Box<EncodingRecord>>,
+  pub(crate) substitute: Vec<Box<EncodingRecord>>,
 }
 
-pub(crate) fn select_cmap(encoding_records: Vec<EncodingRecord>) ->EncodingRecordPriority {
+pub(crate) fn select_cmap(encoding_records: &Vec<Box<EncodingRecord>>) ->EncodingRecordPriority {
     let mut uvs = Vec::new();
     let mut substitute = Vec::new();
     let mut priolities = Vec::new();
@@ -374,20 +374,15 @@ pub(crate) fn select_cmap(encoding_records: Vec<EncodingRecord>) ->EncodingRecor
 
     let mut records_priolity = Vec::new();
     for (i, _) in priolity.iter() {
-      let encoding_record = EncodingRecord {
-        platform_id: encoding_records[*i].platform_id,
-        encoding_id: encoding_records[*i].encoding_id,
-        offset: encoding_records[*i].offset,
-      };  
-
+      let encoding_record = encoding_records[*i].clone();
       records_priolity.push(encoding_record);
     }
 
 
     EncodingRecordPriority { 
       records: records_priolity,
-      uvs: uvs, 
-      substitute: substitute, 
+      uvs, 
+      substitute, 
     }
 }
 

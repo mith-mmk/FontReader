@@ -667,25 +667,20 @@ pub fn font_load(filename: &PathBuf) {
             let encoding = encoding.get_encoding();
             println!("Platform {:?} Encoding {:?}", platform, encoding);
         }
-        let encoding_records: Vec<EncodingRecord> = cmap.encoding_records.iter()
-            .map(|encoding| {
-                encoding.clone()
-            }).collect();
-        let p = cmap::select_cmap(encoding_records);
-        let encodings = p.records;
+
+        let encodings = cmap::select_cmap(&cmap.encoding_records);
         println!("main");
-        encodings.iter().for_each(|encoding| {
+        encodings.records.iter().for_each(|encoding| {
             println!("Platform {:?} Encoding {:?}", encoding.get_platform(), encoding.get_encoding());
         });
+
         println!("substitute");
-        let encodings = p.substitute;
-        encodings.iter().for_each(|encoding| {
+        encodings.substitute.iter().for_each(|encoding| {
             println!("Platform {:?} Encoding {:?}", encoding.get_platform(), encoding.get_encoding());
         });
         println!("uvs");
 
-        let encodings = p.uvs;
-        encodings.iter().for_each(|encoding| {
+        encodings.uvs.iter().for_each(|encoding| {
             println!("Platform {:?} Encoding {:?}", encoding.get_platform(), encoding.get_encoding());
         });
         
