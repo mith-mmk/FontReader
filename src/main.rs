@@ -1,6 +1,13 @@
 use std::path::{Path, PathBuf};
 mod fontheader;
 mod cmap;
+mod fontreader;
+mod head;
+mod hhea;
+mod hmtx;
+mod maxp;
+mod name;
+
 fn main() {
     let font_dir = "./fonts";
     // let font_dir = "C:\\Windows\\Fonts";
@@ -15,15 +22,14 @@ fn main() {
     let mut fonts = Vec::new();
     for font in font_files {
         println!("fontfile: {:?}", font);
-        let buffer = std::fs::read(&font).unwrap();
-        let font_type = fontheader::get_font_type(&buffer);
-
-        println!("fonttype: {:?}", font_type.to_string());
+        let file = std::fs::File::open(font).unwrap();
+        let font_type = fontheader::get_font_type(&file);
+        println!("fonttype: {}", font_type.to_string());
         fonts.push(font_type);
     }
     let fontname = "./fonts/NotoSansJP-Regular.ttf";
     let filename: PathBuf = PathBuf::from(fontname);    
-    fontheader::font_load(&filename);
+    fontreader::font_load(&filename);
 
 
 }

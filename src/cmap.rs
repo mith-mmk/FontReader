@@ -1,22 +1,24 @@
+use std::io::{Read, Seek};
+
 #[derive(Debug, Clone)]
 pub(crate) struct CMAP {
   pub(crate) version: u16,
   pub(crate) num_tables: u16,
   pub(crate) encoding_records: Vec<Box<EncodingRecord>>,
+  pub(crate) buffer: Vec<u8>,
 }
 
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone)]
 pub(crate) struct EncodingRecord {
   pub(crate) platform_id: u16,
   pub(crate) encoding_id: u16,
-  pub(crate) offset: u32,
+  pub(crate) subtable_offset: u32,
 }
-
 
 impl EncodingRecord {
   pub(crate) fn to_string(&self) -> String {
-    format!("platform_id: {}, encoding_id: {}, offset: {}", self.platform_id, self.encoding_id, self.offset)
+    format!("platform_id: {}, encoding_id: {}, offset: {}", self.platform_id, self.encoding_id, self.subtable_offset)
   }
 
   pub(crate) fn get_platform(&self) -> String {
@@ -117,139 +119,177 @@ impl EncodingRecord {
 
 
 #[derive(Debug, Clone)]
-pub(crate) struct CmapSubtable {
+pub(crate) struct CmapEncoding {
+  pub(crate) encoding_record: Box<EncodingRecord>,
+  pub(crate) cmap_subtable: Box<CmapSubtable>,
+}
+
+
+#[derive(Debug, Clone)]
+pub(crate) enum CmapSubtable {
+    Format0(ByteEncoding),
+    Format2(CmapHighByteEncoding),
+    Format4(SegmentMappingToDelta),
+    Format6(TrimmedTableMapping),
+    Format8(Mixed16and32Coverage),
+    Format10(TrimmedArray),
+    Format12(SegmentedCoverage),
+    Format13(ManyToOneRangeMapping),
+    Format14(UnicodeVariationSeauences),
+}
+
+
+#[derive(Debug, Clone)]
+// Format 0: Byte encoding table
+pub(crate) struct ByteEncoding { 
     format: u16,
     length: u16,
     language: u16,
     glyph_id_array: Vec<u8>,
 }
 
+
+
 #[derive(Debug, Clone)]
+// Format 2: High-byte mapping through table
 pub(crate) struct CmapHighByteEncoding {
-    format: u16,
-    length: u16,
-    language: u16,
-    sub_header_keys: Vec<u16>,
-    sub_headers: Vec<CmapSubheader>,
-    glyph_id_array: Vec<u16>,
+  pub(crate) format: u16,
+  pub(crate) length: u16,
+  pub(crate) language: u16,
+  pub(crate) sub_header_keys: Vec<u16>,
+  pub(crate) sub_headers: Vec<CmapSubheader>,
+  pub(crate) glyph_id_array: Vec<u16>,
 }
 
 #[derive(Debug, Clone)]
 pub(crate) struct CmapSubheader {
-    first_code: u16,
-    entry_count: u16,
-    id_delta: i16,
-    id_range_offset: u16,
+  pub(crate) first_code: u16,
+  pub(crate) entry_count: u16,
+  pub(crate) id_delta: i16,
+  pub(crate) id_range_offset: u16,
 }
 
 #[derive(Debug, Clone)]
+// format 4
 pub(crate) struct SegmentMappingToDelta {
-    format: u16,
-    length: u16,
-    language: u16,
-    seg_count_x2: u16,
-    search_range: u16,
-    entry_selector: u16,
-    range_shift: u16,
-    end_code: Vec<u16>,
-    reserved_pad: u16,
-    start_code: Vec<u16>,
-    id_delta: Vec<u16>,
-    id_range_offset: Vec<u16>,
-    glyph_id_array: Vec<u16>,
+  pub(crate) format: u16,
+  pub(crate) length: u16,
+  pub(crate) language: u16,
+  pub(crate) seg_count_x2: u16,
+  pub(crate) search_range: u16,
+  pub(crate) entry_selector: u16,
+  pub(crate) range_shift: u16,
+  pub(crate) end_code: Vec<u16>,
+  pub(crate) reserved_pad: u16,
+  pub(crate) start_code: Vec<u16>,
+  pub(crate) id_delta: Vec<i16>,
+  pub(crate) id_range_offset: Vec<u16>,
+  pub(crate) glyph_id_array: Vec<u16>,
 }
 
 #[derive(Debug, Clone)]
+// format 6 Trimmed table mapping
 pub(crate) struct TrimmedTableMapping {
-    format: u16,
-    length: u16,
-    language: u16,
-    first_code: u16,
-    entry_count: u16,
-    glyph_id_array: Vec<u16>,
+  pub(crate) format: u16,
+  pub(crate) length: u16,
+  pub(crate) language: u16,
+  pub(crate) first_code: u16,
+  pub(crate) entry_count: u16,
+  pub(crate) glyph_id_array: Vec<u16>,
+}
+
+
+#[derive(Debug, Clone)]
+// format 8 Mixed 16-bit and 32-bit coverage
+pub(crate) struct Mixed16and32Coverage {
+  pub(crate) format: u16,
+  pub(crate) reserved: u16,
+  pub(crate) length: u32,
+  pub(crate) language: u32,
+  pub(crate) is32: Vec<u8>,
+  pub(crate) num_groups: u32,
+  pub(crate) groups: Vec<SequentialMapGroup>,
+}
+
+
+#[derive(Debug, Clone)]
+// format 10 Trimmed array
+pub(crate) struct TrimmedArray {
+  pub(crate) format: u16,
+  pub(crate) reserved: u16,
+  pub(crate) length: u32,
+  pub(crate) language: u32,
+  pub(crate) start_char_code: u32,
+  pub(crate) num_chars: u32,
+  pub(crate) glyph_id_array: Vec<u16>,
+}
+
+#[derive(Debug, Clone)]
+// format 12 Segmented coverage
+pub(crate) struct SegmentedCoverage {
+  pub(crate) format: u16,
+  pub(crate) reserved: u16,
+  pub(crate) length: u32,
+  pub(crate) language: u32,
+  pub(crate) num_groups: u32,
+  pub(crate) groups: Vec<SequentialMapGroup>,
 }
 
 #[derive(Debug, Clone)]
 pub(crate) struct SequentialMapGroup {
-    start_char_code: u32,
-    end_char_code: u32,
-    start_glyph_id: u32,
+  pub(crate) start_char_code: u32,
+  pub(crate) end_char_code: u32,
+  pub(crate) start_glyph_id: u32,
 }
 
-#[derive(Debug, Clone)]
-pub(crate) struct Mixed16and32Coverage {
-    format: u16,
-    reserved: u16,
-    length: u32,
-    language: u32,
-    is32: Vec<u8>,
-    num_groups: u32,
-    groups: Vec<SequentialMapGroup>,
-}
 
 #[derive(Debug, Clone)]
-pub(crate) struct TrimmedArray {
-    format: u16,
-    length: u16,
-    language: u16,
-    first_code: u16,
-    entry_count: u16,
-    glyph_id_array: Vec<u16>,
-}
-
-#[derive(Debug, Clone)]
-pub(crate) struct SegmentedCoverage {
-    format: u16,
-    reserved: u16,
-    length: u32,
-    language: u32,
-    n_groups: u32,
-    groups: Vec<SequentialMapGroup>,
-}
-
-#[derive(Debug, Clone)]
+// format 13 Many-to-one range mappings
 pub(crate) struct ManyToOneRangeMapping {
-    format: u16,
-    reserved: u16,
-    length: u32,
-    language: u32,
-    num_chars: u32,
-    ranges: Vec<ConstantMapGroup>,
+  pub(crate) format: u16,
+  pub(crate) reserved: u16,
+  pub(crate) length: u32,
+  pub(crate) language: u32,
+  pub(crate) num_groups: u32,
+  pub(crate) ranges: Vec<ConstantMapGroup>,
 }
 
 #[derive(Debug, Clone)]
 pub(crate) struct ConstantMapGroup {
-    start_char_code: u32,
-    end_char_code: u32,
-    glyph_id: u32,
+  pub(crate) start_char_code: u32,
+  pub(crate) end_char_code: u32,
+  pub(crate) glyph_id: u32,
 }
 
 #[derive(Debug, Clone)]
+// format 14 Unicode Variation Sequences
 pub(crate) struct UnicodeVariationSeauences {
-    format: u16,
-    reserved: u16,
-    length: u32,
-    num_var_selector_records: u32,
-    var_selector_records: Vec<VarSelectorRecord>,
+  pub(crate) format: u16,
+  pub(crate) reserved: u16,
+  pub(crate) length: u32,
+  pub(crate) num_var_selector_records: u32,
+  pub(crate) var_selector_records: Vec<VarSelectorRecord>,
 }
 
 #[derive(Debug, Clone)]
 pub(crate) struct VarSelectorRecord {
-    var_selector: u32, // from u24
-    default_uvs_offset: u32,
-    non_default_uvs_offset: u32,
+  pub(crate) var_selector: u32, // from u24
+  pub(crate) default_uvs_offset: u32,
+  pub(crate) default_uvs: DefaultUVS,
+  pub(crate) non_default_uvs_offset: u32,
+  pub(crate) non_default_uvs: NonDefautUVS,
 }
 
 #[derive(Debug, Clone)]
 pub(crate) struct DefaultUVS {
-    num_unicode_value_ranges: u32,
-    unicode_value_ranges: Vec<UnicodeValueRange>,
+  pub(crate) num_unicode_value_ranges: u32,
+  pub(crate) unicode_value_ranges: Vec<UnicodeValueRange>,
 }
 
 #[derive(Debug, Clone)]
 pub(crate) struct UnicodeValueRange {
-    start_unicode_value: u32,
-    additional_count: u8,
+  pub(crate) start_unicode_value: u32,
+  pub(crate) additional_count: u8,
 }
 
 #[derive(Debug, Clone)]
@@ -265,8 +305,10 @@ pub(crate) struct UVSMapping {
 }
 
 // load_cmap_table(buffer.clone(), record.offset, record.length) -> CMAP
-pub(crate) fn load_cmap_table(font_buffer: &[u8],offset: u32 , length: u32) -> CMAP {
-    let buffer = &font_buffer[offset as usize..(offset + length) as usize];
+pub(crate) fn load_cmap_table<R:Read + Seek>(mut file:R,offset: u32 , length: u32) -> CMAP {
+    file.seek(std::io::SeekFrom::Start(offset as u64)).unwrap();
+    let mut buffer = vec![0; length as usize];
+    file.read_exact(&mut buffer).unwrap();
     let version = u16::from_be_bytes([buffer[0], buffer[1]]);
     let num_tables = u16::from_be_bytes([buffer[2], buffer[3]]);
     let mut encoding_records = Vec::new();
@@ -279,7 +321,7 @@ pub(crate) fn load_cmap_table(font_buffer: &[u8],offset: u32 , length: u32) -> C
         encoding_records.push(Box::new(EncodingRecord {
             platform_id,
             encoding_id,
-            offset: subtable_offset,
+            subtable_offset,
         }));
     }
 
@@ -287,6 +329,7 @@ pub(crate) fn load_cmap_table(font_buffer: &[u8],offset: u32 , length: u32) -> C
         version,
         num_tables,
         encoding_records: encoding_records,
+        buffer: buffer.to_vec()
     }
 }
 
@@ -297,7 +340,7 @@ pub(crate) struct EncodingRecordPriority {
   pub(crate) substitute: Vec<Box<EncodingRecord>>,
 }
 
-pub(crate) fn select_cmap(encoding_records: &Vec<Box<EncodingRecord>>) ->EncodingRecordPriority {
+pub(crate) fn select_encoding(encoding_records: &Vec<Box<EncodingRecord>>) ->EncodingRecordPriority {
     let mut uvs = Vec::new();
     let mut substitute = Vec::new();
     let mut priolities = Vec::new();
@@ -386,11 +429,346 @@ pub(crate) fn select_cmap(encoding_records: &Vec<Box<EncodingRecord>>) ->Encodin
     }
 }
 
-// CMAP selector priority
+pub(crate) fn get_subtable(encoding_record: &Box<EncodingRecord>, buffer: &[u8]) -> CmapSubtable {
+  let offset = encoding_record.subtable_offset as usize;
+  let buffer = &buffer[offset..];
+  let format = u16::from_be_bytes([buffer[0], buffer[1]]);
+  match format {
+    0 => { // Format0
+      let length = u16::from_be_bytes([buffer[2], buffer[3]]);
+      let language = u16::from_be_bytes([buffer[4], buffer[5]]);
+      let mut glyph_id_array = Vec::new();
+      for i in 6..length as usize {
+        glyph_id_array.push(buffer[i]);
+      }
+      CmapSubtable::Format0(ByteEncoding {
+        format,
+        length,
+        language,
+        glyph_id_array,
+      })
+    },
+    2 => { // Format2
+      let length = u16::from_be_bytes([buffer[2], buffer[3]]);
+      let language = u16::from_be_bytes([buffer[4], buffer[5]]);
+      let mut sub_header_keys = Vec::new();
+      // sub header keys
+      let mut offset = 6;
+      for _ in 0..256 {
+        let sub_header_key = u16::from_be_bytes([buffer[offset], buffer[offset + 1]]);
+        offset += 2;
+        sub_header_keys.push(sub_header_key);
+      }
+
+      let mut sub_headers = Vec::new();
+      // sub header
+      for _ in 0..256 {
+        let first_code = u16::from_be_bytes([buffer[offset], buffer[offset + 1]]);
+        let entry_count = u16::from_be_bytes([buffer[offset + 2], buffer[offset + 3]]);
+        let id_delta = i16::from_be_bytes([buffer[offset + 4], buffer[offset + 5]]);
+        let id_range_offset = u16::from_be_bytes([buffer[offset + 6], buffer[offset + 7]]);
+        offset += 8;
+        sub_headers.push(CmapSubheader {
+          first_code,
+          entry_count,
+          id_delta,
+          id_range_offset,
+        });
+      }
+      let mut glyph_id_array = Vec::new();
+      while offset < length as usize {
+        let glyph_id = u16::from_be_bytes([buffer[offset], buffer[offset + 1]]);
+        offset += 2;
+        glyph_id_array.push(glyph_id);
+      }
+
+
+      CmapSubtable::Format2(CmapHighByteEncoding {
+        format,
+        length,
+        language,
+        sub_header_keys,
+        sub_headers,
+        glyph_id_array,
+      })
+    },
+    4 => { // SegmentMappingToDelta
+      // Todo!
+      let length = u16::from_be_bytes([buffer[2], buffer[3]]);
+      let language = u16::from_be_bytes([buffer[4], buffer[5]]);
+      let seg_count_x2 = u16::from_be_bytes([buffer[6], buffer[7]]);
+      let seg_count = seg_count_x2 / 2;
+      let search_range = u16::from_be_bytes([buffer[8], buffer[9]]);
+      let entry_selector = u16::from_be_bytes([buffer[10], buffer[11]]);
+      let range_shift = u16::from_be_bytes([buffer[12], buffer[13]]);
+      let mut end_code = Vec::new();
+      let mut offset = 14;
+      for _ in 0..seg_count {
+        let code = u16::from_be_bytes([buffer[offset], buffer[offset + 1]]);
+        offset += 2;
+        end_code.push(code);
+      }
+      let reserved_pad = u16::from_be_bytes([buffer[offset], buffer[offset + 1]]);
+      offset += 2;
+      let mut start_code = Vec::new();
+      for _ in 0..seg_count {
+        let code = u16::from_be_bytes([buffer[offset], buffer[offset + 1]]);
+        offset += 2;
+        start_code.push(code);
+      }      
+      let mut id_delta = Vec::new();
+      for _ in 0..seg_count {
+        let delta = i16::from_be_bytes([buffer[offset], buffer[offset + 1]]);
+        offset += 2;
+        id_delta.push(delta);
+      }
+      let mut id_range_offset = Vec::new();
+      for _ in 0..seg_count {
+        let range_offset = u16::from_be_bytes([buffer[offset], buffer[offset + 1]]);
+        offset += 2;
+        id_range_offset.push(range_offset);
+      }
+      let mut glyph_id_array = Vec::new();
+      while offset < length as usize {
+        let glyph_id = u16::from_be_bytes([buffer[offset], buffer[offset + 1]]);
+        offset += 2;
+        glyph_id_array.push(glyph_id);
+      }
+      CmapSubtable::Format4(SegmentMappingToDelta {
+        format,
+        length,
+        language,
+        seg_count_x2,
+        search_range,
+        entry_selector,
+        range_shift,
+        end_code,
+        reserved_pad,
+        start_code,
+        id_delta,
+        id_range_offset,
+        glyph_id_array,
+      })
+    },
+    6 => { // Format 6: Trimmed table mapping
+      let length = u16::from_be_bytes([buffer[2], buffer[3]]);
+      let language = u16::from_be_bytes([buffer[4], buffer[5]]);
+      let first_code = u16::from_be_bytes([buffer[6], buffer[7]]);
+      let entry_count = u16::from_be_bytes([buffer[8], buffer[9]]);
+      let mut glyph_id_array = Vec::new();
+      let mut offset = 10;
+      for _ in 0..entry_count {
+        let glyph_id = u16::from_be_bytes([buffer[offset], buffer[offset + 1]]);
+        offset += 2;
+        glyph_id_array.push(glyph_id);
+      }
+
+      CmapSubtable::Format6(TrimmedTableMapping {
+        format,
+        length,
+        language,
+        first_code,
+        entry_count,
+        glyph_id_array,
+      })
+    },
+    8 => { // Format 8 mixed 16-bit and 32-bit coverage
+      let reserved = u16::from_be_bytes([buffer[2], buffer[3]]);
+      let length = u32::from_be_bytes([buffer[4], buffer[5], buffer[6], buffer[7]]);
+      let language = u32::from_be_bytes([buffer[8], buffer[9], buffer[10], buffer[11]]);
+      // i32 [8192]
+      let mut offset = 12;
+      let mut is32 = Vec::new();
+      for _ in 0..8192 {
+        is32.push(buffer[offset]);
+        offset += 1;
+      }
+      let num_groups = u32::from_be_bytes([buffer[offset], buffer[offset + 1], buffer[offset + 2], buffer[offset + 3]]);
+      let mut groups = Vec::new();
+      offset += 4;
+      for _ in 0..num_groups {
+        let start_char_code = u32::from_be_bytes([buffer[offset], buffer[offset + 1], buffer[offset + 2], buffer[offset + 3]]);
+        let end_char_code = u32::from_be_bytes([buffer[offset + 4], buffer[offset + 5], buffer[offset + 6], buffer[offset + 7]]);
+        let start_glyph_id = u32::from_be_bytes([buffer[offset + 8], buffer[offset + 9], buffer[offset + 10], buffer[offset + 11]]);
+        offset += 12;
+        groups.push(SequentialMapGroup {
+          start_char_code,
+          end_char_code,
+          start_glyph_id,
+        });
+      }
+      CmapSubtable::Format8(Mixed16and32Coverage {
+        format,
+        reserved,
+        length,
+        language,
+        is32,
+        num_groups,
+        groups,
+      })
+    },
+    10 => { // Format 10 Trimed array
+      let reserved = u16::from_be_bytes([buffer[2], buffer[3]]);
+      let length: u32 = u32::from_be_bytes([buffer[4], buffer[5], buffer[6], buffer[7]]);
+      let language: u32 = u32::from_be_bytes([buffer[8], buffer[9], buffer[10], buffer[11]]);
+      let start_char_code: u32 = u32::from_be_bytes([buffer[12], buffer[13], buffer[14], buffer[15]]);
+      let num_chars: u32 = u32::from_be_bytes([buffer[16], buffer[17], buffer[18], buffer[19]]);
+      let mut glyph_id_array = Vec::new();
+      let mut offset = 20;
+      for _ in 0..num_chars {
+        let glyph_id = u16::from_be_bytes([buffer[offset], buffer[offset + 1]]);
+        offset += 2;
+        glyph_id_array.push(glyph_id);
+      }
+      CmapSubtable::Format10(TrimmedArray {
+        format,
+        reserved,
+        length,
+        language,
+        start_char_code,
+        num_chars,
+        glyph_id_array,
+      })
+    },
+    12 => { // Format 12 Segmented coverage
+      let reserved = u16::from_be_bytes([buffer[2], buffer[3]]);
+      let length: u32 = u32::from_be_bytes([buffer[4], buffer[5], buffer[6], buffer[7]]);
+      let language: u32 = u32::from_be_bytes([buffer[8], buffer[9], buffer[10], buffer[11]]);
+      let num_groups: u32 = u32::from_be_bytes([buffer[12], buffer[13], buffer[14], buffer[15]]);
+      let mut groups = Vec::new();
+      let mut offset = 16;
+      for _ in 0..num_groups {
+        let start_char_code = u32::from_be_bytes([buffer[offset], buffer[offset + 1], buffer[offset + 2], buffer[offset + 3]]);
+        let end_char_code = u32::from_be_bytes([buffer[offset + 4], buffer[offset + 5], buffer[offset + 6], buffer[offset + 7]]);
+        let start_glyph_id = u32::from_be_bytes([buffer[offset + 8], buffer[offset + 9], buffer[offset + 10], buffer[offset + 11]]);
+        offset += 12;
+        groups.push(SequentialMapGroup {
+          start_char_code,
+          end_char_code,
+          start_glyph_id,
+        });
+      }
+      CmapSubtable::Format12(SegmentedCoverage {
+        format,
+        reserved,
+        length,
+        language,
+        num_groups,
+        groups,
+      })
+    },
+    14 => { // format 14 Unicode Variation Sequences
+      let length = u32::from_be_bytes([buffer[2], buffer[3], buffer[4], buffer[5]]);
+      let num_var_selector_records = u32::from_be_bytes([buffer[6], buffer[7], buffer[8], buffer[9]]);
+      let mut offest = 10;
+      let mut var_selector_records = Vec::new();
+      for _ in 0..num_var_selector_records {
+        let var_selector = u32::from_be_bytes([0, buffer[offest], buffer[offest + 1], buffer[offest + 2]]);
+        // 32bit 
+        let default_uvs_offset = u32::from_be_bytes([buffer[offest + 3], buffer[offest + 4], buffer[offest + 5], buffer[offest + 6]]);
+        let non_default_uvs_offset = u32::from_be_bytes([buffer[offest + 7], buffer[offest + 8], buffer[offest + 9], buffer[offest + 10]]);
+        offest += 11;
+
+        let default_uvs = if default_uvs_offset > 0 {
+          let uvs_offset = default_uvs_offset as usize;
+          let uvs_buffer = &buffer[uvs_offset..];
+          let num_unicode_value_ranges = u32::from_be_bytes([uvs_buffer[0], uvs_buffer[1], uvs_buffer[2], uvs_buffer[3]]);
+          let mut unicode_value_ranges = Vec::new();
+          let mut uvs_offset = 4;
+          for _ in 0..num_unicode_value_ranges {
+            let start_unicode_value = u32::from_be_bytes([uvs_buffer[uvs_offset], uvs_buffer[uvs_offset + 1], uvs_buffer[uvs_offset + 2], uvs_buffer[uvs_offset + 3]]);
+            let additional_count = uvs_buffer[uvs_offset + 4];
+            uvs_offset += 5;
+            unicode_value_ranges.push(UnicodeValueRange {
+              start_unicode_value,
+              additional_count,
+            });
+          } 
+          DefaultUVS {
+            num_unicode_value_ranges,
+            unicode_value_ranges,
+          }
+        } else {
+          DefaultUVS {
+            num_unicode_value_ranges: 0,
+            unicode_value_ranges: Vec::new(),
+          }
+        };
+        let non_default_uvs = if non_default_uvs_offset > 0 {
+          let uvs_offset = non_default_uvs_offset as usize;
+          let non_default_uvs_buffer = &buffer[uvs_offset..];
+          let num_unicode_value_ranges = u32::from_be_bytes([non_default_uvs_buffer[0], non_default_uvs_buffer[1], non_default_uvs_buffer[2], non_default_uvs_buffer[3]]);
+          let mut unicode_value_ranges = Vec::new();
+          let mut uvs_offset = 4;
+          for _ in 0..num_unicode_value_ranges {
+            let unicode_value = u32::from_be_bytes([non_default_uvs_buffer[uvs_offset], non_default_uvs_buffer[uvs_offset + 1], non_default_uvs_buffer[uvs_offset + 2], non_default_uvs_buffer[uvs_offset + 3]]);
+            let glyph_id = u32::from_be_bytes([non_default_uvs_buffer[uvs_offset + 4], non_default_uvs_buffer[uvs_offset + 5], non_default_uvs_buffer[uvs_offset + 6], non_default_uvs_buffer[uvs_offset + 7]]);
+            uvs_offset += 8;            
+            unicode_value_ranges.push(UVSMapping {
+              unicode_value,
+              glyph_id,
+            });
+          }
+          NonDefautUVS {
+            num_unicode_value_ranges,
+            unicode_value_ranges,
+          }
+        } else {
+          NonDefautUVS {
+            num_unicode_value_ranges: 0,
+            unicode_value_ranges: Vec::new(),
+          }
+        };
+
+        var_selector_records.push(VarSelectorRecord {
+          var_selector,
+          default_uvs_offset,
+          default_uvs,
+          non_default_uvs_offset,
+          non_default_uvs,
+        });
+      }
+      CmapSubtable::Format14(UnicodeVariationSeauences {
+        format,
+        reserved: 0,
+        length,
+        num_var_selector_records,
+        var_selector_records,
+      })
+    },
+    _ => { // unknown
+      CmapSubtable::Format0(ByteEncoding {
+        format,
+        length: 0,
+        language: 0,
+        glyph_id_array: Vec::new(),
+      })
+     },
+    }
+  }
 
 
 
-// 100. Platform ID = 2 (ISO) and Encoding ID  = 1 (ISO 10646)
-// 100. Platform ID = 2 (ISO) and Encoding ID  = 0 (7-bit ASCII)
-// 7. Platform ID = 2 (ISO) and Encoding ID  = 2 (ISO 8859-1), Platform ID = 3 (Microsoft) and Encoding ID  = 0, 2, 3, 4, 5 or 6 select language
-//100. other
+
+pub(crate) fn get_cmap_maps(cmap: &CMAP) -> Vec<Box<CmapEncoding>> {
+  println!("version: {}", cmap.version);
+  println!("num_tables: {}", cmap.num_tables);
+  println!("encoding_records: {}", cmap.encoding_records.len());
+  let encoding_records = &cmap.encoding_records;
+  let mut cmap_encodings = Vec::new();
+  for enconding_record in encoding_records {
+    println!("Platform {} Encoding {} {:08X}", enconding_record.get_platform(), enconding_record.get_encoding(), enconding_record.subtable_offset);
+    let buffer = &cmap.buffer;
+    let subtable = get_subtable(enconding_record, buffer);
+    cmap_encodings.push(Box::new(CmapEncoding {
+      encoding_record: enconding_record.clone(),
+      cmap_subtable: Box::new(subtable),
+    }));
+  }
+  cmap_encodings
+}
+
+pub(crate) fn get_cmap_encodings<R: Read + Seek>(file: R, offset: u32 , length: u32) -> Vec<Box<CmapEncoding>> {
+  let cmap = load_cmap_table(file, offset, length);
+  get_cmap_maps(&cmap)
+}

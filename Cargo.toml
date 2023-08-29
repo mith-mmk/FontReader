@@ -6,4 +6,4 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bin-rs = {version = "0.0.7",features = ["stream","util"]}
+byteorder = "1.4.3"

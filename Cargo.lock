@@ -3,14 +3,14 @@
 version = 3
 
 [[package]]
-name = "bin-rs"
-version = "0.0.7"
+name = "byteorder"
+version = "1.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e62e12dae19127152eee5b5ff249a86100a01e388abbac4c22e9f97eb33d9c3d"
+checksum = "14c189c53d098945499cdfa7ecc63567cf3886b3332b312a5b4585d8d3a6a610"
 
 [[package]]
 name = "fontloader"
 version = "0.1.0"
 dependencies = [
- "bin-rs",
+ "byteorder",
 ]

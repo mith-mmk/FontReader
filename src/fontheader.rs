@@ -1,14 +1,12 @@
-use std::borrow::BorrowMut;
-use std::fs;
-use std::io::prelude::*;
-use std::path::PathBuf;
-use crate::cmap::{self, EncodingRecord};
+use std::io::{Read, Seek};
 
-type Fixed = u32;
-type FWORD = i16;
-type UFWORD = u16;
-type F2DOT14 = i16;
-type LONGDATETIME = i64;
+use crate::cmap;
+
+pub type Fixed = u32;
+pub type FWORD = i16;
+pub type UFWORD = u16;
+pub type F2DOT14 = i16;
+pub type LONGDATETIME = i64;
 /*
 // https://docs.microsoft.com/en-us/typography/opentype/spec/otff
 
@@ -49,7 +47,7 @@ impl FontHeaders {
         match self {
             FontHeaders::TTF(header) => {
                 let mut string = String::new();
-                string.push_str("TTF: ");
+                string.push_str("TTF:");
                 // ascii string
                 string.push_str(u32_to_string(header.sfnt_version).as_str());
                 string.push_str(&" major version: ".to_string());
@@ -58,10 +56,10 @@ impl FontHeaders {
                 string.push_str(&header.minor_version.to_string());
                 string.push_str(&" num fonts: ".to_string());
                 string.push_str(&header.num_fonts.to_string());
-                string.push_str(&" table directory: ".to_string());
+                string.push_str(&" table directory:\n".to_string());
                 for table in header.table_directory.iter() {
                     string.push_str(&table.to_string());
-                    string.push_str(&" ".to_string());
+                    string.push_str(&"\n".to_string());
                 }
                 if header.major_version >= 2 {
                     string.push_str(&" ul_dsig_sfnt_version: ".to_string());
@@ -92,11 +90,11 @@ impl FontHeaders {
                 string.push_str(&header.entry_selector.to_string());
                 string.push_str(&" range shift: ".to_string());
                 string.push_str(&header.range_shift.to_string());
-                string.push_str(&" table records: ".to_string());
+                string.push_str(&" table records:\n".to_string());
                 #[cfg(debug_assertions)]
                 for table in header.table_records.iter() {
                     string.push_str(&table.clone().to_string());
-                    string.push_str(&" ".to_string());
+                    string.push_str(&"\n".to_string());
                 }
                 string
             },
@@ -191,10 +189,10 @@ impl FontHeaders {
 
 #[derive(Debug, Clone)]
 pub struct TableRecord {
-    table_tag: u32,
-    check_sum: u32,
-    offset: u32,
-    length: u32,
+    pub(crate) table_tag: u32,
+    pub(crate) check_sum: u32,
+    pub(crate) offset: u32,
+    pub(crate) length: u32,
 }
 
 impl TableRecord {
@@ -216,64 +214,61 @@ impl TableRecord {
 
 #[derive(Debug, Clone)]
 pub struct TTFHeader {
-    sfnt_version: u32,
-    major_version: u16,
-    minor_version: u16,
-    num_fonts: u32,
-    table_directory: Box<Vec<u32>>,
+    pub(crate) sfnt_version: u32,
+    pub(crate) major_version: u16,
+    pub(crate) minor_version: u16,
+    pub(crate) num_fonts: u32,
+    pub(crate) table_directory: Box<Vec<u32>>,
     // Version2
-    ul_dsig_sfnt_version: u32,
-    ul_dsig_length: u32,
-    ul_dsig_offset: u32,
+    pub(crate) ul_dsig_sfnt_version: u32,
+    pub(crate) ul_dsig_length: u32,
+    pub(crate) ul_dsig_offset: u32,
 }
-
 
 #[derive(Debug, Clone)]
 pub struct OTFHeader {
-    sfnt_version: u32,
-    num_tables: u16,
-    search_range: u16,
-    entry_selector: u16,
-    range_shift: u16,
-    table_records: Box<Vec<TableRecord>>,
+    pub(crate) sfnt_version: u32,
+    pub(crate) num_tables: u16,
+    pub(crate) search_range: u16,
+    pub(crate) entry_selector: u16,
+    pub(crate) range_shift: u16,
+    pub(crate) table_records: Box<Vec<TableRecord>>,
 }
-
-
 
 #[derive(Debug, Clone)]
 pub struct WOFFHeader {
-    sfnt_version: u32,
-    signature: u32,
-    flavor: u32,
-    length: u32,
-    num_tables: u16,
-    reserved: u16,
-    total_sfnt_size: u32,
-    major_version: u16,
-    minor_version: u16,
-    meta_offset: u32,
-    meta_length: u32,
-    meta_orig_length: u32,
-    priv_offset: u32,
-    priv_length: u32,
+    pub(crate) sfnt_version: u32,
+    pub(crate) signature: u32,
+    pub(crate) flavor: u32,
+    pub(crate) length: u32,
+    pub(crate) num_tables: u16,
+    pub(crate) reserved: u16,
+    pub(crate) total_sfnt_size: u32,
+    pub(crate) major_version: u16,
+    pub(crate) minor_version: u16,
+    pub(crate) meta_offset: u32,
+    pub(crate) meta_length: u32,
+    pub(crate) meta_orig_length: u32,
+    pub(crate) priv_offset: u32,
+    pub(crate) priv_length: u32,
 }
 
 #[derive(Debug, Clone)]
 pub struct WOFF2Header {
-    sfnt_version: u32,
-    signature: u32,
-    flavor: u32,
-    length: u32,
-    num_tables: u16,
-    reserved: u16,
-    total_sfnt_size: u32,
-    major_version: u16,
-    minor_version: u16,
-    meta_offset: u32,
-    meta_length: u32,
-    meta_orig_length: u32,
-    priv_offset: u32,
-    priv_length: u32,
+    pub(crate) sfnt_version: u32,
+    pub(crate) signature: u32,
+    pub(crate) flavor: u32,
+    pub(crate) length: u32,
+    pub(crate) num_tables: u16,
+    pub(crate) reserved: u16,
+    pub(crate) total_sfnt_size: u32,
+    pub(crate) major_version: u16,
+    pub(crate) minor_version: u16,
+    pub(crate) meta_offset: u32,
+    pub(crate) meta_length: u32,
+    pub(crate) meta_orig_length: u32,
+    pub(crate) priv_offset: u32,
+    pub(crate) priv_length: u32,
 }
 
 /*
@@ -310,11 +305,11 @@ fn check_sum(table: Vec<u8>) -> u32 {
     sum
 }
 
-enum FontTable {
+pub(crate) enum FontTable {
 // required
     CMAP(cmap::CMAP),
-    HEAD(HEAD),
-    HHEA(HHEA),
+    HEAD,
+    HHEA,
     HMTX,
     MAXP,
     NAME,
@@ -384,59 +379,8 @@ enum FontTable {
 }
 
 
-
-
-struct HEAD {
-    major_version: u16,
-    minor_version: u16,
-    font_revision: u32,
-    check_sum_adjustment: u32,
-    magic_number: u32,
-    flags: u16,
-    units_per_em: u16,
-    created: LONGDATETIME,
-    modified: LONGDATETIME,
-    x_min: i16,
-    y_min: i16,
-    x_max: i16,
-    y_max: i16,
-    mac_style: u16,
-    lowest_rec_ppem: u16,
-    font_direction_hint: i16,
-    index_to_loc_format: i16,
-    glyph_data_format: i16,
-}
-
-struct HHEA {
-    major_version: u16,
-    minor_version: u16,
-    ascender: FWORD,
-    descender: FWORD,
-    line_gap: FWORD,
-    advance_width_max: UFWORD,
-    min_left_side_bearing: FWORD,
-    min_right_side_bearing: FWORD,
-    x_max_extent: FWORD,
-    caret_slope_rise: i16,
-    caret_slope_run: i16,
-    caret_offset: i16,
-    reserved1: i16,
-    reserved2: i16,
-    reserved3: i16,
-    reserved4: i16,
-    metric_data_format: i16,
-    number_of_hmetrics: u16,
-}
-
-struct HMTX {
-    advance_width: Box<Vec<u16>>,
-    left_side_bearing: Box<Vec<i16>>,
-} 
-
-
-pub fn get_font_type(fontdata: &[u8]) -> FontHeaders {
-    let mut buffer = [0; 4];
-    let mut file = std::io::Cursor::new(fontdata);    
+pub fn get_font_type<R: Read + Seek>(mut file: R) -> FontHeaders {
+    let mut buffer = [0; 4]; 
     file.read(&mut buffer).unwrap();
     let sfnt_version:u32 = u32::from_be_bytes(buffer);
     let font_type = match &buffer {
@@ -623,68 +567,10 @@ pub fn get_font_type(fontdata: &[u8]) -> FontHeaders {
     font_type
 }
 
-#[derive(Debug, Clone)]
-pub(crate) struct Font {
-    pub(crate) font_type: FontHeaders,
-    pub(crate) cmap: Box<Vec<cmap::CMAP>>,
+
+pub fn get_font_type_from_buffer(fontdata: &[u8]) -> FontHeaders {
+    let file = std::io::Cursor::new(fontdata);
+    get_font_type(file)
 }
 
-pub fn font_load(filename: &PathBuf) {
-    let buffer = fs::read(filename).unwrap();
-    let mut font;
-    match get_font_type(&buffer) {
-        FontHeaders::OTF(header) => {
-            let mut cmaps = Vec::new();
-            header.table_records.into_iter().for_each(|record| {
-                let tag: [u8;4] = record.table_tag.to_be_bytes();
-                print!("{:?} ", tag);
-                match &tag {
-                    b"cmap" => {
-                        cmaps.push(cmap::load_cmap_table(&buffer, record.offset, record.length));
-                    }
-                    _ => {
-                        // println!("Unknown");
-                    }                        
-                }
-            });
-            font = Font {
-                font_type: get_font_type(&buffer),
-                cmap: Box::new(cmaps),
-            };
-            println!("{:?}", font.font_type);
 
-        },
-        _ => {
-            println!("Unknown");
-            return
-        }
-    }
-    font.cmap.into_iter().for_each(|cmap| {
-        println!("Version {} Tables {}", cmap.version, cmap.num_tables);
-        for encoding in cmap.encoding_records.iter() {
-            println!("{}", encoding.to_string());
-            let platform = encoding.get_platform();
-            let encoding = encoding.get_encoding();
-            println!("Platform {:?} Encoding {:?}", platform, encoding);
-        }
-
-        let encodings = cmap::select_cmap(&cmap.encoding_records);
-        println!("main");
-        encodings.records.iter().for_each(|encoding| {
-            println!("Platform {:?} Encoding {:?}", encoding.get_platform(), encoding.get_encoding());
-        });
-
-        println!("substitute");
-        encodings.substitute.iter().for_each(|encoding| {
-            println!("Platform {:?} Encoding {:?}", encoding.get_platform(), encoding.get_encoding());
-        });
-        println!("uvs");
-
-        encodings.uvs.iter().for_each(|encoding| {
-            println!("Platform {:?} Encoding {:?}", encoding.get_platform(), encoding.get_encoding());
-        });
-        
-
-    });
-   
-}
