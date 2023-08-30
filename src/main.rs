@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 mod fontheader;
 mod requires;
 mod fontreader;
-
+mod outline;
 
 fn get_font_type(folder: &String) {
     let dir = Path::new(&folder).read_dir().unwrap();

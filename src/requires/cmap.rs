@@ -154,7 +154,7 @@ impl EncodingRecord {
 #[derive(Debug, Clone)]
 pub(crate) struct CmapEncodings {
   pub(crate) cmap: Box<CMAP>,
-  pub(crate) cmap_encodings: Vec<Box<CmapEncoding>>,
+  pub(crate) cmap_encodings: Box<Vec<CmapEncoding>>,
 }
 
 impl CmapEncodings {
@@ -163,8 +163,56 @@ impl CmapEncodings {
     let cmap_encodings = get_cmap_maps(&cmap);
     CmapEncodings {
       cmap: Box::new(cmap),
-      cmap_encodings,
+      cmap_encodings: Box::new(cmap_encodings),
     }
+  }
+
+  pub(crate) fn get_griph_position(&self, code_number: u32) -> u32 {
+    let cmap_encodings = &self.cmap_encodings;
+    let mut current_encoding = 0;
+    for i in 0..cmap_encodings.len() {
+      if cmap_encodings[i].cmap_subtable.get_format() == 12 {
+        current_encoding = i;
+        break;
+      }
+      if cmap_encodings[i].cmap_subtable.get_format() == 4 {
+        current_encoding = i;
+      }
+    }
+    let cmap_encoding = &cmap_encodings[current_encoding];
+    let cmap_subtable = &cmap_encoding.cmap_subtable;
+    let mut position = 0;
+
+
+    match *cmap_subtable.clone() {
+      CmapSubtable::Format12(format12) => {
+        for i in 0..format12.groups.len() {
+          let group = &format12.groups[i];
+          if group.start_char_code <= code_number && code_number <= group.end_char_code {
+            position = group.start_glyph_id + (code_number - group.start_char_code);
+            break;
+          }
+        }
+      },
+      CmapSubtable::Format4(format4) => {
+        let code_number = code_number as u16;
+        for i in 0..format4.end_code.len() {
+          match format4.start_code[i] <= code_number && code_number <= format4.end_code[i] {
+            true => {
+              let gid = ((code_number as i32 + format4.id_delta[i]  as i32) & 0xffff) as u32;
+                position = gid - format4.start_code[i] as u32;
+                break;
+              }
+            false => (),
+        }
+        }
+      },
+      _ => {
+        panic!("Not support format");
+      }
+    }
+    position
+    
   }
 }
 
@@ -174,6 +222,7 @@ pub(crate) struct CmapEncoding {
   pub(crate) encoding_record: Box<EncodingRecord>,
   pub(crate) cmap_subtable: Box<CmapSubtable>,
 }
+
 
 
 #[derive(Debug, Clone)]
@@ -1113,18 +1162,16 @@ pub(crate) fn get_subtable(encoding_record: &Box<EncodingRecord>, buffer: &[u8])
   }
 
 
-
-
-pub(crate) fn get_cmap_maps(cmap: &CMAP) -> Vec<Box<CmapEncoding>> {
+pub(crate) fn get_cmap_maps(cmap: &CMAP) -> Vec<CmapEncoding> {
   let encoding_records = &cmap.encoding_records;
   let mut cmap_encodings = Vec::new();
   for enconding_record in encoding_records {
     let buffer = &cmap.buffer;
     let subtable = get_subtable(enconding_record, buffer);
-    cmap_encodings.push(Box::new(CmapEncoding {
+    cmap_encodings.push(CmapEncoding {
       encoding_record: enconding_record.clone(),
       cmap_subtable: Box::new(subtable),
-    }));
+    });
   }
   cmap_encodings
 }
