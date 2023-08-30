@@ -22,7 +22,7 @@ pub fn font_load(filename: &PathBuf) {
           let mut cmaps = Vec::new();
           let mut heads = Vec::new();
           let mut hheas = Vec::new();
-          let hmtxs = Vec::new();
+          let mut hmtxs = Vec::new();
           let mut maxps: Vec<maxp::MAXP> = Vec::new();
           let mut names = Vec::new();
           let mut os2s = Vec::new();
@@ -46,14 +46,17 @@ pub fn font_load(filename: &PathBuf) {
                       let hhea = hhea::HHEA::new(&file, record.offset, record.length);
                       hheas.push(hhea);
                   }
-                  b"hmtx" => {
-                    if maxps.len() == 0 {
+                  b"hmtx" => {                    
+                    if maxps.len() == 0 || hheas.len() == 0 {
                       debug_assert!(true, "No maxp table");
                       return
+                    } else {
+                        let num_glyphs = maxps[0].num_glyphs;
+                        let number_of_hmetrics = hheas[0].number_of_hmetrics;
+                        let hmtx = hmtx::HMTX::new(&file, record.offset, record.length
+                          , number_of_hmetrics, num_glyphs);
+                        hmtxs.push(hmtx);
                     }
-                    let num_glyphs = maxps[0].num_glyphs;
-                      #[cfg(debug_assertions)]
-                      println!("hmtx now not implemented");              
                   }
                   b"maxp" => {
                       let maxp = maxp::MAXP::new(&file, record.offset, record.length);
@@ -109,6 +112,11 @@ pub fn font_load(filename: &PathBuf) {
             println!("{} {}", font.head.len(),font.head[0].to_string());
             println!("{} {}", font.hhea.len(),font.hhea[0].to_string());  
             println!("{} {}", font.maxp.len(),font.maxp[0].to_string());
+            if font.hmtx.len() > 0 {
+              println!("{} {}", font.hmtx.len(),font.hmtx[0].to_string());
+            } else {
+              println!("{} {}", font.hmtx.len(),"No hmtx table");
+            }
             println!("{} {}", font.names.len(),font.names[0].to_string());
             println!("{} {}", font.os2s.len(),font.os2s[0].to_string());
             println!("{} {}", font.posts.len(),font.posts[0].to_string());

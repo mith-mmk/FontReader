@@ -1,4 +1,4 @@
-use std::io::{Read, Seek, SeekFrom, Cursor};
+use std::{io::{Read, Seek, SeekFrom, Cursor}, fmt};
 use byteorder::{BigEndian, ReadBytesExt};
 
 #[derive(Debug, Clone)]
@@ -7,10 +7,31 @@ pub(crate) struct HMTX {
   pub(crate) left_side_bearings: Box<Vec<u16>>,
 }
 
+impl fmt::Display for HMTX {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "{}", self.to_string())
+  }
+}
+
 impl HMTX {
   pub(crate) fn new<R:Read + Seek>(file: R, offest: u32, length: u32
-    , number_of_hmetrics: u32,num_glyphs: u32) -> Self {
+    , number_of_hmetrics: u16,num_glyphs: u16) -> Self {
       get_hdmx(file, offest, length, number_of_hmetrics, num_glyphs)
+  }
+
+  pub(crate) fn to_string(&self) -> String {
+    let mut string = "hmtx\n".to_string();
+    for (i, h_metric) in self.h_metrics.iter().enumerate() {
+      let advance_width = format!("Advance Width {}\n", h_metric.advance_width);
+      string += &advance_width;
+      let left_side_bearing = format!("Left Side Bearing {}\n", h_metric.left_side_bearing);
+      string += &left_side_bearing;
+    }
+    for (i, left_side_bearing) in self.left_side_bearings.iter().enumerate() {
+      let left_side_bearing = format!("Left Side Bearing {}\n", left_side_bearing);
+      string += &left_side_bearing;
+    }
+    string
   }
 
 }
@@ -19,11 +40,11 @@ impl HMTX {
 pub(crate) struct LongHorMetric {
   pub(crate) advance_width: u16,
   pub(crate) left_side_bearing: i16,
-} 
+}
 
 
 fn get_hdmx<R: Read + Seek>(file: R, offest: u32, length: u32
-                      , number_of_hmetrics: u32,num_glyphs: u32) -> HMTX {
+                      , number_of_hmetrics: u16,num_glyphs: u16) -> HMTX {
   let mut file = file;
   file.seek(SeekFrom::Start(offest as u64)).unwrap();
   let mut buf = vec![0; length as usize];
