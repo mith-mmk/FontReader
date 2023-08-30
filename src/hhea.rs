@@ -1,4 +1,4 @@
-use std::io::{Read, Seek, SeekFrom, Cursor};
+use std::{io::{Read, Seek, SeekFrom, Cursor}, fmt};
 use byteorder::{BigEndian, ReadBytesExt};
 use crate::fontheader::{FWORD, UFWORD};
 
@@ -24,7 +24,17 @@ pub(crate) struct HHEA {
   pub(crate) number_of_hmetrics: u16,
 }
 
+impl fmt::Display for HHEA {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "{}", self.to_string())
+  }
+}
+
 impl HHEA {
+  pub(crate) fn new<R:Read + Seek>(file: R, offest: u32, length: u32) -> Self {
+    get_hhea(file, offest, length)
+  }
+
   pub(crate) fn to_string(&self) -> String {
     let mut string = "hhea\n".to_string();
     let version = format!("Version {}.{}\n", self.major_version, self.minor_version);
@@ -65,7 +75,7 @@ impl HHEA {
   }
 }
 
-pub(crate) fn get_hhea<R: Read + Seek>(file: R, offest: u32, length: u32) -> HHEA {
+fn get_hhea<R: Read + Seek>(file: R, offest: u32, length: u32) -> HHEA {
   let mut file = file;
   file.seek(SeekFrom::Start(offest as u64)).unwrap();
   let mut buf = vec![0; length as usize];

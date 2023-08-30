@@ -1,4 +1,4 @@
-use std::io::{Read, Seek};
+use std::{io::{Read, Seek}, fmt};
 
 #[derive(Debug, Clone)]
 pub(crate) struct CMAP {
@@ -8,12 +8,45 @@ pub(crate) struct CMAP {
   pub(crate) buffer: Vec<u8>,
 }
 
+impl fmt::Display for CMAP {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "{}", self.to_string())
+  }
+}
+
+impl CMAP {
+  pub(crate) fn new<R:Read + Seek>(file:R, offset: u32, length: u32) -> Self {
+    load_cmap_table(file, offset, length)
+  }
+
+  pub(crate) fn to_string(&self) -> String {
+    let mut string = "cmap\n".to_string();
+    let version = format!("Version {}\n", self.version);
+    string += &version;
+    let num_tables = format!("Num Tables {}\n", self.num_tables);
+    string += &num_tables;
+    for (i, encoding_record) in self.encoding_records.iter().enumerate() {
+      string += &format!("Encoding Record {} : ", i);
+      string += &encoding_record.to_string();
+      string += "\n";
+    }
+    string
+  }
+}
+
 
 #[derive(Debug, Clone)]
 pub(crate) struct EncodingRecord {
   pub(crate) platform_id: u16,
   pub(crate) encoding_id: u16,
   pub(crate) subtable_offset: u32,
+}
+
+
+impl fmt::Display for EncodingRecord {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "{}", self.to_string())
+  }
 }
 
 impl EncodingRecord {
@@ -305,7 +338,7 @@ pub(crate) struct UVSMapping {
 }
 
 // load_cmap_table(buffer.clone(), record.offset, record.length) -> CMAP
-pub(crate) fn load_cmap_table<R:Read + Seek>(mut file:R,offset: u32 , length: u32) -> CMAP {
+fn load_cmap_table<R:Read + Seek>(mut file:R,offset: u32 , length: u32) -> CMAP {
     file.seek(std::io::SeekFrom::Start(offset as u64)).unwrap();
     let mut buffer = vec![0; length as usize];
     file.read_exact(&mut buffer).unwrap();
@@ -751,13 +784,9 @@ pub(crate) fn get_subtable(encoding_record: &Box<EncodingRecord>, buffer: &[u8])
 
 
 pub(crate) fn get_cmap_maps(cmap: &CMAP) -> Vec<Box<CmapEncoding>> {
-  println!("version: {}", cmap.version);
-  println!("num_tables: {}", cmap.num_tables);
-  println!("encoding_records: {}", cmap.encoding_records.len());
   let encoding_records = &cmap.encoding_records;
   let mut cmap_encodings = Vec::new();
   for enconding_record in encoding_records {
-    println!("Platform {} Encoding {} {:08X}", enconding_record.get_platform(), enconding_record.get_encoding(), enconding_record.subtable_offset);
     let buffer = &cmap.buffer;
     let subtable = get_subtable(enconding_record, buffer);
     cmap_encodings.push(Box::new(CmapEncoding {
@@ -772,3 +801,5 @@ pub(crate) fn get_cmap_encodings<R: Read + Seek>(file: R, offset: u32 , length: 
   let cmap = load_cmap_table(file, offset, length);
   get_cmap_maps(&cmap)
 }
+
+

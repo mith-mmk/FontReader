@@ -1,6 +1,20 @@
-use std::{io::{Cursor, SeekFrom, Read, Seek}};
+use std::{io::{Cursor, SeekFrom, Read, Seek}, fmt::{Display, Formatter, self}};
 
 use byteorder::{BigEndian, ReadBytesExt};
+#[cfg(feature="iconv")]
+use iconv::Iconv;
+
+enum EncodingEngine {
+  UTF16BE,
+  ASCII,
+  ShiftJIS,
+  PRC,
+  Big5,
+  Wansung,
+  Johab,
+  Unknown,
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct NAME {
   pub(crate) version: u16,
@@ -11,11 +25,21 @@ pub(crate) struct NAME {
   // above V0
   // under V1
   pub(crate) lang_tag_count: u16,
-  pub(crate) lang_tag_record: Box<Vec<LangTagRecord>>,
+  pub(crate) lang_tag_records: Box<Vec<LangTagRecord>>,
   pub(crate) lang_tag_string: Box<Vec<String>>,
 }
 
+impl Display for NAME {
+  fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+    write!(f, "{}", self.to_string())
+  }
+}
+
 impl NAME {
+  pub(crate) fn new<R:Read + Seek>(file: R, offest: u32, length: u32) -> Self {
+    get_names(file, offest, length)
+  }
+
   pub(crate) fn to_string(&self) -> String {
     let mut string = "name\n".to_string();
     let version = format!("Version {}\n", self.version);
@@ -70,7 +94,7 @@ pub(crate) struct NameRecord{
   pub(crate) string_offset: u16,
 }
 
-pub(crate) fn get_names<R: Read + Seek>(file: R, offest: u32, length: u32) -> NAME {
+fn get_names<R: Read + Seek>(file: R, offest: u32, length: u32) -> NAME {
   let mut file = file;
   file.seek(SeekFrom::Start(offest as u64)).unwrap();
   let mut buf = vec![0; length as usize];
@@ -110,16 +134,82 @@ pub(crate) fn get_names<R: Read + Seek>(file: R, offest: u32, length: u32) -> NA
     }
   }
   let current_position = cursor.position();
+  // platform id = 0,1,4  utf-16be
+  // platform id = 2       ASCII 
+  // platform id = 3
+  //    Encoding id = 0    ASCII
+  //    Encoding id = 1,10 UTF-16BE
+  //    Encoding id = 2   Shift-JIS
+  //    Encoding id = 3   PRC
+  //    Encoding id = 4   Big5
+  //    Encoding id = 5   Wansung
+  //    Encoding id = 6   Johab
+
+
+
+
   let mut name_string = Vec::new();
-  for i in 0..count {
-    let string_offset = name_records[i as usize].string_offset + current_position as u16;
+  for i in 0..count as usize {
+    let encoding_engine = match name_records[i].platform_id {
+      0 | 1 | 4 => EncodingEngine::UTF16BE,
+      2 => EncodingEngine::ASCII,
+      3 => match name_records[i].encoding_id {
+        0 => EncodingEngine::ASCII,
+        1 | 10 => EncodingEngine::UTF16BE,
+        2 => EncodingEngine::ShiftJIS,
+        3 => EncodingEngine::PRC,
+        4 => EncodingEngine::Big5,
+        5 => EncodingEngine::Wansung,
+        6 => EncodingEngine::Johab,
+        _ => EncodingEngine::Unknown,
+      },
+      _ => EncodingEngine::Unknown,
+    };
+
+
+    let string_offset = name_records[i].string_offset + current_position as u16;
     cursor.set_position(string_offset as u64);
-    let mut u16be = Vec::new();
-    for _ in 0..name_records[i as usize].length / 2 {
-      u16be.push(cursor.read_u16::<BigEndian>().unwrap());
+    match encoding_engine {
+      EncodingEngine::UTF16BE => {
+        let mut u16be = Vec::new();
+        for _ in 0..name_records[i as usize].length / 2 {
+          u16be.push(cursor.read_u16::<BigEndian>().unwrap());
+        }
+        let string = String::from_utf16_lossy(&u16be);
+        name_string.push(string);    
+      }
+      EncodingEngine::ASCII => {
+        let mut u8 = Vec::new();
+        for _ in 0..name_records[i as usize].length {
+          u8.push(cursor.read_u8().unwrap());
+        }
+        let string = String::from_utf8_lossy(&u8);
+        name_string.push(string.to_string());
+      }
+      _ => {
+        #[cfg(feature="iconv")]
+        {
+        let mut u8 = Vec::new();
+        for _ in 0..name_records[i as usize].length {
+          u8.push(cursor.read_u8().unwrap());
+        }
+        let string = if encoding_engine == EncodingEngine::ShiftJIS {
+          iconv::decode(&u8, "CP932").unwrap()
+        } else if encoding_engine == EncodingEngine::Big5 {
+          iconv::decode(&u8, "BIG5").unwrap()
+        } else if encoding_engine == EncodingEngine::Wansung {
+          iconv::decode(&u8, "EUC-KR").unwrap()
+        } else if encoding_engine == EncodingEngine::Johab {
+          iconv::decode(&u8, "JOHAB").unwrap()
+        } else {
+          "not support".to_string()
+        };
+        name_string.push(string);
+        }
+        #[cfg(not(feature="iconv"))]
+          name_string.push("this encoding is not support".to_string());
+      }
     }
-    let string = String::from_utf16(&u16be).unwrap();
-    name_string.push(string);
   }
 
   let mut lang_tag_string = Vec::new();
@@ -130,7 +220,7 @@ pub(crate) fn get_names<R: Read + Seek>(file: R, offest: u32, length: u32) -> NA
     for _ in 0..name_records[i as usize].length / 2 {
       u16be.push(cursor.read_u16::<BigEndian>().unwrap());
     }
-    let string = String::from_utf16(&u16be).unwrap();
+    let string = String::from_utf16_lossy(&u16be);
     lang_tag_record[i as usize].offset = string_offset;
     lang_tag_record[i as usize].length = lang_tag_record[i as usize].length;
     lang_tag_string.push(string);
@@ -143,8 +233,7 @@ pub(crate) fn get_names<R: Read + Seek>(file: R, offest: u32, length: u32) -> NA
     name_records: Box::new(name_records),
     name_string: Box::new(name_string),
     lang_tag_count,
-    lang_tag_record: Box::new(lang_tag_record),
+    lang_tag_records: Box::new(lang_tag_record),
     lang_tag_string: Box::new(lang_tag_string),
   }
 }
-

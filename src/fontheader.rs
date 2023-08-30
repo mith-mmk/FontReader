@@ -7,6 +7,53 @@ pub type FWORD = i16;
 pub type UFWORD = u16;
 pub type F2DOT14 = i16;
 pub type LONGDATETIME = i64;
+
+pub fn fixed_to_f32(value: Fixed) -> f32 {
+    let integer = (value >> 16) as f32;
+    let decimal = (value & 0xFFFF) as f32 / 65536.0;
+    integer + decimal
+}
+
+pub fn f2dot14_to_f32(value: F2DOT14) -> f32 {
+    let integer = (value >> 14) as f32;
+    let decimal = (value & 0x3FFF) as f32 / 16384.0;
+    integer + decimal
+}
+
+
+pub fn longdatetime_to_string(value: &LONGDATETIME) -> String {
+    /* LONGDATETIME Date and time represented in number of seconds since 12:00 midnight,
+    January 1, 1904, UTC. The value is represented as a signed 64-bit integer. */
+    let seconds = value % 60;
+    let minutes = (value / 60) % 60;
+    let hours = (value / 3600) % 24;
+    let days = (value / 86400) % 365;    
+    let years = (value / 31536000) + 1904;
+    let leap_year = if years % 4 == 0 {
+        if years % 100 == 0 {
+            if years % 400 == 0 {
+                1
+            } else { 0 }
+        } else { 1 }    
+    } else { 0 };
+
+    let monthes = [31, 28 + leap_year, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    let mut month = 0;
+    let mut days = days;
+    for i in 0..monthes.len() {
+        if days < monthes[i] {
+            month = i + 1;
+            break;
+        } else {
+            days -= monthes[i];
+        }
+    }  
+
+    format!("{:04}-{:02}-{:02} {:02}:{:02}:{:02}Z", years, month, days, hours, minutes, seconds)
+}
+
+
+
 /*
 // https://docs.microsoft.com/en-us/typography/opentype/spec/otff
 

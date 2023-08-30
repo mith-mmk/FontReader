@@ -1,4 +1,4 @@
-use std::io::{Cursor, SeekFrom, Read, Seek};
+use std::{io::{Cursor, SeekFrom, Read, Seek}, fmt};
 
 use byteorder::{BigEndian, ReadBytesExt};
 
@@ -23,7 +23,17 @@ pub(crate) struct MAXP {
   pub(crate) max_component_depth: u16
 }
 
+impl fmt::Display for MAXP {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "{}", self.to_string())
+  }
+}
+
 impl MAXP {
+  pub(crate) fn new<R:Read + Seek>(file: R, offest: u32, length: u32) -> Self {
+    get_maxp(file, offest, length)
+  }
+
   pub(crate) fn to_string(&self) -> String {
     let mut string = "maxp\n".to_string();
     let major = self.version >> 16;
@@ -63,7 +73,7 @@ impl MAXP {
 }
 
 
-pub(crate) fn get_maxp<R: Read + Seek>(file: R, offest: u32, length: u32) -> MAXP{
+fn get_maxp<R: Read + Seek>(file: R, offest: u32, length: u32) -> MAXP{
   let mut file = file;
   file.seek(SeekFrom::Start(offest as u64)).unwrap();
   let mut buf = vec![0; length as usize];

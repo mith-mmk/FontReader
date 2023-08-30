@@ -31,15 +31,15 @@ pub fn font_load(filename: &PathBuf) {
               
               match &tag {
                   b"cmap" => {
-                      cmaps.push(cmap::load_cmap_table(&file, record.offset, record.length));
+                      cmaps.push(CMAP::new(&file, record.offset, record.length));
                       
                   }
                   b"head" => {
-                      let head = head::get_head(&file, record.offset, record.length);
+                      let head = HEAD::new(&file, record.offset, record.length);
                       heads.push(head);
                   }
                   b"hhea" => {
-                      let hhea = hhea::get_hhea(&file, record.offset, record.length);
+                      let hhea = HHEA::new(&file, record.offset, record.length);
                       hheas.push(hhea);
                   }
                   b"hmtx" => {
@@ -52,11 +52,11 @@ pub fn font_load(filename: &PathBuf) {
                       println!("hmtx now not implemented");              
                   }
                   b"maxp" => {
-                      let maxp = maxp::get_maxp(&file, record.offset, record.length);
+                      let maxp = MAXP::new(&file, record.offset, record.length);
                       maxps.push(maxp);
                   }
                   b"name" => {
-                      let name: NAME = name::get_names(&file, record.offset, record.length);
+                      let name: NAME = NAME::new(&file, record.offset, record.length);
                       names.push(name)
                   }
 

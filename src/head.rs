@@ -1,8 +1,8 @@
-use std::io::{Read, Seek, SeekFrom, Cursor};
+use std::{io::{Read, Seek, SeekFrom, Cursor}, fmt};
 use byteorder::{BigEndian, ReadBytesExt};
-use crate::fontheader::LONGDATETIME;
+use crate::fontheader::{LONGDATETIME, self};
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub(crate) struct HEAD {
   pub(crate) major_version: u16,
   pub(crate) minor_version: u16,
@@ -24,7 +24,17 @@ pub(crate) struct HEAD {
   pub(crate) glyph_data_format: i16,
 }
 
+impl fmt::Display for HEAD {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "{}", self.to_string())
+  }
+}
+
 impl HEAD{
+  pub(crate) fn new<R:Read + Seek>(file: R, offest: u32, length: u32) -> Self {
+    get_head(file, offest, length)
+  }
+
   pub(crate) fn to_string(&self) -> String {
     let mut string = "head\n".to_string();
     let version = format!("Version {}.{}\n", self.major_version, self.minor_version);
@@ -39,9 +49,9 @@ impl HEAD{
     string += &flags;
     let units_per_em = format!("Units Per EM {}\n", self.units_per_em);
     string += &units_per_em;
-    let created = format!("Created {}\n", self.created);
+    let created = format!("Created {}\n", fontheader::longdatetime_to_string(&self.created));
     string += &created;
-    let modified = format!("Modified {}\n", self.modified);
+    let modified = format!("Modified {}\n", fontheader::longdatetime_to_string(&self.modified));
     string += &modified;
     let x_min = format!("xMin {}\n", self.x_min);
     string += &x_min;
@@ -85,9 +95,11 @@ impl HEAD{
     string += &glyph_data_format; 
     string
   }
+
+
 }
 
-pub(crate) fn get_head<R: Read + Seek>(file: R, offest: u32, length: u32) -> HEAD {
+fn get_head<R: Read + Seek>(file: R, offest: u32, length: u32) -> HEAD {
   let mut file = file;
   file.seek(SeekFrom::Start(offest as u64)).unwrap();
   let mut buf = vec![0; length as usize];

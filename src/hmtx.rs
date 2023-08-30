@@ -7,6 +7,14 @@ pub(crate) struct HMTX {
   pub(crate) left_side_bearings: Box<Vec<u16>>,
 }
 
+impl HMTX {
+  pub(crate) fn new<R:Read + Seek>(file: R, offest: u32, length: u32
+    , number_of_hmetrics: u32,num_glyphs: u32) -> Self {
+      get_hdmx(file, offest, length, number_of_hmetrics, num_glyphs)
+  }
+
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct LongHorMetric {
   pub(crate) advance_width: u16,
@@ -14,7 +22,7 @@ pub(crate) struct LongHorMetric {
 } 
 
 
-pub(crate) fn get_hdmx<R: Read + Seek>(file: R, offest: u32, length: u32
+fn get_hdmx<R: Read + Seek>(file: R, offest: u32, length: u32
                       , number_of_hmetrics: u32,num_glyphs: u32) -> HMTX {
   let mut file = file;
   file.seek(SeekFrom::Start(offest as u64)).unwrap();
