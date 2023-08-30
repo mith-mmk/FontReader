@@ -8,6 +8,7 @@ mod hmtx;
 mod maxp;
 mod name;
 mod os2;
+mod post;
 
 fn main() {
     let font_dir = "./fonts";

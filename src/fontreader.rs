@@ -10,6 +10,7 @@ pub(crate) struct Font {
     pub(crate) maxp: Box<Vec<maxp::MAXP>>,
     pub(crate) names: Box<Vec<name::NAME>>,
     pub(crate) os2s: Box<Vec<os2::OS2>>,
+    pub(crate) posts: Box<Vec<post::POST>>,
 }
 
 
@@ -21,10 +22,11 @@ pub fn font_load(filename: &PathBuf) {
           let mut cmaps = Vec::new();
           let mut heads = Vec::new();
           let mut hheas = Vec::new();
-          let mut hmtxs = Vec::new();
+          let hmtxs = Vec::new();
           let mut maxps: Vec<maxp::MAXP> = Vec::new();
           let mut names = Vec::new();
           let mut os2s = Vec::new();
+          let mut posts = Vec::new();
           header.table_records.into_iter().for_each(|record| {
               let tag: [u8;4] = record.table_tag.to_be_bytes();
               #[cfg(debug_assertions)]
@@ -65,6 +67,10 @@ pub fn font_load(filename: &PathBuf) {
                       let os2 = os2::OS2::new(&file, record.offset, record.length);
                       os2s.push(os2);
                   }
+                  b"post" => {
+                      let post = post::POST::new(&file, record.offset, record.length);
+                      posts.push(post);
+                  }
 
                   _ => {
                       debug_assert!(true, "Unknown table tag")
@@ -92,6 +98,7 @@ pub fn font_load(filename: &PathBuf) {
               maxp: Box::new(maxps),
               names: Box::new(names),
               os2s: Box::new(os2s),
+              posts: Box::new(posts),
           };
           #[cfg(debug_assertions)]
           {
@@ -104,6 +111,7 @@ pub fn font_load(filename: &PathBuf) {
             println!("{} {}", font.maxp.len(),font.maxp[0].to_string());
             println!("{} {}", font.names.len(),font.names[0].to_string());
             println!("{} {}", font.os2s.len(),font.os2s[0].to_string());
+            println!("{} {}", font.posts.len(),font.posts[0].to_string());
 
             println!("long cmap -> griph");
             let cmap_encodings = font.cmap[0].cmap_encodings.clone();
