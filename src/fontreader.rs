@@ -1,29 +1,30 @@
 use std::{path::PathBuf, fs::File};
-use crate::{fontheader::{get_font_type, FontHeaders}, cmap::{self, CmapSubtable, CMAP}, head::{self, HEAD}, hhea::{self, HHEA}, hmtx::HMTX, maxp::{MAXP, self}, name::{self, NAME}};
-
+use crate::*;
 #[derive(Debug, Clone)]
 pub(crate) struct Font {
-    pub(crate) font_type: FontHeaders,
-    pub(crate) cmap: Box<Vec<CMAP>>,
-    pub(crate) head: Box<Vec<HEAD>>,
-    pub(crate) hhea: Box<Vec<HHEA>>,
-    pub(crate) hmtx: Box<Vec<HMTX>>,
-    pub(crate) maxp: Box<Vec<MAXP>>,
-    pub(crate) names: Box<Vec<NAME>>,
+    pub(crate) font_type: fontheader::FontHeaders,
+    pub(crate) cmap: Box<Vec<cmap::CmapEncodings>>,
+    pub(crate) head: Box<Vec<head::HEAD>>,
+    pub(crate) hhea: Box<Vec<hhea::HHEA>>,
+    pub(crate) hmtx: Box<Vec<hmtx::HMTX>>,
+    pub(crate) maxp: Box<Vec<maxp::MAXP>>,
+    pub(crate) names: Box<Vec<name::NAME>>,
+    pub(crate) os2s: Box<Vec<os2::OS2>>,
 }
 
 
 pub fn font_load(filename: &PathBuf) {
   let file = File::open(filename).unwrap();
   let font;
-  match get_font_type(&file) {
-      FontHeaders::OTF(header) => {
+  match fontheader::get_font_type(&file) {
+      fontheader::FontHeaders::OTF(header) => {
           let mut cmaps = Vec::new();
           let mut heads = Vec::new();
-          let mut hheas: Vec<HHEA> = Vec::new();
-          let mut hmtxs: Vec<HMTX> = Vec::new();
-          let mut maxps: Vec<MAXP> = Vec::new();
-          let mut names: Vec<NAME> = Vec::new();
+          let mut hheas = Vec::new();
+          let mut hmtxs = Vec::new();
+          let mut maxps: Vec<maxp::MAXP> = Vec::new();
+          let mut names = Vec::new();
+          let mut os2s = Vec::new();
           header.table_records.into_iter().for_each(|record| {
               let tag: [u8;4] = record.table_tag.to_be_bytes();
               #[cfg(debug_assertions)]
@@ -31,15 +32,16 @@ pub fn font_load(filename: &PathBuf) {
               
               match &tag {
                   b"cmap" => {
-                      cmaps.push(CMAP::new(&file, record.offset, record.length));
+                      let cmap_encodings = cmap::CmapEncodings::new(&file, record.offset, record.length);
+                      cmaps.push(cmap_encodings);
                       
                   }
                   b"head" => {
-                      let head = HEAD::new(&file, record.offset, record.length);
+                      let head = head::HEAD::new(&file, record.offset, record.length);
                       heads.push(head);
                   }
                   b"hhea" => {
-                      let hhea = HHEA::new(&file, record.offset, record.length);
+                      let hhea = hhea::HHEA::new(&file, record.offset, record.length);
                       hheas.push(hhea);
                   }
                   b"hmtx" => {
@@ -52,12 +54,16 @@ pub fn font_load(filename: &PathBuf) {
                       println!("hmtx now not implemented");              
                   }
                   b"maxp" => {
-                      let maxp = MAXP::new(&file, record.offset, record.length);
+                      let maxp = maxp::MAXP::new(&file, record.offset, record.length);
                       maxps.push(maxp);
                   }
                   b"name" => {
-                      let name: NAME = NAME::new(&file, record.offset, record.length);
+                      let name = name::NAME::new(&file, record.offset, record.length);
                       names.push(name)
+                  }
+                  b"OS/2" => {
+                      let os2 = os2::OS2::new(&file, record.offset, record.length);
+                      os2s.push(os2);
                   }
 
                   _ => {
@@ -78,112 +84,43 @@ pub fn font_load(filename: &PathBuf) {
               return
           }
           font = Font {
-              font_type: get_font_type(&file),
+              font_type: fontheader::get_font_type(&file),
               cmap: Box::new(cmaps),
               head: Box::new(heads),
               hhea: Box::new(hheas),
               hmtx: Box::new(hmtxs),
               maxp: Box::new(maxps),
               names: Box::new(names),
+              os2s: Box::new(os2s),
           };
           #[cfg(debug_assertions)]
           {
-            println!("{} cmap", font.cmap.len());
+            println!("{} {}", font.cmap.len(),font.cmap[0].cmap.to_string());
+            for i in 0..font.cmap[0].cmap.encoding_records.len() {
+              println!("{} {}", i,font.cmap[0].cmap.encoding_records[i].to_string());
+            }
             println!("{} {}", font.head.len(),font.head[0].to_string());
             println!("{} {}", font.hhea.len(),font.hhea[0].to_string());  
             println!("{} {}", font.maxp.len(),font.maxp[0].to_string());
             println!("{} {}", font.names.len(),font.names[0].to_string());
+            println!("{} {}", font.os2s.len(),font.os2s[0].to_string());
+
+            println!("long cmap -> griph");
+            let cmap_encodings = font.cmap[0].cmap_encodings.clone();
+            for (i, cmap_encoding) in cmap_encodings.iter().enumerate() {
+              print!("No {}:", i);
+
+              let encode_record = cmap_encoding.encoding_record.clone();
+              println!("encode_record: {:?}", encode_record);
+              let subtable = cmap_encoding.cmap_subtable.clone();
+              println!("subtable: {}", subtable.get_part_of_string(16));
+            }
+
           }
       },
       _ => {
           debug_assert!(true, "Unknown font type");
           return
       }
-  }
-  // debug
-  #[cfg(all(debug_assertions,feature = "print_cmap"))]
-  font.cmap.into_iter().for_each(|cmap| {
-      print!("cmap: {} {} {}", cmap.version, cmap.num_tables, cmap.encoding_records.len());
-
-      println!("Version {} Tables {}", cmap.version, cmap.num_tables);
-
-      let encodings = cmap::select_encoding(&cmap.encoding_records);
-
-      println!("main");
-      encodings.records.iter().for_each(|encoding| {
-          println!("Platform {:?} Encoding {:?}", encoding.get_platform(), encoding.get_encoding());
-      });
-
-      println!("substitute");
-      encodings.substitute.iter().for_each(|encoding| {
-          println!("Platform {:?} Encoding {:?}", encoding.get_platform(), encoding.get_encoding());
-      });
-      println!("uvs");
-
-      encodings.uvs.iter().for_each(|encoding| {
-          println!("Platform {:?} Encoding {:?}", encoding.get_platform(), encoding.get_encoding());
-      });
-      // grif
-      let maps = cmap::get_cmap_maps(&cmap);
-
-      print!("subtable: ");
-      maps.iter().for_each(|cmap_encoding| {
-          let subtable = cmap_encoding.cmap_subtable.clone();
-          match *subtable {
-              CmapSubtable::Format0(_) => {
-                println!("Format0");
-              },
-              CmapSubtable::Format2(_) => {
-                println!("Format2");
-              },
-              CmapSubtable::Format4(_) => {
-                println!("Format4");
-              },
-              CmapSubtable::Format6(_) => {
-                println!("Format6");
-              },
-              CmapSubtable::Format8(_) => {
-                println!("Format8");
-              },
-              CmapSubtable::Format10(_) => {
-                println!("Format10");
-              },
-              CmapSubtable::Format12(format12) => {
-                println!("Format12");
-                print!("  num_groups: {}", format12.num_groups);
-                print!(" groups: {}", format12.groups.len());
-                println!("  length: {}", format12.length);
-                for i in 0..255 {
-                  let group = &format12.groups[i];
-                  print!("  start_char_code: {:08X}", group.start_char_code);
-                  print!("  end_char_code: {:08X}", group.end_char_code);
-                  println!("  start_glyph_id: {:08X}", group.start_glyph_id);
-        
-                }
-              },
-              CmapSubtable::Format13(_) => {
-                println!("Format13");
-              },
-              CmapSubtable::Format14(format14) => {
-                println!("Format14");
-                print!("  num_var_selector_records: {}", format14.num_var_selector_records);
-                print!(" var_selector_records: {}", format14.var_selector_records.len());
-                println!("  length: {}", format14.length);
-                // 256 glyphs
-                for i in 0..255 {
-                  print!("[{:02X}] ", i);
-                  let griph = format14.var_selector_records[0].default_uvs_offset + i;
-                  print!("glyph: {:08X} ", griph);
-                  let gryph = format14.var_selector_records[0].non_default_uvs_offset + i;
-                  print!("glyph: {:08X} ", gryph);
-                  println!("");
-                }
-              }
-            }
-      });
-
-
-  });
-
- 
+  } 
 }

@@ -7,6 +7,7 @@ mod hhea;
 mod hmtx;
 mod maxp;
 mod name;
+mod os2;
 
 fn main() {
     let font_dir = "./fonts";

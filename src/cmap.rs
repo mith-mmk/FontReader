@@ -152,6 +152,24 @@ impl EncodingRecord {
 
 
 #[derive(Debug, Clone)]
+pub(crate) struct CmapEncodings {
+  pub(crate) cmap: Box<CMAP>,
+  pub(crate) cmap_encodings: Vec<Box<CmapEncoding>>,
+}
+
+impl CmapEncodings {
+  pub(crate) fn new<R:Read + Seek>(file:R, offset: u32, length: u32) -> Self {
+    let cmap = load_cmap_table(file, offset, length);
+    let cmap_encodings = get_cmap_maps(&cmap);
+    CmapEncodings {
+      cmap: Box::new(cmap),
+      cmap_encodings,
+    }
+  }
+}
+
+
+#[derive(Debug, Clone)]
 pub(crate) struct CmapEncoding {
   pub(crate) encoding_record: Box<EncodingRecord>,
   pub(crate) cmap_subtable: Box<CmapSubtable>,
@@ -169,6 +187,233 @@ pub(crate) enum CmapSubtable {
     Format12(SegmentedCoverage),
     Format13(ManyToOneRangeMapping),
     Format14(UnicodeVariationSeauences),
+    FormatUnknown,
+}
+
+impl CmapSubtable {
+  pub(crate) fn get_format(&self) -> u16 {
+    match self {
+      CmapSubtable::Format0(_) => 0,
+      CmapSubtable::Format2(_) => 2,
+      CmapSubtable::Format4(_) => 4,
+      CmapSubtable::Format6(_) => 6,
+      CmapSubtable::Format8(_) => 8,
+      CmapSubtable::Format10(_) => 10,
+      CmapSubtable::Format12(_) => 12,
+      CmapSubtable::Format13(_) => 13,
+      CmapSubtable::Format14(_) => 14,
+      CmapSubtable::FormatUnknown => 0xFFFF,
+    }
+  }
+
+  pub(crate) fn get_part_of_string(&self, length: usize) -> String {
+    match self {
+      CmapSubtable::Format0(format0) => {
+        let mut string = "Format 0: Byte encoding table\n".to_string();
+        let length = if length > format0.glyph_id_array.len() {
+          format0.glyph_id_array.len()
+        } else {
+          length
+        };
+        string += &format!("format: {}\n", format0.format);
+        string += &format!("length: {}\n", format0.length);
+        string += &format!("language: {}\n", format0.language);
+        string += &format!("glyph_id_array:");
+        for i in 0..length {
+          if i % 16 == 0 {
+            string += &format!("\n{:002} ", format0.glyph_id_array[i]);
+          }
+          string += &format!("  {:02X} ", format0.glyph_id_array[i]);
+        }
+        string += "\n";
+        string
+      },
+      CmapSubtable::Format2(format2) => {
+        let mut string = "Format 2: High-byte mapping through table\n".to_string();
+        let length = if length > format2.sub_header_keys.len() {
+          format2.sub_header_keys.len()
+        } else {
+          length
+        };
+        string += &format!("format: {}\n", format2.format);
+        string += &format!("length: {}\n", format2.length);
+        string += &format!("language: {}\n", format2.language);
+        string += &format!("sub_header_keys:");
+        for i in 0..length {
+          if i % 16 == 0 {
+            string += &format!("\n{:002} ", format2.sub_header_keys[i]);
+          }
+          string += &format!("  {:02X} ", format2.sub_header_keys[i]);
+        }
+        string += "\n";
+        string
+      },
+      CmapSubtable::Format4(format4) => {
+        let mut string = "Format 4: Segment mapping to delta values\n".to_string();
+        // SegmentMappingToDelta
+        let length = if length > format4.end_code.len() {
+          format4.end_code.len()
+        } else {
+          length
+        };
+        string += &format!("format: {}\n", format4.format);
+        string += &format!("length: {}\n", format4.length);
+        string += &format!("language: {}\n", format4.language);
+        string += &format!("seg_count_x2: {}\n", format4.seg_count_x2);
+        string += &format!("search_range: {}\n", format4.search_range);
+        string += &format!("entry_selector: {}\n", format4.entry_selector);
+        string += &format!("range_shift: {}\n", format4.range_shift);
+        string += &format!("start_code end_code\n");
+        for i in 0..length {
+          if i < format4.end_code.len() && i < format4.start_code.len() {
+            string += &format!("{} {:04x} {:04x}\n",i ,format4.start_code[i], format4.end_code[i]);
+          }
+        }
+        string += "\n";
+        string
+      },
+      CmapSubtable::Format6(format6) => {
+        let mut string = "Format 6: Trimmed table mapping\n".to_string();
+        let length = if length > format6.glyph_id_array.len() {
+          format6.glyph_id_array.len()
+        } else {
+          length
+        };
+        string += &format!("format: {}\n", format6.format);
+        string += &format!("length: {}\n", format6.length);
+        string += &format!("language: {}\n", format6.language);
+        string += &format!("first_code: {}\n", format6.first_code);
+        string += &format!("entry_count: {}\n", format6.entry_count);
+        string += &format!("glyph_id_array:");
+        for i in 0..length {
+          if i % 16 == 0 {
+            string += &format!("\n{:002} ", format6.glyph_id_array[i]);
+          }
+          string += &format!("  {:02X} ", format6.glyph_id_array[i]);
+        }
+        string += "\n";
+        string
+      },
+      CmapSubtable::Format8(format8) => {
+        let mut string = "Format 8: Mixed 16-bit and 32-bit coverage\n".to_string();
+
+        let length = if length > format8.is32.len() {
+          format8.is32.len()
+        } else {
+          length
+        };
+        string += &format!("format: {}\n", format8.format);
+        string += &format!("reserved: {}\n", format8.reserved);
+        string += &format!("length: {}\n", format8.length);
+        string += &format!("language: {}\n", format8.language);
+        string += &format!("is32:");
+        for i in 0..length {
+          if i % 16 == 0 {
+            string += &format!("\n{:002} ", format8.is32[i]);
+          }
+          string += &format!("  {:02X} ", format8.is32[i]);
+        }
+        string += "\n";
+
+        string += &format!("num_groups: {}\n", format8.num_groups);
+        let lenghth = if length > format8.groups.len() {
+          format8.groups.len()
+        } else {
+          length
+        };
+        string += &format!("groups:\n");
+        for i in 0..lenghth {
+          string += &format!("\n{} ", format8.groups[i].to_string());
+        }
+        string += "\n";
+        string
+      },
+      CmapSubtable::Format10(format10) => {
+        let mut string = "Format 10: Trimmed array\n".to_string();
+        let length = if length > format10.glyph_id_array.len() {
+          format10.glyph_id_array.len()
+        } else {
+          length
+        };
+        string += &format!("format: {}\n", format10.format);
+        string += &format!("reserved: {}\n", format10.reserved);
+        string += &format!("length: {}\n", format10.length);
+        string += &format!("language: {}\n", format10.language);
+        string += &format!("start_char_code: {}\n", format10.start_char_code);
+        string += &format!("num_chars: {}\n", format10.num_chars);
+        string += &format!("glyph_id_array:");
+        for i in 0..length {
+          if i % 16 == 0 {
+            string += &format!("\n{:002} ", format10.glyph_id_array[i]);
+          }
+          string += &format!("  {:02X} ", format10.glyph_id_array[i]);
+        }
+        string += "\n";
+        string
+      },
+      CmapSubtable::Format12(format12) => {
+        let mut string = "Format 12: Segmented coverage\n".to_string();
+        let length = if length > format12.groups.len() {
+          format12.groups.len()
+        } else {
+          length
+        };
+        string += &format!("format: {}\n", format12.format);
+        string += &format!("reserved: {}\n", format12.reserved);
+        string += &format!("length: {}\n", format12.length);
+        string += &format!("language: {}\n", format12.language);
+        string += &format!("num_groups: {}\n", format12.num_groups);
+        string += &format!("groups:\n");
+        for i in 0..length {
+          let seg = &format12.groups[i].to_string();
+          string += &format!("{:3} {}\n",i, seg);
+        }
+        string += "\n";
+        string
+      },
+      CmapSubtable::Format13(format13) => {
+        let mut string = "Format 13: Many-to-one range mappings\n".to_string();
+        let length = if length > format13.groups.len() {
+          format13.groups.len()
+        } else {
+          length
+        };
+        string += &format!("format: {}\n", format13.format);
+        string += &format!("reserved: {}\n", format13.reserved);
+        string += &format!("length: {}\n", format13.length);
+        string += &format!("language: {}\n", format13.language);
+        string += &format!("num_groups: {}\n", format13.num_groups);
+        string += &format!("groups:\n");
+        for i in 0..length {         
+          string += &format!("{:3} {}\n",i, format13.groups[i].to_string());
+        }
+        string += "\n";
+        string
+      },
+      CmapSubtable::Format14(format14) => {
+        let mut string = "Format 14: Unicode Variation Sequences\n".to_string();
+        let length = if length > format14.var_selector_records.len() {
+          format14.var_selector_records.len()
+        } else {
+          length
+        };
+        string += &format!("format: {}\n", format14.format);
+        string += &format!("reserved: {}\n", format14.reserved);
+        string += &format!("length: {}\n", format14.length);
+        string += &format!("num_var_selector_records: {}\n", format14.num_var_selector_records);
+        string += &format!("var_selector_records:\n");
+        for i in 0..length {
+            string += &format!("{} {:002}\n",i, format14.var_selector_records[i].to_stirng());
+        }
+        string += "\n";
+        string
+      },
+      CmapSubtable::FormatUnknown => {
+        "Unknown".to_string()
+      }        
+    }
+  }
+
 }
 
 
@@ -275,6 +520,12 @@ pub(crate) struct SequentialMapGroup {
   pub(crate) start_glyph_id: u32,
 }
 
+impl SequentialMapGroup {
+  fn to_string(&self) -> String {
+    format!("start_char_code: {:04x}, end_char_code: {:04x}, start_glyph_id: {}", self.start_char_code, self.end_char_code, self.start_glyph_id)
+  }
+}
+
 
 #[derive(Debug, Clone)]
 // format 13 Many-to-one range mappings
@@ -284,7 +535,7 @@ pub(crate) struct ManyToOneRangeMapping {
   pub(crate) length: u32,
   pub(crate) language: u32,
   pub(crate) num_groups: u32,
-  pub(crate) ranges: Vec<ConstantMapGroup>,
+  pub(crate) groups: Vec<ConstantMapGroup>,
 }
 
 #[derive(Debug, Clone)]
@@ -292,6 +543,12 @@ pub(crate) struct ConstantMapGroup {
   pub(crate) start_char_code: u32,
   pub(crate) end_char_code: u32,
   pub(crate) glyph_id: u32,
+}
+
+impl ConstantMapGroup {
+  fn to_string(&self) -> String {
+    format!("sstart_char_code: {:04x}, end_char_code: {:04x}, glyph_id: {}", self.start_char_code, self.end_char_code, self.glyph_id)
+  }
 }
 
 #[derive(Debug, Clone)]
@@ -313,10 +570,31 @@ pub(crate) struct VarSelectorRecord {
   pub(crate) non_default_uvs: NonDefautUVS,
 }
 
+impl VarSelectorRecord {
+  fn to_stirng(&self) -> String {
+    format!("var_selector: {}, default_uvs_offset: {}, default_uvs: {}, non_default_uvs_offset: {}, non_default_uvs: {}", self.var_selector, self.default_uvs_offset, self.default_uvs.to_string(), self.non_default_uvs_offset, self.non_default_uvs.to_string())
+  }
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct DefaultUVS {
   pub(crate) num_unicode_value_ranges: u32,
   pub(crate) unicode_value_ranges: Vec<UnicodeValueRange>,
+}
+
+impl DefaultUVS {
+  fn to_string(&self) -> String {
+    let mut string = format!("num_unicode_value_ranges: {}", self.num_unicode_value_ranges);
+    let length = if self.unicode_value_ranges.len() > 10 {
+      10
+    } else {
+      self.unicode_value_ranges.len()
+    };
+    for i in 0..length {
+      string += &format!("{} {} {}\n",i, self.unicode_value_ranges[i].start_unicode_value, self.unicode_value_ranges[i].additional_count);
+    }
+    string
+  }
 }
 
 #[derive(Debug, Clone)]
@@ -325,16 +603,38 @@ pub(crate) struct UnicodeValueRange {
   pub(crate) additional_count: u8,
 }
 
+
 #[derive(Debug, Clone)]
 pub(crate) struct NonDefautUVS {
     num_unicode_value_ranges: u32,
     unicode_value_ranges: Vec<UVSMapping>,
 }
 
+impl NonDefautUVS {
+  fn to_string(&self) -> String {
+    let mut string = format!("num_unicode_value_ranges: {}\n",self.num_unicode_value_ranges);
+    let length = if self.unicode_value_ranges.len() > 10 {
+      10
+    } else {
+      self.unicode_value_ranges.len()
+    };
+    for i in 0..length {
+      string += &format!("{}\n",self.unicode_value_ranges[i].to_string());
+    }
+    string
+  }
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct UVSMapping {
     unicode_value: u32,
     glyph_id: u32,
+}
+
+impl UVSMapping {
+  fn to_string(&self) -> String {
+    format!("\nunicode_value: {:04X}, glyph_id: {}", self.unicode_value, self.glyph_id)
+  }
 }
 
 // load_cmap_table(buffer.clone(), record.offset, record.length) -> CMAP
@@ -690,6 +990,37 @@ pub(crate) fn get_subtable(encoding_record: &Box<EncodingRecord>, buffer: &[u8])
         groups,
       })
     },
+    13 => { // format 13 Many-to-one range mappings
+      let format = u16::from_be_bytes([buffer[0], buffer[1]]);
+      let reserved = u16::from_be_bytes([buffer[2], buffer[3]]);
+      let length: u32 = u32::from_be_bytes([buffer[4], buffer[5], buffer[6], buffer[7]]);
+      let language: u32 = u32::from_be_bytes([buffer[8], buffer[9], buffer[10], buffer[11]]);
+      let num_groups: u32 = u32::from_be_bytes([buffer[12], buffer[13], buffer[14], buffer[15]]);
+      let mut groups = Vec::new();
+      let mut offset = 16;
+      for _ in 0..num_groups {
+        let start_char_code = u32::from_be_bytes([buffer[offset], buffer[offset + 1], buffer[offset + 2], buffer[offset + 3]]);
+        let end_char_code = u32::from_be_bytes([buffer[offset + 4], buffer[offset + 5], buffer[offset + 6], buffer[offset + 7]]);
+        let glyph_id = u32::from_be_bytes([buffer[offset + 8], buffer[offset + 9], buffer[offset + 10], buffer[offset + 11]]);
+        offset += 12;
+        groups.push(ConstantMapGroup {
+          start_char_code,
+          end_char_code,
+          glyph_id,
+        });
+      }
+      CmapSubtable::Format13(ManyToOneRangeMapping {
+        format,
+        reserved,
+        length,
+        language,
+        num_groups,
+        groups,
+      })
+
+
+
+    },
     14 => { // format 14 Unicode Variation Sequences
       let length = u32::from_be_bytes([buffer[2], buffer[3], buffer[4], buffer[5]]);
       let num_var_selector_records = u32::from_be_bytes([buffer[6], buffer[7], buffer[8], buffer[9]]);
@@ -761,6 +1092,7 @@ pub(crate) fn get_subtable(encoding_record: &Box<EncodingRecord>, buffer: &[u8])
           non_default_uvs,
         });
       }
+
       CmapSubtable::Format14(UnicodeVariationSeauences {
         format,
         reserved: 0,
@@ -797,9 +1129,6 @@ pub(crate) fn get_cmap_maps(cmap: &CMAP) -> Vec<Box<CmapEncoding>> {
   cmap_encodings
 }
 
-pub(crate) fn get_cmap_encodings<R: Read + Seek>(file: R, offset: u32 , length: u32) -> Vec<Box<CmapEncoding>> {
-  let cmap = load_cmap_table(file, offset, length);
-  get_cmap_maps(&cmap)
-}
+
 
 
