@@ -1,14 +1,8 @@
 use std::path::{Path, PathBuf};
 mod fontheader;
-mod cmap;
+mod requires;
 mod fontreader;
-mod head;
-mod hhea;
-mod hmtx;
-mod maxp;
-mod name;
-mod os2;
-mod post;
+
 
 fn get_font_type(folder: &String) {
     let dir = Path::new(&folder).read_dir().unwrap();

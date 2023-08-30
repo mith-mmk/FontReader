@@ -1,5 +1,6 @@
 use std::{path::PathBuf, fs::File};
-use crate::*;
+use crate::requires::*;
+use crate::fontheader;
 #[derive(Debug, Clone)]
 pub(crate) struct Font {
     pub(crate) font_type: fontheader::FontHeaders,

@@ -1,6 +1,6 @@
 use std::io::{Read, Seek};
 
-use crate::cmap;
+use crate::requires::cmap;
 
 pub type Fixed = u32;
 pub type FWORD = i16;
