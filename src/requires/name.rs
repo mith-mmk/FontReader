@@ -134,34 +134,21 @@ fn get_names<R: Read + Seek>(file: R, offest: u32, length: u32) -> NAME {
     }
   }
   let current_position = cursor.position();
-  // platform id = 0,1,4  utf-16be
+  // platform id = 0,3,4  utf-16be
   // platform id = 2       ASCII 
-  // platform id = 3
-  //    Encoding id = 0    ASCII
-  //    Encoding id = 1,10 UTF-16BE
-  //    Encoding id = 2   Shift-JIS
-  //    Encoding id = 3   PRC
-  //    Encoding id = 4   Big5
-  //    Encoding id = 5   Wansung
-  //    Encoding id = 6   Johab
-
+  // platform id = 1 0 = ASCII 1 == UTF-16BE
+ 
 
 
 
   let mut name_string = Vec::new();
   for i in 0..count as usize {
     let encoding_engine = match name_records[i].platform_id {
-      0 | 1 | 4 => EncodingEngine::UTF16BE,
+      0 | 3 | 4 => EncodingEngine::UTF16BE,
       2 => EncodingEngine::ASCII,
-      3 => match name_records[i].encoding_id {
+      1 => match name_records[i].encoding_id {
         0 => EncodingEngine::ASCII,
-        1 | 10 => EncodingEngine::UTF16BE,
-        2 => EncodingEngine::ShiftJIS,
-        3 => EncodingEngine::PRC,
-        4 => EncodingEngine::Big5,
-        5 => EncodingEngine::Wansung,
-        6 => EncodingEngine::Johab,
-        _ => EncodingEngine::Unknown,
+        _ => EncodingEngine::UTF16BE,
       },
       _ => EncodingEngine::Unknown,
     };
