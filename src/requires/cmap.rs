@@ -203,15 +203,24 @@ impl CmapEncodings {
         for i in 0..format4.end_code.len() {
           match format4.start_code[i] <= code_number && code_number <= format4.end_code[i] {
             true => {
-              let gid = ((code_number as i32 + format4.id_delta[i]  as i32) & 0xffff) as u32;
-                position = gid - format4.start_code[i] as u32;
-                break;
-              }
+              let id_range_offset = format4.id_range_offset[i] as u32;
+              let gid = if id_range_offset == 0 {
+                   ((code_number as i32 + format4.id_delta[i]  as i32) & 0xffff) as u32
+              } else {
+                let mut offset =  format4.id_range_offset[i] as u32 /2 + i as u32 - format4.seg_count_x2 as u32 / 2;
+                // reverce calculation
+                offset += (code_number as u32 - format4.start_code[i] as u32) as u32;
+                format4.glyph_id_array[offset as usize] as u32
+              }; 
+              position = gid as u32;
+              break;
+            }
             false => (),
-        }
+          }
         }
       },
       _ => {
+        print!("{:?}", cmap_subtable);
         panic!("Not support format");
       }
     }
@@ -886,15 +895,15 @@ pub(crate) fn get_subtable(encoding_record: &EncodingRecord, buffer: &[u8]) -> C
       let seg_count = seg_count_x2 / 2;
       let search_range = u16::from_be_bytes([buffer[8], buffer[9]]);
       let entry_selector = u16::from_be_bytes([buffer[10], buffer[11]]);
-      let range_shift = u16::from_be_bytes([buffer[12], buffer[13]]);
+      let range_shift: u16 = u16::from_be_bytes([buffer[12], buffer[13]]);
       let mut end_code = Vec::new();
-      let mut offset = 14;
+      let mut offset: usize = 14;
       for _ in 0..seg_count {
         let code = u16::from_be_bytes([buffer[offset], buffer[offset + 1]]);
         offset += 2;
         end_code.push(code);
       }
-      let reserved_pad = u16::from_be_bytes([buffer[offset], buffer[offset + 1]]);
+      let reserved_pad: u16 = u16::from_be_bytes([buffer[offset], buffer[offset + 1]]);
       offset += 2;
       let mut start_code = Vec::new();
       for _ in 0..seg_count {
@@ -915,7 +924,7 @@ pub(crate) fn get_subtable(encoding_record: &EncodingRecord, buffer: &[u8]) -> C
         id_range_offset.push(range_offset);
       }
       let mut glyph_id_array = Vec::new();
-      while offset < length as usize {
+      while offset < (length - 1) as usize {
         let glyph_id = u16::from_be_bytes([buffer[offset], buffer[offset + 1]]);
         offset += 2;
         glyph_id_array.push(glyph_id);

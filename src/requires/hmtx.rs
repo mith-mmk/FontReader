@@ -19,6 +19,11 @@ impl HMTX {
       get_hdmx(file, offest, length, number_of_hmetrics, num_glyphs)
   }
 
+  pub(crate) fn get_metrix(&self, i: usize) -> LongHorMetric {
+    let h_metric = self.h_metrics.get(i).unwrap();
+    h_metric.clone()
+  } 
+
   pub(crate) fn to_string(&self) -> String {
     let mut string = "hmtx\n".to_string();
     let max_len = 10;

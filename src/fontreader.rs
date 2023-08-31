@@ -1,8 +1,11 @@
 
+use std::alloc::Layout;
+use std::io::Cursor;
 use std::{path::PathBuf, fs::File};
 use crate::outline::*;
 use crate::requires::*;
 use crate::fontheader;
+use crate::requires::hmtx::LongHorMetric;
 
 #[cfg(debug_assertions)]
 use std::io::{Write, BufWriter};
@@ -24,6 +27,86 @@ pub(crate) struct Font {
   hmtx_pos: Option<Pointer>,
   loca_pos: Option<Pointer>,
   glyf_pos: Option<Pointer>,
+}
+
+impl Font {
+  pub fn get_font_from_file(filename: &PathBuf) -> Option<Self> {
+    font_load(filename)
+  }
+
+  pub fn get_h_metrix(&self, id: usize) -> LongHorMetric {
+    let hmtx = self.hmtx.as_ref().unwrap();
+    hmtx.get_metrix(id)
+  }
+  pub fn get_horizontal_layout(&self, id:usize) -> HorizontalLayout{
+    let lsb = self.get_h_metrix(id).left_side_bearing as isize;
+    let advance_width = self.get_h_metrix(id).advance_width as isize;
+    let rsb = advance_width - lsb;
+    let accender = self.hhea.as_ref().unwrap().get_accender() as isize;
+    let descender = self.hhea.as_ref().unwrap().get_descender() as isize;
+    let line_gap = self.hhea.as_ref().unwrap().get_line_gap() as isize;
+
+    HorizontalLayout {
+      lsb,
+      rsb,
+      advance_width,
+      accender,
+      descender,
+      line_gap,
+    }
+  }
+
+  pub fn get_svg(&self, ch: char) -> String {
+    // utf-32
+    let code = ch as u32;
+    let pos = self.cmap.as_ref().unwrap().get_griph_position(code);
+    let glyf = self.grif.as_ref().unwrap().get_glyph(pos as usize).unwrap();
+    let layout = self.get_horizontal_layout(pos as usize);
+    let width = "24pt";
+    let height = "24pt";
+    let svg = glyf.to_svg(width, height,&layout);
+    svg
+  }
+
+  pub fn get_html(&self, string: &str) -> String {
+    let mut html = String::new();
+    html += "<html>\n";
+    html += "<head>\n";
+    html += "<meta charset=\"UTF-8\">\n";
+    html += "<title>fontreader</title>\n";
+    html += "</head>\n";
+    html += "<body>\n";
+    for ch in string.chars() {
+      if ch == '\n' || ch == '\r'{
+        html += "<br>\n";
+        continue;
+      }
+      if ch == '\t' {
+        html += "<span style=\"width: 4em; display: inline-block;\"></span>\n";
+        continue;
+      }
+      if ch == ' ' {
+        html += "<span style=\"width: 1em; display: inline-block;\"></span>\n";
+        continue;
+      }
+      let svg = self.get_svg(ch);
+      html += &svg;
+    }
+    html += "</body>\n";
+    html += "</html>\n";
+    html
+  }
+
+}
+
+#[derive(Debug, Clone)]
+pub struct HorizontalLayout {
+  pub lsb: isize,
+  pub rsb: isize,
+  pub advance_width: isize,
+  pub accender: isize,
+  pub descender: isize,
+  pub line_gap: isize,
 
 }
 
@@ -33,9 +116,13 @@ struct Pointer {
   pub(crate) length: u32
 }
 
-
-pub fn font_load(filename: &PathBuf) {
+fn font_load(filename: &PathBuf) -> Option<Font> {
   let file = File::open(filename).unwrap();
+  font_load_from_file(file)
+}
+
+
+fn font_load_from_file(file: File) -> Option<Font> {
   let mut font = Font {
     font_type: fontheader::FontHeaders::Unknown,
     cmap: None,
@@ -115,7 +202,6 @@ pub fn font_load(filename: &PathBuf) {
               offset: record.offset,
               length: record.length,
             };
-            println!("glyf {:08x} {}", glyf_pos.offset, glyf_pos.length);
             font.glyf_pos = Some(glyf_pos);
           } 
           _ => {
@@ -145,16 +231,45 @@ pub fn font_load(filename: &PathBuf) {
 
       if font.cmap.is_none() {
         debug_assert!(true, "No cmap table");
-        return
+        return None
       }
       if font.head.is_none() {
         debug_assert!(true, "No head table");
-        return
+        return None
       }
       if font.hhea.is_none() {
         debug_assert!(true, "No hhea table");
-        return
+        return None
       }
+      if font.hmtx.is_none() {
+        debug_assert!(true, "No hmtx table");
+        return None
+      }
+      if font.maxp.is_none() {
+        debug_assert!(true, "No maxp table");
+        return None
+      }
+      if font.name.is_none() {
+        debug_assert!(true, "No name table");
+        return None
+      }
+      if font.os2.is_none() {
+        debug_assert!(true, "No OS/2 table");
+        return None
+      }
+      if font.post.is_none() {
+        debug_assert!(true, "No post table");
+        return None
+      }
+      if font.loca.is_none() {
+        debug_assert!(true, "Not support no loca table");
+        return None
+      }
+      if font.grif.is_none() {
+        debug_assert!(true, "Not support no glyf table");
+        return None
+      }
+
 
       #[cfg(debug_assertions)]
       {
@@ -172,49 +287,53 @@ pub fn font_load(filename: &PathBuf) {
         for i in 0..encoding_records.len() {
           writeln!(&mut writer, "{} {}", i,encoding_records[i].to_string()).unwrap();
         }
-        writeln!(&mut writer, "{}", font.head.unwrap().to_string()).unwrap();
-        writeln!(&mut writer, "{}", font.hhea.unwrap().to_string()).unwrap();  
-            writeln!(&mut writer, "{}", font.maxp.unwrap().to_string()).unwrap();
-            writeln!(&mut writer, "{}", font.hmtx.unwrap().to_string()).unwrap();
-            writeln!(&mut writer, "{}", font.os2.unwrap().to_string()).unwrap();
-            writeln!(&mut writer, "{}", font.post.unwrap().to_string()).unwrap();
-            writeln!(&mut writer, "{}", font.loca.unwrap().to_string()).unwrap();
-
-            writeln!(&mut writer, "{}", font.name.unwrap().to_string()).unwrap();
-
-            writeln!(&mut writer, "long cmap -> griph").unwrap();
-            let cmap_encodings = font.cmap.unwrap().clone();
-            let glyf = font.grif.as_ref().unwrap();
-   
-            for i in 0x25A0..0x25Af {
-                let pos = cmap_encodings.get_griph_position(i);
-                let glyph = glyf.get_glyph(pos as usize).unwrap();
-                let ch = char::from_u32(i).unwrap();
-                writeln!(&mut writer,"{}:{:04} ", ch , pos).unwrap();
-                writeln!(&mut writer,"{}", glyph.to_string()).unwrap();
+        writeln!(&mut writer, "{}", &font.head.as_ref().unwrap().to_string()).unwrap();
+        writeln!(&mut writer, "{}", &font.hhea.as_ref().unwrap().to_string()).unwrap();  
+        writeln!(&mut writer, "{}", &font.maxp.as_ref().unwrap().to_string()).unwrap();
+        writeln!(&mut writer, "{}", &font.hmtx.as_ref().unwrap().to_string()).unwrap();
+        writeln!(&mut writer, "{}", &font.os2.as_ref().unwrap().to_string()).unwrap();
+        writeln!(&mut writer, "{}", &font.post.as_ref().unwrap().to_string()).unwrap();
+        writeln!(&mut writer, "{}", &font.loca.as_ref().unwrap().to_string()).unwrap();
+        writeln!(&mut writer, "{}", &font.name.as_ref().unwrap().to_string()).unwrap();
+        writeln!(&mut writer, "long cmap -> griph").unwrap();
+        let cmap_encodings = &font.cmap.as_ref().unwrap().clone();
+        let glyf = font.grif.as_ref().unwrap();
+        for i in 0x0020..0x0ff {
+            let pos = cmap_encodings.get_griph_position(i);
+            let glyph = glyf.get_glyph(pos as usize).unwrap();
+            let layout = font.get_horizontal_layout(pos as usize);
+            let svg = glyph.to_svg("100px", "100px",&layout);
+            let ch = char::from_u32(i).unwrap();
+            writeln!(&mut writer,"{}:{:04} ", ch , pos).unwrap();
+            writeln!(&mut writer,"{}", glyph.to_string()).unwrap();
+            writeln!( &mut writer,"{}:{:?}", i, layout).unwrap();
+            writeln!(&mut writer,"{}", svg).unwrap();
+        }
+        writeln!(&mut writer, "").unwrap();
+        for i in 0x4e00 .. 0x4eff {
+            if i as u32 % 16 == 0 {
+                writeln!(&mut writer, "").unwrap();
             }
-            writeln!(&mut writer, "").unwrap();
-
-            for i in 0x4e00 .. 0x4eff {
-                if i as u32 % 16 == 0 {
-                    writeln!(&mut writer, "").unwrap();
-                }
-                let pos = cmap_encodings.get_griph_position(i as u32);
-                let ch = char::from_u32(i as u32).unwrap();
-                write!(&mut writer,"{}:{:04} ", ch , pos).unwrap();
-            }
-
-            writeln!(&mut writer, "").unwrap();
-            let i = 0x2a6b2;
             let pos = cmap_encodings.get_griph_position(i as u32);
+            let glyph = glyf.get_glyph(pos as usize).unwrap();
+            let layout = font.get_horizontal_layout(pos as usize);
+            let svg = glyph.to_svg(&"100px", &"100px",&layout);
             let ch = char::from_u32(i as u32).unwrap();
-            writeln!(&mut writer, "{}:{:04} ", ch , pos).unwrap();
+            write!(&mut writer,"{}:{:04} ", ch , pos).unwrap();
+            writeln!(&mut writer,"{}", svg).unwrap();
+          }
+          writeln!(&mut writer, "").unwrap();
+          let i = 0x2a6b2;
+          let pos = cmap_encodings.get_griph_position(i as u32);
+          let ch = char::from_u32(i as u32).unwrap();
+          writeln!(&mut writer, "{}:{:04} ", ch , pos).unwrap();
 
         }
     },
     _ => {
-       debug_assert!(true, "Unknown font type");
-       return
+       debug_assert!(true, "not support type");
+       return None
     }
-  } 
+  }
+  Some(font)
 }

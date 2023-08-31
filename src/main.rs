@@ -1,4 +1,6 @@
 use std::path::{Path, PathBuf};
+
+use fontreader::Font;
 mod fontheader;
 mod requires;
 mod fontreader;
@@ -15,19 +17,27 @@ fn get_font_type(folder: &String) {
     for font in font_files {
         println!("fontfile: {:?}", font);
         let file = std::fs::File::open(font).unwrap();
-        let font_type = fontheader::get_font_type(&file);
+        let font_type = fontheader::get_font_type(file);
         println!("fonttype: {}", font_type.to_string());
         fonts.push(font_type);
     }
 }
 
 fn main() {
-    // let font_dir = "./fonts";
-    // get_font_type(&font_dir.to_owned());
-    let fontname = "./fonts/NotoSansJP-Regular.ttf";
-    let filename: PathBuf = PathBuf::from(fontname);    
-    fontreader::font_load(&filename);
+    // agrs[1] is the folder name
+    let args: Vec<String> = std::env::args().collect();
+    // argv.len()?
+    let fontname = if args.len() >= 2 {args[1].to_string()} else {
+        "e:\\data\\fonts\\NotoSansJP-SemiBold.ttf".to_string()
+    };
 
+    let output_file = "./test/read.html";
+    let filename: PathBuf = PathBuf::from(fontname);    
+    let font = Font::get_font_from_file(&filename).unwrap();
+    let text_file = "./test/read.txt";
+    let string = std::fs::read_to_string(text_file).unwrap();
+    let html = font.get_html(&string);
+    std::fs::write(output_file, html).unwrap(); 
 
 }
 

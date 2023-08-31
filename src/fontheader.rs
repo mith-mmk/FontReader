@@ -5,7 +5,7 @@ use crate::requires::cmap;
 // pub type F2DOT14 = i16;
 pub type LONGDATETIME = i64;
 
-// pub type Fixed = u32;
+//pub type Fixed = u32;
 pub type FWORD = i16;
 pub type UFWORD = u16;
 

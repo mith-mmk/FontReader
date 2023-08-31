@@ -35,6 +35,20 @@ impl HHEA {
     get_hhea(file, offest, length)
   }
 
+  pub(crate) fn get_accender (&self) -> i16 {
+    self.ascender as i16
+  }
+
+  pub(crate) fn get_descender (&self) -> i16 {
+    self.descender as i16
+  }
+
+  pub(crate) fn get_line_gap (&self) -> i16 {
+    self.line_gap as i16
+  }
+
+
+
   pub(crate) fn to_string(&self) -> String {
     let mut string = "hhea\n".to_string();
     let version = format!("Version {}.{}\n", self.major_version, self.minor_version);

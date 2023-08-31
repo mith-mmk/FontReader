@@ -52,8 +52,6 @@ impl fmt::Display for Glyph {
 
 impl Glyph {
   pub fn parse(&self) -> ParsedGlyph {
-
-
     if self.length < 10 {
       return ParsedGlyph {
         number_of_contours: 0,
@@ -203,6 +201,70 @@ impl Glyph {
     }
   }
 
+  pub fn to_svg(&self,width:&str, height: &str, layout: &crate::fontreader::HorizontalLayout) -> String {
+    let parsed = self.parse();
+    let x_min = parsed.x_min as isize - layout.lsb;
+    let y_min = 0;
+    let x_max = parsed.x_max as isize - layout.lsb;
+    let y_max = layout.accender - layout.descender  + layout.line_gap;
+    let mut svg = format!("<svg width=\"{}\" height=\"{}\" viewBox=\"{} {} {} {}\" xmlns=\"http://www.w3.org/2000/svg\">\n", width, height, x_min, y_min, x_max, y_max);
+    let y_max = layout.accender as i16;
+    svg += &format!("<!-- x min {} y min {} x max {} y max {} -->", parsed.x_min, parsed.y_min, parsed.x_max, parsed.y_max);
+    svg += &format!("<!-- offset {} length {} ", parsed.offset, parsed.length);
+    for byte in parsed.instructions {
+      svg += &format!("{:02x} ", byte);
+    }
+    svg += "-->\n";
+
+
+
+    svg += "<path d=\"";
+    let mut pos = 0;
+    let mut befor_on_curve = false;
+    let mut path_start = true;
+    let mut x = 0;
+    let mut y = 0;
+    let mut prev_x = 0;
+    let mut prev_y = 0;
+    let mut strart_x = 0;
+    let mut strart_y = 0;
+    for i in 0..parsed.flags.len() {
+      x += parsed.xs[i];
+      y += parsed.ys[i];
+      if i == 0 {
+        strart_x = x;
+        strart_y = y;
+      } 
+      let on_curve = parsed.on_curves[i];
+      if path_start {
+        svg += &format!("M{} {}", x, y_max - y);
+        path_start = false;
+      } else if befor_on_curve && on_curve {
+        svg += &format!("L{} {}", x, y_max - y);
+      } else if befor_on_curve && !on_curve {
+        svg += &format!("Q{} {} {} {}", prev_x, y_max - prev_y, x, y_max - y);
+      } else if !befor_on_curve && on_curve {
+        svg += &format!("L{} {}", x, y_max - y);
+      } else if !befor_on_curve && !on_curve {
+        svg += &format!("T{} {}", x, y_max - y);
+      }
+      befor_on_curve = on_curve;
+      prev_x = x;
+      prev_y = y;
+      if i >= parsed.end_pts_of_contours[pos] {
+        pos += 1;
+        path_start = true;
+        svg += format!("M{} {}  ", strart_x, y_max - strart_y).as_str();
+        strart_x = x;
+        strart_y = y;
+      }
+    }
+    svg += "\"/>\n</svg>\n";
+    svg
+
+  }
+
+
   pub fn to_string(&self) -> String {
     let parsed = self.parse();
     let mut string = "glyph\n".to_string();
@@ -224,6 +286,15 @@ impl Glyph {
       return string;
     }
 
+    // instructions
+    for (i, byte) in parsed.instructions.iter().enumerate() {
+      if i % 16 == 0 {
+        string += "\n";
+      }
+      string += &format!("{:02x}", byte);
+    }
+    string += "\n";
+
     let mut pos = 0;
     for i in 0..parsed.end_pts_of_contours.len() {
       string += &format!("{} end_pts_of_contours {}\n",i, parsed.end_pts_of_contours[i]);
@@ -236,7 +307,7 @@ impl Glyph {
       let dy = parsed.ys[i];
       x += dx;
       y += dy;
-      string += &format!("{:2} flag {} {:08b} {} {} {} {}\n",i, pos, parsed.flags[i],x, y, dx, dy);
+      string += &format!("{:2} flag {} {:6} {} {} {} {}\n",i, pos, parsed.on_curves[i],x, y, dx, dy);
       if i >= parsed.end_pts_of_contours[pos] {
         pos += 1;
       }
