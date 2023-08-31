@@ -1,6 +1,3 @@
-
-use std::alloc::Layout;
-use std::io::Cursor;
 use std::{path::PathBuf, fs::File};
 use crate::outline::*;
 use crate::requires::*;
@@ -41,14 +38,13 @@ impl Font {
   pub fn get_horizontal_layout(&self, id:usize) -> HorizontalLayout{
     let lsb = self.get_h_metrix(id).left_side_bearing as isize;
     let advance_width = self.get_h_metrix(id).advance_width as isize;
-    let rsb = advance_width - lsb;
+
     let accender = self.hhea.as_ref().unwrap().get_accender() as isize;
     let descender = self.hhea.as_ref().unwrap().get_descender() as isize;
     let line_gap = self.hhea.as_ref().unwrap().get_line_gap() as isize;
 
     HorizontalLayout {
       lsb,
-      rsb,
       advance_width,
       accender,
       descender,
@@ -61,7 +57,7 @@ impl Font {
     let code = ch as u32;
     let pos = self.cmap.as_ref().unwrap().get_griph_position(code);
     let glyf = self.grif.as_ref().unwrap().get_glyph(pos as usize).unwrap();
-    let layout = self.get_horizontal_layout(pos as usize);
+    let layout: HorizontalLayout = self.get_horizontal_layout(pos as usize);
     let width = "24pt";
     let height = "24pt";
     let svg = glyf.to_svg(width, height,&layout);
@@ -102,7 +98,6 @@ impl Font {
 #[derive(Debug, Clone)]
 pub struct HorizontalLayout {
   pub lsb: isize,
-  pub rsb: isize,
   pub advance_width: isize,
   pub accender: isize,
   pub descender: isize,

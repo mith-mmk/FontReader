@@ -203,14 +203,53 @@ impl Glyph {
 
   pub fn to_svg(&self,width:&str, height: &str, layout: &crate::fontreader::HorizontalLayout) -> String {
     let parsed = self.parse();
-    let x_min = parsed.x_min as isize - layout.lsb;
+    let rsb = (layout.advance_width as isize - parsed.x_max as isize) as i16;
+    let x_min = parsed.x_min as i16 - layout.lsb as i16;
     let y_min = 0;
-    let x_max = parsed.x_max as isize - layout.lsb;
+    let x_max = parsed.x_max + rsb;
     let y_max = layout.accender - layout.descender  + layout.line_gap;
+    // heightを後ろから読み出す
+    let len = height.len();
+    let mut i = 0;
+    let mut height_f32 = "".to_string();
+    while i < len {
+      let c = height.chars().nth(i).unwrap();
+      match c {
+        '0'..='9' => {
+          height_f32 += &c.to_string();
+        },
+        '.' => {
+          height_f32 += &c.to_string();
+        },
+        ' ' => {
+          // skip
+        },
+        _ => {
+          break;
+        }
+      }
+      i += 1;
+    }
+    let mut unit = "".to_string();
+    for j in i..len {
+      let c = height.chars().nth(j).unwrap();
+      match c {
+          ' ' => {
+            // skip
+          },
+          _ => {
+            unit += &c.to_string();
+          }
+      }
+    }
+    let height_f32 = height_f32.parse::<f32>().unwrap();
+    let width = x_min as f32 + x_max as f32 + layout.lsb as f32;
+    let width = width * height_f32 / (y_max - y_min) as f32;
+    let width = format!("{}{}", width, unit);
     let mut svg = format!("<svg width=\"{}\" height=\"{}\" viewBox=\"{} {} {} {}\" xmlns=\"http://www.w3.org/2000/svg\">\n", width, height, x_min, y_min, x_max, y_max);
     let y_max = layout.accender as i16;
     svg += &format!("<!-- x min {} y min {} x max {} y max {} -->", parsed.x_min, parsed.y_min, parsed.x_max, parsed.y_max);
-    svg += &format!("<!-- offset {} length {} ", parsed.offset, parsed.length);
+    svg += &format!("<!-- offset {} length {} lsb {} advanced width {} rsb {}", parsed.offset, parsed.length, layout.lsb, layout.advance_width, rsb);
     for byte in parsed.instructions {
       svg += &format!("{:02x} ", byte);
     }
@@ -259,7 +298,7 @@ impl Glyph {
         strart_y = y;
       }
     }
-    svg += "\"/>\n</svg>\n";
+    svg += "\"/>\n</svg>";
     svg
 
   }
