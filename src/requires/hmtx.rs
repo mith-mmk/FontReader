@@ -21,15 +21,22 @@ impl HMTX {
 
   pub(crate) fn to_string(&self) -> String {
     let mut string = "hmtx\n".to_string();
+    let max_len = 10;
     for (i, h_metric) in self.h_metrics.iter().enumerate() {
-      let advance_width = format!("Advance Width {}\n", h_metric.advance_width);
+      let advance_width = format!("{i} Advance Width {} ", h_metric.advance_width);
       string += &advance_width;
       let left_side_bearing = format!("Left Side Bearing {}\n", h_metric.left_side_bearing);
       string += &left_side_bearing;
+      if max_len < i {
+        break;
+      }
     }
     for (i, left_side_bearing) in self.left_side_bearings.iter().enumerate() {
-      let left_side_bearing = format!("Left Side Bearing {}\n", left_side_bearing);
+      let left_side_bearing = format!("{i} Left Side Bearing {}\n", left_side_bearing);
       string += &left_side_bearing;
+      if max_len < i {
+        break;
+      }
     }
     string
   }

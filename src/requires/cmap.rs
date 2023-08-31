@@ -4,7 +4,7 @@ use std::{io::{Read, Seek}, fmt};
 pub(crate) struct CMAP {
   pub(crate) version: u16,
   pub(crate) num_tables: u16,
-  pub(crate) encoding_records: Vec<Box<EncodingRecord>>,
+  pub(crate) encoding_records: Box<Vec<EncodingRecord>>,
   pub(crate) buffer: Vec<u8>,
 }
 
@@ -165,6 +165,10 @@ impl CmapEncodings {
       cmap: Box::new(cmap),
       cmap_encodings: Box::new(cmap_encodings),
     }
+  }
+
+  pub(crate) fn get_encoding_engine(&self) -> Box<Vec<EncodingRecord>> {
+    self.cmap.encoding_records.clone()
   }
 
   pub(crate) fn get_griph_position(&self, code_number: u32) -> u32 {
@@ -700,17 +704,17 @@ fn load_cmap_table<R:Read + Seek>(mut file:R,offset: u32 , length: u32) -> CMAP 
         let encoding_id = u16::from_be_bytes([buffer[offset + 2], buffer[offset + 3]]);
         let subtable_offset = u32::from_be_bytes([buffer[offset + 4], buffer[offset + 5], buffer[offset + 6], buffer[offset + 7]]);
         offset += 8;
-        encoding_records.push(Box::new(EncodingRecord {
+        encoding_records.push(EncodingRecord {
             platform_id,
             encoding_id,
             subtable_offset,
-        }));
+        });
     }
 
     CMAP {
         version,
         num_tables,
-        encoding_records: encoding_records,
+        encoding_records: Box::new(encoding_records),
         buffer: buffer.to_vec()
     }
 }
@@ -811,7 +815,7 @@ pub(crate) fn select_encoding(encoding_records: &Vec<Box<EncodingRecord>>) ->Enc
     }
 }
 
-pub(crate) fn get_subtable(encoding_record: &Box<EncodingRecord>, buffer: &[u8]) -> CmapSubtable {
+pub(crate) fn get_subtable(encoding_record: &EncodingRecord, buffer: &[u8]) -> CmapSubtable {
   let offset = encoding_record.subtable_offset as usize;
   let buffer = &buffer[offset..];
   let format = u16::from_be_bytes([buffer[0], buffer[1]]);
@@ -1165,11 +1169,11 @@ pub(crate) fn get_subtable(encoding_record: &Box<EncodingRecord>, buffer: &[u8])
 pub(crate) fn get_cmap_maps(cmap: &CMAP) -> Vec<CmapEncoding> {
   let encoding_records = &cmap.encoding_records;
   let mut cmap_encodings = Vec::new();
-  for enconding_record in encoding_records {
+  for enconding_record in encoding_records.as_slice() {
     let buffer = &cmap.buffer;
     let subtable = get_subtable(enconding_record, buffer);
     cmap_encodings.push(CmapEncoding {
-      encoding_record: enconding_record.clone(),
+      encoding_record: Box::new(enconding_record.clone()),
       cmap_subtable: Box::new(subtable),
     });
   }

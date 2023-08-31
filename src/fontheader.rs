@@ -2,18 +2,21 @@ use std::io::{Read, Seek};
 
 use crate::requires::cmap;
 
-pub type Fixed = u32;
-pub type FWORD = i16;
-pub type UFWORD = u16;
-pub type F2DOT14 = i16;
+// pub type F2DOT14 = i16;
 pub type LONGDATETIME = i64;
 
+// pub type Fixed = u32;
+pub type FWORD = i16;
+pub type UFWORD = u16;
+
+#[cfg(target_feature = "impl")]
 pub fn fixed_to_f32(value: Fixed) -> f32 {
     let integer = (value >> 16) as f32;
     let decimal = (value & 0xFFFF) as f32 / 65536.0;
     integer + decimal
 }
 
+#[cfg(target_feature = "impl")]
 pub fn f2dot14_to_f32(value: F2DOT14) -> f32 {
     let integer = (value >> 14) as f32;
     let decimal = (value & 0x3FFF) as f32 / 16384.0;

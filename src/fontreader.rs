@@ -1,42 +1,61 @@
+
 use std::{path::PathBuf, fs::File};
 use crate::outline::*;
 use crate::requires::*;
 use crate::fontheader;
+
+#[cfg(debug_assertions)]
+use std::io::{Write, BufWriter};
+
+
 #[derive(Debug, Clone)]
 pub(crate) struct Font {
   pub(crate) font_type: fontheader::FontHeaders,
-  pub(crate) cmap: Box<Vec<cmap::CmapEncodings>>,
-  pub(crate) head: Box<Vec<head::HEAD>>,
-  pub(crate) hhea: Box<Vec<hhea::HHEA>>,
-  pub(crate) hmtx: Box<Vec<hmtx::HMTX>>,
-  pub(crate) maxp: Box<Vec<maxp::MAXP>>,
-  pub(crate) names: Box<Vec<name::NAME>>,
-  pub(crate) os2s: Box<Vec<os2::OS2>>,
-  pub(crate) posts: Box<Vec<post::POST>>,
-  pub(crate) locas: Box<Vec<loca::LOCA>>,
-  pub(crate) grifs: Box<Vec<glyf::GLYF>>,
+  pub(crate) cmap: Option<cmap::CmapEncodings>,
+  pub(crate) head: Option<head::HEAD>,
+  pub(crate) hhea: Option<hhea::HHEA>,
+  pub(crate) hmtx: Option<hmtx::HMTX>,
+  pub(crate) maxp: Option<maxp::MAXP>,
+  pub(crate) name: Option<name::NAME>,
+  pub(crate) os2: Option<os2::OS2>,
+  pub(crate) post: Option<post::POST>,
+  pub(crate) loca: Option<loca::LOCA>,
+  pub(crate) grif: Option<glyf::GLYF>,
+  hmtx_pos: Option<Pointer>,
+  loca_pos: Option<Pointer>,
+  glyf_pos: Option<Pointer>,
+
+}
+
+#[derive(Debug, Clone)]
+struct Pointer {
+  pub(crate) offset: u32,
+  pub(crate) length: u32
 }
 
 
 pub fn font_load(filename: &PathBuf) {
   let file = File::open(filename).unwrap();
-  let font;
+  let mut font = Font {
+    font_type: fontheader::FontHeaders::Unknown,
+    cmap: None,
+    head: None,
+    hhea: None,
+    hmtx: None,
+    maxp: None,
+    name: None,
+    os2: None,
+    post: None,
+    loca: None,
+    grif: None,
+    hmtx_pos: None,
+    loca_pos: None,
+    glyf_pos: None,
+  };
+
   match fontheader::get_font_type(&file) {
     fontheader::FontHeaders::OTF(header) => {
-      let mut cmaps = Vec::new();
-      let mut heads = Vec::new();
-      let mut hheas = Vec::new();
-      let mut hmtxs = Vec::new();
-      let mut maxps: Vec<maxp::MAXP> = Vec::new();
-      let mut names = Vec::new();
-      let mut os2s = Vec::new();
-      let mut posts = Vec::new();
-      let mut locas = Vec::new();
-      let mut grifs = Vec::new();
-      let mut loca_offset = 0;
-      let mut loca_length = 0;
-      let mut griph_offset = 0;
-      let mut griph_length = 0;
+      font.font_type = fontheader::FontHeaders::OTF(header.clone());
       header.table_records.into_iter().for_each(|record| {
         let tag: [u8;4] = record.table_tag.to_be_bytes();
         #[cfg(debug_assertions)]
@@ -45,149 +64,151 @@ pub fn font_load(filename: &PathBuf) {
             let ch = tag[i] as char;
              print!("{}", ch);
           }
-           println!(" {:?}", tag);
+          println!("{:?}", tag);
         }
               
         match &tag {
           b"cmap" => {
             let cmap_encodings = cmap::CmapEncodings::new(&file, record.offset, record.length);
-               cmaps.push(cmap_encodings);
+            font.cmap = Some(cmap_encodings);
           }
           b"head" => {
             let head = head::HEAD::new(&file, record.offset, record.length);
-            heads.push(head);
+            font.head = Some(head);
           }
           b"hhea" => {
             let hhea = hhea::HHEA::new(&file, record.offset, record.length);
-              hheas.push(hhea);
+            font.hhea = Some(hhea);
           }
-          b"hmtx" => {                    
-            if maxps.len() == 0 || hheas.len() == 0 {
-              debug_assert!(true, "No maxp table");
-              return
-            } else {
-              let num_glyphs = maxps[0].num_glyphs;
-              let number_of_hmetrics = hheas[0].number_of_hmetrics;
-              let hmtx = hmtx::HMTX::new(&file, record.offset, record.length,
-                                                  number_of_hmetrics, num_glyphs);
-                hmtxs.push(hmtx);
-            }
+          b"hmtx" => {
+            let htmx_pos = Pointer {
+              offset: record.offset,
+              length: record.length,
+            };
+            font.hmtx_pos = Some(htmx_pos);
           }
           b"maxp" => {
             let maxp = maxp::MAXP::new(&file, record.offset, record.length);
-            maxps.push(maxp);
+            font.maxp = Some(maxp);
           }
           b"name" => {
             let name = name::NAME::new(&file, record.offset, record.length);
-            names.push(name)
+            font.name = Some(name);
           }
           b"OS/2" => {
             let os2 = os2::OS2::new(&file, record.offset, record.length);
-            os2s.push(os2);
+            font.os2 = Some(os2);
           }
           b"post" => {
             let post = post::POST::new(&file, record.offset, record.length);
-            posts.push(post);
+            font.post = Some(post);
           }
           b"loca" => {
-            loca_offset = record.offset;
-            loca_length = record.length;
+            let loca_pos = Pointer {
+              offset: record.offset,
+              length: record.length,
+            };
+            font.loca_pos = Some(loca_pos);
           }
           b"glyf" => {
-            griph_offset = record.offset;
-            griph_length = record.length;
+            let glyf_pos = Pointer {
+              offset: record.offset,
+              length: record.length,
+            };
+            println!("glyf {:08x} {}", glyf_pos.offset, glyf_pos.length);
+            font.glyf_pos = Some(glyf_pos);
           } 
           _ => {
             debug_assert!(true, "Unknown table tag")
           }                        
         }
       });
-      if (loca_offset == 0) {
-        debug_assert!(true, "No loca table");
-        return
-      }
-      if (griph_offset == 0) {
-        debug_assert!(true, "No glyf table");
-        return
-      }
-      let num_glyphs = maxps[0].num_glyphs;
-      let loca = loca::LOCA::new(&file, loca_offset, loca_length, num_glyphs);
-      locas.push(loca);
-      let grif = glyf::GLYF::new(&file, griph_offset, griph_length, &Box::new(locas[0].clone()));
-      grifs.push(grif);
 
-      if cmaps.len() == 0 {
+      let num_glyphs = font.maxp.as_ref().unwrap().num_glyphs;
+      let number_of_hmetrics = font.hhea.as_ref().unwrap().number_of_hmetrics;
+      let offset = font.hmtx_pos.as_ref().unwrap().offset;
+      let length = font.hmtx_pos.as_ref().unwrap().length;
+
+      let hmtx = hmtx::HMTX::new(&file, offset, length, number_of_hmetrics, num_glyphs);
+      font.hmtx = Some(hmtx);
+
+      let offset = font.loca_pos.as_ref().unwrap().offset;
+      let length = font.loca_pos.as_ref().unwrap().length;
+      let loca = loca::LOCA::new(&file, offset, length, num_glyphs);
+      font.loca = Some(loca);
+
+      let offset = font.glyf_pos.as_ref().unwrap().offset;
+      let length = font.glyf_pos.as_ref().unwrap().length;
+      let loca = font.loca.as_ref().unwrap();
+      let glyf = glyf::GLYF::new(&file, offset, length, loca);
+      font.grif = Some(glyf);
+
+      if font.cmap.is_none() {
         debug_assert!(true, "No cmap table");
         return
       }
-      if heads.len() == 0 {
+      if font.head.is_none() {
         debug_assert!(true, "No head table");
         return
       }
-      if hheas.len() == 0 {
+      if font.hhea.is_none() {
         debug_assert!(true, "No hhea table");
         return
       }
-      font = Font {
-        font_type: fontheader::get_font_type(&file),
-        cmap: Box::new(cmaps),
-        head: Box::new(heads),
-        hhea: Box::new(hheas),
-        hmtx: Box::new(hmtxs),
-        maxp: Box::new(maxps),
-        names: Box::new(names),
-        os2s: Box::new(os2s),
-        posts: Box::new(posts),
-        locas: Box::new(locas),
-        grifs: Box::new(grifs),
-      };
+
       #[cfg(debug_assertions)]
       {
-        println!("{} {}", font.cmap.len(),font.cmap[0].cmap.to_string());
-        for i in 0..font.cmap[0].cmap.encoding_records.len() {
-          println!("{} {}", i,font.cmap[0].cmap.encoding_records[i].to_string());
+        // create or open file
+        let file = match File::create("test/font.txt") {
+            Ok(it) => it,
+            Err(_) => {
+              File::open("test/font.txt").unwrap()
+            }
+        };
+        let mut writer = BufWriter::new(file);
+
+        let encoding_records = &font.cmap.as_ref().unwrap().get_encoding_engine();
+        writeln!(&mut writer, "{}", &font.cmap.as_ref().unwrap().cmap.to_string()).unwrap();
+        for i in 0..encoding_records.len() {
+          writeln!(&mut writer, "{} {}", i,encoding_records[i].to_string()).unwrap();
         }
-        println!("{} {}", font.head.len(),font.head[0].to_string());
-        println!("{} {}", font.hhea.len(),font.hhea[0].to_string());  
-            println!("{} {}", font.maxp.len(),font.maxp[0].to_string());
-            if font.hmtx.len() > 0 {
-              println!("{} {}", font.hmtx.len(),font.hmtx[0].to_string());
-            } else {
-              println!("{} {}", font.hmtx.len(),"No hmtx table");
-            }
-            println!("{} {}", font.os2s.len(),font.os2s[0].to_string());
-            println!("{} {}", font.posts.len(),font.posts[0].to_string());
-            println!("{} {}", font.locas.len(),font.locas[0].to_string());
+        writeln!(&mut writer, "{}", font.head.unwrap().to_string()).unwrap();
+        writeln!(&mut writer, "{}", font.hhea.unwrap().to_string()).unwrap();  
+            writeln!(&mut writer, "{}", font.maxp.unwrap().to_string()).unwrap();
+            writeln!(&mut writer, "{}", font.hmtx.unwrap().to_string()).unwrap();
+            writeln!(&mut writer, "{}", font.os2.unwrap().to_string()).unwrap();
+            writeln!(&mut writer, "{}", font.post.unwrap().to_string()).unwrap();
+            writeln!(&mut writer, "{}", font.loca.unwrap().to_string()).unwrap();
 
-            println!("{} {}", font.names.len(),font.names[0].to_string());
+            writeln!(&mut writer, "{}", font.name.unwrap().to_string()).unwrap();
 
-            println!("long cmap -> griph");
-            let cmap_encodings = font.cmap[0].clone();
+            writeln!(&mut writer, "long cmap -> griph").unwrap();
+            let cmap_encodings = font.cmap.unwrap().clone();
+            let glyf = font.grif.as_ref().unwrap();
    
-            for i in 0x20..0xff {
-                if i % 16 == 0 {
-                    println!("");
-                }
+            for i in 0x25A0..0x25Af {
                 let pos = cmap_encodings.get_griph_position(i);
+                let glyph = glyf.get_glyph(pos as usize).unwrap();
                 let ch = char::from_u32(i).unwrap();
-                print!("{}:{:04} ", ch , pos);
+                writeln!(&mut writer,"{}:{:04} ", ch , pos).unwrap();
+                writeln!(&mut writer,"{}", glyph.to_string()).unwrap();
             }
-            println!("");
+            writeln!(&mut writer, "").unwrap();
 
             for i in 0x4e00 .. 0x4eff {
                 if i as u32 % 16 == 0 {
-                    println!("");
+                    writeln!(&mut writer, "").unwrap();
                 }
                 let pos = cmap_encodings.get_griph_position(i as u32);
                 let ch = char::from_u32(i as u32).unwrap();
-                print!("{}:{:04} ", ch , pos);
+                write!(&mut writer,"{}:{:04} ", ch , pos).unwrap();
             }
 
-            println!("");
+            writeln!(&mut writer, "").unwrap();
             let i = 0x2a6b2;
             let pos = cmap_encodings.get_griph_position(i as u32);
             let ch = char::from_u32(i as u32).unwrap();
-            println!("{}:{:04} ", ch , pos);
+            writeln!(&mut writer, "{}:{:04} ", ch , pos).unwrap();
 
         }
     },
