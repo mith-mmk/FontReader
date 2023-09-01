@@ -1104,9 +1104,9 @@ pub(crate) fn get_subtable(encoding_record: &EncodingRecord, buffer: &[u8]) -> C
           let mut unicode_value_ranges = Vec::new();
           let mut uvs_offset = 4;
           for _ in 0..num_unicode_value_ranges {
-            let start_unicode_value = u32::from_be_bytes([uvs_buffer[uvs_offset], uvs_buffer[uvs_offset + 1], uvs_buffer[uvs_offset + 2], uvs_buffer[uvs_offset + 3]]);
-            let additional_count = uvs_buffer[uvs_offset + 4];
-            uvs_offset += 5;
+            let start_unicode_value = u32::from_be_bytes([0, uvs_buffer[uvs_offset], uvs_buffer[uvs_offset + 1], uvs_buffer[uvs_offset + 2]]);
+            let additional_count = uvs_buffer[uvs_offset + 3];
+            uvs_offset += 4;
             unicode_value_ranges.push(UnicodeValueRange {
               start_unicode_value,
               additional_count,
@@ -1129,9 +1129,9 @@ pub(crate) fn get_subtable(encoding_record: &EncodingRecord, buffer: &[u8]) -> C
           let mut unicode_value_ranges = Vec::new();
           let mut uvs_offset = 4;
           for _ in 0..num_unicode_value_ranges {
-            let unicode_value = u32::from_be_bytes([non_default_uvs_buffer[uvs_offset], non_default_uvs_buffer[uvs_offset + 1], non_default_uvs_buffer[uvs_offset + 2], non_default_uvs_buffer[uvs_offset + 3]]);
-            let glyph_id = u32::from_be_bytes([non_default_uvs_buffer[uvs_offset + 4], non_default_uvs_buffer[uvs_offset + 5], non_default_uvs_buffer[uvs_offset + 6], non_default_uvs_buffer[uvs_offset + 7]]);
-            uvs_offset += 8;            
+            let unicode_value = u32::from_be_bytes([0, non_default_uvs_buffer[uvs_offset], non_default_uvs_buffer[uvs_offset + 1], non_default_uvs_buffer[uvs_offset + 2]]);
+            let glyph_id = u16::from_be_bytes([non_default_uvs_buffer[uvs_offset + 3], non_default_uvs_buffer[uvs_offset + 4]]) as u32;
+            uvs_offset += 5;
             unicode_value_ranges.push(UVSMapping {
               unicode_value,
               glyph_id,
