@@ -61,9 +61,9 @@ impl Font {
     let pos = self.cmap.as_ref().unwrap().get_griph_position(code);
     let glyf = self.grif.as_ref().unwrap().get_glyph(pos as usize).unwrap();
     let layout: HorizontalLayout = self.get_horizontal_layout(pos as usize);
-    let width = "24pt";
-    let height = "24pt";
-    let svg = glyf.to_svg(width, height,&layout);
+    let fontsize = 24.0;
+    let fontunit = "pt";
+    let svg = glyf.to_svg(fontsize, fontunit,&layout);
     svg
   }
 
@@ -302,7 +302,7 @@ fn font_load<R:BinaryReader>(file: &mut R) -> Option<Font> {
             let pos = cmap_encodings.get_griph_position(i);
             let glyph = glyf.get_glyph(pos as usize).unwrap();
             let layout = font.get_horizontal_layout(pos as usize);
-            let svg = glyph.to_svg("100px", "100px",&layout);
+            let svg = glyph.to_svg(32.0, "pt",&layout);
             let ch = char::from_u32(i).unwrap();
             writeln!(&mut writer,"{}:{:04} ", ch , pos).unwrap();
             writeln!(&mut writer,"{}", glyph.to_string()).unwrap();
@@ -317,7 +317,7 @@ fn font_load<R:BinaryReader>(file: &mut R) -> Option<Font> {
             let pos = cmap_encodings.get_griph_position(i as u32);
             let glyph = glyf.get_glyph(pos as usize).unwrap();
             let layout = font.get_horizontal_layout(pos as usize);
-            let svg = glyph.to_svg(&"100px", &"100px",&layout);
+            let svg = glyph.to_svg(100.0, &"px",&layout);
             let ch = char::from_u32(i as u32).unwrap();
             write!(&mut writer,"{}:{:04} ", ch , pos).unwrap();
             writeln!(&mut writer,"{}", svg).unwrap();
