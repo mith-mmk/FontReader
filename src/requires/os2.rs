@@ -1,6 +1,5 @@
 use std::{io::{Cursor, SeekFrom, Read, Seek}, fmt::{Display, Formatter, self}};
-
-use byteorder::{BigEndian, ReadBytesExt};
+use bin_rs::reader::BinaryReader;
 
 #[derive(Debug, Clone)]
 pub(crate) struct OS2 {
@@ -54,7 +53,7 @@ impl fmt::Display for OS2 {
 }
 
 impl OS2 {
-  pub(crate) fn new<R:Read + Seek>(file: R, offest: u32, length: u32) -> Self {
+  pub(crate) fn new<R:BinaryReader>(file: &mut R, offest: u32, length: u32) -> Self {
     get_os2(file, offest, length)
   }
 
@@ -155,51 +154,61 @@ impl OS2 {
   }  
 }
 
-fn get_os2<R:Read + Seek>(mut file: R, offest: u32, length: u32) -> OS2 {
+fn get_os2<R:BinaryReader>(mut file: &mut R, offest: u32, length: u32) -> OS2 {
   let mut file = file;
   let mut buffer = vec![0; length as usize];
   file.seek(SeekFrom::Start(offest as u64)).unwrap();
-  file.read_exact(&mut buffer).unwrap();
-  let mut cursor = Cursor::new(buffer);
-  let version = cursor.read_u16::<BigEndian>().unwrap();
-  let x_avg_char_width = cursor.read_i16::<BigEndian>().unwrap();
-  let us_weight_class = cursor.read_u16::<BigEndian>().unwrap();
-  let us_width_class = cursor.read_u16::<BigEndian>().unwrap();
-  let fs_type = cursor.read_u16::<BigEndian>().unwrap();
-  let y_subscript_x_size = cursor.read_i16::<BigEndian>().unwrap();
-  let y_subscript_y_size = cursor.read_i16::<BigEndian>().unwrap();
-  let y_subscript_x_offset = cursor.read_i16::<BigEndian>().unwrap();
-  let y_subscript_y_offset = cursor.read_i16::<BigEndian>().unwrap();
-  let y_superscript_x_size = cursor.read_i16::<BigEndian>().unwrap();
-  let y_superscript_y_size = cursor.read_i16::<BigEndian>().unwrap();
-  let y_superscript_x_offset = cursor.read_i16::<BigEndian>().unwrap();
-  let y_superscript_y_offset = cursor.read_i16::<BigEndian>().unwrap();
-  let y_strikeout_size = cursor.read_i16::<BigEndian>().unwrap();
-  let y_strikeout_position = cursor.read_i16::<BigEndian>().unwrap();
-  let s_family_class = cursor.read_i16::<BigEndian>().unwrap();
+  let version = file.read_u16().unwrap();
+  let x_avg_char_width = file.read_i16().unwrap();
+  let us_weight_class = file.read_u16().unwrap();
+  let us_width_class = file.read_u16().unwrap();
+  let fs_type = file.read_u16().unwrap();
+  let y_subscript_x_size = file.read_i16().unwrap();
+  let y_subscript_y_size = file.read_i16().unwrap();
+  let y_subscript_x_offset = file.read_i16().unwrap();
+  let y_subscript_y_offset = file.read_i16().unwrap();
+  let y_superscript_x_size = file.read_i16().unwrap();
+  let y_superscript_y_size = file.read_i16().unwrap();
+  let y_superscript_x_offset = file.read_i16().unwrap();
+  let y_superscript_y_offset = file.read_i16().unwrap();
+  let y_strikeout_size = file.read_i16().unwrap();
+  let y_strikeout_position = file.read_i16().unwrap();
+  let s_family_class = file.read_i16().unwrap();
+ 
   let mut panose = [0; 10];
-  cursor.read_exact(&mut panose).unwrap();
-  let ul_unicode_range1 = cursor.read_u32::<BigEndian>().unwrap();
-  let ul_unicode_range2 = cursor.read_u32::<BigEndian>().unwrap();
-  let ul_unicode_range3 = cursor.read_u32::<BigEndian>().unwrap();
-  let ul_unicode_range4 = cursor.read_u32::<BigEndian>().unwrap();
+  file.read_bytes(&mut panose).unwrap();
+  let ul_unicode_range1 = file.read_u32().unwrap();
+  let ul_unicode_range2 = file.read_u32().unwrap();
+  let ul_unicode_range3 = file.read_u32().unwrap();
+  let ul_unicode_range4 = file.read_u32().unwrap();
+    
   let mut ach_vend_id = [0; 4];
-  cursor.read_exact(&mut ach_vend_id).unwrap();
-  let fs_selection = cursor.read_u16::<BigEndian>().unwrap();
-  let us_first_char_index = cursor.read_u16::<BigEndian>().unwrap();
-  let us_last_char_index = cursor.read_u16::<BigEndian>().unwrap();
-  let s_typo_ascender = cursor.read_i16::<BigEndian>().unwrap();
-  let s_typo_descender = cursor.read_i16::<BigEndian>().unwrap();
-  let s_typo_line_gap = cursor.read_i16::<BigEndian>().unwrap();
-  let us_win_ascent = cursor.read_u16::<BigEndian>().unwrap();
-
+  file.read_bytes(&mut ach_vend_id).unwrap();
+  let fs_selection = file.read_u16().unwrap();
+  let us_first_char_index = file.read_u16().unwrap();
+  let us_last_char_index = file.read_u16().unwrap();
+  let s_typo_ascender = file.read_i16().unwrap();
+  let s_typo_descender = file.read_i16().unwrap();
+  let s_typo_line_gap = file.read_i16().unwrap();
+  let us_win_ascent = file.read_u16().unwrap();
+  let us_win_descent = file.read_u16().unwrap();
+  let ul_code_page_range1 = file.read_u32().unwrap();
+  let ul_code_page_range2 = file.read_u32().unwrap();
+  let sx_height = file.read_i16().unwrap();
+  let s_cap_height = file.read_i16().unwrap();
+  let us_default_char = file.read_u16().unwrap();
+  let us_break_char = file.read_u16().unwrap();
+  let us_max_context = file.read_u16().unwrap();
+  let us_lower_optical_point_size = file.read_u16().unwrap();
+  let us_upper_optical_point_size = file.read_u16().unwrap();
+ 
   let mut us_win_descent = 0;
   let mut ul_code_page_range1 = 0;
   let mut ul_code_page_range2 = 0;
   if version >= 1 {
-    us_win_descent = cursor.read_u16::<BigEndian>().unwrap();
-    ul_code_page_range1 = cursor.read_u32::<BigEndian>().unwrap();
-    ul_code_page_range2 = cursor.read_u32::<BigEndian>().unwrap();
+    us_win_descent = file.read_u16().unwrap();
+    ul_code_page_range1 = file.read_u32().unwrap();
+    ul_code_page_range2 = file.read_u32().unwrap();
   }
 
   let mut sx_height = 0;
@@ -209,17 +218,17 @@ fn get_os2<R:Read + Seek>(mut file: R, offest: u32, length: u32) -> OS2 {
   let mut us_max_context = 0;
 
   if version >= 2 {
-    sx_height = cursor.read_i16::<BigEndian>().unwrap();
-    s_cap_height = cursor.read_i16::<BigEndian>().unwrap();
-    us_default_char = cursor.read_u16::<BigEndian>().unwrap();
-    us_break_char = cursor.read_u16::<BigEndian>().unwrap();
-    us_max_context = cursor.read_u16::<BigEndian>().unwrap();
+    sx_height = file.read_i16().unwrap();
+    s_cap_height = file.read_i16().unwrap();
+    us_default_char = file.read_u16().unwrap();
+    us_break_char = file.read_u16().unwrap();
+    us_max_context = file.read_u16().unwrap();
   }
   let mut us_lower_optical_point_size = 0;
   let mut us_upper_optical_point_size = 0;
-if version >= 5 {
-    us_lower_optical_point_size = cursor.read_u16::<BigEndian>().unwrap();
-    us_upper_optical_point_size = cursor.read_u16::<BigEndian>().unwrap();
+  if version >= 5 {
+    us_lower_optical_point_size = file.read_u16().unwrap();
+    us_upper_optical_point_size = file.read_u16().unwrap();
   }
   OS2 {
     version,

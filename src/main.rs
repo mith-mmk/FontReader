@@ -14,10 +14,9 @@ fn get_font_type(folder: &String) {
         font_files.push(filename);
     }
     let mut fonts = Vec::new();
-    for font in font_files {
+    for mut font in font_files {
         println!("fontfile: {:?}", font);
-        let file = std::fs::File::open(font).unwrap();
-        let font_type = fontheader::get_font_type(file);
+        let font_type = fontheader::get_font_type_from_file(&mut font);
         println!("fonttype: {}", font_type.to_string());
         fonts.push(font_type);
     }

@@ -1,6 +1,7 @@
-use std::{io::{Cursor, SeekFrom, Read, Seek}, fmt};
+use std::{io::{SeekFrom}, fmt};
 
-use byteorder::{BigEndian, ReadBytesExt};
+use bin_rs::reader::BinaryReader;
+
 
 
 #[derive(Debug, Clone)]
@@ -30,7 +31,7 @@ impl fmt::Display for MAXP {
 }
 
 impl MAXP {
-  pub(crate) fn new<R:Read + Seek>(file: R, offest: u32, length: u32) -> Self {
+  pub(crate) fn new<R:BinaryReader>(file: &mut R, offest: u32, length: u32) -> Self {
     get_maxp(file, offest, length)
   }
 
@@ -73,14 +74,11 @@ impl MAXP {
 }
 
 
-fn get_maxp<R: Read + Seek>(file: R, offest: u32, length: u32) -> MAXP{
+fn get_maxp<R: BinaryReader>(file: &mut R, offest: u32, length: u32) -> MAXP{
   let mut file = file;
   file.seek(SeekFrom::Start(offest as u64)).unwrap();
-  let mut buf = vec![0; length as usize];
-  file.read_exact(&mut buf).unwrap();
-  let mut cursor = Cursor::new(buf);
-  let version = cursor.read_u32::<BigEndian>().unwrap();
-  let num_glyphs = cursor.read_u16::<BigEndian>().unwrap();
+  let version = file.read_u32().unwrap();
+  let num_glyphs = file.read_u16().unwrap();  
   if version == 0x00005000 {
     return MAXP{
       version,
@@ -100,20 +98,20 @@ fn get_maxp<R: Read + Seek>(file: R, offest: u32, length: u32) -> MAXP{
       max_component_depth: 0,
     }
   }
+  let max_points = file.read_u16().unwrap();
+  let max_contours = file.read_u16().unwrap();
+  let max_composite_points = file.read_u16().unwrap();
+  let max_composite_contours = file.read_u16().unwrap();
+  let max_zones = file.read_u16().unwrap();
+  let max_twilight_points = file.read_u16().unwrap();
+  let max_storage = file.read_u16().unwrap();
+  let max_function_defs = file.read_u16().unwrap();
+  let max_instruction_defs = file.read_u16().unwrap();
+  let max_stack_elements = file.read_u16().unwrap();
+  let max_size_of_instructions = file.read_u16().unwrap();
+  let max_component_elements = file.read_u16().unwrap();
+  let max_component_depth = file.read_u16().unwrap();
 
-  let max_points = cursor.read_u16::<BigEndian>().unwrap();
-  let max_contours = cursor.read_u16::<BigEndian>().unwrap();
-  let max_composite_points = cursor.read_u16::<BigEndian>().unwrap();
-  let max_composite_contours = cursor.read_u16::<BigEndian>().unwrap();
-  let max_zones = cursor.read_u16::<BigEndian>().unwrap();
-  let max_twilight_points = cursor.read_u16::<BigEndian>().unwrap();
-  let max_storage = cursor.read_u16::<BigEndian>().unwrap();
-  let max_function_defs = cursor.read_u16::<BigEndian>().unwrap();
-  let max_instruction_defs = cursor.read_u16::<BigEndian>().unwrap();
-  let max_stack_elements = cursor.read_u16::<BigEndian>().unwrap();
-  let max_size_of_instructions = cursor.read_u16::<BigEndian>().unwrap();
-  let max_component_elements = cursor.read_u16::<BigEndian>().unwrap();
-  let max_component_depth = cursor.read_u16::<BigEndian>().unwrap();
   MAXP {
     version,
     num_glyphs,

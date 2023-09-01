@@ -1,5 +1,6 @@
-use std::{io::{Read, Seek, SeekFrom, Cursor}, fmt};
-use byteorder::{BigEndian, ReadBytesExt};
+use std::{io::SeekFrom, fmt};
+use bin_rs::reader::BinaryReader;
+
 use crate::fontheader::{FWORD, UFWORD};
 
 #[derive(Debug, Clone)]
@@ -31,7 +32,7 @@ impl fmt::Display for HHEA {
 }
 
 impl HHEA {
-  pub(crate) fn new<R:Read + Seek>(file: R, offest: u32, length: u32) -> Self {
+  pub(crate) fn new<R:BinaryReader>(file: &mut R, offest: u32, length: u32) -> Self {
     get_hhea(file, offest, length)
   }
 
@@ -89,31 +90,27 @@ impl HHEA {
   }
 }
 
-fn get_hhea<R: Read + Seek>(file: R, offest: u32, length: u32) -> HHEA {
+fn get_hhea<R: BinaryReader>(file: &mut R, offest: u32, length: u32) -> HHEA {
   let mut file = file;
   file.seek(SeekFrom::Start(offest as u64)).unwrap();
-  let mut buf = vec![0; length as usize];
-  file.read_exact(&mut buf).unwrap();
-  let mut cursor = Cursor::new(buf);
-  let major_version = cursor.read_u16::<BigEndian>().unwrap();
-  let minor_version = cursor.read_u16::<BigEndian>().unwrap();
-  let ascender = cursor.read_i16::<BigEndian>().unwrap();
-  let descender = cursor.read_i16::<BigEndian>().unwrap();
-  let line_gap = cursor.read_i16::<BigEndian>().unwrap();
-  let advance_width_max = cursor.read_u16::<BigEndian>().unwrap();
-  let min_left_side_bearing = cursor.read_i16::<BigEndian>().unwrap();
-  let min_right_side_bearing = cursor.read_i16::<BigEndian>().unwrap();
-  let x_max_extent = cursor.read_i16::<BigEndian>().unwrap();
-  let caret_slope_rise = cursor.read_i16::<BigEndian>().unwrap();
-  let caret_slope_run = cursor.read_i16::<BigEndian>().unwrap();
-  let caret_offset = cursor.read_i16::<BigEndian>().unwrap();
-  let reserved1 = cursor.read_i16::<BigEndian>().unwrap();
-  let reserved2 = cursor.read_i16::<BigEndian>().unwrap();
-  let reserved3 = cursor.read_i16::<BigEndian>().unwrap();
-  let reserved4 = cursor.read_i16::<BigEndian>().unwrap();
-  let metric_data_format = cursor.read_i16::<BigEndian>().unwrap();
-  let number_of_hmetrics = cursor.read_u16::<BigEndian>().unwrap();
-
+  let major_version = file.read_u16().unwrap();
+  let minor_version = file.read_u16().unwrap();
+  let ascender = file.read_i16().unwrap();
+  let descender = file.read_i16().unwrap();
+  let line_gap = file.read_i16().unwrap();
+  let advance_width_max = file.read_u16().unwrap();
+  let min_left_side_bearing = file.read_i16().unwrap();
+  let min_right_side_bearing = file.read_i16().unwrap();
+  let x_max_extent = file.read_i16().unwrap();
+  let caret_slope_rise = file.read_i16().unwrap();
+  let caret_slope_run = file.read_i16().unwrap();
+  let caret_offset = file.read_i16().unwrap();
+  let reserved1 = file.read_i16().unwrap();
+  let reserved2 = file.read_i16().unwrap();
+  let reserved3 = file.read_i16().unwrap();
+  let reserved4 = file.read_i16().unwrap();
+  let metric_data_format = file.read_i16().unwrap();
+  let number_of_hmetrics = file.read_u16().unwrap();
   HHEA{
     major_version,
     minor_version,

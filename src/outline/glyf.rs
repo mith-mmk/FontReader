@@ -1,6 +1,6 @@
-use core::num;
-use std::{io::{Read, Seek, SeekFrom, Cursor, BufRead}, fmt, os::raw, vec};
-use byteorder::{BigEndian, ReadBytesExt};
+use std::{io::{SeekFrom}, fmt,};
+
+use bin_rs::reader::BinaryReader;
 
 use crate::requires::cmap::CmapHighByteEncoding;
 
@@ -370,7 +370,7 @@ impl fmt::Display for GLYF {
 }
 
 impl GLYF {
-  pub(crate) fn new<R:Read + Seek>(file: R, offset: u32, length: u32, loca: &loca::LOCA) -> Self {
+  pub(crate) fn new<R:BinaryReader>(file: &mut R, offset: u32, length: u32, loca: &loca::LOCA) -> Self {
     get_glyf(file, offset, length, &loca)
   }
 
@@ -396,8 +396,7 @@ impl GLYF {
 
 
 
-fn get_glyf<R:Read + Seek>(file: R, offset: u32, length: u32, loca: &loca::LOCA) -> GLYF {
-  let mut file = file;
+fn get_glyf<R:BinaryReader>(file: &mut R, offset: u32, length: u32, loca: &loca::LOCA) -> GLYF {
   let loca = loca.clone();
   file.seek(SeekFrom::Start(offset as u64)).unwrap();
   let offsets = loca.offsets.clone();
@@ -405,7 +404,7 @@ fn get_glyf<R:Read + Seek>(file: R, offset: u32, length: u32, loca: &loca::LOCA)
   for i in 0..offsets.len() - 1 {
     let offset = offsets[i];
     let length = offsets[i + 1] - offset;
-    let glyph = get_glyph(&mut file, offset, length);
+    let glyph = get_glyph(file, offset, length);
     glyphs.push(glyph);
   }
   GLYF {
@@ -413,7 +412,7 @@ fn get_glyf<R:Read + Seek>(file: R, offset: u32, length: u32, loca: &loca::LOCA)
   }
 }
 
-fn get_glyph<R:Read + Seek>(file: &mut R, offset: u32, length: u32) -> Glyph {
+fn get_glyph<R:BinaryReader>(file: &mut R, offset: u32, length: u32) -> Glyph {
   if length == 0 {
     return Glyph {
       offset: offset,
@@ -422,14 +421,11 @@ fn get_glyph<R:Read + Seek>(file: &mut R, offset: u32, length: u32) -> Glyph {
     };
   }
 
-  let mut buf = vec![0u8; length as usize];
-  file.read_exact(&mut buf).unwrap();
-  let cursor = Cursor::new(buf);
-  let griph= cursor.into_inner();
-
+  let glyphs = file.read_bytes_as_vec(length as usize).unwrap();
   Glyph {
-    glyphs: Box::new(griph),
-    offset,
-    length,
+    glyphs: Box::new(glyphs),
+    offset: offset,
+    length: length,
   }
+
 }

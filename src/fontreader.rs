@@ -1,4 +1,7 @@
+use std::io::BufReader;
 use std::{path::PathBuf, fs::File};
+use bin_rs::reader::{BinaryReader, StreamReader};
+
 use crate::outline::*;
 use crate::requires::*;
 use crate::fontheader;
@@ -28,7 +31,7 @@ pub(crate) struct Font {
 
 impl Font {
   pub fn get_font_from_file(filename: &PathBuf) -> Option<Self> {
-    font_load(filename)
+    font_load_from_file(filename)
   }
 
   pub fn get_h_metrix(&self, id: usize) -> LongHorMetric {
@@ -111,13 +114,15 @@ struct Pointer {
   pub(crate) length: u32
 }
 
-fn font_load(filename: &PathBuf) -> Option<Font> {
+fn font_load_from_file(filename: &PathBuf) -> Option<Font> {
   let file = File::open(filename).unwrap();
-  font_load_from_file(file)
+  let reader = BufReader::new(file);
+  let mut reader = StreamReader::new(reader);
+  font_load(&mut reader)
 }
 
 
-fn font_load_from_file(file: File) -> Option<Font> {
+fn font_load<R:BinaryReader>(file: &mut R) -> Option<Font> {
   let mut font = Font {
     font_type: fontheader::FontHeaders::Unknown,
     cmap: None,
@@ -135,7 +140,7 @@ fn font_load_from_file(file: File) -> Option<Font> {
     glyf_pos: None,
   };
 
-  match fontheader::get_font_type(&file) {
+  match fontheader::get_font_type(file) {
     fontheader::FontHeaders::OTF(header) => {
       font.font_type = fontheader::FontHeaders::OTF(header.clone());
       header.table_records.into_iter().for_each(|record| {
@@ -151,15 +156,15 @@ fn font_load_from_file(file: File) -> Option<Font> {
               
         match &tag {
           b"cmap" => {
-            let cmap_encodings = cmap::CmapEncodings::new(&file, record.offset, record.length);
+            let cmap_encodings = cmap::CmapEncodings::new(file, record.offset, record.length);
             font.cmap = Some(cmap_encodings);
           }
           b"head" => {
-            let head = head::HEAD::new(&file, record.offset, record.length);
+            let head = head::HEAD::new(file, record.offset, record.length);
             font.head = Some(head);
           }
           b"hhea" => {
-            let hhea = hhea::HHEA::new(&file, record.offset, record.length);
+            let hhea = hhea::HHEA::new(file, record.offset, record.length);
             font.hhea = Some(hhea);
           }
           b"hmtx" => {
@@ -170,19 +175,19 @@ fn font_load_from_file(file: File) -> Option<Font> {
             font.hmtx_pos = Some(htmx_pos);
           }
           b"maxp" => {
-            let maxp = maxp::MAXP::new(&file, record.offset, record.length);
+            let maxp = maxp::MAXP::new(file, record.offset, record.length);
             font.maxp = Some(maxp);
           }
           b"name" => {
-            let name = name::NAME::new(&file, record.offset, record.length);
+            let name = name::NAME::new(file, record.offset, record.length);
             font.name = Some(name);
           }
           b"OS/2" => {
-            let os2 = os2::OS2::new(&file, record.offset, record.length);
+            let os2 = os2::OS2::new(file, record.offset, record.length);
             font.os2 = Some(os2);
           }
           b"post" => {
-            let post = post::POST::new(&file, record.offset, record.length);
+            let post = post::POST::new(file, record.offset, record.length);
             font.post = Some(post);
           }
           b"loca" => {
@@ -210,18 +215,18 @@ fn font_load_from_file(file: File) -> Option<Font> {
       let offset = font.hmtx_pos.as_ref().unwrap().offset;
       let length = font.hmtx_pos.as_ref().unwrap().length;
 
-      let hmtx = hmtx::HMTX::new(&file, offset, length, number_of_hmetrics, num_glyphs);
+      let hmtx = hmtx::HMTX::new(file, offset, length, number_of_hmetrics, num_glyphs);
       font.hmtx = Some(hmtx);
 
       let offset = font.loca_pos.as_ref().unwrap().offset;
       let length = font.loca_pos.as_ref().unwrap().length;
-      let loca = loca::LOCA::new(&file, offset, length, num_glyphs);
+      let loca = loca::LOCA::new(file, offset, length, num_glyphs);
       font.loca = Some(loca);
 
       let offset = font.glyf_pos.as_ref().unwrap().offset;
       let length = font.glyf_pos.as_ref().unwrap().length;
       let loca = font.loca.as_ref().unwrap();
-      let glyf = glyf::GLYF::new(&file, offset, length, loca);
+      let glyf = glyf::GLYF::new(file, offset, length, loca);
       font.grif = Some(glyf);
 
       if font.cmap.is_none() {
@@ -329,6 +334,10 @@ fn font_load_from_file(file: File) -> Option<Font> {
        debug_assert!(true, "not support type");
        return None
     }
+    fontheader::FontHeaders::TTF(_) => todo!(),
+    fontheader::FontHeaders::WOFF(_) => todo!(),
+    fontheader::FontHeaders::WOFF2(_) => todo!(),
+    fontheader::FontHeaders::Unknown => todo!(),
   }
   Some(font)
 }

@@ -1,6 +1,8 @@
-use std::{io::{Cursor, SeekFrom, Read, Seek}, fmt::{Display, Formatter, self}};
 
-use byteorder::{BigEndian, ReadBytesExt};
+
+use std::{fmt::{Display, Formatter, self}, io::SeekFrom};
+
+use bin_rs::reader::BinaryReader;
 #[cfg(feature="iconv")]
 use iconv::Iconv;
 
@@ -36,7 +38,7 @@ impl Display for NAME {
 }
 
 impl NAME {
-  pub(crate) fn new<R:Read + Seek>(file: R, offest: u32, length: u32) -> Self {
+  pub(crate) fn new<R:BinaryReader>(file: &mut R, offest: u32, length: u32) -> Self {
     get_names(file, offest, length)
   }
 
@@ -94,23 +96,19 @@ pub(crate) struct NameRecord{
   pub(crate) string_offset: u16,
 }
 
-fn get_names<R: Read + Seek>(file: R, offest: u32, length: u32) -> NAME {
-  let mut file = file;
+fn get_names<R: BinaryReader>(file: &mut R, offest: u32, length: u32) -> NAME {
   file.seek(SeekFrom::Start(offest as u64)).unwrap();
-  let mut buf = vec![0; length as usize];
-  file.read_exact(&mut buf).unwrap();
-  let mut cursor = Cursor::new(buf);
-  let version = cursor.read_u16::<BigEndian>().unwrap();
-  let count = cursor.read_u16::<BigEndian>().unwrap();
-  let storage_offset = cursor.read_u16::<BigEndian>().unwrap();
+  let version = file.read_u16().unwrap();
+  let count = file.read_u16().unwrap();
+  let storage_offset = file.read_u16().unwrap();
   let mut name_records = Vec::new();
   for _ in 0..count {
-    let platform_id = cursor.read_u16::<BigEndian>().unwrap();
-    let encoding_id = cursor.read_u16::<BigEndian>().unwrap();
-    let language_id = cursor.read_u16::<BigEndian>().unwrap();
-    let name_id = cursor.read_u16::<BigEndian>().unwrap();
-    let length = cursor.read_u16::<BigEndian>().unwrap();
-    let string_offset = cursor.read_u16::<BigEndian>().unwrap();
+    let platform_id = file.read_u16().unwrap();
+    let encoding_id = file.read_u16().unwrap();
+    let language_id = file.read_u16().unwrap();
+    let name_id = file.read_u16().unwrap();
+    let length = file.read_u16().unwrap();
+    let string_offset = file.read_u16().unwrap();
     name_records.push(NameRecord {
       platform_id,
       encoding_id,
@@ -123,23 +121,20 @@ fn get_names<R: Read + Seek>(file: R, offest: u32, length: u32) -> NAME {
   let mut lang_tag_count = 0;
   let mut lang_tag_record = Vec::new();
   if version > 0 {
-    lang_tag_count = cursor.read_u16::<BigEndian>().unwrap();
+    lang_tag_count = file.read_u16().unwrap();
     for _ in 0..lang_tag_count {
-      let length = cursor.read_u16::<BigEndian>().unwrap();
-      let offset = cursor.read_u16::<BigEndian>().unwrap();
+      let length = file.read_u16().unwrap();
+      let offset = file.read_u16().unwrap();
       lang_tag_record.push(LangTagRecord {
         length,
         offset
       });
     }
   }
-  let current_position = cursor.position();
+  let current_position = file.offset().unwrap();
   // platform id = 0,3,4  utf-16be
   // platform id = 2       ASCII 
   // platform id = 1 0 = ASCII 1 == UTF-16BE
- 
-
-
 
   let mut name_string = Vec::new();
   for i in 0..count as usize {
@@ -154,32 +149,22 @@ fn get_names<R: Read + Seek>(file: R, offest: u32, length: u32) -> NAME {
     };
 
 
-    let string_offset = name_records[i].string_offset + current_position as u16;
-    cursor.set_position(string_offset as u64);
+    let string_offset = name_records[i].string_offset as u64 + current_position ;
+    file.seek(SeekFrom::Start(string_offset as u64)).unwrap();
     match encoding_engine {
       EncodingEngine::UTF16BE => {
-        let mut u16be = Vec::new();
-        for _ in 0..name_records[i as usize].length / 2 {
-          u16be.push(cursor.read_u16::<BigEndian>().unwrap());
-        }
-        let string = String::from_utf16_lossy(&u16be);
+        let string = file.read_utf16_string(name_records[i].length as usize).unwrap();
         name_string.push(string);    
       }
       EncodingEngine::ASCII => {
-        let mut u8 = Vec::new();
-        for _ in 0..name_records[i as usize].length {
-          u8.push(cursor.read_u8().unwrap());
-        }
-        let string = String::from_utf8_lossy(&u8);
+        let string = file.read_ascii_string(name_records[i].length as usize).unwrap();
         name_string.push(string.to_string());
       }
       _ => {
         #[cfg(feature="iconv")]
         {
         let mut u8 = Vec::new();
-        for _ in 0..name_records[i as usize].length {
-          u8.push(cursor.read_u8().unwrap());
-        }
+        let u8 = file.read_bytes_as_vec(name_records[i].length as usize).unwrap();
         let string = if encoding_engine == EncodingEngine::ShiftJIS {
           iconv::decode(&u8, "CP932").unwrap()
         } else if encoding_engine == EncodingEngine::Big5 {
@@ -202,12 +187,8 @@ fn get_names<R: Read + Seek>(file: R, offest: u32, length: u32) -> NAME {
   let mut lang_tag_string = Vec::new();
   for i in 0..lang_tag_count {
     let string_offset = lang_tag_record[i as usize].offset + current_position as u16;
-    cursor.set_position(string_offset as u64);
-    let mut u16be = Vec::new();
-    for _ in 0..name_records[i as usize].length / 2 {
-      u16be.push(cursor.read_u16::<BigEndian>().unwrap());
-    }
-    let string = String::from_utf16_lossy(&u16be);
+    file.seek(SeekFrom::Start(string_offset as u64)).unwrap();
+    let string = file.read_utf16_string(lang_tag_record[i as usize].length as usize).unwrap();
     lang_tag_record[i as usize].offset = string_offset;
     lang_tag_record[i as usize].length = lang_tag_record[i as usize].length;
     lang_tag_string.push(string);

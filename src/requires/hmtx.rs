@@ -1,5 +1,7 @@
-use std::{io::{Read, Seek, SeekFrom, Cursor}, fmt};
-use byteorder::{BigEndian, ReadBytesExt};
+use std::{io::{Read, Seek, SeekFrom}, fmt};
+
+use bin_rs::reader::BinaryReader;
+
 
 #[derive(Debug, Clone)]
 pub(crate) struct HMTX {
@@ -14,7 +16,7 @@ impl fmt::Display for HMTX {
 }
 
 impl HMTX {
-  pub(crate) fn new<R:Read + Seek>(file: R, offest: u32, length: u32
+  pub(crate) fn new<R:BinaryReader>(file: &mut R, offest: u32, length: u32
     , number_of_hmetrics: u16,num_glyphs: u16) -> Self {
       get_hdmx(file, offest, length, number_of_hmetrics, num_glyphs)
   }
@@ -55,17 +57,14 @@ pub(crate) struct LongHorMetric {
 }
 
 
-fn get_hdmx<R: Read + Seek>(file: R, offest: u32, length: u32
+fn get_hdmx<R: bin_rs::reader::BinaryReader>(file: &mut R, offest: u32, length: u32
                       , number_of_hmetrics: u16,num_glyphs: u16) -> HMTX {
   let mut file = file;
   file.seek(SeekFrom::Start(offest as u64)).unwrap();
-  let mut buf = vec![0; length as usize];
-  file.read_exact(&mut buf).unwrap();
-  let mut cursor = Cursor::new(buf);
   let mut h_metrics = Vec::new();
   for _ in 0..number_of_hmetrics {
-    let advance_width = cursor.read_u16::<BigEndian>().unwrap();
-    let left_side_bearing = cursor.read_i16::<BigEndian>().unwrap();
+    let advance_width = file.read_u16().unwrap();
+    let left_side_bearing = file.read_i16().unwrap();
     h_metrics.push(LongHorMetric {
       advance_width: advance_width,
       left_side_bearing: left_side_bearing,
@@ -74,7 +73,7 @@ fn get_hdmx<R: Read + Seek>(file: R, offest: u32, length: u32
   let mut left_side_bearings = Vec::new();
   let number = num_glyphs - number_of_hmetrics;
   for _ in 0..number {
-    let left_side_bearing = cursor.read_u16::<BigEndian>().unwrap();
+    let left_side_bearing = file.read_u16().unwrap();
     left_side_bearings.push(left_side_bearing);
   }
   HMTX {

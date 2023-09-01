@@ -1,4 +1,6 @@
-use std::io::{Read, Seek};
+use std::path::PathBuf;
+
+use bin_rs::{reader::{BinaryReader, BytesReader, StreamReader}, Endian};
 
 use crate::requires::cmap;
 
@@ -112,8 +114,8 @@ impl FontHeaders {
                     string.push_str(&"\n".to_string());
                 }
                 if header.major_version >= 2 {
-                    string.push_str(&" ul_dsig_sfnt_version: ".to_string());
-                    string.push_str(&header.ul_dsig_sfnt_version.to_string());
+                    string.push_str(&" ul_dsig_tag: ".to_string());
+                    string.push_str(&header.ul_dsig_tag.to_string());
                     string.push_str(&" ul_dsig_length: ".to_string());
                     string.push_str(&header.ul_dsig_length.to_string());
                     string.push_str(&" ul_dsig_offset: ".to_string());
@@ -270,7 +272,7 @@ pub struct TTFHeader {
     pub(crate) num_fonts: u32,
     pub(crate) table_directory: Box<Vec<u32>>,
     // Version2
-    pub(crate) ul_dsig_sfnt_version: u32,
+    pub(crate) ul_dsig_tag: u32,
     pub(crate) ul_dsig_length: u32,
     pub(crate) ul_dsig_offset: u32,
 }
@@ -428,44 +430,46 @@ pub(crate) enum FontTable {
     UNKNOWN
 }
 
+pub fn get_font_type_from_file(filename: &PathBuf) -> FontHeaders {
+    let file = std::fs::File::open(filename).unwrap();
+    let mut reader = std::io::BufReader::new(file);
+    let mut file = StreamReader::new(reader);
+    get_font_type(&mut file)
+}
 
-pub fn get_font_type<R: Read + Seek>(mut file: R) -> FontHeaders {
-    let mut buffer = [0; 4]; 
-    file.read(&mut buffer).unwrap();
+pub fn get_font_type<B: BinaryReader>(file: &mut B) -> FontHeaders {
+    let mut buffer = [0; 4];
+    file.set_endian(Endian::BigEndian);
+    file.read_bytes(&mut buffer).unwrap();
     let sfnt_version:u32 = u32::from_be_bytes(buffer);
     let font_type = match &buffer {
         b"ttcf" => {
-            let mut major_version = [0; 2];
-            file.read(&mut major_version).unwrap();
-            let mut minor_version = [0; 2];
-            let version = u16::from_be_bytes(major_version);
-            file.read(&mut minor_version).unwrap();
-            let mut num_fonts = [0; 4];
-            file.read(&mut num_fonts).unwrap();
+            let major_version = file.read_u16().unwrap();
+            let minor_version = file.read_u16().unwrap();
+            let num_fonts = file.read_u32().unwrap();
             let mut table_directory = Vec::new();
-            for _ in 0..u32::from_be_bytes(num_fonts) {
-                let mut offset = [0; 4];
-                file.read(&mut offset).unwrap();
-                table_directory.push(u32::from_be_bytes(offset));
+            for _ in 0..num_fonts {
+                let offset = file.read_u32().unwrap();
+                table_directory.push(offset);
             }
-            let mut ul_dsig_sfnt_version = [0; 4];
-            let mut ul_dsig_length: [u8; 4] = [0; 4];
-            let mut ul_dsig_offset = [0; 4];
-            if version >= 2 {
-                file.read(&mut ul_dsig_sfnt_version).unwrap();
-                file.read(&mut ul_dsig_length).unwrap();
-                file.read(&mut ul_dsig_offset).unwrap();
+            let mut ul_dsig_tag = 0;
+            let mut ul_dsig_length = 0;
+            let mut ul_dsig_offset = 0;
+            if major_version >= 2 {
+                ul_dsig_tag = file.read_u32().unwrap();
+                ul_dsig_length = file.read_u32().unwrap();
+                ul_dsig_offset = file.read_u32().unwrap();
             }
             let fontheader = {
                 TTFHeader {
-                    sfnt_version : sfnt_version,
-                    major_version: version,
-                    minor_version: u16::from_be_bytes(minor_version),
-                    num_fonts: u32::from_be_bytes(num_fonts),
+                    sfnt_version,
+                    major_version,
+                    minor_version,
+                    num_fonts: num_fonts,
                     table_directory: Box::new(table_directory),
-                    ul_dsig_sfnt_version: u32::from_be_bytes(ul_dsig_sfnt_version),
-                    ul_dsig_length: u32::from_be_bytes(ul_dsig_length),
-                    ul_dsig_offset: u32::from_be_bytes(ul_dsig_offset),
+                    ul_dsig_tag,
+                    ul_dsig_length,
+                    ul_dsig_offset,                    
                 }
             };  
             FontHeaders::TTF(fontheader)
@@ -473,144 +477,96 @@ pub fn get_font_type<R: Read + Seek>(mut file: R) -> FontHeaders {
         // if 0x00010000 -> OTF
 
         b"\x00\x01\x00\x00" | b"OTTO" => {
-            let mut num_tables = [0; 2];
-            file.read(&mut num_tables).unwrap();
-            let mut search_range = [0; 2];
-            file.read(&mut search_range).unwrap();
-            let mut entry_selector = [0; 2];
-            file.read(&mut entry_selector).unwrap();
-            let mut range_shift = [0; 2];
-            file.read(&mut range_shift).unwrap();
-            let mut table_directory = [0; 16];
-            file.read(&mut table_directory).unwrap();
-            let mut table_data = [0; 4];
-            file.read(&mut table_data).unwrap();
-            let mut checksum = [0; 4];
-            file.read(&mut checksum).unwrap();
-            let mut offset = [0; 4];
-            file.read(&mut offset).unwrap();
-            let mut length = [0; 4];
-            file.read(&mut length).unwrap();
+            let num_tables = file.read_u16().unwrap();
+            let search_range = file.read_u16().unwrap();
+            let entry_selector = file.read_u16().unwrap();
+            let range_shift = file.read_u16().unwrap();
             let mut table_records = Vec::new();
-            for _ in 0..u16::from_be_bytes(num_tables) {
-                let mut table_tag = [0; 4];
-                file.read(&mut table_tag).unwrap();
-                let mut check_sum = [0; 4];
-                file.read(&mut check_sum).unwrap();
-                let mut offset = [0; 4];
-                file.read(&mut offset).unwrap();
-                let mut length = [0; 4];
-                file.read(&mut length).unwrap();
-                // debug
-                let table_record = TableRecord {
-                    table_tag: u32::from_be_bytes(table_tag),
-                    check_sum: u32::from_be_bytes(check_sum),
-                    offset: u32::from_be_bytes(offset),
-                    length: u32::from_be_bytes(length),
-                };
-                table_records.push(table_record);
+            for _ in 0..num_tables {
+                let table_tag = file.read_u32().unwrap();
+                let check_sum = file.read_u32().unwrap();
+                let offset = file.read_u32().unwrap();
+                let length = file.read_u32().unwrap();
+                table_records.push(TableRecord {
+                    table_tag,
+                    check_sum,
+                    offset,
+                    length,
+                });
             }
 
             let fontheader = OTFHeader {
-                sfnt_version : sfnt_version,
-                num_tables: u16::from_be_bytes(num_tables),
-                search_range: u16::from_be_bytes(search_range),
-                entry_selector: u16::from_be_bytes(entry_selector),
-                range_shift: u16::from_be_bytes(range_shift),
-                table_records: Box::new(table_records),
+                sfnt_version,
+                num_tables,
+                search_range,
+                entry_selector,
+                range_shift,
+                table_records: Box::new(table_records), 
             };
             FontHeaders::OTF(fontheader)
         },
         // 0
         b"wOFF" => {
-            let mut signature = [0; 4];
-            file.read(&mut signature).unwrap();
-            let mut flavor = [0; 4];
-            file.read(&mut flavor).unwrap();
-            let mut length = [0; 4];
-            file.read(&mut length).unwrap();
-            let mut num_tables = [0; 2];
-            file.read(&mut num_tables).unwrap();
-            let mut reserved = [0; 2];
-            file.read(&mut reserved).unwrap();
-            let mut total_sfnt_size = [0; 4];
-            file.read(&mut total_sfnt_size).unwrap();
-            let mut major_version = [0; 2];
-            file.read(&mut major_version).unwrap();
-            let mut minor_version = [0; 2];
-            file.read(&mut minor_version).unwrap();
-            let mut meta_offset = [0; 4];
-            file.read(&mut meta_offset).unwrap();
-            let mut meta_length = [0; 4];
-            file.read(&mut meta_length).unwrap();
-            let mut meta_orig_length = [0; 4];
-            file.read(&mut meta_orig_length).unwrap();
-            let mut priv_offset = [0; 4];
-            file.read(&mut priv_offset).unwrap();
-            let mut priv_length = [0; 4];
-            file.read(&mut priv_length).unwrap();
-            let fontheader = WOFFHeader {
-                sfnt_version : sfnt_version,
-                signature: u32::from_be_bytes(signature),
-                flavor: u32::from_be_bytes(flavor),
-                length: u32::from_be_bytes(length),
-                num_tables: u16::from_be_bytes(num_tables),
-                reserved: u16::from_be_bytes(reserved),
-                total_sfnt_size: u32::from_be_bytes(total_sfnt_size),
-                major_version: u16::from_be_bytes(major_version),
-                minor_version: u16::from_be_bytes(minor_version),
-                meta_offset: u32::from_be_bytes(meta_offset),
-                meta_length: u32::from_be_bytes(meta_length),
-                meta_orig_length: u32::from_be_bytes(meta_orig_length),
-                priv_offset: u32::from_be_bytes(priv_offset),
-                priv_length: u32::from_be_bytes(priv_length),
-            };
-            FontHeaders::WOFF(fontheader)
+            let signature = file.read_u32().unwrap();
+            let flavor = file.read_u32().unwrap();
+            let length = file.read_u32().unwrap();
+            let num_tables = file.read_u16().unwrap();
+            let reserved = file.read_u16().unwrap();
+            let total_sfnt_size = file.read_u32().unwrap();
+            let major_version = file.read_u16().unwrap();
+            let minor_version = file.read_u16().unwrap();
+            let meta_offset = file.read_u32().unwrap();
+            let meta_length = file.read_u32().unwrap();
+            let meta_orig_length = file.read_u32().unwrap();
+            let priv_offset = file.read_u32().unwrap();
+            let priv_length = file.read_u32().unwrap();            
+            FontHeaders::WOFF(WOFFHeader {
+                sfnt_version,
+                signature,
+                flavor,
+                length,
+                num_tables,
+                reserved,
+                total_sfnt_size,
+                major_version,
+                minor_version,
+                meta_offset,
+                meta_length,
+                meta_orig_length,
+                priv_offset,
+                priv_length,
+            })
         },
-        b"wOF2" => {          
-            let mut signature = [0; 4];
-            file.read(&mut signature).unwrap();
-            let mut flavor = [0; 4];
-            file.read(&mut flavor).unwrap();
-            let mut length = [0; 4];
-            file.read(&mut length).unwrap();
-            let mut num_tables = [0; 2];
-            file.read(&mut num_tables).unwrap();
-            let mut reserved = [0; 2];
-            file.read(&mut reserved).unwrap();
-            let mut total_sfnt_size = [0; 4];
-            file.read(&mut total_sfnt_size).unwrap();
-            let mut major_version = [0; 2];
-            file.read(&mut major_version).unwrap();
-            let mut minor_version = [0; 2];
-            file.read(&mut minor_version).unwrap();
-            let mut meta_offset = [0; 4];
-            file.read(&mut meta_offset).unwrap();
-            let mut meta_length = [0; 4];
-            file.read(&mut meta_length).unwrap();
-            let mut meta_orig_length = [0; 4];
-            file.read(&mut meta_orig_length).unwrap();
-            let mut priv_offset = [0; 4];
-            file.read(&mut priv_offset).unwrap();
-            let mut priv_length = [0; 4];
-            file.read(&mut priv_length).unwrap();
-            let fontheader: WOFF2Header = WOFF2Header {
-                sfnt_version : sfnt_version,
-                signature: u32::from_be_bytes(signature),
-                flavor: u32::from_be_bytes(flavor),
-                length: u32::from_be_bytes(length),
-                num_tables: u16::from_be_bytes(num_tables),
-                reserved: u16::from_be_bytes(reserved),
-                total_sfnt_size: u32::from_be_bytes(total_sfnt_size),
-                major_version: u16::from_be_bytes(major_version),
-                minor_version: u16::from_be_bytes(minor_version),
-                meta_offset: u32::from_be_bytes(meta_offset),
-                meta_length: u32::from_be_bytes(meta_length),
-                meta_orig_length: u32::from_be_bytes(meta_orig_length),
-                priv_offset: u32::from_be_bytes(priv_offset),
-                priv_length: u32::from_be_bytes(priv_length),
-            };
-            FontHeaders::WOFF2(fontheader)           
+        b"wOF2" => {
+            let signature = file.read_u32().unwrap();
+            let flavor = file.read_u32().unwrap();
+            let length = file.read_u32().unwrap();
+            let num_tables = file.read_u16().unwrap();
+            let reserved = file.read_u16().unwrap();
+            let total_sfnt_size = file.read_u32().unwrap();
+            let major_version = file.read_u16().unwrap();
+            let minor_version = file.read_u16().unwrap();
+            let meta_offset = file.read_u32().unwrap();
+            let meta_length = file.read_u32().unwrap();
+            let meta_orig_length = file.read_u32().unwrap();
+            let priv_offset = file.read_u32().unwrap();
+            let priv_length = file.read_u32().unwrap();
+            FontHeaders::WOFF2(WOFF2Header {
+                sfnt_version,
+                signature,
+                flavor,
+                length,
+                num_tables,
+                reserved,
+                total_sfnt_size,
+                major_version,
+                minor_version,
+                meta_offset,
+                meta_length,
+                meta_orig_length,
+                priv_offset,
+                priv_length,
+            })
         },
         _ => FontHeaders::Unknown,
     };
@@ -619,7 +575,7 @@ pub fn get_font_type<R: Read + Seek>(mut file: R) -> FontHeaders {
 
 
 pub fn get_font_type_from_buffer(fontdata: &[u8]) -> FontHeaders {
-    let file = std::io::Cursor::new(fontdata);
+    let file = &mut BytesReader::new(fontdata);
     get_font_type(file)
 }
 

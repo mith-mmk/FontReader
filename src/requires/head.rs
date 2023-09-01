@@ -1,5 +1,6 @@
 use std::{io::{Read, Seek, SeekFrom, Cursor}, fmt};
-use byteorder::{BigEndian, ReadBytesExt};
+use bin_rs::reader::BinaryReader;
+
 use crate::fontheader::{LONGDATETIME, self};
 
 #[derive(Debug, Clone)]
@@ -31,7 +32,7 @@ impl fmt::Display for HEAD {
 }
 
 impl HEAD{
-  pub(crate) fn new<R:Read + Seek>(file: R, offest: u32, length: u32) -> Self {
+  pub(crate) fn new<B:BinaryReader>(file: &mut B, offest: u32, length: u32) -> Self {
     get_head(file, offest, length)
   }
 
@@ -99,30 +100,29 @@ impl HEAD{
 
 }
 
-fn get_head<R: Read + Seek>(file: R, offest: u32, length: u32) -> HEAD {
+fn get_head<R: BinaryReader>(file:&mut R, offest: u32, length: u32) -> HEAD {
   let mut file = file;
   file.seek(SeekFrom::Start(offest as u64)).unwrap();
-  let mut buf = vec![0; length as usize];
-  file.read_exact(&mut buf).unwrap();
-  let mut cursor = Cursor::new(buf);
-  let major_version = cursor.read_u16::<BigEndian>().unwrap();
-  let minor_version = cursor.read_u16::<BigEndian>().unwrap();
-  let font_revision = cursor.read_u32::<BigEndian>().unwrap();
-  let check_sum_adjustment = cursor.read_u32::<BigEndian>().unwrap();
-  let magic_number = cursor.read_u32::<BigEndian>().unwrap();
-  let flags = cursor.read_u16::<BigEndian>().unwrap();
-  let units_per_em = cursor.read_u16::<BigEndian>().unwrap();
-  let created = cursor.read_i64::<BigEndian>().unwrap();
-  let modified = cursor.read_i64::<BigEndian>().unwrap();
-  let x_min = cursor.read_i16::<BigEndian>().unwrap();
-  let y_min = cursor.read_i16::<BigEndian>().unwrap();
-  let x_max = cursor.read_i16::<BigEndian>().unwrap();
-  let y_max = cursor.read_i16::<BigEndian>().unwrap();
-  let mac_style = cursor.read_u16::<BigEndian>().unwrap();
-  let lowest_rec_ppem = cursor.read_u16::<BigEndian>().unwrap();
-  let font_direction_hint = cursor.read_i16::<BigEndian>().unwrap();
-  let index_to_loc_format = cursor.read_i16::<BigEndian>().unwrap();
-  let glyph_data_format = cursor.read_i16::<BigEndian>().unwrap();
+  let buf = file.read_bytes_as_vec(length as usize).unwrap();
+
+  let major_version = file.read_u16().unwrap();
+  let minor_version = file.read_u16().unwrap();
+  let font_revision = file.read_u32().unwrap();
+  let check_sum_adjustment = file.read_u32().unwrap();
+  let magic_number = file.read_u32().unwrap();
+  let flags = file.read_u16().unwrap();
+  let units_per_em = file.read_u16().unwrap();
+  let created = file.read_i64().unwrap();
+  let modified = file.read_i64().unwrap();
+  let x_min = file.read_i16().unwrap();
+  let y_min = file.read_i16().unwrap();
+  let x_max = file.read_i16().unwrap();
+  let y_max = file.read_i16().unwrap();
+  let mac_style = file.read_u16().unwrap();
+  let lowest_rec_ppem = file.read_u16().unwrap();
+  let font_direction_hint = file.read_i16().unwrap();
+  let index_to_loc_format = file.read_i16().unwrap();
+  let glyph_data_format = file.read_i16().unwrap();
   HEAD {
     major_version,
     minor_version,

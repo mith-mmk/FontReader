@@ -6,5 +6,6 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-byteorder = "1.4.3"
+bin-rs = "0.0.9"
+# byteorder = "1.4.3"
 # iconv = "0.1"

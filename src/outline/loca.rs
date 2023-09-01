@@ -1,5 +1,7 @@
 use std::{io::{Read, Seek, SeekFrom, Cursor}, fmt};
-use byteorder::{BigEndian, ReadBytesExt};
+
+use bin_rs::reader::BinaryReader;
+
 
 #[derive(Debug, Clone)]
 pub(crate) struct LOCA {
@@ -14,7 +16,7 @@ impl fmt::Display for LOCA {
 }
 
 impl LOCA{
-  pub(crate) fn new<R:Read + Seek>(file: R, offest: u32, length: u32, num_glyphs: u16) -> Self {
+  pub(crate) fn new<R:BinaryReader>(file: &mut R, offest: u32, length: u32, num_glyphs: u16) -> Self {
     get_loca(file, offest, length, num_glyphs)
   }
 
@@ -40,13 +42,9 @@ impl LOCA{
   }
 }
 
-fn get_loca<R:Read + Seek>(file: R, offest: u32, length: u32, num_glyphs: u16) -> LOCA {
+fn get_loca<R:BinaryReader>(file:&mut R, offest: u32, length: u32, num_glyphs: u16) -> LOCA {
   let size = length / num_glyphs as u32;
-  let mut file = file;
   file.seek(SeekFrom::Start(offest as u64)).unwrap();
-  let mut buf = vec![0; length as usize];
-  file.read_exact(&mut buf).unwrap();
-  let mut cursor = Cursor::new(buf);
   if size != 4 && size != 2 {
     panic!("Invalid size of loca table");
   }
@@ -54,9 +52,9 @@ fn get_loca<R:Read + Seek>(file: R, offest: u32, length: u32, num_glyphs: u16) -
   let mut offsets = Vec::new();
   for _ in 0..num_glyphs + 1 {
     let offset: u32 = if size == 2 {
-      cursor.read_u16::<BigEndian>().unwrap() as u32 * 2
+      file.read_u16().unwrap() as u32 * 2
     } else {
-      cursor.read_u32::<BigEndian>().unwrap()
+      file.read_u32().unwrap()
     };
     offsets.push(offset);
   }
