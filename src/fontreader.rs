@@ -12,8 +12,8 @@ use std::io::{Write, BufWriter};
 
 
 #[derive(Debug, Clone)]
-pub(crate) struct Font {
-  pub(crate) font_type: fontheader::FontHeaders,
+pub struct Font {
+  pub font_type: fontheader::FontHeaders,
   pub(crate) cmap: Option<cmap::CmapEncodings>,
   pub(crate) head: Option<head::HEAD>,
   pub(crate) hhea: Option<hhea::HHEA>,
@@ -34,7 +34,7 @@ impl Font {
     font_load_from_file(filename)
   }
 
-  pub fn get_h_metrix(&self, id: usize) -> LongHorMetric {
+  pub(crate) fn get_h_metrix(&self, id: usize) -> LongHorMetric {
     let hmtx = self.hmtx.as_ref().unwrap();
     hmtx.get_metrix(id)
   }
@@ -82,10 +82,6 @@ impl Font {
       }
       if ch == '\t' {
         html += "<span style=\"width: 4em; display: inline-block;\"></span>\n";
-        continue;
-      }
-      if ch == ' ' {
-        html += "<span style=\"width: 1em; display: inline-block;\"></span>\n";
         continue;
       }
       let svg = self.get_svg(ch);
@@ -262,7 +258,7 @@ fn font_load<R:BinaryReader>(file: &mut R) -> Option<Font> {
         return None
       }
       if font.loca.is_none() {
-        debug_assert!(true, "Not support no loca table");
+        debug_assert!(true, "Not support no loca table, current only support OpenType font, not support CFF/CFF2/SVG font");
         return None
       }
       if font.grif.is_none() {

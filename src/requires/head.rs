@@ -101,9 +101,7 @@ impl HEAD{
 }
 
 fn get_head<R: BinaryReader>(file:&mut R, offest: u32, length: u32) -> HEAD {
-  let mut file = file;
   file.seek(SeekFrom::Start(offest as u64)).unwrap();
-  let buf = file.read_bytes_as_vec(length as usize).unwrap();
 
   let major_version = file.read_u16().unwrap();
   let minor_version = file.read_u16().unwrap();

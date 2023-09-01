@@ -2,8 +2,6 @@ use std::{io::{SeekFrom}, fmt,};
 
 use bin_rs::reader::BinaryReader;
 
-use crate::requires::cmap::CmapHighByteEncoding;
-
 use super::loca;
 /*
 int16	numberOfContours	If the number of contours is greater than or equal to zero, this is a simple glyph. If negative, this is a composite glyph — the value -1 should be used for composite glyphs.
@@ -231,10 +229,9 @@ impl Glyph {
     let mut path_start = true;
     let mut x = 0;
     let mut y = 0;
-    let mut prev_x = 0;
-    let mut prev_y = 0;
     let mut strart_x = 0;
     let mut strart_y = 0;
+
     for i in 0..parsed.flags.len() {
       x += parsed.xs[i];
       y += parsed.ys[i];
@@ -243,28 +240,33 @@ impl Glyph {
         strart_y = y;
       } 
       let on_curve = parsed.on_curves[i];
+      let next_x = if i + 1 < parsed.xs.len() {x + parsed.xs[i + 1]} else { strart_x };
+      let next_y = if i + 1 < parsed.ys.len() {y + parsed.ys[i + 1]} else { strart_y };
+      let next_on_curve = if i + 1 < parsed.on_curves.len() {parsed.on_curves[i + 1]} else { true };
       if path_start {
         svg += &format!("M{} {}", x, y_max - y);
         path_start = false;
-      } else if befor_on_curve && on_curve {
-        svg += &format!("L{} {}", x, y_max - y);
-      } else if befor_on_curve && !on_curve {
-        svg += &format!("Q{} {} {} {}", prev_x, y_max - prev_y, x, y_max - y);
-      } else if !befor_on_curve && on_curve {
-        svg += &format!("L{} {}", x, y_max - y);
-      } else if !befor_on_curve && !on_curve {
-        svg += &format!("T{} {}", x, y_max - y);
+      } else if on_curve {
+        if befor_on_curve {
+          svg += &format!("L{} {}", x, y_max - y);
+        }
+      } else {
+        if befor_on_curve {
+          if next_on_curve {
+            svg += &format!("Q{} {} {} {}", x, y_max - y, next_x, y_max - next_y);
+          } else {
+            svg += &format!("Q{} {} {} {}", x, y_max - y, (x + next_x) / 2, y_max - (y + next_y) / 2);
+          }
+        } else {
+          svg += &format!("T{} {}", x, y_max - y);
+        }
       }
+
       befor_on_curve = on_curve;
-      prev_x = x;
-      prev_y = y;
       if i >= parsed.end_pts_of_contours[pos] {
         pos += 1;
         path_start = true;
-        svg += format!("M{} {}  ", strart_x, y_max - strart_y).as_str();
-        strart_x = x;
-        strart_y = y;
-      }
+      }   
     }
     svg += "\"/>\n</svg>";
     svg

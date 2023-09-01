@@ -1,7 +1,5 @@
 use std::path::PathBuf;
-
 use bin_rs::{reader::{BinaryReader, BytesReader, StreamReader}, Endian};
-
 use crate::requires::cmap;
 
 // pub type F2DOT14 = i16;
