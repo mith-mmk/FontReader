@@ -236,8 +236,16 @@ impl Glyph {
       x += parsed.xs[i];
       y += parsed.ys[i];
       let on_curve = parsed.on_curves[i];
-      let next_x = if i + 1 < parsed.xs.len() {x + parsed.xs[i + 1]} else { start_x };
-      let next_y = if i + 1 < parsed.ys.len() {y + parsed.ys[i + 1]} else { start_y };
+      let mut next_x = x;
+      let mut next_y = y;
+      if parsed.end_pts_of_contours[pos] == i || i == 0 || i == parsed.flags.len() - 1 {
+        next_x = start_x;
+        next_y = start_y;
+      } else {
+        next_x = x + parsed.xs[i + 1];
+        next_y = y + parsed.ys[i + 1];
+
+      }
       let next_on_curve = if i + 1 < parsed.on_curves.len() {parsed.on_curves[i + 1]} else { true };
       if path_start {
         svg += &format!("M{} {}", x, y_max - y);
