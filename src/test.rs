@@ -41,34 +41,46 @@ mod tests {
      use crate::outline::cff::operand_encoding;
       let b = [0x8b];
       let value = operand_encoding(&b);
-      assert_eq!(value, Some(0));
+      assert_eq!(value, Some(0_f64));
       let b = [0xef];
       let value = operand_encoding(&b);
-      assert_eq!(value, Some(100));
+      assert_eq!(value, Some(100_f64));
       let b = [0x27];
       let value = operand_encoding(&b);
-      assert_eq!(value, Some(-100));
+      assert_eq!(value, Some(-100_f64));
       let b = [0xfa, 0x7c];
       let value = operand_encoding(&b);
-      assert_eq!(value, Some(1000));
+      assert_eq!(value, Some(1000_f64));
       let b = [0xfe, 0x7c];
       let value = operand_encoding(&b);
-      assert_eq!(value, Some(-1000));
+      assert_eq!(value, Some(-1000_f64));
       let b = [0x1c, 0x27, 0x10];
       let value = operand_encoding(&b);
-      assert_eq!(value, Some(10000));
+      assert_eq!(value, Some(10000_f64));
       let b = [0x1c, 0xd8, 0xf0];
       let value = operand_encoding(&b);
-      assert_eq!(value, Some(-10000));
+      assert_eq!(value, Some(-10000_f64));
       let b = [0x1d, 0x00, 0x01, 0x86, 0xa0];
       let value = operand_encoding(&b);
-      assert_eq!(value, Some(100000));
+      assert_eq!(value, Some(100000_f64));
       let b = [0x1d, 0xff, 0xfe, 0x79, 0x60];
       let value = operand_encoding(&b);
-      assert_eq!(value, Some(-100000));
+      assert_eq!(value, Some(-100000_f64));
       let b = [31];
       let value = operand_encoding(&b);
       assert_eq!(value, None);
+      let b = [0x1e, 0x2e, 0xa2, 0x5f];
+      let value = operand_encoding(&b);
+      // 2 - .25
+      assert_eq!(value, None);
+      let b = [0x1e, 0xe2, 0xa2, 0x5f];
+      let value = operand_encoding(&b);
+      assert_eq!(value, Some(-2.25_f64));
+      // -0.140541e-3
+      let b = [0x1e, 0x0a, 0x14, 0x05, 0x41, 0xc3, 0xff];
+      let value = operand_encoding(&b);
+      assert_eq!(value, Some(-0.0140541_f64));
+      
 
       Ok(())
   }
