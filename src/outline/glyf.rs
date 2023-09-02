@@ -229,36 +229,42 @@ impl Glyph {
     let mut path_start = true;
     let mut x = 0;
     let mut y = 0;
-    let mut strart_x = 0;
-    let mut strart_y = 0;
+    let mut start_x = 0;
+    let mut start_y = 0;
 
     for i in 0..parsed.flags.len() {
       x += parsed.xs[i];
       y += parsed.ys[i];
-      if i == 0 {
-        strart_x = x;
-        strart_y = y;
-      } 
       let on_curve = parsed.on_curves[i];
-      let next_x = if i + 1 < parsed.xs.len() {x + parsed.xs[i + 1]} else { strart_x };
-      let next_y = if i + 1 < parsed.ys.len() {y + parsed.ys[i + 1]} else { strart_y };
+      let next_x = if i + 1 < parsed.xs.len() {x + parsed.xs[i + 1]} else { start_x };
+      let next_y = if i + 1 < parsed.ys.len() {y + parsed.ys[i + 1]} else { start_y };
       let next_on_curve = if i + 1 < parsed.on_curves.len() {parsed.on_curves[i + 1]} else { true };
       if path_start {
         svg += &format!("M{} {}", x, y_max - y);
+        start_x = x;
+        start_y = y;
         path_start = false;
       } else if on_curve {
         if befor_on_curve {
           svg += &format!("L{} {}", x, y_max - y);
+        } else {
+          // Q px py x y or T x y was writed
         }
       } else {
         if befor_on_curve {
           if next_on_curve {
             svg += &format!("Q{} {} {} {}", x, y_max - y, next_x, y_max - next_y);
-          } else {
+          } else { // next off curve
             svg += &format!("Q{} {} {} {}", x, y_max - y, (x + next_x) / 2, y_max - (y + next_y) / 2);
           }
-        } else {
-          svg += &format!("T{} {}", x, y_max - y);
+        } else { // befor off curve 
+          svg += &format!("T{} {}", next_x, y_max - next_y);
+          /*
+          if next_on_curve {
+            svg += &format!("T{} {}", next_x, y_max - next_y);
+          } else {  // next off curve
+            svg += &format!("T{} {}", (x + next_x) / 2, y_max - (y + next_y) / 2);
+          } */
         }
       }
 
