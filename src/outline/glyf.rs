@@ -236,8 +236,8 @@ impl Glyph {
       x += parsed.xs[i];
       y += parsed.ys[i];
       let on_curve = parsed.on_curves[i];
-      let mut next_x = x;
-      let mut next_y = y;
+      let next_x;
+      let next_y;
       if parsed.end_pts_of_contours[pos] == i || i == 0 || i == parsed.flags.len() - 1 {
         next_x = start_x;
         next_y = start_y;

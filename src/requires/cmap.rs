@@ -1,6 +1,7 @@
 use std::fmt;
-
 use bin_rs::reader::BinaryReader;
+
+// cmap is a table that maps character codes to glyph index values
 
 #[derive(Debug, Clone)]
 pub(crate) struct CMAP {

@@ -1,10 +1,10 @@
-#[cfg(test)]
 mod tests {
-  #[test]
-  use fontheader::fixed_to_f32;
-  use fontheader::f2dot14_to_f32;
+
+  #[cfg(target_feature = "impl")]
   fn convert() {
-    /*1.999939	0x7fff	1	16383/16384
+    use crate::fontheader::fixed_to_f32;
+    use crate::fontheader::f2dot14_to_f32;
+      /*1.999939	0x7fff	1	16383/16384
       1.75	0x7000	1	12288/16384
       0.000061	0x0001	0	1/16384
       0.0	0x0000	0	0/16384
@@ -35,4 +35,42 @@ mod tests {
     let value = fixed_to_f32(0x8000_0000);
     assert_eq!(value, -2.0);
   }
+
+  #[test]
+  fn operand_encoding_test() -> Result<(), Box<dyn std::error::Error>>{
+     use crate::outline::cff::operand_encoding;
+      let b = [0x8b];
+      let value = operand_encoding(&b);
+      assert_eq!(value, Some(0));
+      let b = [0xef];
+      let value = operand_encoding(&b);
+      assert_eq!(value, Some(100));
+      let b = [0x27];
+      let value = operand_encoding(&b);
+      assert_eq!(value, Some(-100));
+      let b = [0xfa, 0x7c];
+      let value = operand_encoding(&b);
+      assert_eq!(value, Some(1000));
+      let b = [0xfe, 0x7c];
+      let value = operand_encoding(&b);
+      assert_eq!(value, Some(-1000));
+      let b = [0x1c, 0x27, 0x10];
+      let value = operand_encoding(&b);
+      assert_eq!(value, Some(10000));
+      let b = [0x1c, 0xd8, 0xf0];
+      let value = operand_encoding(&b);
+      assert_eq!(value, Some(-10000));
+      let b = [0x1d, 0x00, 0x01, 0x86, 0xa0];
+      let value = operand_encoding(&b);
+      assert_eq!(value, Some(100000));
+      let b = [0x1d, 0xff, 0xfe, 0x79, 0x60];
+      let value = operand_encoding(&b);
+      assert_eq!(value, Some(-100000));
+      let b = [31];
+      let value = operand_encoding(&b);
+      assert_eq!(value, None);
+
+      Ok(())
+  }
+
 }

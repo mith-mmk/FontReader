@@ -1,7 +1,8 @@
-use std::{io::{Read, Seek, SeekFrom, Cursor}, fmt};
+use std::{io::SeekFrom, fmt};
 use bin_rs::reader::BinaryReader;
-
 use crate::fontheader::{LONGDATETIME, self};
+
+// head table
 
 #[derive(Debug, Clone)]
 pub(crate) struct HEAD {

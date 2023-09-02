@@ -1,4 +1,4 @@
-
+// name is a table that contains font name information.
 
 use std::{fmt::{Display, Formatter, self}, io::SeekFrom};
 

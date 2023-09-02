@@ -4,3 +4,6 @@ pub mod requires;
 pub mod outline;
 
 pub type Font = fontreader::Font;
+
+#[cfg(test)]
+mod test;

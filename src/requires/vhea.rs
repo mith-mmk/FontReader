@@ -1,21 +1,22 @@
+// vhea is Vertical Metrics Header Table (optional)
+// https://docs.microsoft.com/en-us/typography/opentype/spec/vhea
+
 use std::{io::SeekFrom, fmt};
 use bin_rs::reader::BinaryReader;
-
-// hhea table Font horizontal metrics header
 
 use crate::fontheader::{FWORD, UFWORD};
 
 #[derive(Debug, Clone)]
-pub(crate) struct HHEA {
+pub(crate) struct VHEA {
   pub(crate) major_version: u16,
   pub(crate) minor_version: u16,
   pub(crate) ascender: FWORD,
   pub(crate) descender: FWORD,
   pub(crate) line_gap: FWORD,
-  pub(crate) advance_width_max: UFWORD,
-  pub(crate) min_left_side_bearing: FWORD,
-  pub(crate) min_right_side_bearing: FWORD,
-  pub(crate) x_max_extent: FWORD,
+  pub(crate) advance_height_max: UFWORD,
+  pub(crate) min_top_side_bearing: FWORD,
+  pub(crate) min_bottom_side_bearing: FWORD,
+  pub(crate) y_max_extent: FWORD,
   pub(crate) caret_slope_rise: i16,
   pub(crate) caret_slope_run: i16,
   pub(crate) caret_offset: i16,
@@ -27,15 +28,15 @@ pub(crate) struct HHEA {
   pub(crate) number_of_hmetrics: u16,
 }
 
-impl fmt::Display for HHEA {
+impl fmt::Display for VHEA {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     write!(f, "{}", self.to_string())
   }
 }
 
-impl HHEA {
+impl VHEA {
   pub(crate) fn new<R:BinaryReader>(file: &mut R, offest: u32, length: u32) -> Self {
-    get_hhea(file, offest, length)
+    get_vhea(file, offest, length)
   }
 
   pub(crate) fn get_accender (&self) -> i16 {
@@ -62,14 +63,14 @@ impl HHEA {
     string += &descender;
     let line_gap = format!("Line Gap {}\n", self.line_gap);
     string += &line_gap;
-    let advance_width_max = format!("Advance Width Max {}\n", self.advance_width_max);
-    string += &advance_width_max;
-    let min_left_side_bearing = format!("Min Left Side Bearing {}\n", self.min_left_side_bearing);
-    string += &min_left_side_bearing;
-    let min_right_side_bearing = format!("Min Right Side Bearing {}\n", self.min_right_side_bearing);
-    string += &min_right_side_bearing;
-    let x_max_extent = format!("xMax Extent {}\n", self.x_max_extent);
-    string += &x_max_extent;
+    let advance_height_max = format!("Advance Height Max {}\n", self.advance_height_max);
+    string += &advance_height_max;
+    let min_top_side_bearing = format!("Min Top Side Bearing {}\n", self.min_top_side_bearing);
+    string += &min_top_side_bearing;
+    let min_bottom_side_bearing = format!("Min Buttom Side Bearing {}\n", self.min_bottom_side_bearing);
+    string += &min_bottom_side_bearing;
+    let y_max_extent = format!("xMax Extent {}\n", self.y_max_extent);
+    string += &y_max_extent;
     let caret_slope_rise = format!("Caret Slope Rise {}\n", self.caret_slope_rise);
     string += &caret_slope_rise;
     let caret_slope_run = format!("Caret Slope Run {}\n", self.caret_slope_run);
@@ -92,7 +93,7 @@ impl HHEA {
   }
 }
 
-fn get_hhea<R: BinaryReader>(file: &mut R, offest: u32, length: u32) -> HHEA {
+fn get_vhea<R: BinaryReader>(file: &mut R, offest: u32, length: u32) -> VHEA {
   let mut file = file;
   file.seek(SeekFrom::Start(offest as u64)).unwrap();
   let major_version = file.read_u16().unwrap();
@@ -100,10 +101,10 @@ fn get_hhea<R: BinaryReader>(file: &mut R, offest: u32, length: u32) -> HHEA {
   let ascender = file.read_i16().unwrap();
   let descender = file.read_i16().unwrap();
   let line_gap = file.read_i16().unwrap();
-  let advance_width_max = file.read_u16().unwrap();
-  let min_left_side_bearing = file.read_i16().unwrap();
-  let min_right_side_bearing = file.read_i16().unwrap();
-  let x_max_extent = file.read_i16().unwrap();
+  let advance_height_max = file.read_u16().unwrap();
+  let min_top_side_bearing = file.read_i16().unwrap();
+  let min_bottom_side_bearing = file.read_i16().unwrap();
+  let y_max_extent = file.read_i16().unwrap();
   let caret_slope_rise = file.read_i16().unwrap();
   let caret_slope_run = file.read_i16().unwrap();
   let caret_offset = file.read_i16().unwrap();
@@ -113,16 +114,17 @@ fn get_hhea<R: BinaryReader>(file: &mut R, offest: u32, length: u32) -> HHEA {
   let reserved4 = file.read_i16().unwrap();
   let metric_data_format = file.read_i16().unwrap();
   let number_of_hmetrics = file.read_u16().unwrap();
-  HHEA{
+
+  VHEA{
     major_version,
     minor_version,
     ascender,
     descender,
     line_gap,
-    advance_width_max,
-    min_left_side_bearing,
-    min_right_side_bearing,
-    x_max_extent,
+    advance_height_max,
+    min_top_side_bearing,
+    min_bottom_side_bearing,
+    y_max_extent,
     caret_slope_rise,
     caret_slope_run,
     caret_offset,

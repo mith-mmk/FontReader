@@ -10,23 +10,32 @@ use crate::requires::hmtx::LongHorMetric;
 #[cfg(debug_assertions)]
 use std::io::{Write, BufWriter};
 
+enum GlyphFormat {
+  OpenTypeGlif,
+  CFF,
+  CFF2,
+  SVG,
+  Bitmap,
+  Unknown
+}
+
 
 #[derive(Debug, Clone)]
 pub struct Font {
   pub font_type: fontheader::FontHeaders,
-  pub(crate) cmap: Option<cmap::CmapEncodings>,
-  pub(crate) head: Option<head::HEAD>,
-  pub(crate) hhea: Option<hhea::HHEA>,
-  pub(crate) hmtx: Option<hmtx::HMTX>,
-  pub(crate) maxp: Option<maxp::MAXP>,
-  pub(crate) name: Option<name::NAME>,
-  pub(crate) os2: Option<os2::OS2>,
-  pub(crate) post: Option<post::POST>,
-  pub(crate) loca: Option<loca::LOCA>,
-  pub(crate) grif: Option<glyf::GLYF>,
+  pub(crate) cmap: Option<cmap::CmapEncodings>, // must
+  pub(crate) head: Option<head::HEAD>, // must
+  pub(crate) hhea: Option<hhea::HHEA>, // must
+  pub(crate) hmtx: Option<hmtx::HMTX>, // must
+  pub(crate) maxp: Option<maxp::MAXP>, // must
+  pub(crate) name: Option<name::NAME>, // must
+  pub(crate) os2: Option<os2::OS2>, // must
+  pub(crate) post: Option<post::POST>, // must
+  pub(crate) loca: Option<loca::LOCA>, // openType font, CFF/CFF2 none
+  pub(crate) grif: Option<glyf::GLYF>, // openType font, CFF/CFF2 none
   hmtx_pos: Option<Pointer>,
-  loca_pos: Option<Pointer>,
-  glyf_pos: Option<Pointer>,
+  loca_pos: Option<Pointer>,  // OpenType font, CFF/CFF2 none
+  glyf_pos: Option<Pointer>,  // OpenType font, CFF/CFF2 none
 }
 
 impl Font {

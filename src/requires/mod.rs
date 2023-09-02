@@ -6,4 +6,5 @@ pub(crate) mod maxp;
 pub(crate) mod name;
 pub(crate) mod os2;
 pub(crate) mod post;
-
+pub(crate) mod vhea;
+pub(crate) mod vmtx;

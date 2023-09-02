@@ -1,7 +1,8 @@
 use std::{io::SeekFrom, fmt};
 use bin_rs::reader::BinaryReader;
 
-// Postscript
+// post table for PostScript
+
 #[derive(Debug, Clone)]
 pub(crate) struct POST {
   pub(crate) version: u32,

@@ -1,5 +1,7 @@
-use std::{io::{Cursor, SeekFrom, Read, Seek}, fmt::{Display, Formatter, self}};
+use std::{io::SeekFrom, fmt};
 use bin_rs::reader::BinaryReader;
+
+// OS/2 table OS/2 and Windows specific metrics
 
 #[derive(Debug, Clone)]
 pub(crate) struct OS2 {
@@ -47,7 +49,7 @@ pub(crate) struct OS2 {
 
 
 impl fmt::Display for OS2 {
-  fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     write!(f, "{}", self.to_string())
   }
 }

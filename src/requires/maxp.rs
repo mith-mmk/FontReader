@@ -1,8 +1,7 @@
-use std::{io::{SeekFrom}, fmt};
-
+use std::{io::SeekFrom, fmt};
 use bin_rs::reader::BinaryReader;
 
-
+// maxp table Maximum profile
 
 #[derive(Debug, Clone)]
 pub(crate) struct MAXP {
