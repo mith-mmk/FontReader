@@ -258,13 +258,7 @@ impl Glyph {
             svg += &format!("Q{} {} {} {}", x, y_max - y, (x + next_x) / 2, y_max - (y + next_y) / 2);
           }
         } else { // befor off curve 
-          svg += &format!("T{} {}", next_x, y_max - next_y);
-          /*
-          if next_on_curve {
-            svg += &format!("T{} {}", next_x, y_max - next_y);
-          } else {  // next off curve
-            svg += &format!("T{} {}", (x + next_x) / 2, y_max - (y + next_y) / 2);
-          } */
+          svg += &format!("T{} {}", (x + next_x) / 2, y_max - (y + next_y) / 2);
         }
       }
 
