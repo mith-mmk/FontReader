@@ -2,10 +2,10 @@ use std::io::BufReader;
 use std::{path::PathBuf, fs::File};
 use bin_rs::reader::{BinaryReader, StreamReader};
 
-use crate::outline::*;
-use crate::requires::*;
+use crate::opentype::outline::*;
+use crate::opentype::requires::*;
 use crate::fontheader;
-use crate::requires::hmtx::LongHorMetric;
+use crate::opentype::requires::hmtx::LongHorMetric;
 
 #[cfg(debug_assertions)]
 use std::io::{Write, BufWriter};

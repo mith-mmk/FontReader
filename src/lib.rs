@@ -1,7 +1,6 @@
 pub mod fontheader;
 pub mod fontreader;
-pub mod requires;
-pub mod outline;
+pub mod opentype;
 
 pub type Font = fontreader::Font;
 

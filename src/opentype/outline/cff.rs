@@ -1,7 +1,6 @@
 // CFF is Adobe Type 1 font format, which is a compact binary format.
 
 // Compare this snippet from src/outline/cff.rs:
-use std::fmt;
 use bin_rs::reader::{BinaryReader, BytesReader};
 //
 // // CFF is Adobe Type 1 font format, which is a compact binary format.

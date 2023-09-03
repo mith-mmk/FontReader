@@ -38,7 +38,7 @@ mod tests {
 
   #[test]
   fn operand_encoding_test() -> Result<(), Box<dyn std::error::Error>>{
-     use crate::outline::cff::operand_encoding;
+     use crate::opentype::outline::cff::operand_encoding;
       let b = [0x8b];
       let value = operand_encoding(&b);
       assert_eq!(value, Some(0_f64));
