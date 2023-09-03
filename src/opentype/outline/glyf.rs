@@ -1,4 +1,4 @@
-use std::{io::{SeekFrom}, fmt,};
+use std::{io::SeekFrom, fmt};
 
 use bin_rs::reader::BinaryReader;
 
@@ -18,7 +18,7 @@ pub(crate) struct GLYF {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct Glyph {
+pub struct Glyph {
     pub glyphs: Box<Vec<u8>>,
     pub offset: u32,
     pub length: u32,

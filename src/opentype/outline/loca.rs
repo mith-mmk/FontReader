@@ -1,4 +1,4 @@
-use std::{io::{Read, Seek, SeekFrom, Cursor}, fmt};
+use std::{io::SeekFrom, fmt};
 
 use bin_rs::reader::BinaryReader;
 

@@ -10,14 +10,37 @@ use crate::opentype::requires::hmtx::LongHorMetric;
 #[cfg(debug_assertions)]
 use std::io::{Write, BufWriter};
 
-enum GlyphFormat {
-  OpenTypeGlif,
+#[derive(Debug, Clone)]
+
+pub enum GlyphFormat {
+  OpenTypeGlyph,
   CFF,
   CFF2,
   SVG,
   Bitmap,
   Unknown
 }
+
+#[derive(Debug, Clone)]
+
+pub enum FontLayout {
+  Horizontal(HorizontalLayout),
+  Vertical(VerticalLayout),
+  Unknown
+}
+
+#[derive(Debug, Clone)]
+pub struct GriphData {
+  format: GlyphFormat,
+  pub(crate) open_type_glif: Option<OpenTypeGlyph>,
+}
+
+#[derive(Debug, Clone)]
+pub struct OpenTypeGlyph {
+    layout: FontLayout,
+    glyph: Box<glyf::Glyph>,
+}
+
 
 
 #[derive(Debug, Clone)]
@@ -64,6 +87,24 @@ impl Font {
     }
   }
 
+
+  pub fn get_gryph(&self, ch: char) -> GriphData{
+    let code = ch as u32;
+    let pos = self.cmap.as_ref().unwrap().get_griph_position(code);
+    let glyph = self.grif.as_ref().unwrap().get_glyph(pos as usize).unwrap();
+    let layout: HorizontalLayout = self.get_horizontal_layout(pos as usize);
+    let open_type_glyph = OpenTypeGlyph {
+      layout: FontLayout::Horizontal(layout),
+      glyph: Box::new(glyph.clone()),
+    };
+
+    GriphData {
+      format: GlyphFormat::OpenTypeGlyph,
+      open_type_glif: Some(open_type_glyph),
+    }
+
+  }
+
   pub fn get_svg(&self, ch: char) -> String {
     // utf-32
     let code = ch as u32;
@@ -103,6 +144,12 @@ impl Font {
 
 }
 
+enum layout {
+  Horizontal(HorizontalLayout),
+  Vertical(VerticalLayout),
+  Unknown
+}
+
 #[derive(Debug, Clone)]
 pub struct HorizontalLayout {
   pub lsb: isize,
@@ -110,7 +157,15 @@ pub struct HorizontalLayout {
   pub accender: isize,
   pub descender: isize,
   pub line_gap: isize,
+}
 
+#[derive(Debug, Clone)]
+pub struct VerticalLayout {
+  pub tsb: isize,
+  pub advance_height: isize,
+  pub accender: isize,
+  pub descender: isize,
+  pub line_gap: isize,
 }
 
 #[derive(Debug, Clone)]
