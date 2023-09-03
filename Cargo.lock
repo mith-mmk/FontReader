@@ -10,7 +10,7 @@ checksum = "1bd4397ed51cf25473907e4f67156904fb18dda32d22f107c94be41b047e2461"
 
 [[package]]
 name = "fontloader"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "bin-rs",
 ]
