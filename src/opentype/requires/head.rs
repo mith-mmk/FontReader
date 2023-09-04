@@ -104,24 +104,24 @@ impl HEAD{
 fn get_head<R: BinaryReader>(file:&mut R, offest: u32, length: u32) -> HEAD {
   file.seek(SeekFrom::Start(offest as u64)).unwrap();
 
-  let major_version = file.read_u16().unwrap();
-  let minor_version = file.read_u16().unwrap();
-  let font_revision = file.read_u32().unwrap();
-  let check_sum_adjustment = file.read_u32().unwrap();
-  let magic_number = file.read_u32().unwrap();
-  let flags = file.read_u16().unwrap();
-  let units_per_em = file.read_u16().unwrap();
-  let created = file.read_i64().unwrap();
-  let modified = file.read_i64().unwrap();
-  let x_min = file.read_i16().unwrap();
-  let y_min = file.read_i16().unwrap();
-  let x_max = file.read_i16().unwrap();
-  let y_max = file.read_i16().unwrap();
-  let mac_style = file.read_u16().unwrap();
-  let lowest_rec_ppem = file.read_u16().unwrap();
-  let font_direction_hint = file.read_i16().unwrap();
-  let index_to_loc_format = file.read_i16().unwrap();
-  let glyph_data_format = file.read_i16().unwrap();
+  let major_version = file.read_u16_be().unwrap();
+  let minor_version = file.read_u16_be().unwrap();
+  let font_revision = file.read_u32_be().unwrap();
+  let check_sum_adjustment = file.read_u32_be().unwrap();
+  let magic_number = file.read_u32_be().unwrap();
+  let flags = file.read_u16_be().unwrap();
+  let units_per_em = file.read_u16_be().unwrap();
+  let created = file.read_i64_be().unwrap();
+  let modified = file.read_i64_be().unwrap();
+  let x_min = file.read_i16_be().unwrap();
+  let y_min = file.read_i16_be().unwrap();
+  let x_max = file.read_i16_be().unwrap();
+  let y_max = file.read_i16_be().unwrap();
+  let mac_style = file.read_u16_be().unwrap();
+  let lowest_rec_ppem = file.read_u16_be().unwrap();
+  let font_direction_hint = file.read_i16_be().unwrap();
+  let index_to_loc_format = file.read_i16_be().unwrap();
+  let glyph_data_format = file.read_i16_be().unwrap();
   HEAD {
     major_version,
     minor_version,

@@ -61,15 +61,15 @@ fn get_post<R:BinaryReader>(file: &mut R, offest: u32, length: u32) -> POST {
   let mut file = file;
   let mut buffer = vec![0u8; length as usize];
   file.seek(SeekFrom::Start(offest as u64)).unwrap();
-  let version = file.read_u32().unwrap();
-  let italic_angle = file.read_i32().unwrap();
-  let underline_position = file.read_i16().unwrap();
-  let underline_thickness = file.read_i16().unwrap();
-  let is_fixed_pitch = file.read_u32().unwrap();
-  let min_mem_type42 = file.read_u32().unwrap();
-  let max_mem_type42 = file.read_u32().unwrap();
-  let min_mem_type1 = file.read_u32().unwrap();
-  let max_mem_type1 = file.read_u32().unwrap();
+  let version = file.read_u32_be().unwrap();
+  let italic_angle = file.read_i32_be().unwrap();
+  let underline_position = file.read_i16_be().unwrap();
+  let underline_thickness = file.read_i16_be().unwrap();
+  let is_fixed_pitch = file.read_u32_be().unwrap();
+  let min_mem_type42 = file.read_u32_be().unwrap();
+  let max_mem_type42 = file.read_u32_be().unwrap();
+  let min_mem_type1 = file.read_u32_be().unwrap();
+  let max_mem_type1 = file.read_u32_be().unwrap();
  
 
   let mut number_of_glyphs = 0;
@@ -78,9 +78,9 @@ fn get_post<R:BinaryReader>(file: &mut R, offest: u32, length: u32) -> POST {
   let remain = length - 32;
   if remain > 0 {
     if version >= 0x0002_0000 {
-      number_of_glyphs = file.read_u16().unwrap();
+      number_of_glyphs = file.read_u16_be().unwrap();
       for _ in 0..number_of_glyphs {
-        let index = file.read_u16().unwrap();
+        let index = file.read_u16_be().unwrap();
         glyph_name_index.push(index);
       }
       let remain = (length - 34 - number_of_glyphs as u32 * 2) as usize;

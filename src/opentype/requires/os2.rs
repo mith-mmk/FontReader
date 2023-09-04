@@ -156,61 +156,66 @@ impl OS2 {
   }  
 }
 
-fn get_os2<R:BinaryReader>(mut file: &mut R, offest: u32, length: u32) -> OS2 {
-  let mut file = file;
-  let mut buffer = vec![0; length as usize];
+fn get_os2<R:BinaryReader>(file: &mut R, offest: u32, length: u32) -> OS2 {
+  let file = file;
   file.seek(SeekFrom::Start(offest as u64)).unwrap();
-  let version = file.read_u16().unwrap();
-  let x_avg_char_width = file.read_i16().unwrap();
-  let us_weight_class = file.read_u16().unwrap();
-  let us_width_class = file.read_u16().unwrap();
-  let fs_type = file.read_u16().unwrap();
-  let y_subscript_x_size = file.read_i16().unwrap();
-  let y_subscript_y_size = file.read_i16().unwrap();
-  let y_subscript_x_offset = file.read_i16().unwrap();
-  let y_subscript_y_offset = file.read_i16().unwrap();
-  let y_superscript_x_size = file.read_i16().unwrap();
-  let y_superscript_y_size = file.read_i16().unwrap();
-  let y_superscript_x_offset = file.read_i16().unwrap();
-  let y_superscript_y_offset = file.read_i16().unwrap();
-  let y_strikeout_size = file.read_i16().unwrap();
-  let y_strikeout_position = file.read_i16().unwrap();
-  let s_family_class = file.read_i16().unwrap();
- 
+  let version = file.read_u16_be().unwrap();
+  let x_avg_char_width = file.read_i16_be().unwrap();
+  let us_weight_class = file.read_u16_be().unwrap();
+  let us_width_class = file.read_u16_be().unwrap();
+  let fs_type = file.read_u16_be().unwrap();
+  let y_subscript_x_size = file.read_i16_be().unwrap();
+  let y_subscript_y_size = file.read_i16_be().unwrap();
+  let y_subscript_x_offset = file.read_i16_be().unwrap();
+  let y_subscript_y_offset = file.read_i16_be().unwrap();
+  let y_superscript_x_size = file.read_i16_be().unwrap();
+  let y_superscript_y_size = file.read_i16_be().unwrap();
+  let y_superscript_x_offset = file.read_i16_be().unwrap();
+  let y_superscript_y_offset = file.read_i16_be().unwrap();
+  let y_strikeout_size = file.read_i16_be().unwrap();
+  let y_strikeout_position = file.read_i16_be().unwrap();
+  let s_family_class = file.read_i16_be().unwrap();
+  // 16 * 2 = 32
   let mut panose = [0; 10];
   file.read_bytes(&mut panose).unwrap();
-  let ul_unicode_range1 = file.read_u32().unwrap();
-  let ul_unicode_range2 = file.read_u32().unwrap();
-  let ul_unicode_range3 = file.read_u32().unwrap();
-  let ul_unicode_range4 = file.read_u32().unwrap();
+  // 42
+  let ul_unicode_range1 = file.read_u32_be().unwrap();
+  let ul_unicode_range2 = file.read_u32_be().unwrap();
+  let ul_unicode_range3 = file.read_u32_be().unwrap();
+  let ul_unicode_range4 = file.read_u32_be().unwrap();
+  // 58
     
   let mut ach_vend_id = [0; 4];
   file.read_bytes(&mut ach_vend_id).unwrap();
-  let fs_selection = file.read_u16().unwrap();
-  let us_first_char_index = file.read_u16().unwrap();
-  let us_last_char_index = file.read_u16().unwrap();
-  let s_typo_ascender = file.read_i16().unwrap();
-  let s_typo_descender = file.read_i16().unwrap();
-  let s_typo_line_gap = file.read_i16().unwrap();
-  let us_win_ascent = file.read_u16().unwrap();
-  let us_win_descent = file.read_u16().unwrap();
-  let ul_code_page_range1 = file.read_u32().unwrap();
-  let ul_code_page_range2 = file.read_u32().unwrap();
-  let sx_height = file.read_i16().unwrap();
-  let s_cap_height = file.read_i16().unwrap();
-  let us_default_char = file.read_u16().unwrap();
-  let us_break_char = file.read_u16().unwrap();
-  let us_max_context = file.read_u16().unwrap();
-  let us_lower_optical_point_size = file.read_u16().unwrap();
-  let us_upper_optical_point_size = file.read_u16().unwrap();
+  // 62
+  let fs_selection = file.read_u16_be().unwrap();
+  let us_first_char_index = file.read_u16_be().unwrap();
+  let us_last_char_index = file.read_u16_be().unwrap();
+  let s_typo_ascender = file.read_i16_be().unwrap();
+  let s_typo_descender = file.read_i16_be().unwrap();
+  let s_typo_line_gap = file.read_i16_be().unwrap();
+  // 76
+  let us_win_ascent = file.read_u16_be().unwrap();
+  let us_win_descent = file.read_u16_be().unwrap();
+  let ul_code_page_range1 = file.read_u32_be().unwrap();
+  let ul_code_page_range2 = file.read_u32_be().unwrap();
+  let sx_height = file.read_i16_be().unwrap();
+  let s_cap_height = file.read_i16_be().unwrap();
+  let us_default_char = file.read_u16_be().unwrap();
+  let us_break_char = file.read_u16_be().unwrap();
+  let us_max_context = file.read_u16_be().unwrap();
+  // 96
+  
+  let us_lower_optical_point_size = file.read_u16_be().unwrap();
+  let us_upper_optical_point_size = file.read_u16_be().unwrap();
  
   let mut us_win_descent = 0;
   let mut ul_code_page_range1 = 0;
   let mut ul_code_page_range2 = 0;
   if version >= 1 {
-    us_win_descent = file.read_u16().unwrap();
-    ul_code_page_range1 = file.read_u32().unwrap();
-    ul_code_page_range2 = file.read_u32().unwrap();
+    us_win_descent = file.read_u16_be().unwrap();
+    ul_code_page_range1 = file.read_u32_be().unwrap();
+    ul_code_page_range2 = file.read_u32_be().unwrap();
   }
 
   let mut sx_height = 0;
@@ -220,17 +225,17 @@ fn get_os2<R:BinaryReader>(mut file: &mut R, offest: u32, length: u32) -> OS2 {
   let mut us_max_context = 0;
 
   if version >= 2 {
-    sx_height = file.read_i16().unwrap();
-    s_cap_height = file.read_i16().unwrap();
-    us_default_char = file.read_u16().unwrap();
-    us_break_char = file.read_u16().unwrap();
-    us_max_context = file.read_u16().unwrap();
+    sx_height = file.read_i16_be().unwrap();
+    s_cap_height = file.read_i16_be().unwrap();
+    us_default_char = file.read_u16_be().unwrap();
+    us_break_char = file.read_u16_be().unwrap();
+    us_max_context = file.read_u16_be().unwrap();
   }
   let mut us_lower_optical_point_size = 0;
   let mut us_upper_optical_point_size = 0;
   if version >= 5 {
-    us_lower_optical_point_size = file.read_u16().unwrap();
-    us_upper_optical_point_size = file.read_u16().unwrap();
+    us_lower_optical_point_size = file.read_u16_be().unwrap();
+    us_upper_optical_point_size = file.read_u16_be().unwrap();
   }
   OS2 {
     version,

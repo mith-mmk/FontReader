@@ -64,8 +64,8 @@ fn get_hdmx<R: bin_rs::reader::BinaryReader>(file: &mut R, offest: u32, length: 
   file.seek(SeekFrom::Start(offest as u64)).unwrap();
   let mut h_metrics = Vec::new();
   for _ in 0..number_of_hmetrics {
-    let advance_width = file.read_u16().unwrap();
-    let top_side_bearing = file.read_i16().unwrap();
+    let advance_width = file.read_u16_be().unwrap();
+    let top_side_bearing = file.read_i16_be().unwrap();
     h_metrics.push(LongHorMetric {
       advance_width: advance_width,
       top_side_bearing: top_side_bearing,
@@ -74,7 +74,7 @@ fn get_hdmx<R: bin_rs::reader::BinaryReader>(file: &mut R, offest: u32, length: 
   let mut top_side_bearings = Vec::new();
   let number = num_glyphs - number_of_hmetrics;
   for _ in 0..number {
-    let top_side_bearing = file.read_u16().unwrap();
+    let top_side_bearing = file.read_u16_be().unwrap();
     top_side_bearings.push(top_side_bearing);
   }
   VMTX {

@@ -707,13 +707,13 @@ impl UVSMapping {
 fn load_cmap_table<R:BinaryReader>(file:&mut R,offset: u32 , length: u32) -> CMAP {
     file.seek(std::io::SeekFrom::Start(offset as u64)).unwrap();
 
-    let version = file.read_u16().unwrap();
-    let num_tables = file.read_u16().unwrap();
+    let version = file.read_u16_be().unwrap();
+    let num_tables = file.read_u16_be().unwrap();
     let mut encoding_records = Vec::new();
     for _ in 0..num_tables {
-        let platform_id = file.read_u16().unwrap();
-        let encoding_id = file.read_u16().unwrap();
-        let subtable_offset = file.read_u32().unwrap();
+        let platform_id = file.read_u16_be().unwrap();
+        let encoding_id = file.read_u16_be().unwrap();
+        let subtable_offset = file.read_u32_be().unwrap();
         encoding_records.push(EncodingRecord {
             platform_id,
             encoding_id,

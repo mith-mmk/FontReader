@@ -182,11 +182,11 @@ impl Header {
 
 impl Index {
   pub(crate) fn parse<R: BinaryReader>(r: &mut R) -> Result<Self, Box<dyn std::error::Error>> {
-    let count = r.read_u16()?;
+    let count = r.read_u16_be()?;
     let off_size = r.read_u8()?;
     let mut offsets = Vec::new();
     for _ in 0..count + 1 {
-      let offset = r.read_u32()?;
+      let offset = r.read_u32_be()?;
       offsets.push(offset);
     }
     let mut data = Vec::new();

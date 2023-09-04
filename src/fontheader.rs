@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 use bin_rs::{reader::{BinaryReader, BytesReader, StreamReader}, Endian};
-use crate::opentype::requires::cmap;
+use crate::{opentype::OTFHeader, util::u32_to_string};
+use crate::woff::woff::WOFFHeader;
 
 // pub type F2DOT14 = i16;
 pub type LONGDATETIME = i64;
@@ -82,15 +83,7 @@ pub enum FontHeaders {
     Unknown
 }
 
-fn u32_to_string(value: u32) -> String {
-    let bytes = value.to_be_bytes();
-    // bytes to string
-    let mut string = String::new();
-    for byte in bytes.iter() {
-        string.push(char::from(*byte));
-    }
-    string
-}
+
 
 impl FontHeaders {
   pub fn to_string(&self) -> String {
@@ -158,34 +151,34 @@ impl FontHeaders {
                     signature.push_str(&format!("{:02X}", byte));
                 }
                 string.push_str(&signature);
-                string.push_str(&" flavor: ".to_string());
+                string.push_str(&"\n flavor: ".to_string());
                 let bytes = header.flavor.to_be_bytes();
                 let mut flavor = String::new();
                 for byte in bytes.iter() {
                     flavor.push_str(&format!("{:02X}", byte));
                 }
                 string.push_str(&flavor);
-                string.push_str(&" length: ".to_string());
+                string.push_str(&"\n length: ".to_string());
                 string.push_str(&header.length.to_string());
-                string.push_str(&" num tables: ".to_string());
+                string.push_str(&"\n num tables: ".to_string());
                 string.push_str(&header.num_tables.to_string());
-                string.push_str(&" reserved: ".to_string());
+                string.push_str(&"\n reserved: ".to_string());
                 string.push_str(&header.reserved.to_string());
-                string.push_str(&" total sfnt size: ".to_string());
+                string.push_str(&"\n total sfnt size: ".to_string());
                 string.push_str(&header.total_sfnt_size.to_string());
-                string.push_str(&" major version: ".to_string());
+                string.push_str(&"\n major version: ".to_string());
                 string.push_str(&header.major_version.to_string());
-                string.push_str(&" minor version: ".to_string());
+                string.push_str(&"\n minor version: ".to_string());
                 string.push_str(&header.minor_version.to_string());
-                string.push_str(&" meta offset: ".to_string());
+                string.push_str(&"\n meta offset: ".to_string());
                 string.push_str(&header.meta_offset.to_string());
-                string.push_str(&" meta length: ".to_string());
+                string.push_str(&"\n meta length: ".to_string());
                 string.push_str(&header.meta_length.to_string());
-                string.push_str(&" meta orig length: ".to_string());
+                string.push_str(&"\n meta orig length: ".to_string());
                 string.push_str(&header.meta_orig_length.to_string());
-                string.push_str(&" priv offset: ".to_string());
+                string.push_str(&"\n priv offset: ".to_string());
                 string.push_str(&header.priv_offset.to_string());
-                string.push_str(&" priv length: ".to_string());
+                string.push_str(&"\n priv length: ".to_string());
                 string.push_str(&header.priv_length.to_string());
                 string
             },
@@ -237,29 +230,6 @@ impl FontHeaders {
     }       
 }
 
-#[derive(Debug, Clone)]
-pub struct TableRecord {
-    pub(crate) table_tag: u32,
-    pub(crate) check_sum: u32,
-    pub(crate) offset: u32,
-    pub(crate) length: u32,
-}
-
-impl TableRecord {
-    fn to_string(self) -> String {
-        let mut string = String::new();
-        string.push_str(&"table tag: ".to_string());
-        string.push_str(u32_to_string(self.table_tag).as_str());
-        string.push_str(&" check sum: ".to_string());
-        // hex digit
-        string.push_str(&format!("{:08X}", self.check_sum));
-        string.push_str(&" offset: ".to_string());
-        string.push_str(&format!("{:08X}", self.offset));
-        string.push_str(&" length: ".to_string());
-        string.push_str(&format!("{:08X}", self.length));
-        string
-    }
-}
 
 
 #[derive(Debug, Clone)]
@@ -275,33 +245,9 @@ pub struct TTFHeader {
     pub(crate) ul_dsig_offset: u32,
 }
 
-#[derive(Debug, Clone)]
-pub struct OTFHeader {
-    pub(crate) sfnt_version: u32,
-    pub(crate) num_tables: u16,
-    pub(crate) search_range: u16,
-    pub(crate) entry_selector: u16,
-    pub(crate) range_shift: u16,
-    pub(crate) table_records: Box<Vec<TableRecord>>,
-}
 
-#[derive(Debug, Clone)]
-pub struct WOFFHeader {
-    pub(crate) sfnt_version: u32,
-    pub(crate) signature: u32,
-    pub(crate) flavor: u32,
-    pub(crate) length: u32,
-    pub(crate) num_tables: u16,
-    pub(crate) reserved: u16,
-    pub(crate) total_sfnt_size: u32,
-    pub(crate) major_version: u16,
-    pub(crate) minor_version: u16,
-    pub(crate) meta_offset: u32,
-    pub(crate) meta_length: u32,
-    pub(crate) meta_orig_length: u32,
-    pub(crate) priv_offset: u32,
-    pub(crate) priv_length: u32,
-}
+
+
 
 #[derive(Debug, Clone)]
 pub struct WOFF2Header {
@@ -321,116 +267,9 @@ pub struct WOFF2Header {
     pub(crate) priv_length: u32,
 }
 
-/*
-uint32
-CalcTableChecksum(uint32 *Table, uint32 Length)
-{
-uint32 Sum = 0L;
-uint32 *Endptr = Table+((Length+3) & ~3) / sizeof(uint32);
-while (Table < EndPtr)
-    Sum += *Table++;
-return Sum;
-} */
-
-fn check_sum(table: Vec<u8>) -> u32 {
-    let mut sum = 0;
-    for i in 0..table.len()/4 {
-        let offset = i * 4;
-        let mut bytes = [0; 4];
-        for j in 0..4 {
-            bytes[j] = table[offset + j];
-        }
-        let number: u32 = u32::from_be_bytes(bytes);      
-        sum += number;
-    }
-    let remain = table.len() % 4;
-    if remain > 0 {
-        let mut bytes = [0; 4];
-        for i in 0..remain {
-            bytes[i] = table[table.len() - remain + i];
-        }
-        let number: u32 = u32::from_be_bytes(bytes);
-        sum += number;
-    }
-    sum
-}
-
-pub(crate) enum FontTable {
-// required
-    CMAP(cmap::CMAP),
-    HEAD,
-    HHEA,
-    HMTX,
-    MAXP,
-    NAME,
-    OS2,
-    POST,
-// tables related to TrueType outlines
-    CVT,
-    FPGM,
-    GLYF,
-    LOCA,
-    PREP,
-    GASP,
-// tables related to CFF outlines
-    CFF,
-    CFF2,
-    VORG,
-// SVG
-    SVG,
-// Bitmap Glyphs
-    EBDT,
-    EBLC,
-    EBSV,
-// Color Bitmap Glyphs
-    CBDT,
-    CBLC,
-    COLR,
-    CPAL,
-// Advanced Typographics
-    BASE,
-    GDEF,
-    GPOS,
-    GSUB,
-    JSTF,
-    MATH,
-    MERG,
-    PROP,
-    ZWJ,
-// OpenType Font Variant
-    AVAR,
-    CVAR,
-    FVAR,
-    GVAR,
-    HVAR,
-    MVAR,
-    STAT,
-    VVAR,
-// Color Fonts
-    // COLR,
-    // CPAL,
-    // CBDT,
-    // CBLC,
-    SBIX,
-    // SVG,
-// Other OpenType Tables
-    DISG,
-    HDMX,
-    KERN,
-    LTSH,
-//    MERG,
-    META,
-//    STAT,
-    PCLT,
-    VDMX,
-    VHEA,
-    VMTX,
-    UNKNOWN
-}
-
 pub fn get_font_type_from_file(filename: &PathBuf) -> FontHeaders {
     let file = std::fs::File::open(filename).unwrap();
-    let mut reader = std::io::BufReader::new(file);
+    let reader = std::io::BufReader::new(file);
     let mut file = StreamReader::new(reader);
     get_font_type(&mut file)
 }
@@ -442,21 +281,21 @@ pub fn get_font_type<B: BinaryReader>(file: &mut B) -> FontHeaders {
     let sfnt_version:u32 = u32::from_be_bytes(buffer);
     let font_type = match &buffer {
         b"ttcf" => {
-            let major_version = file.read_u16().unwrap();
-            let minor_version = file.read_u16().unwrap();
-            let num_fonts = file.read_u32().unwrap();
+            let major_version = file.read_u16_be().unwrap();
+            let minor_version = file.read_u16_be().unwrap();
+            let num_fonts = file.read_u32_be().unwrap();
             let mut table_directory = Vec::new();
             for _ in 0..num_fonts {
-                let offset = file.read_u32().unwrap();
+                let offset = file.read_u32_be().unwrap();
                 table_directory.push(offset);
             }
             let mut ul_dsig_tag = 0;
             let mut ul_dsig_length = 0;
             let mut ul_dsig_offset = 0;
             if major_version >= 2 {
-                ul_dsig_tag = file.read_u32().unwrap();
-                ul_dsig_length = file.read_u32().unwrap();
-                ul_dsig_offset = file.read_u32().unwrap();
+                ul_dsig_tag = file.read_u32_be().unwrap();
+                ul_dsig_length = file.read_u32_be().unwrap();
+                ul_dsig_offset = file.read_u32_be().unwrap();
             }
             let fontheader = {
                 TTFHeader {
@@ -475,17 +314,17 @@ pub fn get_font_type<B: BinaryReader>(file: &mut B) -> FontHeaders {
         // if 0x00010000 -> OTF
 
         b"\x00\x01\x00\x00" | b"OTTO" => {
-            let num_tables = file.read_u16().unwrap();
-            let search_range = file.read_u16().unwrap();
-            let entry_selector = file.read_u16().unwrap();
-            let range_shift = file.read_u16().unwrap();
+            let num_tables = file.read_u16_be().unwrap();
+            let search_range = file.read_u16_be().unwrap();
+            let entry_selector = file.read_u16_be().unwrap();
+            let range_shift = file.read_u16_be().unwrap();
             let mut table_records = Vec::new();
             for _ in 0..num_tables {
-                let table_tag = file.read_u32().unwrap();
-                let check_sum = file.read_u32().unwrap();
-                let offset = file.read_u32().unwrap();
-                let length = file.read_u32().unwrap();
-                table_records.push(TableRecord {
+                let table_tag = file.read_u32_be().unwrap();
+                let check_sum = file.read_u32_be().unwrap();
+                let offset = file.read_u32_be().unwrap();
+                let length = file.read_u32_be().unwrap();
+                table_records.push(crate::opentype::TableRecord {
                     table_tag,
                     check_sum,
                     offset,
@@ -505,19 +344,19 @@ pub fn get_font_type<B: BinaryReader>(file: &mut B) -> FontHeaders {
         },
         // 0
         b"wOFF" => {
-            let signature = file.read_u32().unwrap();
-            let flavor = file.read_u32().unwrap();
-            let length = file.read_u32().unwrap();
-            let num_tables = file.read_u16().unwrap();
-            let reserved = file.read_u16().unwrap();
-            let total_sfnt_size = file.read_u32().unwrap();
-            let major_version = file.read_u16().unwrap();
-            let minor_version = file.read_u16().unwrap();
-            let meta_offset = file.read_u32().unwrap();
-            let meta_length = file.read_u32().unwrap();
-            let meta_orig_length = file.read_u32().unwrap();
-            let priv_offset = file.read_u32().unwrap();
-            let priv_length = file.read_u32().unwrap();            
+            let signature = file.read_u32_be().unwrap();
+            let flavor = file.read_u32_be().unwrap();
+            let length = file.read_u32_be().unwrap();
+            let num_tables = file.read_u16_be().unwrap();
+            let reserved = file.read_u16_be().unwrap();
+            let total_sfnt_size = file.read_u32_be().unwrap();
+            let major_version = file.read_u16_be().unwrap();
+            let minor_version = file.read_u16_be().unwrap();
+            let meta_offset = file.read_u32_be().unwrap();
+            let meta_length = file.read_u32_be().unwrap();
+            let meta_orig_length = file.read_u32_be().unwrap();
+            let priv_offset = file.read_u32_be().unwrap();
+            let priv_length = file.read_u32_be().unwrap();            
             FontHeaders::WOFF(WOFFHeader {
                 sfnt_version,
                 signature,
@@ -536,19 +375,19 @@ pub fn get_font_type<B: BinaryReader>(file: &mut B) -> FontHeaders {
             })
         },
         b"wOF2" => {
-            let signature = file.read_u32().unwrap();
-            let flavor = file.read_u32().unwrap();
-            let length = file.read_u32().unwrap();
-            let num_tables = file.read_u16().unwrap();
-            let reserved = file.read_u16().unwrap();
-            let total_sfnt_size = file.read_u32().unwrap();
-            let major_version = file.read_u16().unwrap();
-            let minor_version = file.read_u16().unwrap();
-            let meta_offset = file.read_u32().unwrap();
-            let meta_length = file.read_u32().unwrap();
-            let meta_orig_length = file.read_u32().unwrap();
-            let priv_offset = file.read_u32().unwrap();
-            let priv_length = file.read_u32().unwrap();
+            let signature = file.read_u32_be().unwrap();
+            let flavor = file.read_u32_be().unwrap();
+            let length = file.read_u32_be().unwrap();
+            let num_tables = file.read_u16_be().unwrap();
+            let reserved = file.read_u16_be().unwrap();
+            let total_sfnt_size = file.read_u32_be().unwrap();
+            let major_version = file.read_u16_be().unwrap();
+            let minor_version = file.read_u16_be().unwrap();
+            let meta_offset = file.read_u32_be().unwrap();
+            let meta_length = file.read_u32_be().unwrap();
+            let meta_orig_length = file.read_u32_be().unwrap();
+            let priv_offset = file.read_u32_be().unwrap();
+            let priv_length = file.read_u32_be().unwrap();
             FontHeaders::WOFF2(WOFF2Header {
                 sfnt_version,
                 signature,

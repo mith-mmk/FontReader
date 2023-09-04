@@ -10,9 +10,9 @@ fn main() {
       "e:\\data\\fonts\\NotoSansJP-SemiBold.ttf".to_string()
   };
 
-  let output_file = "./test/read.html";
   let filename: PathBuf = PathBuf::from(fontname);    
   let font = Font::get_font_from_file(&filename).unwrap();
+  print!("font: {:?}", font);
   let text = "Hello, world!";
   for ch in text.chars() {
     let glyph = font.get_gryph(ch);

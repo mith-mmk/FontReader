@@ -1,11 +1,13 @@
-use std::io::BufReader;
+use std::io::{BufReader};
 use std::{path::PathBuf, fs::File};
-use bin_rs::reader::{BinaryReader, StreamReader};
+use bin_rs::reader::{BinaryReader, StreamReader, BytesReader};
 
 use crate::opentype::outline::*;
 use crate::opentype::requires::*;
 use crate::fontheader;
+use crate::opentype::requires::cmap::CmapEncodings;
 use crate::opentype::requires::hmtx::LongHorMetric;
+use crate::util::u32_to_string;
 
 #[cfg(debug_assertions)]
 use std::io::{Write, BufWriter};
@@ -42,11 +44,10 @@ pub struct OpenTypeGlyph {
 }
 
 
-
 #[derive(Debug, Clone)]
 pub struct Font {
   pub font_type: fontheader::FontHeaders,
-  pub(crate) cmap: Option<cmap::CmapEncodings>, // must
+  pub(crate) cmap: Option<CmapEncodings>, // must
   pub(crate) head: Option<head::HEAD>, // must
   pub(crate) hhea: Option<hhea::HHEA>, // must
   pub(crate) hmtx: Option<hmtx::HMTX>, // must
@@ -108,6 +109,8 @@ impl Font {
   pub fn get_svg(&self, ch: char) -> String {
     // utf-32
     let code = ch as u32;
+    println!("code: {}", code);
+    println!("cmap: {:?}", self.cmap.as_ref().unwrap());
     let pos = self.cmap.as_ref().unwrap().get_griph_position(code);
     let glyf = self.grif.as_ref().unwrap().get_glyph(pos as usize).unwrap();
     let layout: HorizontalLayout = self.get_horizontal_layout(pos as usize);
@@ -144,7 +147,7 @@ impl Font {
 
 }
 
-enum layout {
+enum Layout {
   Horizontal(HorizontalLayout),
   Vertical(VerticalLayout),
   Unknown
@@ -216,7 +219,7 @@ fn font_load<R:BinaryReader>(file: &mut R) -> Option<Font> {
               
         match &tag {
           b"cmap" => {
-            let cmap_encodings = cmap::CmapEncodings::new(file, record.offset, record.length);
+            let cmap_encodings = CmapEncodings::new(file, record.offset, record.length);
             font.cmap = Some(cmap_encodings);
           }
           b"head" => {
@@ -390,12 +393,79 @@ fn font_load<R:BinaryReader>(file: &mut R) -> Option<Font> {
 
         }
     },
-    _ => {
-       debug_assert!(true, "not support type");
-       return None
-    }
     fontheader::FontHeaders::TTF(_) => todo!(),
-    fontheader::FontHeaders::WOFF(_) => todo!(),
+    fontheader::FontHeaders::WOFF(_) => {
+      let woff = crate::woff::WOFF::from(file);
+
+      let mut hmtx_table = None;
+      let mut loca_table = None;
+      let mut glyf_table = None;
+      for table in woff.tables {
+        let tag:[u8;4]=[(table.tag >> 24)  as u8, (table.tag >> 16) as u8, (table.tag >> 8) as u8, table.tag  as u8];
+        println!("tag: {}", crate::util::u32_to_string(table.tag));
+        match &tag {
+          b"cmap" => {
+            let mut reader = BytesReader::new(&table.data);
+            let cmap_encodings = CmapEncodings::new(&mut reader, 0, table.data.len() as u32);
+            font.cmap = Some(cmap_encodings);
+            println!("cmap");
+          }
+          b"head" => {
+            let mut reader = BytesReader::new(&table.data);
+            let head = head::HEAD::new(&mut reader, 0, table.data.len() as u32);
+            font.head = Some(head);
+          } 
+          b"OS/2" => {
+            // let mut reader = BytesReader::new(&table.data);
+            // let os2 = os2::OS2::new(&mut reader, 0, table.data.len() as u32);
+            // font.os2 = Some(os2);
+          }
+          b"hhea" => {
+            let mut reader = BytesReader::new(&table.data);
+            let hhea = hhea::HHEA::new(&mut reader, 0, table.data.len() as u32);
+            font.hhea = Some(hhea);
+          }
+          b"maxp" => {
+            let mut reader = BytesReader::new(&table.data);
+            let maxp = maxp::MAXP::new(&mut reader, 0, table.data.len() as u32);
+            font.maxp = Some(maxp);
+          }
+          b"hmtx" => {
+            print!("hmtx");
+            print!("{} ", table.data.len());
+            hmtx_table = Some(table);
+          }
+          b"name" => {
+            let mut reader = BytesReader::new(&table.data);
+            let name = name::NAME::new(&mut reader, 0, table.data.len() as u32);
+            font.name = Some(name);
+          }
+          b"post" => {
+            let mut reader = BytesReader::new(&table.data);
+            let post = post::POST::new(&mut reader, 0, table.data.len() as u32);
+            font.post = Some(post);
+          }
+          b"loca" => {
+            loca_table = Some(table);
+          }
+          b"glyf" => {
+            glyf_table = Some(table);
+          }
+          _ => {
+            debug_assert!(true, "Unknown table tag")
+          }
+        }
+      }
+      let mut reader = BytesReader::new(&hmtx_table.as_ref().unwrap().data);
+      let hmtx = hmtx::HMTX::new(&mut reader, 0, hmtx_table.as_ref().unwrap().data.len() as u32, font.hhea.as_ref().unwrap().number_of_hmetrics, font.maxp.as_ref().unwrap().num_glyphs);
+      font.hmtx = Some(hmtx);
+      let mut reader = BytesReader::new(&loca_table.as_ref().unwrap().data);
+      let loca = loca::LOCA::new(&mut reader, 0, loca_table.as_ref().unwrap().data.len() as u32, font.maxp.as_ref().unwrap().num_glyphs);
+      font.loca = Some(loca);
+      let mut reader = BytesReader::new(&glyf_table.as_ref().unwrap().data);
+      let glyf = glyf::GLYF::new(&mut reader, 0, glyf_table.as_ref().unwrap().data.len() as u32, font.loca.as_ref().unwrap());
+      font.grif = Some(glyf);
+    }
     fontheader::FontHeaders::WOFF2(_) => todo!(),
     fontheader::FontHeaders::Unknown => todo!(),
   }

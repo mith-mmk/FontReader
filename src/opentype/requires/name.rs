@@ -98,17 +98,17 @@ pub(crate) struct NameRecord{
 
 fn get_names<R: BinaryReader>(file: &mut R, offest: u32, length: u32) -> NAME {
   file.seek(SeekFrom::Start(offest as u64)).unwrap();
-  let version = file.read_u16().unwrap();
-  let count = file.read_u16().unwrap();
-  let storage_offset = file.read_u16().unwrap();
+  let version = file.read_u16_be().unwrap();
+  let count = file.read_u16_be().unwrap();
+  let storage_offset = file.read_u16_be().unwrap();
   let mut name_records = Vec::new();
   for _ in 0..count {
-    let platform_id = file.read_u16().unwrap();
-    let encoding_id = file.read_u16().unwrap();
-    let language_id = file.read_u16().unwrap();
-    let name_id = file.read_u16().unwrap();
-    let length = file.read_u16().unwrap();
-    let string_offset = file.read_u16().unwrap();
+    let platform_id = file.read_u16_be().unwrap();
+    let encoding_id = file.read_u16_be().unwrap();
+    let language_id = file.read_u16_be().unwrap();
+    let name_id = file.read_u16_be().unwrap();
+    let length = file.read_u16_be().unwrap();
+    let string_offset = file.read_u16_be().unwrap();
     name_records.push(NameRecord {
       platform_id,
       encoding_id,
@@ -121,10 +121,10 @@ fn get_names<R: BinaryReader>(file: &mut R, offest: u32, length: u32) -> NAME {
   let mut lang_tag_count = 0;
   let mut lang_tag_record = Vec::new();
   if version > 0 {
-    lang_tag_count = file.read_u16().unwrap();
+    lang_tag_count = file.read_u16_be().unwrap();
     for _ in 0..lang_tag_count {
-      let length = file.read_u16().unwrap();
-      let offset = file.read_u16().unwrap();
+      let length = file.read_u16_be().unwrap();
+      let offset = file.read_u16_be().unwrap();
       lang_tag_record.push(LangTagRecord {
         length,
         offset
@@ -153,7 +153,7 @@ fn get_names<R: BinaryReader>(file: &mut R, offest: u32, length: u32) -> NAME {
     file.seek(SeekFrom::Start(string_offset as u64)).unwrap();
     match encoding_engine {
       EncodingEngine::UTF16BE => {
-        let string = file.read_utf16_string(name_records[i].length as usize).unwrap();
+        let string = file.read_utf16be_string(name_records[i].length as usize).unwrap();
         name_string.push(string);    
       }
       EncodingEngine::ASCII => {
@@ -188,7 +188,7 @@ fn get_names<R: BinaryReader>(file: &mut R, offest: u32, length: u32) -> NAME {
   for i in 0..lang_tag_count {
     let string_offset = lang_tag_record[i as usize].offset + current_position as u16;
     file.seek(SeekFrom::Start(string_offset as u64)).unwrap();
-    let string = file.read_utf16_string(lang_tag_record[i as usize].length as usize).unwrap();
+    let string = file.read_utf16be_string(lang_tag_record[i as usize].length as usize).unwrap();
     lang_tag_record[i as usize].offset = string_offset;
     lang_tag_record[i as usize].length = lang_tag_record[i as usize].length;
     lang_tag_string.push(string);

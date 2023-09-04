@@ -12,5 +12,6 @@ readme = "README.md"
 
 [dependencies]
 bin-rs = "0.0.9"
+miniz_oxide = {version = "0.7.1"}
 # byteorder = "1.4.3"
 # iconv = "0.1"

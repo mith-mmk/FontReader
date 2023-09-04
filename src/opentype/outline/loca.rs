@@ -52,9 +52,9 @@ fn get_loca<R:BinaryReader>(file:&mut R, offest: u32, length: u32, num_glyphs: u
   let mut offsets = Vec::new();
   for _ in 0..num_glyphs + 1 {
     let offset: u32 = if size == 2 {
-      file.read_u16().unwrap() as u32 * 2
+      file.read_u16_be().unwrap() as u32 * 2
     } else {
-      file.read_u32().unwrap()
+      file.read_u32_be().unwrap()
     };
     offsets.push(offset);
   }

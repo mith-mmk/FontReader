@@ -96,24 +96,24 @@ impl VHEA {
 fn get_vhea<R: BinaryReader>(file: &mut R, offest: u32, length: u32) -> VHEA {
   let mut file = file;
   file.seek(SeekFrom::Start(offest as u64)).unwrap();
-  let major_version = file.read_u16().unwrap();
-  let minor_version = file.read_u16().unwrap();
-  let ascender = file.read_i16().unwrap();
-  let descender = file.read_i16().unwrap();
-  let line_gap = file.read_i16().unwrap();
-  let advance_height_max = file.read_u16().unwrap();
-  let min_top_side_bearing = file.read_i16().unwrap();
-  let min_bottom_side_bearing = file.read_i16().unwrap();
-  let y_max_extent = file.read_i16().unwrap();
-  let caret_slope_rise = file.read_i16().unwrap();
-  let caret_slope_run = file.read_i16().unwrap();
-  let caret_offset = file.read_i16().unwrap();
-  let reserved1 = file.read_i16().unwrap();
-  let reserved2 = file.read_i16().unwrap();
-  let reserved3 = file.read_i16().unwrap();
-  let reserved4 = file.read_i16().unwrap();
-  let metric_data_format = file.read_i16().unwrap();
-  let number_of_hmetrics = file.read_u16().unwrap();
+  let major_version = file.read_u16_be().unwrap();
+  let minor_version = file.read_u16_be().unwrap();
+  let ascender = file.read_i16_be().unwrap();
+  let descender = file.read_i16_be().unwrap();
+  let line_gap = file.read_i16_be().unwrap();
+  let advance_height_max = file.read_u16_be().unwrap();
+  let min_top_side_bearing = file.read_i16_be().unwrap();
+  let min_bottom_side_bearing = file.read_i16_be().unwrap();
+  let y_max_extent = file.read_i16_be().unwrap();
+  let caret_slope_rise = file.read_i16_be().unwrap();
+  let caret_slope_run = file.read_i16_be().unwrap();
+  let caret_offset = file.read_i16_be().unwrap();
+  let reserved1 = file.read_i16_be().unwrap();
+  let reserved2 = file.read_i16_be().unwrap();
+  let reserved3 = file.read_i16_be().unwrap();
+  let reserved4 = file.read_i16_be().unwrap();
+  let metric_data_format = file.read_i16_be().unwrap();
+  let number_of_hmetrics = file.read_u16_be().unwrap();
 
   VHEA{
     major_version,
