@@ -3,45 +3,40 @@ use miniz_oxide::inflate::decompress_to_vec_zlib;
 
 #[derive(Debug, Clone)]
 pub struct WOFFHeader {
-    pub(crate) sfnt_version: u32,
-    pub(crate) signature: u32,
-    pub(crate) flavor: u32,
-    pub(crate) length: u32,
-    pub(crate) num_tables: u16,
-    pub(crate) reserved: u16,
-    pub(crate) total_sfnt_size: u32,
-    pub(crate) major_version: u16,
-    pub(crate) minor_version: u16,
-    pub(crate) meta_offset: u32,
-    pub(crate) meta_length: u32,
-    pub(crate) meta_orig_length: u32,
-    pub(crate) priv_offset: u32,
-    pub(crate) priv_length: u32,
+  pub(crate) sfnt_version: u32,
+  pub(crate) signature: u32,
+  pub(crate) flavor: u32,
+  pub(crate) length: u32,
+  pub(crate) num_tables: u16,
+  pub(crate) reserved: u16,
+  pub(crate) total_sfnt_size: u32,
+  pub(crate) major_version: u16,
+  pub(crate) minor_version: u16,
+  pub(crate) meta_offset: u32,
+  pub(crate) meta_length: u32,
+  pub(crate) meta_orig_length: u32,
+  pub(crate) priv_offset: u32,
+  pub(crate) priv_length: u32,
 }
 
 impl WOFFHeader {
-    pub(crate) fn new() -> WOFFHeader {
-        WOFFHeader {
-            sfnt_version: 0,
-            signature: 0,
-            flavor: 0,
-            length: 0,
-            num_tables: 0,
-            reserved: 0,
-            total_sfnt_size: 0,
-            major_version: 0,
-            minor_version: 0,
-            meta_offset: 0,
-            meta_length: 0,
-            meta_orig_length: 0,
-            priv_offset: 0,
-            priv_length: 0,
-        }
-    }
-
-    fn from<R: BinaryReader>(reader: &mut R) -> Self {
-    let mut header = WOFFHeader::new();
-    reader.seek(std::io::SeekFrom::Start(0)).unwrap();
+  pub(crate) fn new<R: BinaryReader>(reader: &mut R) -> Self {
+    let mut header = Self {
+      sfnt_version: 0,
+      signature: 0,
+      flavor: 0,
+      length: 0,
+      num_tables: 0,
+      reserved: 0,
+      total_sfnt_size: 0,
+      major_version: 0,
+      minor_version: 0,
+      meta_offset: 0,
+      meta_length: 0,
+      meta_orig_length: 0,
+      priv_offset: 0,
+      priv_length: 0,
+    };
     header.signature = reader.read_u32().unwrap();
     header.flavor = reader.read_u32().unwrap();
     header.length = reader.read_u32().unwrap();
@@ -105,10 +100,7 @@ pub(crate) struct WOFF {
 }
 
 impl WOFF{
-    pub(crate) fn from<R:BinaryReader>(reader: &mut R) -> Self{
-      // read header
-      let header = WOFFHeader::from(reader);
-      // read table records
+    pub(crate) fn from<B:BinaryReader>(reader: &mut B, header: WOFFHeader) -> Self {
       let mut table_records = Vec::new();
       for _ in 0..header.num_tables {
           let mut table_record = WOFFTableRecord::new();
@@ -167,6 +159,11 @@ impl WOFF{
         private_data: Box::new(private_data),
         tables,
       }
+    }
+
+    pub(crate) fn new<R:BinaryReader>(reader: &mut R) -> Self{
+      let header = WOFFHeader::new(reader);
+      Self::from(reader, header)
     }
 
     pub fn get_metadata(&self) -> &str {

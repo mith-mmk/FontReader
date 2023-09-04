@@ -12,6 +12,8 @@ fn main() {
     let output_file = "./test/read.html";
     let filename: PathBuf = PathBuf::from(fontname);    
     let font = Font::get_font_from_file(&filename).unwrap();
+    let string = font.get_info();
+    println!("{}", string);
     let text_file = "./test/read.txt";
     let string = std::fs::read_to_string(text_file).unwrap();
     let html = font.get_html(&string);

@@ -2,7 +2,7 @@ use std::io::{BufReader};
 use std::{path::PathBuf, fs::File};
 use bin_rs::reader::{BinaryReader, StreamReader, BytesReader};
 
-use crate::opentype::outline::*;
+use crate::opentype::{outline::*, OTFHeader};
 use crate::opentype::requires::*;
 use crate::fontheader;
 use crate::opentype::requires::cmap::CmapEncodings;
@@ -60,9 +60,31 @@ pub struct Font {
   hmtx_pos: Option<Pointer>,
   loca_pos: Option<Pointer>,  // OpenType font, CFF/CFF2 none
   glyf_pos: Option<Pointer>,  // OpenType font, CFF/CFF2 none
+  pub(crate) more_fonts: Box<Vec<Font>>,
 }
 
 impl Font {
+  fn empty() -> Self {
+    Self {
+      font_type: fontheader::FontHeaders::Unknown,
+      cmap: None,
+      head: None,
+      hhea: None,
+      hmtx: None,
+      maxp: None,
+      name: None,
+      os2: None,
+      post: None,
+      loca: None,
+      grif: None,
+      hmtx_pos: None,
+      loca_pos: None,
+      glyf_pos: None,
+      more_fonts: Box::new(Vec::new()),
+    }
+  }
+
+
   pub fn get_font_from_file(filename: &PathBuf) -> Option<Self> {
     font_load_from_file(filename)
   }
@@ -109,8 +131,6 @@ impl Font {
   pub fn get_svg(&self, ch: char) -> String {
     // utf-32
     let code = ch as u32;
-    println!("code: {}", code);
-    println!("cmap: {:?}", self.cmap.as_ref().unwrap());
     let pos = self.cmap.as_ref().unwrap().get_griph_position(code);
     let glyf = self.grif.as_ref().unwrap().get_glyph(pos as usize).unwrap();
     let layout: HorizontalLayout = self.get_horizontal_layout(pos as usize);
@@ -143,6 +163,21 @@ impl Font {
     html += "</body>\n";
     html += "</html>\n";
     html
+  }
+
+  pub fn get_info(&self) -> String {
+    let mut string = String::new();
+    let name = self.name.as_ref().unwrap();
+    let font_famiry = name.get_family_name();
+    let subfamily_name = name.get_subfamily_name();
+    string += &format!("Font famiry: {} {}\n", font_famiry, subfamily_name);
+    for more_font in self.more_fonts.iter() {
+      let name = more_font.name.as_ref().unwrap();
+      let font_famiry = name.get_family_name();
+      let subfamily_name = name.get_subfamily_name();
+      string += &format!("Font famiry: {} {}\n", font_famiry, subfamily_name);
+    }
+    string
   }
 
 }
@@ -186,156 +221,12 @@ fn font_load_from_file(filename: &PathBuf) -> Option<Font> {
 
 
 fn font_load<R:BinaryReader>(file: &mut R) -> Option<Font> {
-  let mut font = Font {
-    font_type: fontheader::FontHeaders::Unknown,
-    cmap: None,
-    head: None,
-    hhea: None,
-    hmtx: None,
-    maxp: None,
-    name: None,
-    os2: None,
-    post: None,
-    loca: None,
-    grif: None,
-    hmtx_pos: None,
-    loca_pos: None,
-    glyf_pos: None,
-  };
-
   match fontheader::get_font_type(file) {
     fontheader::FontHeaders::OTF(header) => {
-      font.font_type = fontheader::FontHeaders::OTF(header.clone());
-      header.table_records.into_iter().for_each(|record| {
-        let tag: [u8;4] = record.table_tag.to_be_bytes();
-        #[cfg(debug_assertions)]
-        {
-          for i in 0..4 {
-            let ch = tag[i] as char;
-             print!("{}", ch);
-          }
-          println!("{:?}", tag);
-        }
-              
-        match &tag {
-          b"cmap" => {
-            let cmap_encodings = CmapEncodings::new(file, record.offset, record.length);
-            font.cmap = Some(cmap_encodings);
-          }
-          b"head" => {
-            let head = head::HEAD::new(file, record.offset, record.length);
-            font.head = Some(head);
-          }
-          b"hhea" => {
-            let hhea = hhea::HHEA::new(file, record.offset, record.length);
-            font.hhea = Some(hhea);
-          }
-          b"hmtx" => {
-            let htmx_pos = Pointer {
-              offset: record.offset,
-              length: record.length,
-            };
-            font.hmtx_pos = Some(htmx_pos);
-          }
-          b"maxp" => {
-            let maxp = maxp::MAXP::new(file, record.offset, record.length);
-            font.maxp = Some(maxp);
-          }
-          b"name" => {
-            let name = name::NAME::new(file, record.offset, record.length);
-            font.name = Some(name);
-          }
-          b"OS/2" => {
-            let os2 = os2::OS2::new(file, record.offset, record.length);
-            font.os2 = Some(os2);
-          }
-          b"post" => {
-            let post = post::POST::new(file, record.offset, record.length);
-            font.post = Some(post);
-          }
-          b"loca" => {
-            let loca_pos = Pointer {
-              offset: record.offset,
-              length: record.length,
-            };
-            font.loca_pos = Some(loca_pos);
-          }
-          b"glyf" => {
-            let glyf_pos = Pointer {
-              offset: record.offset,
-              length: record.length,
-            };
-            font.glyf_pos = Some(glyf_pos);
-          } 
-          _ => {
-            debug_assert!(true, "Unknown table tag")
-          }                        
-        }
-      });
-
-      let num_glyphs = font.maxp.as_ref().unwrap().num_glyphs;
-      let number_of_hmetrics = font.hhea.as_ref().unwrap().number_of_hmetrics;
-      let offset = font.hmtx_pos.as_ref().unwrap().offset;
-      let length = font.hmtx_pos.as_ref().unwrap().length;
-
-      let hmtx = hmtx::HMTX::new(file, offset, length, number_of_hmetrics, num_glyphs);
-      font.hmtx = Some(hmtx);
-
-      let offset = font.loca_pos.as_ref().unwrap().offset;
-      let length = font.loca_pos.as_ref().unwrap().length;
-      let loca = loca::LOCA::new(file, offset, length, num_glyphs);
-      font.loca = Some(loca);
-
-      let offset = font.glyf_pos.as_ref().unwrap().offset;
-      let length = font.glyf_pos.as_ref().unwrap().length;
-      let loca = font.loca.as_ref().unwrap();
-      let glyf = glyf::GLYF::new(file, offset, length, loca);
-      font.grif = Some(glyf);
-
-      if font.cmap.is_none() {
-        debug_assert!(true, "No cmap table");
-        return None
-      }
-      if font.head.is_none() {
-        debug_assert!(true, "No head table");
-        return None
-      }
-      if font.hhea.is_none() {
-        debug_assert!(true, "No hhea table");
-        return None
-      }
-      if font.hmtx.is_none() {
-        debug_assert!(true, "No hmtx table");
-        return None
-      }
-      if font.maxp.is_none() {
-        debug_assert!(true, "No maxp table");
-        return None
-      }
-      if font.name.is_none() {
-        debug_assert!(true, "No name table");
-        return None
-      }
-      if font.os2.is_none() {
-        debug_assert!(true, "No OS/2 table");
-        return None
-      }
-      if font.post.is_none() {
-        debug_assert!(true, "No post table");
-        return None
-      }
-      if font.loca.is_none() {
-        debug_assert!(true, "Not support no loca table, current only support OpenType font, not support CFF/CFF2/SVG font");
-        return None
-      }
-      if font.grif.is_none() {
-        debug_assert!(true, "Not support no glyf table");
-        return None
-      }
-
-
+      let font = from_opentype(file, &header);
       #[cfg(debug_assertions)]
       {
+        let font = font.as_ref().unwrap();
         // create or open file
         let file = match File::create("test/font.txt") {
             Ok(it) => it,
@@ -390,12 +281,32 @@ fn font_load<R:BinaryReader>(file: &mut R) -> Option<Font> {
           let pos = cmap_encodings.get_griph_position(i as u32);
           let ch = char::from_u32(i as u32).unwrap();
           writeln!(&mut writer, "{}:{:04} ", ch , pos).unwrap();
-
+          Some(font.clone())
         }
     },
-    fontheader::FontHeaders::TTF(_) => todo!(),
-    fontheader::FontHeaders::WOFF(_) => {
-      let woff = crate::woff::WOFF::from(file);
+    fontheader::FontHeaders::TTF(header) =>{
+      let num_fonts = header.num_fonts.clone();
+      let tt = crate::truetype::TrueType::from(file, header);
+      let table = &tt.tables[0];
+      let mut font = from_opentype(file, table);
+      let mut fonts = Vec::new();
+      for i in 1..num_fonts {
+        let table = &tt.tables[i as usize];
+        let font = from_opentype(file, table);
+        match font.is_some() {
+            true => {
+              fonts.push(font.unwrap());
+            }
+            false => (),
+        }
+      }
+      font.as_mut().unwrap().more_fonts = Box::new(fonts);
+      font
+    },
+    fontheader::FontHeaders::WOFF(header) => {
+      let mut font = Font::empty();
+      font.font_type = fontheader::FontHeaders::WOFF(header.clone());
+      let woff = crate::woff::WOFF::from(file, header);
 
       let mut hmtx_table = None;
       let mut loca_table = None;
@@ -465,9 +376,142 @@ fn font_load<R:BinaryReader>(file: &mut R) -> Option<Font> {
       let mut reader = BytesReader::new(&glyf_table.as_ref().unwrap().data);
       let glyf = glyf::GLYF::new(&mut reader, 0, glyf_table.as_ref().unwrap().data.len() as u32, font.loca.as_ref().unwrap());
       font.grif = Some(glyf);
+      Some(font)
     }
     fontheader::FontHeaders::WOFF2(_) => todo!(),
     fontheader::FontHeaders::Unknown => todo!(),
+  }
+}
+
+fn from_opentype<R:BinaryReader>(file :&mut R,header: &OTFHeader) -> Option<Font>{
+  let mut font = Font::empty();
+  font.font_type = fontheader::FontHeaders::OTF(header.clone());
+
+  header.table_records.as_ref().into_iter().for_each(|record| {
+    let tag: [u8;4] = record.table_tag.to_be_bytes();
+    #[cfg(debug_assertions)]
+    {
+      for i in 0..4 {
+        let ch = tag[i] as char;
+         print!("{}", ch);
+      }
+      println!("{:?}", tag);
+    }
+          
+    match &tag {
+      b"cmap" => {
+        let cmap_encodings = CmapEncodings::new(file, record.offset, record.length);
+        font.cmap = Some(cmap_encodings);
+      }
+      b"head" => {
+        let head = head::HEAD::new(file, record.offset, record.length);
+        font.head = Some(head);
+      }
+      b"hhea" => {
+        let hhea = hhea::HHEA::new(file, record.offset, record.length);
+        font.hhea = Some(hhea);
+      }
+      b"hmtx" => {
+        let htmx_pos = Pointer {
+          offset: record.offset,
+          length: record.length,
+        };
+        font.hmtx_pos = Some(htmx_pos);
+      }
+      b"maxp" => {
+        let maxp = maxp::MAXP::new(file, record.offset, record.length);
+        font.maxp = Some(maxp);
+      }
+      b"name" => {
+        let name = name::NAME::new(file, record.offset, record.length);
+        font.name = Some(name);
+      }
+      b"OS/2" => {
+        let os2 = os2::OS2::new(file, record.offset, record.length);
+        font.os2 = Some(os2);
+      }
+      b"post" => {
+        let post = post::POST::new(file, record.offset, record.length);
+        font.post = Some(post);
+      }
+      b"loca" => {
+        let loca_pos = Pointer {
+          offset: record.offset,
+          length: record.length,
+        };
+        font.loca_pos = Some(loca_pos);
+      }
+      b"glyf" => {
+        let glyf_pos = Pointer {
+          offset: record.offset,
+          length: record.length,
+        };
+        font.glyf_pos = Some(glyf_pos);
+      } 
+      _ => {
+        debug_assert!(true, "Unknown table tag")
+      }                        
+    }
+  });
+
+  let num_glyphs = font.maxp.as_ref().unwrap().num_glyphs;
+  let number_of_hmetrics = font.hhea.as_ref().unwrap().number_of_hmetrics;
+  let offset = font.hmtx_pos.as_ref().unwrap().offset;
+  let length = font.hmtx_pos.as_ref().unwrap().length;
+
+  let hmtx = hmtx::HMTX::new(file, offset, length, number_of_hmetrics, num_glyphs);
+  font.hmtx = Some(hmtx);
+
+  let offset = font.loca_pos.as_ref().unwrap().offset;
+  let length = font.loca_pos.as_ref().unwrap().length;
+  let loca = loca::LOCA::new(file, offset, length, num_glyphs);
+  font.loca = Some(loca);
+
+  let offset = font.glyf_pos.as_ref().unwrap().offset;
+  let length = font.glyf_pos.as_ref().unwrap().length;
+  let loca = font.loca.as_ref().unwrap();
+  let glyf = glyf::GLYF::new(file, offset, length, loca);
+  font.grif = Some(glyf);
+
+  if font.cmap.is_none() {
+    debug_assert!(true, "No cmap table");
+    return None
+  }
+  if font.head.is_none() {
+    debug_assert!(true, "No head table");
+    return None
+  }
+  if font.hhea.is_none() {
+    debug_assert!(true, "No hhea table");
+    return None
+  }
+  if font.hmtx.is_none() {
+    debug_assert!(true, "No hmtx table");
+    return None
+  }
+  if font.maxp.is_none() {
+    debug_assert!(true, "No maxp table");
+    return None
+  }
+  if font.name.is_none() {
+    debug_assert!(true, "No name table");
+    return None
+  }
+  if font.os2.is_none() {
+    debug_assert!(true, "No OS/2 table");
+    return None
+  }
+  if font.post.is_none() {
+    debug_assert!(true, "No post table");
+    return None
+  }
+  if font.loca.is_none() {
+    debug_assert!(true, "Not support no loca table, current only support OpenType font, not support CFF/CFF2/SVG font");
+    return None
+  }
+  if font.grif.is_none() {
+    debug_assert!(true, "Not support no glyf table");
+    return None
   }
   Some(font)
 }

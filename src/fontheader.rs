@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 use bin_rs::{reader::{BinaryReader, BytesReader, StreamReader}, Endian};
-use crate::{opentype::OTFHeader, util::u32_to_string};
+use crate::{opentype::OTFHeader, util::u32_to_string, truetype::TTFHeader};
 use crate::woff::woff::WOFFHeader;
 
 // pub type F2DOT14 = i16;
@@ -9,6 +9,30 @@ pub type LONGDATETIME = i64;
 //pub type Fixed = u32;
 pub type FWORD = i16;
 pub type UFWORD = u16;
+
+#[derive(Debug, Clone)]
+pub(crate) struct TableRecord {
+    pub(crate) table_tag: u32,
+    pub(crate) check_sum: u32,
+    pub(crate) offset: u32,
+    pub(crate) length: u32,
+}
+
+impl TableRecord {
+    pub(crate) fn to_string(self) -> String {
+        let mut string = String::new();
+        string.push_str(&"table tag: ".to_string());
+        string.push_str(u32_to_string(self.table_tag).as_str());
+        string.push_str(&" check sum: ".to_string());
+        // hex digit
+        string.push_str(&format!("{:08X}", self.check_sum));
+        string.push_str(&" offset: ".to_string());
+        string.push_str(&format!("{:08X}", self.offset));
+        string.push_str(&" length: ".to_string());
+        string.push_str(&format!("{:08X}", self.length));
+        string
+    }
+}
 
 #[cfg(target_feature = "impl")]
 pub fn fixed_to_f32(value: Fixed) -> f32 {
@@ -101,9 +125,11 @@ impl FontHeaders {
                 string.push_str(&header.num_fonts.to_string());
                 string.push_str(&" table directory:\n".to_string());
                 for table in header.table_directory.iter() {
-                    string.push_str(&table.to_string());
+                    let table_offset = format!("{:08x}", table);
+                    string.push_str(&table_offset);
                     string.push_str(&"\n".to_string());
                 }
+
                 if header.major_version >= 2 {
                     string.push_str(&" ul_dsig_tag: ".to_string());
                     string.push_str(&header.ul_dsig_tag.to_string());
@@ -231,24 +257,6 @@ impl FontHeaders {
 }
 
 
-
-#[derive(Debug, Clone)]
-pub struct TTFHeader {
-    pub(crate) sfnt_version: u32,
-    pub(crate) major_version: u16,
-    pub(crate) minor_version: u16,
-    pub(crate) num_fonts: u32,
-    pub(crate) table_directory: Box<Vec<u32>>,
-    // Version2
-    pub(crate) ul_dsig_tag: u32,
-    pub(crate) ul_dsig_length: u32,
-    pub(crate) ul_dsig_offset: u32,
-}
-
-
-
-
-
 #[derive(Debug, Clone)]
 pub struct WOFF2Header {
     pub(crate) sfnt_version: u32,
@@ -275,104 +283,25 @@ pub fn get_font_type_from_file(filename: &PathBuf) -> FontHeaders {
 }
 
 pub fn get_font_type<B: BinaryReader>(file: &mut B) -> FontHeaders {
-    let mut buffer = [0; 4];
     file.set_endian(Endian::BigEndian);
-    file.read_bytes(&mut buffer).unwrap();
+    let buffer = file.read_bytes_no_move(4).unwrap();
+    let buffer: [u8;4] = buffer.try_into().unwrap();
     let sfnt_version:u32 = u32::from_be_bytes(buffer);
     let font_type = match &buffer {
         b"ttcf" => {
-            let major_version = file.read_u16_be().unwrap();
-            let minor_version = file.read_u16_be().unwrap();
-            let num_fonts = file.read_u32_be().unwrap();
-            let mut table_directory = Vec::new();
-            for _ in 0..num_fonts {
-                let offset = file.read_u32_be().unwrap();
-                table_directory.push(offset);
-            }
-            let mut ul_dsig_tag = 0;
-            let mut ul_dsig_length = 0;
-            let mut ul_dsig_offset = 0;
-            if major_version >= 2 {
-                ul_dsig_tag = file.read_u32_be().unwrap();
-                ul_dsig_length = file.read_u32_be().unwrap();
-                ul_dsig_offset = file.read_u32_be().unwrap();
-            }
-            let fontheader = {
-                TTFHeader {
-                    sfnt_version,
-                    major_version,
-                    minor_version,
-                    num_fonts: num_fonts,
-                    table_directory: Box::new(table_directory),
-                    ul_dsig_tag,
-                    ul_dsig_length,
-                    ul_dsig_offset,                    
-                }
-            };  
+            let fontheader = TTFHeader::new(file);
             FontHeaders::TTF(fontheader)
         },
         // if 0x00010000 -> OTF
 
         b"\x00\x01\x00\x00" | b"OTTO" => {
-            let num_tables = file.read_u16_be().unwrap();
-            let search_range = file.read_u16_be().unwrap();
-            let entry_selector = file.read_u16_be().unwrap();
-            let range_shift = file.read_u16_be().unwrap();
-            let mut table_records = Vec::new();
-            for _ in 0..num_tables {
-                let table_tag = file.read_u32_be().unwrap();
-                let check_sum = file.read_u32_be().unwrap();
-                let offset = file.read_u32_be().unwrap();
-                let length = file.read_u32_be().unwrap();
-                table_records.push(crate::opentype::TableRecord {
-                    table_tag,
-                    check_sum,
-                    offset,
-                    length,
-                });
-            }
-
-            let fontheader = OTFHeader {
-                sfnt_version,
-                num_tables,
-                search_range,
-                entry_selector,
-                range_shift,
-                table_records: Box::new(table_records), 
-            };
+            let fontheader = OTFHeader::new(file);
             FontHeaders::OTF(fontheader)
         },
         // 0
         b"wOFF" => {
-            let signature = file.read_u32_be().unwrap();
-            let flavor = file.read_u32_be().unwrap();
-            let length = file.read_u32_be().unwrap();
-            let num_tables = file.read_u16_be().unwrap();
-            let reserved = file.read_u16_be().unwrap();
-            let total_sfnt_size = file.read_u32_be().unwrap();
-            let major_version = file.read_u16_be().unwrap();
-            let minor_version = file.read_u16_be().unwrap();
-            let meta_offset = file.read_u32_be().unwrap();
-            let meta_length = file.read_u32_be().unwrap();
-            let meta_orig_length = file.read_u32_be().unwrap();
-            let priv_offset = file.read_u32_be().unwrap();
-            let priv_length = file.read_u32_be().unwrap();            
-            FontHeaders::WOFF(WOFFHeader {
-                sfnt_version,
-                signature,
-                flavor,
-                length,
-                num_tables,
-                reserved,
-                total_sfnt_size,
-                major_version,
-                minor_version,
-                meta_offset,
-                meta_length,
-                meta_orig_length,
-                priv_offset,
-                priv_length,
-            })
+            let header = WOFFHeader::new(file);
+            FontHeaders::WOFF(header)
         },
         b"wOF2" => {
             let signature = file.read_u32_be().unwrap();

@@ -93,7 +93,7 @@ impl HHEA {
 }
 
 fn get_hhea<R: BinaryReader>(file: &mut R, offest: u32, length: u32) -> HHEA {
-  let mut file = file;
+  let file = file;
   file.seek(SeekFrom::Start(offest as u64)).unwrap();
   let major_version = file.read_u16_be().unwrap();
   let minor_version = file.read_u16_be().unwrap();

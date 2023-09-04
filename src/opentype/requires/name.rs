@@ -2,7 +2,7 @@
 
 use std::{fmt::{Display, Formatter, self}, io::SeekFrom};
 
-use bin_rs::reader::BinaryReader;
+use bin_rs::reader::{BinaryReader, BytesReader};
 #[cfg(feature="iconv")]
 use iconv::Iconv;
 
@@ -23,7 +23,6 @@ pub(crate) struct NAME {
   pub(crate) count: u16,
   pub(crate) storage_offset: u16,
   pub(crate) name_records: Box<Vec<NameRecord>>,
-  pub(crate) name_string: Box<Vec<String>>,
   // above V0
   // under V1
   pub(crate) lang_tag_count: u16,
@@ -48,8 +47,7 @@ impl NAME {
     string += &version;
     let count = format!("Count {}\n", self.count);
     string += &count;
-    for (i, name_string) in self.name_string.iter().enumerate() {
-      let name_record = &self.name_records[i];
+    for name_record in self.name_records.iter() {
       let platform_id = format!("Platform ID {}\n", name_record.platform_id);
       string += &platform_id;
       let encoding_id = format!("Encoding ID {}\n", name_record.encoding_id);
@@ -62,8 +60,7 @@ impl NAME {
       string += &length;
       let string_offset = format!("String Offset {}\n", name_record.string_offset);
       string += &string_offset;
-      string += &format!("Name String {} : ", i);
-      string += &name_string;
+      string += &format!("Name String {} : ", name_record.string);
       string += "\n";
     }
 
@@ -78,6 +75,29 @@ impl NAME {
 
     string   
   }
+
+  pub fn get_family_name(&self) -> String {
+    let mut family_name = "".to_string();
+    for name_record in self.name_records.iter() {
+      if name_record.name_id == 1 {
+        family_name = name_record.string.clone();
+        break;
+      }
+    }
+    family_name
+  }
+
+  pub fn get_subfamily_name(&self) -> String {
+    let mut subfamily_name = "".to_string();
+    for name_record in self.name_records.iter() {
+      if name_record.name_id == 2 {
+        subfamily_name = name_record.string.clone();
+        break;
+      }
+    }
+    subfamily_name
+  }
+
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -94,10 +114,12 @@ pub(crate) struct NameRecord{
   pub(crate) name_id: u16,
   pub(crate) length: u16,
   pub(crate) string_offset: u16,
+  pub(crate) string: String,
 }
 
 fn get_names<R: BinaryReader>(file: &mut R, offest: u32, length: u32) -> NAME {
   file.seek(SeekFrom::Start(offest as u64)).unwrap();
+  let current_position = file.offset().unwrap();
   let version = file.read_u16_be().unwrap();
   let count = file.read_u16_be().unwrap();
   let storage_offset = file.read_u16_be().unwrap();
@@ -116,6 +138,7 @@ fn get_names<R: BinaryReader>(file: &mut R, offest: u32, length: u32) -> NAME {
       name_id,
       length,
       string_offset,
+      string: "".to_string(),
     });
   }
   let mut lang_tag_count = 0;
@@ -131,12 +154,11 @@ fn get_names<R: BinaryReader>(file: &mut R, offest: u32, length: u32) -> NAME {
       });
     }
   }
-  let current_position = file.offset().unwrap();
+  let current_position = current_position + storage_offset as u64;
   // platform id = 0,3,4  utf-16be
   // platform id = 2       ASCII 
   // platform id = 1 0 = ASCII 1 == UTF-16BE
 
-  let mut name_string = Vec::new();
   for i in 0..count as usize {
     let encoding_engine = match name_records[i].platform_id {
       0 | 3 | 4 => EncodingEngine::UTF16BE,
@@ -153,33 +175,19 @@ fn get_names<R: BinaryReader>(file: &mut R, offest: u32, length: u32) -> NAME {
     file.seek(SeekFrom::Start(string_offset as u64)).unwrap();
     match encoding_engine {
       EncodingEngine::UTF16BE => {
-        let string = file.read_utf16be_string(name_records[i].length as usize).unwrap();
-        name_string.push(string);    
+        let mut utf16s = Vec::new();
+        for _ in 0..name_records[i].length /2 {
+          let utf16 = file.read_u16_be().unwrap();
+          utf16s.push(utf16);
+        }
+        name_records[i].string = String::from_utf16(&utf16s).unwrap();
       }
       EncodingEngine::ASCII => {
         let string = file.read_ascii_string(name_records[i].length as usize).unwrap();
-        name_string.push(string.to_string());
+        name_records[i].string = string.to_string();
       }
       _ => {
-        #[cfg(feature="iconv")]
-        {
-        let mut u8 = Vec::new();
-        let u8 = file.read_bytes_as_vec(name_records[i].length as usize).unwrap();
-        let string = if encoding_engine == EncodingEngine::ShiftJIS {
-          iconv::decode(&u8, "CP932").unwrap()
-        } else if encoding_engine == EncodingEngine::Big5 {
-          iconv::decode(&u8, "BIG5").unwrap()
-        } else if encoding_engine == EncodingEngine::Wansung {
-          iconv::decode(&u8, "EUC-KR").unwrap()
-        } else if encoding_engine == EncodingEngine::Johab {
-          iconv::decode(&u8, "JOHAB").unwrap()
-        } else {
-          "not support".to_string()
-        };
-        name_string.push(string);
-        }
-        #[cfg(not(feature="iconv"))]
-          name_string.push("this encoding is not support".to_string());
+        name_records[i].string = "this encoding is not support".to_string();
       }
     }
   }
@@ -199,7 +207,6 @@ fn get_names<R: BinaryReader>(file: &mut R, offest: u32, length: u32) -> NAME {
     count,
     storage_offset,
     name_records: Box::new(name_records),
-    name_string: Box::new(name_string),
     lang_tag_count,
     lang_tag_records: Box::new(lang_tag_record),
     lang_tag_string: Box::new(lang_tag_string),
