@@ -183,8 +183,12 @@ fn get_names<R: BinaryReader>(file: &mut R, offest: u32, length: u32) -> NAME {
         name_records[i].string = String::from_utf16(&utf16s).unwrap();
       }
       EncodingEngine::ASCII => {
-        let string = file.read_ascii_string(name_records[i].length as usize).unwrap();
-        name_records[i].string = string.to_string();
+        let ascii = file.read_bytes_as_vec(name_records[i].length as usize).unwrap();
+        let mut utf16s = Vec::new();
+        for i in 0..ascii.len() {
+          utf16s.push(ascii[i] as u16);
+        }
+        name_records[i].string = String::from_utf16(&utf16s).unwrap();
       }
       _ => {
         name_records[i].string = "this encoding is not support".to_string();

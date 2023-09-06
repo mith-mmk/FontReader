@@ -248,8 +248,13 @@ impl Glyph {
       }
       let next_on_curve = if i + 1 < parsed.on_curves.len() {parsed.on_curves[i + 1]} else { true };
       if path_start {
-        start_x = x;
-        start_y = y;
+        if on_curve {
+          start_x = x;
+          start_y = y;
+        } else {
+          start_x = (x + next_x) / 2;
+          start_y = (y + next_y) / 2;
+        }
 
         svg += &format!("M{} {}", start_x, y_max - start_y);
         path_start = false;
@@ -277,7 +282,6 @@ impl Glyph {
         }
       }
       if i >= parsed.end_pts_of_contours[pos] {
-        svg += "Z ";
         pos += 1;
         path_start = true;
       }   
