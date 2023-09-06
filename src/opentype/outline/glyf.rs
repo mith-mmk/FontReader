@@ -248,17 +248,20 @@ impl Glyph {
       }
       let next_on_curve = if i + 1 < parsed.on_curves.len() {parsed.on_curves[i + 1]} else { true };
       if path_start {
-        svg += &format!("M{} {}", x, y_max - y);
         start_x = x;
         start_y = y;
+
+        svg += &format!("M{} {}", start_x, y_max - start_y);
         path_start = false;
       } else if on_curve {
+
         if befor_on_curve {
           svg += &format!("L{} {}", x, y_max - y);
         } else {
           // Q px py x y or T x y was writed
         }
       } else {
+ 
         if befor_on_curve {
           if next_on_curve {
             svg += &format!("Q{} {} {} {}", x, y_max - y, next_x, y_max - next_y);
@@ -273,12 +276,13 @@ impl Glyph {
           }
         }
       }
-
-      befor_on_curve = on_curve;
       if i >= parsed.end_pts_of_contours[pos] {
+        svg += "Z ";
         pos += 1;
         path_start = true;
       }   
+      befor_on_curve = on_curve;
+
     }
     svg += "\"/>\n</svg>";
     svg
