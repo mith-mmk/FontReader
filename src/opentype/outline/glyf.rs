@@ -203,13 +203,13 @@ impl Glyph {
     let parsed = self.parse();
     let rsb = (layout.advance_width as isize - parsed.x_max as isize) as i16;
     let x_min = parsed.x_min as i16 - layout.lsb as i16;
-    let y_min = 0;
+    let y_min = parsed.y_min;
     let x_max = parsed.x_max + rsb;
     let y_max = layout.accender - layout.descender  + layout.line_gap;
     // heightを後ろから読み出す
     let height = fonsize;
     let width = x_min as f32 + x_max as f32 + layout.lsb as f32;
-    let width = width * height / (y_max - y_min) as f32;
+    let width = width * height / (y_max - y_min as isize) as f32;
     let height_str = format!("{}{}", height, fontunit);
     let width_str = format!("{}{}", width, fontunit);
     let mut svg = format!("<svg width=\"{}\" height=\"{}\" viewBox=\"{} {} {} {}\" xmlns=\"http://www.w3.org/2000/svg\">\n", width_str, height_str, x_min, y_min, x_max, y_max);
