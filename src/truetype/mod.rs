@@ -78,7 +78,6 @@ impl TrueType {
 
     for i in 0..header.num_fonts {
       reader.seek(SeekFrom::Start(header.table_directory[i as usize] as u64)).unwrap();
-      println!("{:04X} ",header.table_directory[i as usize]);
       tables.push(OTFHeader::new(reader));
     }
 

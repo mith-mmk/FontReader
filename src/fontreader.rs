@@ -226,7 +226,7 @@ fn font_load<R:BinaryReader>(file: &mut R) -> Option<Font> {
       let font = from_opentype(file, &header);
       #[cfg(debug_assertions)]
       {
-        let font = font.as_ref().unwrap();
+        let _font = font.as_ref().unwrap();
         // create or open file
         let file = match File::create("test/font.txt") {
             Ok(it) => it,
@@ -236,26 +236,26 @@ fn font_load<R:BinaryReader>(file: &mut R) -> Option<Font> {
         };
         let mut writer = BufWriter::new(file);
 
-        let encoding_records = &font.cmap.as_ref().unwrap().get_encoding_engine();
-        writeln!(&mut writer, "{}", &font.cmap.as_ref().unwrap().cmap.to_string()).unwrap();
+        let encoding_records = &_font.cmap.as_ref().unwrap().get_encoding_engine();
+        writeln!(&mut writer, "{}", _font.cmap.as_ref().unwrap().cmap.to_string()).unwrap();
         for i in 0..encoding_records.len() {
           writeln!(&mut writer, "{} {}", i,encoding_records[i].to_string()).unwrap();
         }
-        writeln!(&mut writer, "{}", &font.head.as_ref().unwrap().to_string()).unwrap();
-        writeln!(&mut writer, "{}", &font.hhea.as_ref().unwrap().to_string()).unwrap();  
-        writeln!(&mut writer, "{}", &font.maxp.as_ref().unwrap().to_string()).unwrap();
-        writeln!(&mut writer, "{}", &font.hmtx.as_ref().unwrap().to_string()).unwrap();
-        writeln!(&mut writer, "{}", &font.os2.as_ref().unwrap().to_string()).unwrap();
-        writeln!(&mut writer, "{}", &font.post.as_ref().unwrap().to_string()).unwrap();
-        writeln!(&mut writer, "{}", &font.loca.as_ref().unwrap().to_string()).unwrap();
-        writeln!(&mut writer, "{}", &font.name.as_ref().unwrap().to_string()).unwrap();
+        writeln!(&mut writer, "{}", &_font.head.as_ref().unwrap().to_string()).unwrap();
+        writeln!(&mut writer, "{}", &_font.hhea.as_ref().unwrap().to_string()).unwrap();  
+        writeln!(&mut writer, "{}", &_font.maxp.as_ref().unwrap().to_string()).unwrap();
+        writeln!(&mut writer, "{}", &_font.hmtx.as_ref().unwrap().to_string()).unwrap();
+        writeln!(&mut writer, "{}", &_font.os2.as_ref().unwrap().to_string()).unwrap();
+        writeln!(&mut writer, "{}", &_font.post.as_ref().unwrap().to_string()).unwrap();
+        writeln!(&mut writer, "{}", &_font.loca.as_ref().unwrap().to_string()).unwrap();
+        writeln!(&mut writer, "{}", &_font.name.as_ref().unwrap().to_string()).unwrap();
         writeln!(&mut writer, "long cmap -> griph").unwrap();
-        let cmap_encodings = &font.cmap.as_ref().unwrap().clone();
-        let glyf = font.grif.as_ref().unwrap();
+        let cmap_encodings = &_font.cmap.as_ref().unwrap().clone();
+        let glyf = _font.grif.as_ref().unwrap();
         for i in 0x0020..0x0ff {
             let pos = cmap_encodings.get_griph_position(i);
             let glyph = glyf.get_glyph(pos as usize).unwrap();
-            let layout = font.get_horizontal_layout(pos as usize);
+            let layout = _font.get_horizontal_layout(pos as usize);
             let svg = glyph.to_svg(32.0, "pt",&layout);
             let ch = char::from_u32(i).unwrap();
             writeln!(&mut writer,"{}:{:04} ", ch , pos).unwrap();
@@ -270,7 +270,7 @@ fn font_load<R:BinaryReader>(file: &mut R) -> Option<Font> {
             }
             let pos = cmap_encodings.get_griph_position(i as u32);
             let glyph = glyf.get_glyph(pos as usize).unwrap();
-            let layout = font.get_horizontal_layout(pos as usize);
+            let layout = _font.get_horizontal_layout(pos as usize);
             let svg = glyph.to_svg(100.0, &"px",&layout);
             let ch = char::from_u32(i as u32).unwrap();
             write!(&mut writer,"{}:{:04} ", ch , pos).unwrap();
@@ -281,9 +281,9 @@ fn font_load<R:BinaryReader>(file: &mut R) -> Option<Font> {
           let pos = cmap_encodings.get_griph_position(i as u32);
           let ch = char::from_u32(i as u32).unwrap();
           writeln!(&mut writer, "{}:{:04} ", ch , pos).unwrap();
-          Some(font.clone())
         }
-    },
+        font
+      },
     fontheader::FontHeaders::TTF(header) =>{
       let num_fonts = header.num_fonts.clone();
       let tt = crate::truetype::TrueType::from(file, header);
