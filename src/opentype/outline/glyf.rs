@@ -238,7 +238,7 @@ impl Glyph {
       let on_curve = parsed.on_curves[i];
       let next_x;
       let next_y;
-      if parsed.end_pts_of_contours[pos] == i || i == 0 || i == parsed.flags.len() - 1 {
+      if parsed.end_pts_of_contours[pos] == i  || i == parsed.flags.len() - 1 {
         next_x = start_x;
         next_y = start_y;
       } else {
@@ -266,7 +266,11 @@ impl Glyph {
             svg += &format!("Q{} {} {} {}", x, y_max - y, (x + next_x) / 2, y_max - (y + next_y) / 2);
           }
         } else { // befor off curve 
-          svg += &format!("T{} {}", (x + next_x) / 2, y_max - (y + next_y) / 2);
+          if next_on_curve {
+            svg += &format!("T{} {}", next_x, y_max - next_y);
+          } else { // next off curve
+            svg += &format!("Q{} {} {} {}", x, y_max -y, (x + next_x) / 2, y_max - (y + next_y) / 2);
+          }
         }
       }
 
