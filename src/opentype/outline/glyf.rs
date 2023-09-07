@@ -196,24 +196,23 @@ impl Glyph {
             on_curves,
         }
     }
-    
 
     pub(crate) fn get_svg_heder(
         &self,
         fonsize: f32,
         fontunit: &str,
         layout: &crate::fontreader::HorizontalLayout,
-        ) -> String {
+    ) -> String {
         let parsed = self.parse();
         Self::get_svg_header_from_parsed(&parsed, fonsize, fontunit, layout)
     }
 
     pub(crate) fn get_svg_header_from_parsed(
-            parsed : &ParsedGlyph,
-            fonsize: f32,
-            fontunit: &str,
-            layout: &crate::fontreader::HorizontalLayout,
-        ) -> String {
+        parsed: &ParsedGlyph,
+        fonsize: f32,
+        fontunit: &str,
+        layout: &crate::fontreader::HorizontalLayout,
+    ) -> String {
         let rsb = (layout.advance_width - parsed.x_max as isize) as i16;
         let x_min = parsed.x_min - layout.lsb as i16;
         let y_min = parsed.y_min;
@@ -241,16 +240,13 @@ impl Glyph {
         svg
     }
 
-    pub(crate) fn get_svg_path(
-        &self,
-        layout: &crate::fontreader::HorizontalLayout
-        ) -> String {
+    pub(crate) fn get_svg_path(&self, layout: &crate::fontreader::HorizontalLayout) -> String {
         let parsed = self.parse();
         Self::get_svg_path_parsed(&parsed, layout)
     }
-    
+
     pub(crate) fn get_svg_path_parsed(
-        parsed : &ParsedGlyph,
+        parsed: &ParsedGlyph,
         layout: &crate::fontreader::HorizontalLayout,
     ) -> String {
         let y_max = layout.accender as i16;
@@ -343,7 +339,7 @@ impl Glyph {
         }
         svg += "\"/>";
         svg
-    } 
+    }
 
     pub fn to_svg(
         &self,
@@ -352,7 +348,7 @@ impl Glyph {
         layout: &crate::fontreader::HorizontalLayout,
     ) -> String {
         let parsed = self.parse();
-        let mut svg =Self::get_svg_header_from_parsed(&parsed, fonsize, fontunit ,layout);
+        let mut svg = Self::get_svg_header_from_parsed(&parsed, fonsize, fontunit, layout);
         // heightを後ろから読み出す
         svg += &Self::get_svg_path_parsed(&parsed, layout);
         svg += "\n</svg>";

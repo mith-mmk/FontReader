@@ -1,6 +1,6 @@
 use std::io::SeekFrom;
 
-use crate::{opentype::OTFHeader};
+use crate::opentype::OTFHeader;
 use bin_rs::reader::BinaryReader;
 
 #[derive(Debug, Clone)]

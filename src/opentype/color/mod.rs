@@ -1,2 +1,2 @@
-pub mod cpal;
 pub mod colr;
+pub mod cpal;

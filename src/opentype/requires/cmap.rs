@@ -205,8 +205,7 @@ impl CmapEncodings {
                                 let mut offset = format4.id_range_offset[i] as u32 / 2 + i as u32
                                     - format4.seg_count_x2 as u32 / 2;
                                 // reverce calculation
-                                offset +=
-                                    code_number as u32 - format4.start_code[i] as u32;
+                                offset += code_number as u32 - format4.start_code[i] as u32;
                                 format4.glyph_id_array[offset as usize] as u32
                             };
                             position = gid;
@@ -747,9 +746,7 @@ pub(crate) struct EncodingRecordPriority {
     pub(crate) substitute: Vec<EncodingRecord>,
 }
 
-pub(crate) fn select_encoding(
-    encoding_records: &Vec<EncodingRecord>,
-) -> EncodingRecordPriority {
+pub(crate) fn select_encoding(encoding_records: &Vec<EncodingRecord>) -> EncodingRecordPriority {
     let mut uvs = Vec::new();
     let mut substitute = Vec::new();
     let mut priolities = Vec::new();

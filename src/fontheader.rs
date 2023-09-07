@@ -255,9 +255,7 @@ impl FontHeaders {
                 string.push_str(&header.priv_length.to_string());
                 string
             }
-            FontHeaders::Unknown => {
-                "Unknown".to_string()
-            }
+            FontHeaders::Unknown => "Unknown".to_string(),
         }
     }
 }
@@ -292,7 +290,7 @@ pub fn get_font_type<B: BinaryReader>(file: &mut B) -> FontHeaders {
     let buffer = file.read_bytes_no_move(4).unwrap();
     let buffer: [u8; 4] = buffer.try_into().unwrap();
     let sfnt_version: u32 = u32::from_be_bytes(buffer);
-    
+
     match &buffer {
         b"ttcf" => {
             let fontheader = TTFHeader::new(file);

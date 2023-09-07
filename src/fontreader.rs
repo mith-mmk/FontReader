@@ -3,12 +3,11 @@ use std::io::BufReader;
 use std::{fs::File, path::PathBuf};
 
 use crate::fontheader;
+use crate::opentype::color::{colr, cpal};
 use crate::opentype::requires::cmap::CmapEncodings;
 use crate::opentype::requires::hmtx::LongHorMetric;
 use crate::opentype::requires::*;
 use crate::opentype::{outline::*, OTFHeader};
-use crate::opentype::color::{colr, cpal};
-
 
 #[cfg(debug_assertions)]
 use std::io::{BufWriter, Write};
@@ -138,18 +137,34 @@ impl Font {
         let fontsize = 24.0;
         let fontunit = "pt";
         if let Some(colr) = self.colr.as_ref() {
-            let mut string = format!("<!-- glyf id: {} -->",pos);
+            let mut string = format!("<!-- glyf id: {} -->", pos);
             string += &glyf.get_svg_heder(fontsize, fontunit, &layout);
             let layers = colr.get_layer_record(pos as u16);
             for layer in layers {
                 let glyf_id = layer.glyph_id as u32;
-                let glyf = self.grif.as_ref().unwrap().get_glyph(glyf_id as usize).unwrap();
-                let pallet = self.cpal.as_ref().unwrap().get_pallet(layer.palette_index as usize);
-                #[cfg(debug_assertions)] {
-                    string += &format!("<!-- pallet index {} -->\n",layer.palette_index);
-                    string += &format!("<!-- Red {} Green {} Blue {} Alpha {} -->\n", pallet.red, pallet.green, pallet.blue, pallet.alpha);
+                let glyf = self
+                    .grif
+                    .as_ref()
+                    .unwrap()
+                    .get_glyph(glyf_id as usize)
+                    .unwrap();
+                let pallet = self
+                    .cpal
+                    .as_ref()
+                    .unwrap()
+                    .get_pallet(layer.palette_index as usize);
+                #[cfg(debug_assertions)]
+                {
+                    string += &format!("<!-- pallet index {} -->\n", layer.palette_index);
+                    string += &format!(
+                        "<!-- Red {} Green {} Blue {} Alpha {} -->\n",
+                        pallet.red, pallet.green, pallet.blue, pallet.alpha
+                    );
                 }
-                string += &format!("<g fill=\"rgba({}, {}, {}, {})\">\n",pallet.red, pallet.green, pallet.blue, pallet.alpha);
+                string += &format!(
+                    "<g fill=\"rgba({}, {}, {}, {})\">\n",
+                    pallet.red, pallet.green, pallet.blue, pallet.alpha
+                );
                 string += &glyf.get_svg_path(&layout);
                 string += "</g>\n";
             }
@@ -158,7 +173,6 @@ impl Font {
         } else {
             glyf.to_svg(fontsize, fontunit, &layout)
         }
-
     }
 
     pub fn get_html(&self, string: &str) -> String {
@@ -254,12 +268,7 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Option<Font> {
                 let mut writer = BufWriter::new(file);
 
                 let encoding_records = &_font.cmap.as_ref().unwrap().get_encoding_engine();
-                writeln!(
-                    &mut writer,
-                    "{}",
-                    _font.cmap.as_ref().unwrap().cmap
-                )
-                .unwrap();
+                writeln!(&mut writer, "{}", _font.cmap.as_ref().unwrap().cmap).unwrap();
                 for i in 0..encoding_records.len() {
                     writeln!(&mut writer, "{} {}", i, encoding_records[i].to_string()).unwrap();
                 }
@@ -443,84 +452,80 @@ fn from_opentype<R: BinaryReader>(file: &mut R, header: &OTFHeader) -> Option<Fo
     let mut font = Font::empty();
     font.font_type = fontheader::FontHeaders::OTF(header.clone());
 
-    header
-        .table_records
-        .as_ref()
-        .iter()
-        .for_each(|record| {
-            let tag: [u8; 4] = record.table_tag.to_be_bytes();
-            #[cfg(debug_assertions)]
-            {
-                for i in 0..4 {
-                    let ch = tag[i] as char;
-                    print!("{}", ch);
-                }
-                println!("{:?}", tag);
+    header.table_records.as_ref().iter().for_each(|record| {
+        let tag: [u8; 4] = record.table_tag.to_be_bytes();
+        #[cfg(debug_assertions)]
+        {
+            for i in 0..4 {
+                let ch = tag[i] as char;
+                print!("{}", ch);
             }
+            println!("{:?}", tag);
+        }
 
-            match &tag {
-                b"cmap" => {
-                    let cmap_encodings = CmapEncodings::new(file, record.offset, record.length);
-                    font.cmap = Some(cmap_encodings);
-                }
-                b"head" => {
-                    let head = head::HEAD::new(file, record.offset, record.length);
-                    font.head = Some(head);
-                }
-                b"hhea" => {
-                    let hhea = hhea::HHEA::new(file, record.offset, record.length);
-                    font.hhea = Some(hhea);
-                }
-                b"hmtx" => {
-                    let htmx_pos = Pointer {
-                        offset: record.offset,
-                        length: record.length,
-                    };
-                    font.hmtx_pos = Some(htmx_pos);
-                }
-                b"maxp" => {
-                    let maxp = maxp::MAXP::new(file, record.offset, record.length);
-                    font.maxp = Some(maxp);
-                }
-                b"name" => {
-                    let name = name::NAME::new(file, record.offset, record.length);
-                    font.name = Some(name);
-                }
-                b"OS/2" => {
-                    let os2 = os2::OS2::new(file, record.offset, record.length);
-                    font.os2 = Some(os2);
-                }
-                b"post" => {
-                    let post = post::POST::new(file, record.offset, record.length);
-                    font.post = Some(post);
-                }
-                b"loca" => {
-                    let loca_pos = Pointer {
-                        offset: record.offset,
-                        length: record.length,
-                    };
-                    font.loca_pos = Some(loca_pos);
-                }
-                b"glyf" => {
-                    let glyf_pos = Pointer {
-                        offset: record.offset,
-                        length: record.length,
-                    };
-                    font.glyf_pos = Some(glyf_pos);
-                }
-                b"COLR" => {
-                    let colr = colr::COLR::new(file, record.offset, record.length);
-                    font.colr = Some(colr);
-                }
-                b"CPAL" => {
-                    let cpal = cpal::CPAL::new(file, record.offset, record.length);
-                    font.cpal = Some(cpal);
-                }
-                _ => {
-                    debug_assert!(true, "Unknown table tag")
-                }
+        match &tag {
+            b"cmap" => {
+                let cmap_encodings = CmapEncodings::new(file, record.offset, record.length);
+                font.cmap = Some(cmap_encodings);
             }
-        });
+            b"head" => {
+                let head = head::HEAD::new(file, record.offset, record.length);
+                font.head = Some(head);
+            }
+            b"hhea" => {
+                let hhea = hhea::HHEA::new(file, record.offset, record.length);
+                font.hhea = Some(hhea);
+            }
+            b"hmtx" => {
+                let htmx_pos = Pointer {
+                    offset: record.offset,
+                    length: record.length,
+                };
+                font.hmtx_pos = Some(htmx_pos);
+            }
+            b"maxp" => {
+                let maxp = maxp::MAXP::new(file, record.offset, record.length);
+                font.maxp = Some(maxp);
+            }
+            b"name" => {
+                let name = name::NAME::new(file, record.offset, record.length);
+                font.name = Some(name);
+            }
+            b"OS/2" => {
+                let os2 = os2::OS2::new(file, record.offset, record.length);
+                font.os2 = Some(os2);
+            }
+            b"post" => {
+                let post = post::POST::new(file, record.offset, record.length);
+                font.post = Some(post);
+            }
+            b"loca" => {
+                let loca_pos = Pointer {
+                    offset: record.offset,
+                    length: record.length,
+                };
+                font.loca_pos = Some(loca_pos);
+            }
+            b"glyf" => {
+                let glyf_pos = Pointer {
+                    offset: record.offset,
+                    length: record.length,
+                };
+                font.glyf_pos = Some(glyf_pos);
+            }
+            b"COLR" => {
+                let colr = colr::COLR::new(file, record.offset, record.length);
+                font.colr = Some(colr);
+            }
+            b"CPAL" => {
+                let cpal = cpal::CPAL::new(file, record.offset, record.length);
+                font.cpal = Some(cpal);
+            }
+            _ => {
+                debug_assert!(true, "Unknown table tag")
+            }
+        }
+    });
 
     let num_glyphs = font.maxp.as_ref().unwrap().num_glyphs;
     let number_of_hmetrics = font.hhea.as_ref().unwrap().number_of_hmetrics;

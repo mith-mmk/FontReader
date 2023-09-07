@@ -5,7 +5,7 @@ use std::{
     io::SeekFrom,
 };
 
-use bin_rs::reader::{BinaryReader};
+use bin_rs::reader::BinaryReader;
 #[cfg(feature = "iconv")]
 use iconv::Iconv;
 
