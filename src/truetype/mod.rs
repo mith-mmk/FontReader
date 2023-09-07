@@ -1,6 +1,6 @@
 use std::io::SeekFrom;
 
-use crate::{opentype::OTFHeader, util::u32_to_string};
+use crate::{opentype::OTFHeader};
 use bin_rs::reader::BinaryReader;
 
 #[derive(Debug, Clone)]
@@ -23,7 +23,7 @@ impl TTFHeader {
             major_version: 0,
             minor_version: 0,
             num_fonts: 0,
-            table_directory: Box::new(Vec::new()),
+            table_directory: Box::<Vec<u32>>::default(),
             ul_dsig_tag: 0,
             ul_dsig_length: 0,
             ul_dsig_offset: 0,
@@ -98,7 +98,7 @@ impl TrueType {
         string += &format!("ul_dsig_length: {}\n", self.header.ul_dsig_length);
         string += &format!("ul_dsig_offset: {}\n", self.header.ul_dsig_offset);
         for (i, table) in self.tables.iter().enumerate() {
-            string += &format!("table[{}]: {}\n", i, table.to_string());
+            string += &format!("table[{}]: {}\n", i, table);
         }
         string
     }

@@ -206,10 +206,10 @@ impl CmapEncodings {
                                     - format4.seg_count_x2 as u32 / 2;
                                 // reverce calculation
                                 offset +=
-                                    (code_number as u32 - format4.start_code[i] as u32) as u32;
+                                    code_number as u32 - format4.start_code[i] as u32;
                                 format4.glyph_id_array[offset as usize] as u32
                             };
-                            position = gid as u32;
+                            position = gid;
                             break;
                         }
                         false => (),
@@ -273,7 +273,7 @@ impl CmapSubtable {
                 string += &format!("format: {}\n", format0.format);
                 string += &format!("length: {}\n", format0.length);
                 string += &format!("language: {}\n", format0.language);
-                string += &format!("glyph_id_array:");
+                string += "glyph_id_array:";
                 for i in 0..length {
                     if i % 16 == 0 {
                         string += &format!("\n{:002} ", format0.glyph_id_array[i]);
@@ -293,7 +293,7 @@ impl CmapSubtable {
                 string += &format!("format: {}\n", format2.format);
                 string += &format!("length: {}\n", format2.length);
                 string += &format!("language: {}\n", format2.language);
-                string += &format!("sub_header_keys:");
+                string += "sub_header_keys:";
                 for i in 0..length {
                     if i % 16 == 0 {
                         string += &format!("\n{:002} ", format2.sub_header_keys[i]);
@@ -318,7 +318,7 @@ impl CmapSubtable {
                 string += &format!("search_range: {}\n", format4.search_range);
                 string += &format!("entry_selector: {}\n", format4.entry_selector);
                 string += &format!("range_shift: {}\n", format4.range_shift);
-                string += &format!("start_code end_code\n");
+                string += "start_code end_code\n";
                 for i in 0..length {
                     if i < format4.end_code.len() && i < format4.start_code.len() {
                         string += &format!(
@@ -342,7 +342,7 @@ impl CmapSubtable {
                 string += &format!("language: {}\n", format6.language);
                 string += &format!("first_code: {}\n", format6.first_code);
                 string += &format!("entry_count: {}\n", format6.entry_count);
-                string += &format!("glyph_id_array:");
+                string += "glyph_id_array:";
                 for i in 0..length {
                     if i % 16 == 0 {
                         string += &format!("\n{:002} ", format6.glyph_id_array[i]);
@@ -364,7 +364,7 @@ impl CmapSubtable {
                 string += &format!("reserved: {}\n", format8.reserved);
                 string += &format!("length: {}\n", format8.length);
                 string += &format!("language: {}\n", format8.language);
-                string += &format!("is32:");
+                string += "is32:";
                 for i in 0..length {
                     if i % 16 == 0 {
                         string += &format!("\n{:002} ", format8.is32[i]);
@@ -379,7 +379,7 @@ impl CmapSubtable {
                 } else {
                     length
                 };
-                string += &format!("groups:\n");
+                string += "groups:\n";
                 for i in 0..lenghth {
                     string += &format!("\n{} ", format8.groups[i].to_string());
                 }
@@ -399,7 +399,7 @@ impl CmapSubtable {
                 string += &format!("language: {}\n", format10.language);
                 string += &format!("start_char_code: {}\n", format10.start_char_code);
                 string += &format!("num_chars: {}\n", format10.num_chars);
-                string += &format!("glyph_id_array:");
+                string += "glyph_id_array:";
                 for i in 0..length {
                     if i % 16 == 0 {
                         string += &format!("\n{:002} ", format10.glyph_id_array[i]);
@@ -421,7 +421,7 @@ impl CmapSubtable {
                 string += &format!("length: {}\n", format12.length);
                 string += &format!("language: {}\n", format12.language);
                 string += &format!("num_groups: {}\n", format12.num_groups);
-                string += &format!("groups:\n");
+                string += "groups:\n";
                 for i in 0..length {
                     let seg = &format12.groups[i].to_string();
                     string += &format!("{:3} {}\n", i, seg);
@@ -441,7 +441,7 @@ impl CmapSubtable {
                 string += &format!("length: {}\n", format13.length);
                 string += &format!("language: {}\n", format13.language);
                 string += &format!("num_groups: {}\n", format13.num_groups);
-                string += &format!("groups:\n");
+                string += "groups:\n";
                 for i in 0..length {
                     string += &format!("{:3} {}\n", i, format13.groups[i].to_string());
                 }
@@ -462,7 +462,7 @@ impl CmapSubtable {
                     "num_var_selector_records: {}\n",
                     format14.num_var_selector_records
                 );
-                string += &format!("var_selector_records:\n");
+                string += "var_selector_records:\n";
                 for i in 0..length {
                     string += &format!(
                         "{} {:002}\n",
@@ -742,13 +742,13 @@ fn load_cmap_table<R: BinaryReader>(file: &mut R, offset: u32, length: u32) -> C
 
 #[derive(Debug, Clone)]
 pub(crate) struct EncodingRecordPriority {
-    pub(crate) records: Vec<Box<EncodingRecord>>,
-    pub(crate) uvs: Vec<Box<EncodingRecord>>,
-    pub(crate) substitute: Vec<Box<EncodingRecord>>,
+    pub(crate) records: Vec<EncodingRecord>,
+    pub(crate) uvs: Vec<EncodingRecord>,
+    pub(crate) substitute: Vec<EncodingRecord>,
 }
 
 pub(crate) fn select_encoding(
-    encoding_records: &Vec<Box<EncodingRecord>>,
+    encoding_records: &Vec<EncodingRecord>,
 ) -> EncodingRecordPriority {
     let mut uvs = Vec::new();
     let mut substitute = Vec::new();
@@ -825,7 +825,7 @@ pub(crate) fn select_encoding(
     let mut priolity = Vec::new();
     // sort by priority
     for (i, priority) in priolities.iter().enumerate() {
-        priolity.push((i, priority.clone()));
+        priolity.push((i, *priority));
     }
     priolity.sort_by(|a, b| a.1.cmp(&b.1));
 

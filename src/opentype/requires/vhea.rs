@@ -40,15 +40,15 @@ impl VHEA {
     }
 
     pub(crate) fn get_accender(&self) -> i16 {
-        self.ascender as i16
+        self.ascender
     }
 
     pub(crate) fn get_descender(&self) -> i16 {
-        self.descender as i16
+        self.descender
     }
 
     pub(crate) fn get_line_gap(&self) -> i16 {
-        self.line_gap as i16
+        self.line_gap
     }
 
     pub(crate) fn to_string(&self) -> String {
@@ -92,8 +92,8 @@ impl VHEA {
     }
 }
 
-fn get_vhea<R: BinaryReader>(file: &mut R, offest: u32, length: u32) -> VHEA {
-    let mut file = file;
+fn get_vhea<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> VHEA {
+    let file = file;
     file.seek(SeekFrom::Start(offest as u64)).unwrap();
     let major_version = file.read_u16_be().unwrap();
     let minor_version = file.read_u16_be().unwrap();

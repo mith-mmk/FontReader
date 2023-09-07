@@ -106,7 +106,7 @@ impl HEAD {
     }
 }
 
-fn get_head<R: BinaryReader>(file: &mut R, offest: u32, length: u32) -> HEAD {
+fn get_head<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> HEAD {
     file.seek(SeekFrom::Start(offest as u64)).unwrap();
 
     let major_version = file.read_u16_be().unwrap();

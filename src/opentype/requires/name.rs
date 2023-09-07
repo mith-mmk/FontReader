@@ -5,7 +5,7 @@ use std::{
     io::SeekFrom,
 };
 
-use bin_rs::reader::{BinaryReader, BytesReader};
+use bin_rs::reader::{BinaryReader};
 #[cfg(feature = "iconv")]
 use iconv::Iconv;
 
@@ -71,7 +71,7 @@ impl NAME {
         string += &lang_count;
 
         for lang_tag_string in self.lang_tag_string.iter() {
-            string += &lang_tag_string;
+            string += lang_tag_string;
             string += "\n";
         }
 
@@ -118,7 +118,7 @@ pub(crate) struct NameRecord {
     pub(crate) string: String,
 }
 
-fn get_names<R: BinaryReader>(file: &mut R, offest: u32, length: u32) -> NAME {
+fn get_names<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> NAME {
     file.seek(SeekFrom::Start(offest as u64)).unwrap();
     let current_position = file.offset().unwrap();
     let version = file.read_u16_be().unwrap();
@@ -169,7 +169,7 @@ fn get_names<R: BinaryReader>(file: &mut R, offest: u32, length: u32) -> NAME {
         };
 
         let string_offset = name_records[i].string_offset as u64 + current_position;
-        file.seek(SeekFrom::Start(string_offset as u64)).unwrap();
+        file.seek(SeekFrom::Start(string_offset)).unwrap();
         match encoding_engine {
             EncodingEngine::UTF16BE => {
                 let mut utf16s = Vec::new();

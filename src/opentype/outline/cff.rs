@@ -15,21 +15,21 @@ type Card32 = u32;
 */
 
 pub(crate) fn operand_encoding(b: &[u8]) -> Option<f64> {
-    if b.len() == 0 {
+    if b.is_empty() {
         return None;
     }
     let b0 = b[0];
-    if b0 >= 32 && b0 <= 246 {
+    if (32..=246).contains(&b0) {
         return Some((b0 as i32 - 139) as f64);
     }
-    if b0 >= 247 && b0 <= 250 {
+    if (247..=250).contains(&b0) {
         if b.len() < 2 {
             return None;
         }
         let b1 = b[1];
         return Some(((b0 as i32 - 247) * 256 + b1 as i32 + 108) as f64);
     }
-    if b0 >= 251 && b0 <= 254 {
+    if (251..=254).contains(&b0) {
         if b.len() < 2 {
             return None;
         }

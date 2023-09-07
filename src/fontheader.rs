@@ -24,14 +24,14 @@ pub(crate) struct TableRecord {
 impl TableRecord {
     pub(crate) fn to_string(self) -> String {
         let mut string = String::new();
-        string.push_str(&"table tag: ".to_string());
+        string.push_str("table tag: ");
         string.push_str(u32_to_string(self.table_tag).as_str());
-        string.push_str(&" check sum: ".to_string());
+        string.push_str(" check sum: ");
         // hex digit
         string.push_str(&format!("{:08X}", self.check_sum));
-        string.push_str(&" offset: ".to_string());
+        string.push_str(" offset: ");
         string.push_str(&format!("{:08X}", self.offset));
-        string.push_str(&" length: ".to_string());
+        string.push_str(" length: ");
         string.push_str(&format!("{:08X}", self.length));
         string
     }
@@ -124,25 +124,25 @@ impl FontHeaders {
                 string.push_str("TTF:");
                 // ascii string
                 string.push_str(u32_to_string(header.sfnt_version).as_str());
-                string.push_str(&" major version: ".to_string());
+                string.push_str(" major version: ");
                 string.push_str(&header.major_version.to_string());
-                string.push_str(&" minor version: ".to_string());
+                string.push_str(" minor version: ");
                 string.push_str(&header.minor_version.to_string());
-                string.push_str(&" num fonts: ".to_string());
+                string.push_str(" num fonts: ");
                 string.push_str(&header.num_fonts.to_string());
-                string.push_str(&" table directory:\n".to_string());
+                string.push_str(" table directory:\n");
                 for table in header.table_directory.iter() {
                     let table_offset = format!("{:08x}", table);
                     string.push_str(&table_offset);
-                    string.push_str(&"\n".to_string());
+                    string.push('\n');
                 }
 
                 if header.major_version >= 2 {
-                    string.push_str(&" ul_dsig_tag: ".to_string());
+                    string.push_str(" ul_dsig_tag: ");
                     string.push_str(&header.ul_dsig_tag.to_string());
-                    string.push_str(&" ul_dsig_length: ".to_string());
+                    string.push_str(" ul_dsig_length: ");
                     string.push_str(&header.ul_dsig_length.to_string());
-                    string.push_str(&" ul_dsig_offset: ".to_string());
+                    string.push_str(" ul_dsig_offset: ");
                     string.push_str(&header.ul_dsig_offset.to_string());
                 }
                 string
@@ -157,19 +157,19 @@ impl FontHeaders {
                     sfnt_version.push_str(&format!("{:02X}", byte));
                 }
                 string.push_str(&sfnt_version);
-                string.push_str(&" num tables: ".to_string());
+                string.push_str(" num tables: ");
                 string.push_str(&header.num_tables.to_string());
-                string.push_str(&" search range: ".to_string());
+                string.push_str(" search range: ");
                 string.push_str(&header.search_range.to_string());
-                string.push_str(&" entry selector: ".to_string());
+                string.push_str(" entry selector: ");
                 string.push_str(&header.entry_selector.to_string());
-                string.push_str(&" range shift: ".to_string());
+                string.push_str(" range shift: ");
                 string.push_str(&header.range_shift.to_string());
-                string.push_str(&" table records:\n".to_string());
+                string.push_str(" table records:\n");
                 #[cfg(debug_assertions)]
                 for table in header.table_records.iter() {
                     string.push_str(&table.clone().to_string());
-                    string.push_str(&"\n".to_string());
+                    string.push('\n');
                 }
                 string
             }
@@ -183,34 +183,34 @@ impl FontHeaders {
                     signature.push_str(&format!("{:02X}", byte));
                 }
                 string.push_str(&signature);
-                string.push_str(&"\n flavor: ".to_string());
+                string.push_str("\n flavor: ");
                 let bytes = header.flavor.to_be_bytes();
                 let mut flavor = String::new();
                 for byte in bytes.iter() {
                     flavor.push_str(&format!("{:02X}", byte));
                 }
                 string.push_str(&flavor);
-                string.push_str(&"\n length: ".to_string());
+                string.push_str("\n length: ");
                 string.push_str(&header.length.to_string());
-                string.push_str(&"\n num tables: ".to_string());
+                string.push_str("\n num tables: ");
                 string.push_str(&header.num_tables.to_string());
-                string.push_str(&"\n reserved: ".to_string());
+                string.push_str("\n reserved: ");
                 string.push_str(&header.reserved.to_string());
-                string.push_str(&"\n total sfnt size: ".to_string());
+                string.push_str("\n total sfnt size: ");
                 string.push_str(&header.total_sfnt_size.to_string());
-                string.push_str(&"\n major version: ".to_string());
+                string.push_str("\n major version: ");
                 string.push_str(&header.major_version.to_string());
-                string.push_str(&"\n minor version: ".to_string());
+                string.push_str("\n minor version: ");
                 string.push_str(&header.minor_version.to_string());
-                string.push_str(&"\n meta offset: ".to_string());
+                string.push_str("\n meta offset: ");
                 string.push_str(&header.meta_offset.to_string());
-                string.push_str(&"\n meta length: ".to_string());
+                string.push_str("\n meta length: ");
                 string.push_str(&header.meta_length.to_string());
-                string.push_str(&"\n meta orig length: ".to_string());
+                string.push_str("\n meta orig length: ");
                 string.push_str(&header.meta_orig_length.to_string());
-                string.push_str(&"\n priv offset: ".to_string());
+                string.push_str("\n priv offset: ");
                 string.push_str(&header.priv_offset.to_string());
-                string.push_str(&"\n priv length: ".to_string());
+                string.push_str("\n priv length: ");
                 string.push_str(&header.priv_length.to_string());
                 string
             }
@@ -224,39 +224,39 @@ impl FontHeaders {
                     signature.push_str(&format!("{:02X}", byte));
                 }
                 string.push_str(&signature);
-                string.push_str(&" flavor: ".to_string());
+                string.push_str(" flavor: ");
                 let bytes = header.flavor.to_be_bytes();
                 let mut flavor = String::new();
                 for byte in bytes.iter() {
                     flavor.push_str(&format!("{:02X}", byte));
                 }
                 string.push_str(&flavor);
-                string.push_str(&" length: ".to_string());
+                string.push_str(" length: ");
                 string.push_str(&header.length.to_string());
-                string.push_str(&" num tables: ".to_string());
+                string.push_str(" num tables: ");
                 string.push_str(&header.num_tables.to_string());
-                string.push_str(&" reserved: ".to_string());
+                string.push_str(" reserved: ");
                 string.push_str(&header.reserved.to_string());
-                string.push_str(&" total sfnt size: ".to_string());
+                string.push_str(" total sfnt size: ");
                 string.push_str(&header.total_sfnt_size.to_string());
-                string.push_str(&" major version: ".to_string());
+                string.push_str(" major version: ");
                 string.push_str(&header.major_version.to_string());
-                string.push_str(&" minor version: ".to_string());
+                string.push_str(" minor version: ");
                 string.push_str(&header.minor_version.to_string());
-                string.push_str(&" meta offset: ".to_string());
+                string.push_str(" meta offset: ");
                 string.push_str(&header.meta_offset.to_string());
-                string.push_str(&" meta length: ".to_string());
+                string.push_str(" meta length: ");
                 string.push_str(&header.meta_length.to_string());
-                string.push_str(&" meta orig length: ".to_string());
+                string.push_str(" meta orig length: ");
                 string.push_str(&header.meta_orig_length.to_string());
-                string.push_str(&" priv offset: ".to_string());
+                string.push_str(" priv offset: ");
                 string.push_str(&header.priv_offset.to_string());
-                string.push_str(&" priv length: ".to_string());
+                string.push_str(" priv length: ");
                 string.push_str(&header.priv_length.to_string());
                 string
             }
             FontHeaders::Unknown => {
-                format!("Unknown")
+                "Unknown".to_string()
             }
         }
     }
@@ -292,7 +292,8 @@ pub fn get_font_type<B: BinaryReader>(file: &mut B) -> FontHeaders {
     let buffer = file.read_bytes_no_move(4).unwrap();
     let buffer: [u8; 4] = buffer.try_into().unwrap();
     let sfnt_version: u32 = u32::from_be_bytes(buffer);
-    let font_type = match &buffer {
+    
+    match &buffer {
         b"ttcf" => {
             let fontheader = TTFHeader::new(file);
             FontHeaders::TTF(fontheader)
@@ -339,8 +340,7 @@ pub fn get_font_type<B: BinaryReader>(file: &mut B) -> FontHeaders {
             })
         }
         _ => FontHeaders::Unknown,
-    };
-    font_type
+    }
 }
 
 pub fn get_font_type_from_buffer(fontdata: &[u8]) -> FontHeaders {

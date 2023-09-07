@@ -7,7 +7,7 @@ use crate::opentype::requires::cmap::CmapEncodings;
 use crate::opentype::requires::hmtx::LongHorMetric;
 use crate::opentype::requires::*;
 use crate::opentype::{outline::*, OTFHeader};
-use crate::util::u32_to_string;
+
 
 #[cfg(debug_assertions)]
 use std::io::{BufWriter, Write};
@@ -79,7 +79,7 @@ impl Font {
             hmtx_pos: None,
             loca_pos: None,
             glyf_pos: None,
-            more_fonts: Box::new(Vec::new()),
+            more_fonts: Box::<Vec<Font>>::default(),
         }
     }
 
@@ -132,8 +132,8 @@ impl Font {
         let layout: HorizontalLayout = self.get_horizontal_layout(pos as usize);
         let fontsize = 24.0;
         let fontunit = "pt";
-        let svg = glyf.to_svg(fontsize, fontunit, &layout);
-        svg
+        
+        glyf.to_svg(fontsize, fontunit, &layout)
     }
 
     pub fn get_html(&self, string: &str) -> String {
@@ -232,7 +232,7 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Option<Font> {
                 writeln!(
                     &mut writer,
                     "{}",
-                    _font.cmap.as_ref().unwrap().cmap.to_string()
+                    _font.cmap.as_ref().unwrap().cmap
                 )
                 .unwrap();
                 for i in 0..encoding_records.len() {
@@ -260,20 +260,20 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Option<Font> {
                     writeln!(&mut writer, "{}:{:?}", i, layout).unwrap();
                     writeln!(&mut writer, "{}", svg).unwrap();
                 }
-                writeln!(&mut writer, "").unwrap();
+                writeln!(&mut writer).unwrap();
                 for i in 0x4e00..0x4eff {
                     if i as u32 % 16 == 0 {
-                        writeln!(&mut writer, "").unwrap();
+                        writeln!(&mut writer).unwrap();
                     }
                     let pos = cmap_encodings.get_griph_position(i as u32);
                     let glyph = glyf.get_glyph(pos as usize).unwrap();
                     let layout = _font.get_horizontal_layout(pos as usize);
-                    let svg = glyph.to_svg(100.0, &"px", &layout);
+                    let svg = glyph.to_svg(100.0, "px", &layout);
                     let ch = char::from_u32(i as u32).unwrap();
                     write!(&mut writer, "{}:{:04} ", ch, pos).unwrap();
                     writeln!(&mut writer, "{}", svg).unwrap();
                 }
-                writeln!(&mut writer, "").unwrap();
+                writeln!(&mut writer).unwrap();
                 let i = 0x2a6b2;
                 let pos = cmap_encodings.get_griph_position(i as u32);
                 let ch = char::from_u32(i as u32).unwrap();
@@ -282,7 +282,7 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Option<Font> {
             font
         }
         fontheader::FontHeaders::TTF(header) => {
-            let num_fonts = header.num_fonts.clone();
+            let num_fonts = header.num_fonts;
             let tt = crate::truetype::TrueType::from(file, header);
             let table = &tt.tables[0];
             let mut font = from_opentype(file, table);
@@ -409,7 +409,7 @@ fn from_opentype<R: BinaryReader>(file: &mut R, header: &OTFHeader) -> Option<Fo
     header
         .table_records
         .as_ref()
-        .into_iter()
+        .iter()
         .for_each(|record| {
             let tag: [u8; 4] = record.table_tag.to_be_bytes();
             #[cfg(debug_assertions)]

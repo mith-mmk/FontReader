@@ -77,8 +77,8 @@ impl MAXP {
     }
 }
 
-fn get_maxp<R: BinaryReader>(file: &mut R, offest: u32, length: u32) -> MAXP {
-    let mut file = file;
+fn get_maxp<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> MAXP {
+    let file = file;
     file.seek(SeekFrom::Start(offest as u64)).unwrap();
     let version = file.read_u32_be().unwrap();
     let num_glyphs = file.read_u16_be().unwrap();

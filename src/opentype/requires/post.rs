@@ -58,8 +58,8 @@ impl POST {
 }
 
 fn get_post<R: BinaryReader>(file: &mut R, offest: u32, length: u32) -> POST {
-    let mut file = file;
-    let mut buffer = vec![0u8; length as usize];
+    let file = file;
+    let _buffer = vec![0u8; length as usize];
     file.seek(SeekFrom::Start(offest as u64)).unwrap();
     let version = file.read_u32_be().unwrap();
     let italic_angle = file.read_i32_be().unwrap();
@@ -75,27 +75,25 @@ fn get_post<R: BinaryReader>(file: &mut R, offest: u32, length: u32) -> POST {
     let mut glyph_name_index = Vec::new();
     let mut names = Vec::new();
     let remain = length - 32;
-    if remain > 0 {
-        if version >= 0x0002_0000 {
-            number_of_glyphs = file.read_u16_be().unwrap();
-            for _ in 0..number_of_glyphs {
-                let index = file.read_u16_be().unwrap();
-                glyph_name_index.push(index);
+    if remain > 0 && version >= 0x0002_0000 {
+        number_of_glyphs = file.read_u16_be().unwrap();
+        for _ in 0..number_of_glyphs {
+            let index = file.read_u16_be().unwrap();
+            glyph_name_index.push(index);
+        }
+        let remain = (length - 34 - number_of_glyphs as u32 * 2) as usize;
+        let buf = file.read_bytes_as_vec(length as usize).unwrap();
+        let mut offset: usize = 0;
+        while offest < remain as u32 {
+            let mut name = String::new();
+            // PASCAL String
+            let len = buf[offset];
+            for i in 0..len {
+                let c = buf[offset + i as usize + 1];
+                name.push(c as char);
             }
-            let remain = (length - 34 - number_of_glyphs as u32 * 2) as usize;
-            let buf = file.read_bytes_as_vec(length as usize).unwrap();
-            let mut offset: usize = 0;
-            while offest < remain as u32 {
-                let mut name = String::new();
-                // PASCAL String
-                let len = buf[offset];
-                for i in 0..len {
-                    let c = buf[offset + i as usize + 1];
-                    name.push(c as char);
-                }
-                offset += len as usize + 1;
-                names.push(name);
-            }
+            offset += len as usize + 1;
+            names.push(name);
         }
     }
 

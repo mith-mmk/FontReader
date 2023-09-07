@@ -63,19 +63,19 @@ pub(crate) struct LongHorMetric {
 fn get_hdmx<R: bin_rs::reader::BinaryReader>(
     file: &mut R,
     offest: u32,
-    length: u32,
+    _length: u32,
     number_of_hmetrics: u16,
     num_glyphs: u16,
 ) -> VMTX {
-    let mut file = file;
+    let file = file;
     file.seek(SeekFrom::Start(offest as u64)).unwrap();
     let mut h_metrics = Vec::new();
     for _ in 0..number_of_hmetrics {
         let advance_width = file.read_u16_be().unwrap();
         let top_side_bearing = file.read_i16_be().unwrap();
         h_metrics.push(LongHorMetric {
-            advance_width: advance_width,
-            top_side_bearing: top_side_bearing,
+            advance_width,
+            top_side_bearing,
         });
     }
     let mut top_side_bearings = Vec::new();

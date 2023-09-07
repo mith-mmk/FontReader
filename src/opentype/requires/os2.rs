@@ -93,7 +93,7 @@ impl OS2 {
         string += &y_strikeout_position;
         let s_family_class = format!("sFamilyClass {}\n", self.s_family_class);
         string += &s_family_class;
-        let mut panose = format!("Panose :");
+        let mut panose = "Panose :".to_string();
         for value in self.panose.iter() {
             panose += &format!(" {}", value);
         }
@@ -162,7 +162,7 @@ impl OS2 {
     }
 }
 
-fn get_os2<R: BinaryReader>(file: &mut R, offest: u32, length: u32) -> OS2 {
+fn get_os2<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> OS2 {
     let file = file;
     file.seek(SeekFrom::Start(offest as u64)).unwrap();
     let version = file.read_u16_be().unwrap();
@@ -202,18 +202,18 @@ fn get_os2<R: BinaryReader>(file: &mut R, offest: u32, length: u32) -> OS2 {
     let s_typo_line_gap = file.read_i16_be().unwrap();
     // 76
     let us_win_ascent = file.read_u16_be().unwrap();
-    let us_win_descent = file.read_u16_be().unwrap();
-    let ul_code_page_range1 = file.read_u32_be().unwrap();
-    let ul_code_page_range2 = file.read_u32_be().unwrap();
-    let sx_height = file.read_i16_be().unwrap();
-    let s_cap_height = file.read_i16_be().unwrap();
-    let us_default_char = file.read_u16_be().unwrap();
-    let us_break_char = file.read_u16_be().unwrap();
-    let us_max_context = file.read_u16_be().unwrap();
+    let _us_win_descent = file.read_u16_be().unwrap();
+    let _ul_code_page_range1 = file.read_u32_be().unwrap();
+    let _ul_code_page_range2 = file.read_u32_be().unwrap();
+    let _sx_height = file.read_i16_be().unwrap();
+    let _s_cap_height = file.read_i16_be().unwrap();
+    let _us_default_char = file.read_u16_be().unwrap();
+    let _us_break_char = file.read_u16_be().unwrap();
+    let _us_max_context = file.read_u16_be().unwrap();
     // 96
 
-    let us_lower_optical_point_size = file.read_u16_be().unwrap();
-    let us_upper_optical_point_size = file.read_u16_be().unwrap();
+    let _us_lower_optical_point_size = file.read_u16_be().unwrap();
+    let _us_upper_optical_point_size = file.read_u16_be().unwrap();
 
     let mut us_win_descent = 0;
     let mut ul_code_page_range1 = 0;

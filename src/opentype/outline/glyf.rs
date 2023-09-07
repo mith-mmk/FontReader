@@ -104,7 +104,7 @@ impl Glyph {
                 let number = (high_byte << 8) + low_byte;
                 coutour.push(number as usize);
             }
-            let last_end_pts_of_contours = coutour[number_of_contours as usize as usize - 1] + 1;
+            let last_end_pts_of_contours = coutour[number_of_contours as usize - 1] + 1;
             let high_byte = self.glyphs[offset] as u16;
             let low_byte = self.glyphs[offset + 1] as u16;
             let instruction_length = (high_byte << 8) + low_byte;
@@ -204,8 +204,8 @@ impl Glyph {
         layout: &crate::fontreader::HorizontalLayout,
     ) -> String {
         let parsed = self.parse();
-        let rsb = (layout.advance_width as isize - parsed.x_max as isize) as i16;
-        let x_min = parsed.x_min as i16 - layout.lsb as i16;
+        let rsb = (layout.advance_width - parsed.x_max as isize) as i16;
+        let x_min = parsed.x_min - layout.lsb as i16;
         let y_min = parsed.y_min;
         let x_max = parsed.x_max + rsb;
         let y_max = layout.accender - layout.descender + layout.line_gap;
@@ -274,34 +274,32 @@ impl Glyph {
                 } else {
                     // Q px py x y or T x y was writed
                 }
-            } else {
-                if befor_on_curve {
-                    if next_on_curve {
-                        svg += &format!("Q{} {} {} {}", x, y_max - y, next_x, y_max - next_y);
-                    } else {
-                        // next off curve
-                        svg += &format!(
-                            "Q{} {} {} {}",
-                            x,
-                            y_max - y,
-                            (x + next_x) / 2,
-                            y_max - (y + next_y) / 2
-                        );
-                    }
+            } else if befor_on_curve {
+                if next_on_curve {
+                    svg += &format!("Q{} {} {} {}", x, y_max - y, next_x, y_max - next_y);
                 } else {
-                    // befor off curve
-                    if next_on_curve {
-                        svg += &format!("T{} {}", next_x, y_max - next_y);
-                    } else {
-                        // next off curve
-                        svg += &format!(
-                            "Q{} {} {} {}",
-                            x,
-                            y_max - y,
-                            (x + next_x) / 2,
-                            y_max - (y + next_y) / 2
-                        );
-                    }
+                    // next off curve
+                    svg += &format!(
+                        "Q{} {} {} {}",
+                        x,
+                        y_max - y,
+                        (x + next_x) / 2,
+                        y_max - (y + next_y) / 2
+                    );
+                }
+            } else {
+                // befor off curve
+                if next_on_curve {
+                    svg += &format!("T{} {}", next_x, y_max - next_y);
+                } else {
+                    // next off curve
+                    svg += &format!(
+                        "Q{} {} {} {}",
+                        x,
+                        y_max - y,
+                        (x + next_x) / 2,
+                        y_max - (y + next_y) / 2
+                    );
                 }
             }
             if i >= parsed.end_pts_of_contours[pos] {
@@ -384,7 +382,7 @@ impl GLYF {
         length: u32,
         loca: &loca::LOCA,
     ) -> Self {
-        get_glyf(file, offset, length, &loca)
+        get_glyf(file, offset, length, loca)
     }
 
     pub fn get_glyph(&self, index: usize) -> Option<&Glyph> {
@@ -406,7 +404,7 @@ impl GLYF {
     }
 }
 
-fn get_glyf<R: BinaryReader>(file: &mut R, offset: u32, length: u32, loca: &loca::LOCA) -> GLYF {
+fn get_glyf<R: BinaryReader>(file: &mut R, offset: u32, _length: u32, loca: &loca::LOCA) -> GLYF {
     let loca = loca.clone();
     file.seek(SeekFrom::Start(offset as u64)).unwrap();
     let offsets = loca.offsets.clone();
@@ -425,16 +423,16 @@ fn get_glyf<R: BinaryReader>(file: &mut R, offset: u32, length: u32, loca: &loca
 fn get_glyph<R: BinaryReader>(file: &mut R, offset: u32, length: u32) -> Glyph {
     if length == 0 {
         return Glyph {
-            offset: offset,
-            length: length,
-            glyphs: Box::new(Vec::new()),
+            offset,
+            length,
+            glyphs: Box::<Vec<u8>>::default(),
         };
     }
 
     let glyphs = file.read_bytes_as_vec(length as usize).unwrap();
     Glyph {
         glyphs: Box::new(glyphs),
-        offset: offset,
-        length: length,
+        offset,
+        length,
     }
 }
