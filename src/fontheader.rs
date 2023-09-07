@@ -1,7 +1,10 @@
-use std::path::PathBuf;
-use bin_rs::{reader::{BinaryReader, BytesReader, StreamReader}, Endian};
-use crate::{opentype::OTFHeader, util::u32_to_string, truetype::TTFHeader};
 use crate::woff::woff::WOFFHeader;
+use crate::{opentype::OTFHeader, truetype::TTFHeader, util::u32_to_string};
+use bin_rs::{
+    reader::{BinaryReader, BytesReader, StreamReader},
+    Endian,
+};
+use std::path::PathBuf;
 
 // pub type F2DOT14 = i16;
 pub type LONGDATETIME = i64;
@@ -48,22 +51,27 @@ pub fn f2dot14_to_f32(value: F2DOT14) -> f32 {
     integer + decimal
 }
 
-
 pub fn longdatetime_to_string(value: &LONGDATETIME) -> String {
     /* LONGDATETIME Date and time represented in number of seconds since 12:00 midnight,
     January 1, 1904, UTC. The value is represented as a signed 64-bit integer. */
     let seconds = value % 60;
     let minutes = (value / 60) % 60;
     let hours = (value / 3600) % 24;
-    let days = (value / 86400) % 365;    
+    let days = (value / 86400) % 365;
     let years = (value / 31536000) + 1904;
     let leap_year = if years % 4 == 0 {
         if years % 100 == 0 {
             if years % 400 == 0 {
                 1
-            } else { 0 }
-        } else { 1 }    
-    } else { 0 };
+            } else {
+                0
+            }
+        } else {
+            1
+        }
+    } else {
+        0
+    };
 
     let monthes = [31, 28 + leap_year, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
     let mut month = 0;
@@ -75,12 +83,13 @@ pub fn longdatetime_to_string(value: &LONGDATETIME) -> String {
         } else {
             days -= monthes[i];
         }
-    }  
+    }
 
-    format!("{:04}-{:02}-{:02} {:02}:{:02}:{:02}Z", years, month, days, hours, minutes, seconds)
+    format!(
+        "{:04}-{:02}-{:02} {:02}:{:02}:{:02}Z",
+        years, month, days, hours, minutes, seconds
+    )
 }
-
-
 
 /*
 // https://docs.microsoft.com/en-us/typography/opentype/spec/otff
@@ -104,13 +113,11 @@ pub enum FontHeaders {
     OTF(OTFHeader),
     WOFF(WOFFHeader),
     WOFF2(WOFF2Header),
-    Unknown
+    Unknown,
 }
 
-
-
 impl FontHeaders {
-  pub fn to_string(&self) -> String {
+    pub fn to_string(&self) -> String {
         match self {
             FontHeaders::TTF(header) => {
                 let mut string = String::new();
@@ -139,8 +146,7 @@ impl FontHeaders {
                     string.push_str(&header.ul_dsig_offset.to_string());
                 }
                 string
-
-            },
+            }
             FontHeaders::OTF(header) => {
                 let mut string = String::new();
                 string.push_str("OTF: ");
@@ -166,7 +172,7 @@ impl FontHeaders {
                     string.push_str(&"\n".to_string());
                 }
                 string
-            },
+            }
             FontHeaders::WOFF(header) => {
                 let mut string = String::new();
                 string.push_str("WOFF: ");
@@ -207,7 +213,7 @@ impl FontHeaders {
                 string.push_str(&"\n priv length: ".to_string());
                 string.push_str(&header.priv_length.to_string());
                 string
-            },
+            }
             FontHeaders::WOFF2(header) => {
                 let mut string = String::new();
                 string.push_str("WOFF2: ");
@@ -248,14 +254,13 @@ impl FontHeaders {
                 string.push_str(&" priv length: ".to_string());
                 string.push_str(&header.priv_length.to_string());
                 string
-            },
+            }
             FontHeaders::Unknown => {
                 format!("Unknown")
-            },
+            }
         }
-    }       
+    }
 }
-
 
 #[derive(Debug, Clone)]
 pub struct WOFF2Header {
@@ -285,24 +290,23 @@ pub fn get_font_type_from_file(filename: &PathBuf) -> FontHeaders {
 pub fn get_font_type<B: BinaryReader>(file: &mut B) -> FontHeaders {
     file.set_endian(Endian::BigEndian);
     let buffer = file.read_bytes_no_move(4).unwrap();
-    let buffer: [u8;4] = buffer.try_into().unwrap();
-    let sfnt_version:u32 = u32::from_be_bytes(buffer);
+    let buffer: [u8; 4] = buffer.try_into().unwrap();
+    let sfnt_version: u32 = u32::from_be_bytes(buffer);
     let font_type = match &buffer {
         b"ttcf" => {
             let fontheader = TTFHeader::new(file);
             FontHeaders::TTF(fontheader)
-        },
+        }
         // if 0x00010000 -> OTF
-
         b"\x00\x01\x00\x00" | b"OTTO" => {
             let fontheader = OTFHeader::new(file);
             FontHeaders::OTF(fontheader)
-        },
+        }
         // 0
         b"wOFF" => {
             let header = WOFFHeader::new(file);
             FontHeaders::WOFF(header)
-        },
+        }
         b"wOF2" => {
             let signature = file.read_u32_be().unwrap();
             let flavor = file.read_u32_be().unwrap();
@@ -333,16 +337,13 @@ pub fn get_font_type<B: BinaryReader>(file: &mut B) -> FontHeaders {
                 priv_offset,
                 priv_length,
             })
-        },
+        }
         _ => FontHeaders::Unknown,
     };
     font_type
 }
 
-
 pub fn get_font_type_from_buffer(fontdata: &[u8]) -> FontHeaders {
     let file = &mut BytesReader::new(fontdata);
     get_font_type(file)
 }
-
-

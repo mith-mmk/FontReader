@@ -5,7 +5,7 @@ use std::fmt;
 use bin_rs::reader::BinaryReader;
 pub use outline::glyf::Glyph;
 
-use crate::{util::u32_to_string, fontheader::TableRecord};
+use crate::{fontheader::TableRecord, util::u32_to_string};
 
 use self::requires::cmap;
 
@@ -20,7 +20,7 @@ pub struct OTFHeader {
 }
 
 impl OTFHeader {
-    pub(crate) fn new<R:BinaryReader>(file: &mut R) -> Self{
+    pub(crate) fn new<R: BinaryReader>(file: &mut R) -> Self {
         let sfnt_version = file.read_u32_be().unwrap();
         let num_tables = file.read_u16_be().unwrap();
         let search_range = file.read_u16_be().unwrap();
@@ -46,7 +46,7 @@ impl OTFHeader {
             search_range,
             entry_selector,
             range_shift,
-            table_records: Box::new(table_records), 
+            table_records: Box::new(table_records),
         }
     }
 
@@ -63,9 +63,8 @@ impl OTFHeader {
             string += &format!("offset: {}\n", table_record.offset);
             string += &format!("length: {}\n", table_record.length);
         }
-        string        
+        string
     }
-
 }
 
 impl fmt::Display for OTFHeader {
@@ -75,74 +74,74 @@ impl fmt::Display for OTFHeader {
 }
 
 pub(crate) enum FontTable {
-  // required
-      CMAP(cmap::CMAP),
-      HEAD,
-      HHEA,
-      HMTX,
-      MAXP,
-      NAME,
-      OS2,
-      POST,
-  // tables related to TrueType outlines
-      CVT,
-      FPGM,
-      GLYF,
-      LOCA,
-      PREP,
-      GASP,
-  // tables related to CFF outlines
-      CFF,
-      CFF2,
-      VORG,
-  // SVG
-      SVG,
-  // Bitmap Glyphs
-      EBDT,
-      EBLC,
-      EBSV,
-  // Color Bitmap Glyphs
-      CBDT,
-      CBLC,
-      COLR,
-      CPAL,
-  // Advanced Typographics
-      BASE,
-      GDEF,
-      GPOS,
-      GSUB,
-      JSTF,
-      MATH,
-      MERG,
-      PROP,
-      ZWJ,
-  // OpenType Font Variant
-      AVAR,
-      CVAR,
-      FVAR,
-      GVAR,
-      HVAR,
-      MVAR,
-      STAT,
-      VVAR,
-  // Color Fonts
-      // COLR,
-      // CPAL,
-      // CBDT,
-      // CBLC,
-      SBIX,
-      // SVG,
-  // Other OpenType Tables
-      DISG,
-      HDMX,
-      KERN,
-      LTSH,
-  //    MERG,
-      META,
-  //    STAT,
-      PCLT,
-      VDMX,
-      VHEA,
-      VMTX,
-      UNKNOWN
-  }
+    // required
+    CMAP(cmap::CMAP),
+    HEAD,
+    HHEA,
+    HMTX,
+    MAXP,
+    NAME,
+    OS2,
+    POST,
+    // tables related to TrueType outlines
+    CVT,
+    FPGM,
+    GLYF,
+    LOCA,
+    PREP,
+    GASP,
+    // tables related to CFF outlines
+    CFF,
+    CFF2,
+    VORG,
+    // SVG
+    SVG,
+    // Bitmap Glyphs
+    EBDT,
+    EBLC,
+    EBSV,
+    // Color Bitmap Glyphs
+    CBDT,
+    CBLC,
+    COLR,
+    CPAL,
+    // Advanced Typographics
+    BASE,
+    GDEF,
+    GPOS,
+    GSUB,
+    JSTF,
+    MATH,
+    MERG,
+    PROP,
+    ZWJ,
+    // OpenType Font Variant
+    AVAR,
+    CVAR,
+    FVAR,
+    GVAR,
+    HVAR,
+    MVAR,
+    STAT,
+    VVAR,
+    // Color Fonts
+    // COLR,
+    // CPAL,
+    // CBDT,
+    // CBLC,
+    SBIX,
+    // SVG,
+    // Other OpenType Tables
+    DISG,
+    HDMX,
+    KERN,
+    LTSH,
+    //    MERG,
+    META,
+    //    STAT,
+    PCLT,
+    VDMX,
+    VHEA,
+    VMTX,
+    UNKNOWN,
+}

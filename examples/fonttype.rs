@@ -22,10 +22,10 @@ fn main() {
     // agrs[1] is the folder name
     let args: Vec<String> = std::env::args().collect();
     // argv.len()?
-    let folder = if args.len() >= 2 {args[1].to_string()} else {
+    let folder = if args.len() >= 2 {
+        args[1].to_string()
+    } else {
         "e:\\data\\fonts".to_string()
     };
     get_font_type(&folder);
-
-
 }
