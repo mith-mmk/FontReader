@@ -196,40 +196,73 @@ impl Glyph {
             on_curves,
         }
     }
+    
 
-    pub fn to_svg(
+    pub(crate) fn get_svg_heder(
         &self,
         fonsize: f32,
         fontunit: &str,
         layout: &crate::fontreader::HorizontalLayout,
-    ) -> String {
+        ) -> String {
         let parsed = self.parse();
+        Self::get_svg_header_from_parsed(&parsed, fonsize, fontunit, layout)
+    }
+
+    pub(crate) fn get_svg_header_from_parsed(
+            parsed : &ParsedGlyph,
+            fonsize: f32,
+            fontunit: &str,
+            layout: &crate::fontreader::HorizontalLayout,
+        ) -> String {
         let rsb = (layout.advance_width - parsed.x_max as isize) as i16;
         let x_min = parsed.x_min - layout.lsb as i16;
         let y_min = parsed.y_min;
         let x_max = parsed.x_max + rsb;
         let y_max = layout.accender - layout.descender + layout.line_gap;
-        // heightを後ろから読み出す
         let height = fonsize;
         let width = x_min as f32 + x_max as f32 + layout.lsb as f32;
         let width = width * height / (y_max - y_min as isize) as f32;
+
         let height_str = format!("{}{}", height, fontunit);
         let width_str = format!("{}{}", width, fontunit);
-        let mut svg = format!("<svg width=\"{}\" height=\"{}\" viewBox=\"{} {} {} {}\" xmlns=\"http://www.w3.org/2000/svg\">\n", width_str, height_str, x_min, y_min, x_max, y_max);
-        let y_max = layout.accender as i16;
-        svg += &format!(
-            "<!-- x min {} y min {} x max {} y max {} -->",
-            parsed.x_min, parsed.y_min, parsed.x_max, parsed.y_max
-        );
-        svg += &format!(
-            "<!-- offset {} length {} lsb {} advanced width {} rsb {}",
-            parsed.offset, parsed.length, layout.lsb, layout.advance_width, rsb
-        );
-        for byte in parsed.instructions {
-            svg += &format!("{:02x} ", byte);
+        let mut svg = format!("<svg width=\"{}\" height=\"{}\" viewBox=\"{} {} {} {}\" xmlns=\"http://www.w3.org/2000/svg\">", width_str, height_str, x_min, y_min, x_max, y_max);
+        #[cfg(debug_assertions)]
+        {
+            let rsb = (layout.advance_width - parsed.x_max as isize) as i16;
+            svg += &format!(
+                "<!-- x min {} y min {} x max {} y max {} -->",
+                parsed.x_min, parsed.y_min, parsed.x_max, parsed.y_max
+            );
+            svg += &format!(
+                "<!-- offset {} length {} lsb {} advanced width {} rsb {} -->",
+                parsed.offset, parsed.length, layout.lsb, layout.advance_width, rsb
+            );
         }
-        svg += "-->\n";
+        svg
+    }
 
+    pub(crate) fn get_svg_path(
+        &self,
+        layout: &crate::fontreader::HorizontalLayout
+        ) -> String {
+        let parsed = self.parse();
+        Self::get_svg_path_parsed(&parsed, layout)
+    }
+    
+    pub(crate) fn get_svg_path_parsed(
+        parsed : &ParsedGlyph,
+        layout: &crate::fontreader::HorizontalLayout,
+    ) -> String {
+        let y_max = layout.accender as i16;
+        let mut svg = String::new();
+        #[cfg(debug_assertions)]
+        {
+            svg += "<!-- ";
+            for byte in &parsed.instructions {
+                svg += &format!("{:02x} ", byte);
+            }
+            svg += "-->\n";
+        }
         svg += "<path d=\"";
         let mut pos = 0;
         let mut befor_on_curve = false;
@@ -308,7 +341,21 @@ impl Glyph {
             }
             befor_on_curve = on_curve;
         }
-        svg += "\"/>\n</svg>";
+        svg += "\"/>";
+        svg
+    } 
+
+    pub fn to_svg(
+        &self,
+        fonsize: f32,
+        fontunit: &str,
+        layout: &crate::fontreader::HorizontalLayout,
+    ) -> String {
+        let parsed = self.parse();
+        let mut svg =Self::get_svg_header_from_parsed(&parsed, fonsize, fontunit ,layout);
+        // heightを後ろから読み出す
+        svg += &Self::get_svg_path_parsed(&parsed, layout);
+        svg += "\n</svg>";
         svg
     }
 

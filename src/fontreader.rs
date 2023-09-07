@@ -137,8 +137,28 @@ impl Font {
         let layout: HorizontalLayout = self.get_horizontal_layout(pos as usize);
         let fontsize = 24.0;
         let fontunit = "pt";
-        
-        glyf.to_svg(fontsize, fontunit, &layout)
+        if let Some(colr) = self.colr.as_ref() {
+            let mut string = format!("<!-- glyf id: {} -->",pos);
+            string += &glyf.get_svg_heder(fontsize, fontunit, &layout);
+            let layers = colr.get_layer_record(pos as u16);
+            for layer in layers {
+                let glyf_id = layer.glyph_id as u32;
+                let glyf = self.grif.as_ref().unwrap().get_glyph(glyf_id as usize).unwrap();
+                let pallet = self.cpal.as_ref().unwrap().get_pallet(layer.palette_index as usize);
+                #[cfg(debug_assertions)] {
+                    string += &format!("<!-- pallet index {} -->\n",layer.palette_index);
+                    string += &format!("<!-- Red {} Green {} Blue {} Alpha {} -->\n", pallet.red, pallet.green, pallet.blue, pallet.alpha);
+                }
+                string += &format!("<g fill=\"rgba({}, {}, {}, {})\">\n",pallet.red, pallet.green, pallet.blue, pallet.alpha);
+                string += &glyf.get_svg_path(&layout);
+                string += "</g>\n";
+            }
+            string += "</svg>";
+            string
+        } else {
+            glyf.to_svg(fontsize, fontunit, &layout)
+        }
+
     }
 
     pub fn get_html(&self, string: &str) -> String {
@@ -251,8 +271,8 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Option<Font> {
                 writeln!(&mut writer, "{}", &_font.post.as_ref().unwrap().to_string()).unwrap();
                 writeln!(&mut writer, "{}", &_font.loca.as_ref().unwrap().to_string()).unwrap();
                 writeln!(&mut writer, "{}", &_font.name.as_ref().unwrap().to_string()).unwrap();
-                writeln!(&mut writer, "{:?}", &_font.cpal.as_ref().unwrap()).unwrap();
-                writeln!(&mut writer, "{:?}", &_font.colr.as_ref().unwrap()).unwrap();
+                writeln!(&mut writer, "{}", &_font.cpal.as_ref().unwrap().to_string()).unwrap();
+                writeln!(&mut writer, "{}", &_font.colr.as_ref().unwrap().to_string()).unwrap();
                 writeln!(&mut writer, "long cmap -> griph").unwrap();
                 let cmap_encodings = &_font.cmap.as_ref().unwrap().clone();
                 let glyf = _font.grif.as_ref().unwrap();
