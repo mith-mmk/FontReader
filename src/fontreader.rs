@@ -7,6 +7,7 @@ use crate::opentype::requires::cmap::CmapEncodings;
 use crate::opentype::requires::hmtx::LongHorMetric;
 use crate::opentype::requires::*;
 use crate::opentype::{outline::*, OTFHeader};
+use crate::opentype::color::{colr, cpal};
 
 
 #[cfg(debug_assertions)]
@@ -56,6 +57,8 @@ pub struct Font {
     pub(crate) post: Option<post::POST>,    // must
     pub(crate) loca: Option<loca::LOCA>,    // openType font, CFF/CFF2 none
     pub(crate) grif: Option<glyf::GLYF>,    // openType font, CFF/CFF2 none
+    pub(crate) colr: Option<colr::COLR>,
+    pub(crate) cpal: Option<cpal::CPAL>,
     hmtx_pos: Option<Pointer>,
     loca_pos: Option<Pointer>, // OpenType font, CFF/CFF2 none
     glyf_pos: Option<Pointer>, // OpenType font, CFF/CFF2 none
@@ -76,6 +79,8 @@ impl Font {
             post: None,
             loca: None,
             grif: None,
+            colr: None,
+            cpal: None,
             hmtx_pos: None,
             loca_pos: None,
             glyf_pos: None,
@@ -246,6 +251,8 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Option<Font> {
                 writeln!(&mut writer, "{}", &_font.post.as_ref().unwrap().to_string()).unwrap();
                 writeln!(&mut writer, "{}", &_font.loca.as_ref().unwrap().to_string()).unwrap();
                 writeln!(&mut writer, "{}", &_font.name.as_ref().unwrap().to_string()).unwrap();
+                writeln!(&mut writer, "{:?}", &_font.cpal.as_ref().unwrap()).unwrap();
+                writeln!(&mut writer, "{:?}", &_font.colr.as_ref().unwrap()).unwrap();
                 writeln!(&mut writer, "long cmap -> griph").unwrap();
                 let cmap_encodings = &_font.cmap.as_ref().unwrap().clone();
                 let glyf = _font.grif.as_ref().unwrap();
@@ -365,6 +372,16 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Option<Font> {
                     b"glyf" => {
                         glyf_table = Some(table);
                     }
+                    b"COLR" => {
+                        let mut reader = BytesReader::new(&table.data);
+                        let colr = colr::COLR::new(&mut reader, 0, table.data.len() as u32);
+                        font.colr = Some(colr);
+                    }
+                    b"CPAL" => {
+                        let mut reader = BytesReader::new(&table.data);
+                        let cpal = cpal::CPAL::new(&mut reader, 0, table.data.len() as u32);
+                        font.cpal = Some(cpal);
+                    }
                     _ => {
                         debug_assert!(true, "Unknown table tag")
                     }
@@ -470,6 +487,14 @@ fn from_opentype<R: BinaryReader>(file: &mut R, header: &OTFHeader) -> Option<Fo
                         length: record.length,
                     };
                     font.glyf_pos = Some(glyf_pos);
+                }
+                b"COLR" => {
+                    let colr = colr::COLR::new(file, record.offset, record.length);
+                    font.colr = Some(colr);
+                }
+                b"CPAL" => {
+                    let cpal = cpal::CPAL::new(file, record.offset, record.length);
+                    font.cpal = Some(cpal);
                 }
                 _ => {
                     debug_assert!(true, "Unknown table tag")

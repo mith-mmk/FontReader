@@ -1,4 +1,5 @@
 pub mod outline;
+pub mod color;
 pub mod requires;
 use std::fmt;
 
