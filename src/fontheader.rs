@@ -1,5 +1,5 @@
 use crate::woff::woff::WOFFHeader;
-use crate::{opentype::OTFHeader, opentype::TTFHeader, util::u32_to_string};
+use crate::{opentype::OTFHeader, opentype::TTCHeader, util::u32_to_string};
 use bin_rs::{
     reader::{BinaryReader, BytesReader, StreamReader},
     Endian,
@@ -109,7 +109,7 @@ type int64 = i64;
 
 #[derive(Debug, Clone)]
 pub enum FontHeaders {
-    TTF(TTFHeader),
+    TTC(TTCHeader),
     OTF(OTFHeader),
     WOFF(WOFFHeader),
     WOFF2(WOFF2Header),
@@ -119,9 +119,9 @@ pub enum FontHeaders {
 impl FontHeaders {
     pub fn to_string(&self) -> String {
         match self {
-            FontHeaders::TTF(header) => {
+            FontHeaders::TTC(header) => {
                 let mut string = String::new();
-                string.push_str("TTF:");
+                string.push_str("TTC:");
                 // ascii string
                 string.push_str(u32_to_string(header.sfnt_version).as_str());
                 string.push_str(" major version: ");
@@ -145,33 +145,14 @@ impl FontHeaders {
                     string.push_str(" ul_dsig_offset: ");
                     string.push_str(&header.ul_dsig_offset.to_string());
                 }
+                for(font_index, font) in header.font_collection.iter().enumerate() {
+                    string.push_str(&format!("font[{}]:\n {}\n", font_index, font.to_string()));
+                }
+
                 string
             }
             FontHeaders::OTF(header) => {
-                let mut string = String::new();
-                string.push_str("OTF: ");
-                string.push_str(u32_to_string(header.sfnt_version).as_str());
-                let bytes = header.sfnt_version.to_be_bytes();
-                let mut sfnt_version = String::new();
-                for byte in bytes.iter() {
-                    sfnt_version.push_str(&format!("{:02X}", byte));
-                }
-                string.push_str(&sfnt_version);
-                string.push_str(" num tables: ");
-                string.push_str(&header.num_tables.to_string());
-                string.push_str(" search range: ");
-                string.push_str(&header.search_range.to_string());
-                string.push_str(" entry selector: ");
-                string.push_str(&header.entry_selector.to_string());
-                string.push_str(" range shift: ");
-                string.push_str(&header.range_shift.to_string());
-                string.push_str(" table records:\n");
-                #[cfg(debug_assertions)]
-                for table in header.table_records.iter() {
-                    string.push_str(&table.clone().to_string());
-                    string.push('\n');
-                }
-                string
+                Self::get_otf_string(header)
             }
             FontHeaders::WOFF(header) => {
                 let mut string = String::new();
@@ -258,6 +239,33 @@ impl FontHeaders {
             FontHeaders::Unknown => "Unknown".to_string(),
         }
     }
+
+    fn get_otf_string(header: &OTFHeader) -> String {
+        let mut string = String::new();
+        string.push_str("OTF: ");
+        string.push_str(u32_to_string(header.sfnt_version).as_str());
+        let bytes = header.sfnt_version.to_be_bytes();
+        let mut sfnt_version = String::new();
+        for byte in bytes.iter() {
+            sfnt_version.push_str(&format!("{:02X}", byte));
+        }
+        string.push_str(&sfnt_version);
+        string.push_str(" num tables: ");
+        string.push_str(&header.num_tables.to_string());
+        string.push_str(" search range: ");
+        string.push_str(&header.search_range.to_string());
+        string.push_str(" entry selector: ");
+        string.push_str(&header.entry_selector.to_string());
+        string.push_str(" range shift: ");
+        string.push_str(&header.range_shift.to_string());
+        string.push_str(" table records:\n");
+        #[cfg(debug_assertions)]
+        for table in header.table_records.iter() {
+            string.push_str(&table.clone().to_string());
+            string.push('\n');
+        }
+        string
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -293,8 +301,8 @@ pub fn get_font_type<B: BinaryReader>(file: &mut B) -> FontHeaders {
 
     match &buffer {
         b"ttcf" => {
-            let fontheader = TTFHeader::new(file);
-            FontHeaders::TTF(fontheader)
+            let fontheader = TTCHeader::new(file);
+            FontHeaders::TTC(fontheader)
         }
         // if 0x00010000 -> OTF
         b"\x00\x01\x00\x00" | b"OTTO" => {

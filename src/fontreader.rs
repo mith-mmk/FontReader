@@ -6,7 +6,7 @@ use crate::fontheader;
 use crate::opentype::color::{colr, cpal};
 use crate::opentype::requires::cmap::CmapEncodings;
 use crate::opentype::requires::hmtx::LongHorMetric;
-use crate::opentype::{requires::*, FontCollection};
+use crate::opentype::requires::*;
 use crate::opentype::{outline::*, OTFHeader};
 
 #[cfg(debug_assertions)]
@@ -261,78 +261,90 @@ fn font_load_from_file(filename: &PathBuf) -> Option<Font> {
     font_load(&mut reader)
 }
 
+#[cfg(debug_assertions)]
+fn font_debug(_font: &Font) {
+    // create or open file
+    let file = match File::create("test/font.txt") {
+        Ok(it) => it,
+        Err(_) => File::open("test/font.txt").unwrap(),
+    };
+    let mut writer = BufWriter::new(file);
+
+    let encoding_records = &_font.cmap.as_ref().unwrap().get_encoding_engine();
+    writeln!(&mut writer, "{}", _font.cmap.as_ref().unwrap().cmap).unwrap();
+    for i in 0..encoding_records.len() {
+        writeln!(&mut writer, "{} {}", i, encoding_records[i].to_string()).unwrap();
+    }
+    writeln!(&mut writer, "{}", &_font.head.as_ref().unwrap().to_string()).unwrap();
+    writeln!(&mut writer, "{}", &_font.hhea.as_ref().unwrap().to_string()).unwrap();
+    writeln!(&mut writer, "{}", &_font.maxp.as_ref().unwrap().to_string()).unwrap();
+    writeln!(&mut writer, "{}", &_font.hmtx.as_ref().unwrap().to_string()).unwrap();
+    writeln!(&mut writer, "{}", &_font.os2.as_ref().unwrap().to_string()).unwrap();
+    writeln!(&mut writer, "{}", &_font.post.as_ref().unwrap().to_string()).unwrap();
+    writeln!(&mut writer, "{}", &_font.name.as_ref().unwrap().to_string()).unwrap();
+
+    if _font.loca.is_some() {
+        writeln!(&mut writer, "{}", &_font.loca.as_ref().unwrap().to_string()).unwrap();
+    }
+    if _font.cpal.is_some() {
+        writeln!(&mut writer, "{}", &_font.cpal.as_ref().unwrap().to_string()).unwrap();
+    }
+    if _font.colr.is_some() {
+        writeln!(&mut writer, "{}", &_font.colr.as_ref().unwrap().to_string()).unwrap();
+    }
+
+    writeln!(&mut writer, "long cmap -> griph").unwrap();
+    let cmap_encodings = &_font.cmap.as_ref().unwrap().clone();
+    let glyf = _font.grif.as_ref().unwrap();
+    for i in 0x0020..0x0ff {
+        let pos = cmap_encodings.get_griph_position(i);
+        let glyph = glyf.get_glyph(pos as usize).unwrap();
+        let layout = _font.get_horizontal_layout(pos as usize);
+        let svg = glyph.to_svg(32.0, "pt", &layout);
+        let ch = char::from_u32(i).unwrap();
+        writeln!(&mut writer, "{}:{:04} ", ch, pos).unwrap();
+        writeln!(&mut writer, "{}", glyph.to_string()).unwrap();
+        writeln!(&mut writer, "{}:{:?}", i, layout).unwrap();
+        writeln!(&mut writer, "{}", svg).unwrap();
+    }
+    writeln!(&mut writer).unwrap();
+    for i in 0x4e00..0x4eff {
+        if i as u32 % 16 == 0 {
+            writeln!(&mut writer).unwrap();
+        }
+        let pos = cmap_encodings.get_griph_position(i as u32);
+        let glyph = glyf.get_glyph(pos as usize).unwrap();
+        let layout = _font.get_horizontal_layout(pos as usize);
+        let svg = glyph.to_svg(100.0, "px", &layout);
+        let ch = char::from_u32(i as u32).unwrap();
+        write!(&mut writer, "{}:{:04} ", ch, pos).unwrap();
+        writeln!(&mut writer, "{}", svg).unwrap();
+    }
+    writeln!(&mut writer).unwrap();
+    let i = 0x2a6b2;
+    let pos = cmap_encodings.get_griph_position(i as u32);
+    let ch = char::from_u32(i as u32).unwrap();
+    writeln!(&mut writer, "{}:{:04} ", ch, pos).unwrap();
+}
+
 fn font_load<R: BinaryReader>(file: &mut R) -> Option<Font> {
     match fontheader::get_font_type(file) {
         fontheader::FontHeaders::OTF(header) => {
             let font = from_opentype(file, &header);
             #[cfg(debug_assertions)]
             {
-                let _font = font.as_ref().unwrap();
-                // create or open file
-                let file = match File::create("test/font.txt") {
-                    Ok(it) => it,
-                    Err(_) => File::open("test/font.txt").unwrap(),
-                };
-                let mut writer = BufWriter::new(file);
-
-                let encoding_records = &_font.cmap.as_ref().unwrap().get_encoding_engine();
-                writeln!(&mut writer, "{}", _font.cmap.as_ref().unwrap().cmap).unwrap();
-                for i in 0..encoding_records.len() {
-                    writeln!(&mut writer, "{} {}", i, encoding_records[i].to_string()).unwrap();
-                }
-                writeln!(&mut writer, "{}", &_font.head.as_ref().unwrap().to_string()).unwrap();
-                writeln!(&mut writer, "{}", &_font.hhea.as_ref().unwrap().to_string()).unwrap();
-                writeln!(&mut writer, "{}", &_font.maxp.as_ref().unwrap().to_string()).unwrap();
-                writeln!(&mut writer, "{}", &_font.hmtx.as_ref().unwrap().to_string()).unwrap();
-                writeln!(&mut writer, "{}", &_font.os2.as_ref().unwrap().to_string()).unwrap();
-                writeln!(&mut writer, "{}", &_font.post.as_ref().unwrap().to_string()).unwrap();
-                writeln!(&mut writer, "{}", &_font.loca.as_ref().unwrap().to_string()).unwrap();
-                writeln!(&mut writer, "{}", &_font.name.as_ref().unwrap().to_string()).unwrap();
-                writeln!(&mut writer, "{}", &_font.cpal.as_ref().unwrap().to_string()).unwrap();
-                writeln!(&mut writer, "{}", &_font.colr.as_ref().unwrap().to_string()).unwrap();
-                writeln!(&mut writer, "long cmap -> griph").unwrap();
-                let cmap_encodings = &_font.cmap.as_ref().unwrap().clone();
-                let glyf = _font.grif.as_ref().unwrap();
-                for i in 0x0020..0x0ff {
-                    let pos = cmap_encodings.get_griph_position(i);
-                    let glyph = glyf.get_glyph(pos as usize).unwrap();
-                    let layout = _font.get_horizontal_layout(pos as usize);
-                    let svg = glyph.to_svg(32.0, "pt", &layout);
-                    let ch = char::from_u32(i).unwrap();
-                    writeln!(&mut writer, "{}:{:04} ", ch, pos).unwrap();
-                    writeln!(&mut writer, "{}", glyph.to_string()).unwrap();
-                    writeln!(&mut writer, "{}:{:?}", i, layout).unwrap();
-                    writeln!(&mut writer, "{}", svg).unwrap();
-                }
-                writeln!(&mut writer).unwrap();
-                for i in 0x4e00..0x4eff {
-                    if i as u32 % 16 == 0 {
-                        writeln!(&mut writer).unwrap();
-                    }
-                    let pos = cmap_encodings.get_griph_position(i as u32);
-                    let glyph = glyf.get_glyph(pos as usize).unwrap();
-                    let layout = _font.get_horizontal_layout(pos as usize);
-                    let svg = glyph.to_svg(100.0, "px", &layout);
-                    let ch = char::from_u32(i as u32).unwrap();
-                    write!(&mut writer, "{}:{:04} ", ch, pos).unwrap();
-                    writeln!(&mut writer, "{}", svg).unwrap();
-                }
-                writeln!(&mut writer).unwrap();
-                let i = 0x2a6b2;
-                let pos = cmap_encodings.get_griph_position(i as u32);
-                let ch = char::from_u32(i as u32).unwrap();
-                writeln!(&mut writer, "{}:{:04} ", ch, pos).unwrap();
+                font_debug(font.as_ref().unwrap());
             }
             font
         }
-        fontheader::FontHeaders::TTF(header) => {
+        fontheader::FontHeaders::TTC(header) => {
             let num_fonts = header.num_fonts;
-            let font_collection = FontCollection::from(file, header);
-            let table = &font_collection.tables[0];
+            let font_collection = header.font_collection.as_ref();
+            let table = &font_collection[0];
             let mut font = from_opentype(file, table);
             let mut fonts = Vec::new();
             for i in 1..num_fonts {
-                let table = &font_collection.tables[i as usize];
+                let table = &font_collection[i as usize];
                 let font = from_opentype(file, table);
                 match font.is_some() {
                     true => {
@@ -342,6 +354,10 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Option<Font> {
                 }
             }
             font.as_mut().unwrap().more_fonts = Box::new(fonts);
+            #[cfg(debug_assertions)]
+            {
+                font_debug(font.as_ref().unwrap());
+            }
             font
         }
         fontheader::FontHeaders::WOFF(header) => {
@@ -449,6 +465,10 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Option<Font> {
                 font.loca.as_ref().unwrap(),
             );
             font.grif = Some(glyf);
+            #[cfg(debug_assertions)]
+            {
+                font_debug(&font);
+            }
             Some(font)
         }
         fontheader::FontHeaders::WOFF2(_) => todo!(),

@@ -215,7 +215,7 @@ impl Glyph {
     ) -> String {
         let rsb = (layout.advance_width - parsed.x_max as isize) as i16;
         let x_min = parsed.x_min - layout.lsb as i16;
-        let y_min = parsed.y_min;
+        let y_min = 0;
         let x_max = parsed.x_max + rsb;
         let y_max = layout.accender - layout.descender + layout.line_gap;
         let height = fonsize;
@@ -294,6 +294,9 @@ impl Glyph {
                     start_x = (x + next_x) / 2;
                     start_y = (y + next_y) / 2;
                 }
+                if i != 0 {
+                    svg += &format!("Z ");
+                }
 
                 svg += &format!("M{} {}", start_x, y_max - start_y);
                 path_start = false;
@@ -337,7 +340,7 @@ impl Glyph {
             }
             befor_on_curve = on_curve;
         }
-        svg += "\"/>";
+        svg += "Z\"/>";
         svg
     }
 

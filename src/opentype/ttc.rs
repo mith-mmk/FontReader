@@ -4,7 +4,7 @@ use crate::opentype::OTFHeader;
 use bin_rs::reader::BinaryReader;
 
 #[derive(Debug, Clone)]
-pub struct TTFHeader {
+pub struct TTCHeader {
     pub(crate) sfnt_version: u32,
     pub(crate) major_version: u16,
     pub(crate) minor_version: u16,
@@ -14,11 +14,12 @@ pub struct TTFHeader {
     pub(crate) ul_dsig_tag: u32,
     pub(crate) ul_dsig_length: u32,
     pub(crate) ul_dsig_offset: u32,
+    pub(crate) font_collection: Box<Vec<OTFHeader>>,
 }
 
-impl TTFHeader {
+impl TTCHeader {
     pub(crate) fn new<R: BinaryReader>(reader: &mut R) -> Self {
-        let mut header = TTFHeader {
+        let mut header = TTCHeader {
             sfnt_version: 0,
             major_version: 0,
             minor_version: 0,
@@ -27,6 +28,7 @@ impl TTFHeader {
             ul_dsig_tag: 0,
             ul_dsig_length: 0,
             ul_dsig_offset: 0,
+            font_collection: Box::<Vec<OTFHeader>>::default(),
         };
         header.sfnt_version = reader.read_u32_be().unwrap();
         header.major_version = reader.read_u16_be().unwrap();
@@ -56,49 +58,34 @@ impl TTFHeader {
                 println!("ul_dsig_offset: {:08X}", header.ul_dsig_offset);
             }
         }
-        header
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct FontCollection {
-    pub(crate) header: TTFHeader,
-    pub(crate) tables: Box<Vec<OTFHeader>>,
-}
-
-impl FontCollection {
-    pub fn new<R: BinaryReader>(reader: &mut R) -> Self {
-        let header = TTFHeader::new(reader);
-        Self::from(reader, header)
-    }
-
-    pub fn from<R: BinaryReader>(reader: &mut R, header: TTFHeader) -> Self {
-        let mut tables = Vec::new();
+        let mut font_collection = Vec::new();
 
         for i in 0..header.num_fonts {
             reader
                 .seek(SeekFrom::Start(header.table_directory[i as usize] as u64))
                 .unwrap();
-            tables.push(OTFHeader::new(reader));
+            font_collection.push(OTFHeader::new(reader));
         }
-
-        Self {
-            header,
-            tables: Box::new(tables),
-        }
+        header.font_collection = Box::new(font_collection);
+        header
     }
 
-    fn to_string(&self) -> String {
-        let mut string = "FontCollection\n".to_string();
-        string += &format!("sfnt_version: {}\n", self.header.sfnt_version);
-        string += &format!("major_version: {}\n", self.header.major_version);
-        string += &format!("minor_version: {}\n", self.header.minor_version);
-        string += &format!("num_fonts: {}\n", self.header.num_fonts);
-        string += &format!("ul_dsig_tag: {}\n", self.header.ul_dsig_tag);
-        string += &format!("ul_dsig_length: {}\n", self.header.ul_dsig_length);
-        string += &format!("ul_dsig_offset: {}\n", self.header.ul_dsig_offset);
-        for (i, table) in self.tables.iter().enumerate() {
-            string += &format!("table[{}]: {}\n", i, table);
+    pub(crate) fn to_string(&self) -> String {
+        let mut string = "TTCHeader\n".to_string();
+        string += &format!("sfnt_version: {}\n", self.sfnt_version);
+        string += &format!("major_version: {}\n", self.major_version);
+        string += &format!("minor_version: {}\n", self.minor_version);
+        string += &format!("num_fonts: {}\n", self.num_fonts);
+        for (i, table) in self.table_directory.iter().enumerate() {
+            string += &format!("table[{}]: {:08X}\n", i, table);
+        }
+        if self.major_version == 2 {
+            string += &format!("ul_dsig_tag: {:08X}\n", self.ul_dsig_tag);
+            string += &format!("ul_dsig_length: {}\n", self.ul_dsig_length);
+            string += &format!("ul_dsig_offset: {:08X}\n", self.ul_dsig_offset);
+        }
+        for (i, font) in self.font_collection.iter().enumerate() {
+            string += &format!("font[{}]:\n {}\n", i, font.to_string());
         }
         string
     }

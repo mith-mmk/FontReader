@@ -63,9 +63,9 @@ impl COLR {
         string.push_str(&format!("version: {}\n", self.version));
         string.push_str(&format!("num_base_glyphs: {}\n", self.num_base_glyphs));
         string.push_str(&format!("num_layers: {}\n", self.num_layers));
-        let MAX_LENGTH = 100;
-        let len = if MAX_LENGTH < self.base_glyph_records.len() {
-            MAX_LENGTH
+        let max_length = 10;
+        let len = if max_length < self.base_glyph_records.len() {
+            max_length
         } else {
             self.base_glyph_records.len()
         };
@@ -75,8 +75,8 @@ impl COLR {
                 i, self.base_glyph_records[i]
             ));
         }
-        let len = if MAX_LENGTH < self.layer_records.len() {
-            MAX_LENGTH
+        let len = if max_length < self.layer_records.len() {
+            max_length
         } else {
             self.layer_records.len()
         };

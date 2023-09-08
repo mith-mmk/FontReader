@@ -67,7 +67,13 @@ impl CPAL {
         ));
         string.push_str(&format!("num_palettes: {}\n", self.num_palettes));
         string.push_str(&format!("num_color_records: {}\n", self.num_color_records));
-        for i in 0..self.num_color_records as usize {
+        let max_length = 10;
+        let len = if 10 < self.color_records.len() {
+            max_length
+        } else {
+            self.color_records.len()
+        };
+        for i in 0..len as usize {
             string.push_str(&format!(
                 "color_record[{}]: {} {} {} {}\n",
                 i,
