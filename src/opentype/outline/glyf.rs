@@ -209,18 +209,18 @@ impl Glyph {
 
     pub(crate) fn get_svg_header_from_parsed(
         parsed: &ParsedGlyph,
-        fonsize: f32,
+        fontsize: f32,
         fontunit: &str,
         layout: &crate::fontreader::HorizontalLayout,
     ) -> String {
         let rsb = (layout.advance_width - parsed.x_max as isize) as i16;
         let x_min = parsed.x_min - layout.lsb as i16;
-        let y_min = 0;
+        let y_min = - layout.line_gap;
         let x_max = parsed.x_max + rsb;
-        let y_max = layout.accender - layout.descender + layout.line_gap;
-        let height = fonsize;
-        let width = x_min as f32 + x_max as f32 + layout.lsb as f32;
-        let width = width * height / (y_max - y_min as isize) as f32;
+        let y_max = layout.accender - layout.descender + layout.line_gap * 2;
+        let height = fontsize;
+        let width = x_min as f32 + x_max as f32 ;
+        let width = width * height / y_max as f32;
 
         let height_str = format!("{}{}", height, fontunit);
         let width_str = format!("{}{}", width, fontunit);
@@ -228,6 +228,10 @@ impl Glyph {
         #[cfg(debug_assertions)]
         {
             let rsb = (layout.advance_width - parsed.x_max as isize) as i16;
+            svg += &format!(
+                "<!-- lsb {} accender {} descender {} line_gap {} avance width {}-->",
+                layout.lsb, layout.accender, layout.descender, layout.line_gap, layout.advance_width
+            );
             svg += &format!(
                 "<!-- x min {} y min {} x max {} y max {} -->",
                 parsed.x_min, parsed.y_min, parsed.x_max, parsed.y_max
