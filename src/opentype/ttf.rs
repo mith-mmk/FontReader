@@ -61,12 +61,12 @@ impl TTFHeader {
 }
 
 #[derive(Debug, Clone)]
-pub struct TrueType {
+pub struct FontCollection {
     pub(crate) header: TTFHeader,
     pub(crate) tables: Box<Vec<OTFHeader>>,
 }
 
-impl TrueType {
+impl FontCollection {
     pub fn new<R: BinaryReader>(reader: &mut R) -> Self {
         let header = TTFHeader::new(reader);
         Self::from(reader, header)
@@ -89,7 +89,7 @@ impl TrueType {
     }
 
     fn to_string(&self) -> String {
-        let mut string = "TrueType\n".to_string();
+        let mut string = "FontCollection\n".to_string();
         string += &format!("sfnt_version: {}\n", self.header.sfnt_version);
         string += &format!("major_version: {}\n", self.header.major_version);
         string += &format!("minor_version: {}\n", self.header.minor_version);

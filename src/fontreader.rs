@@ -6,7 +6,7 @@ use crate::fontheader;
 use crate::opentype::color::{colr, cpal};
 use crate::opentype::requires::cmap::CmapEncodings;
 use crate::opentype::requires::hmtx::LongHorMetric;
-use crate::opentype::requires::*;
+use crate::opentype::{requires::*, FontCollection};
 use crate::opentype::{outline::*, OTFHeader};
 
 #[cfg(debug_assertions)]
@@ -136,10 +136,18 @@ impl Font {
         let layout: HorizontalLayout = self.get_horizontal_layout(pos as usize);
         let fontsize = 24.0;
         let fontunit = "pt";
+
         if let Some(colr) = self.colr.as_ref() {
-            let mut string = format!("<!-- glyf id: {} -->", pos);
-            string += &glyf.get_svg_heder(fontsize, fontunit, &layout);
             let layers = colr.get_layer_record(pos as u16);
+            if layers.is_empty() {
+                return glyf.to_svg(fontsize, fontunit, &layout)
+            }
+            let mut string = glyf.get_svg_heder(fontsize, fontunit, &layout);
+            #[cfg(debug_assertions)]
+            {
+                string += &format!("\n<!-- {} glyf id: {} -->", ch, pos);
+            }
+
             for layer in layers {
                 let glyf_id = layer.glyph_id as u32;
                 let glyf = self
@@ -319,12 +327,12 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Option<Font> {
         }
         fontheader::FontHeaders::TTF(header) => {
             let num_fonts = header.num_fonts;
-            let tt = crate::truetype::TrueType::from(file, header);
-            let table = &tt.tables[0];
+            let font_collection = FontCollection::from(file, header);
+            let table = &font_collection.tables[0];
             let mut font = from_opentype(file, table);
             let mut fonts = Vec::new();
             for i in 1..num_fonts {
-                let table = &tt.tables[i as usize];
+                let table = &font_collection.tables[i as usize];
                 let font = from_opentype(file, table);
                 match font.is_some() {
                     true => {

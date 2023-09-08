@@ -1,5 +1,5 @@
 use crate::woff::woff::WOFFHeader;
-use crate::{opentype::OTFHeader, truetype::TTFHeader, util::u32_to_string};
+use crate::{opentype::OTFHeader, opentype::TTFHeader, util::u32_to_string};
 use bin_rs::{
     reader::{BinaryReader, BytesReader, StreamReader},
     Endian,

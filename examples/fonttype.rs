@@ -25,7 +25,7 @@ fn main() {
     let folder = if args.len() >= 2 {
         args[1].to_string()
     } else {
-        "e:\\data\\fonts".to_string()
+        "c:\\windows\\fonts".to_string()
     };
     get_font_type(&folder);
 }

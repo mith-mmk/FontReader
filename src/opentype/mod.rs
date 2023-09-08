@@ -1,11 +1,13 @@
 pub mod color;
 pub mod outline;
 pub mod requires;
+mod ttf;
 use std::fmt;
 
 use bin_rs::reader::BinaryReader;
 pub use outline::glyf::Glyph;
-
+pub use ttf::FontCollection as FontCollection;
+pub use ttf::TTFHeader as TTFHeader;
 use crate::{fontheader::TableRecord, util::u32_to_string};
 
 use self::requires::cmap;
