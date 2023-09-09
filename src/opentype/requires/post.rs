@@ -82,7 +82,7 @@ fn get_post<R: BinaryReader>(file: &mut R, offest: u32, length: u32) -> POST {
             glyph_name_index.push(index);
         }
         let remain = (length - 34 - number_of_glyphs as u32 * 2) as usize;
-        let buf = file.read_bytes_as_vec(length as usize).unwrap();
+        let buf = file.read_bytes_as_vec(remain as usize).unwrap();
         let mut offset: usize = 0;
         while offest < remain as u32 {
             let mut name = String::new();
