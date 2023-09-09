@@ -14,7 +14,8 @@ fn main() {
     let output_file = "./test/read.html";
     let filename: PathBuf = PathBuf::from(fontname);
     let mut font = Font::get_font_from_file(&filename).unwrap();
-    let res = font.set_font(2);
+    let len = font.get_font_count();
+    let res = font.set_font(len - 1);
     if res.is_err() {
         print!("error: {:?}", res);
         }
