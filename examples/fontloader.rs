@@ -1,5 +1,5 @@
 use fontloader::Font;
-use std::path::PathBuf;
+use std::{path::PathBuf, env};
 
 fn main() {
     // agrs[1] is the folder name
@@ -8,7 +8,21 @@ fn main() {
     let fontname = if args.len() >= 2 {
         args[1].to_string()
     } else {
-        "e:\\data\\fonts\\NotoSansJP-SemiBold.ttf".to_string()
+        #[cfg(target_os = "windows")]
+        {
+            // $env:windir\fonts\msgothic.ttc
+            let windir = env::var("windir").unwrap();
+            format!("{}\\fonts\\msgothic.ttc", windir)
+        }
+        #[cfg(target_os = "macos")]
+        {
+            let home = env::var("HOME").unwrap();
+            format!("{}/Library/Fonts/ヒラギノ角ゴシック W4.ttc", home)
+        }
+        #[cfg(target_os = "linux")]
+        {
+            "/usr/share/fonts".to_string()
+        }
     };
 
     let output_file = "./test/read.html";

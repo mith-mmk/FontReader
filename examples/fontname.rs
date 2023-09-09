@@ -22,8 +22,7 @@ fn main() {
         }
         #[cfg(target_os = "linux")]
         {
-            let home = env::var("HOME").unwrap();
-            format!("{}/.fonts/NotoSansJP-Regular.otf", home)
+          "/usr/share/fonts".to_string()
         }
     };
 

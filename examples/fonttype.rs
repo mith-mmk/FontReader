@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{path::Path, env};
 
 use fontloader::fontheader;
 
@@ -25,7 +25,21 @@ fn main() {
     let folder = if args.len() >= 2 {
         args[1].to_string()
     } else {
-        "c:\\windows\\fonts".to_string()
+        #[cfg(target_os = "windows")]
+        {
+            // $env:windir\fonts\msgothic.ttc
+            let windir = env::var("windir").unwrap();
+            format!("{}\\fonts\\", windir)
+        }
+        #[cfg(target_os = "macos")]
+        {
+            let home = env::var("HOME").unwrap();
+            format!("{}/Library/Fonts/", home)
+        }
+        #[cfg(target_os = "linux")]
+        {
+            "/usr/share/fonts".to_string()
+        }
     };
     get_font_type(&folder);
 }
