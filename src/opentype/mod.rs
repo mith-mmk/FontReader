@@ -1,12 +1,14 @@
 pub mod color;
 pub mod outline;
 pub mod requires;
+pub mod platforms;
 mod ttc;
 use std::fmt;
 
 use bin_rs::reader::BinaryReader;
 pub use outline::glyf::Glyph;
 pub use ttc::TTCHeader as TTCHeader;
+pub use requires::name::NameID;
 use crate::{fontheader::TableRecord, util::u32_to_string};
 
 use self::requires::cmap;

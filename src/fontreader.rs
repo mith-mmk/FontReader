@@ -1,9 +1,12 @@
 use bin_rs::reader::{BinaryReader, BytesReader, StreamReader};
-use std::io::BufReader;
+use std::collections::HashMap;
+use std::error::Error;
+use std::io::{BufReader, ErrorKind};
 use std::{fs::File, path::PathBuf};
 
 use crate::fontheader;
 use crate::opentype::color::{colr, cpal};
+use crate::opentype::platforms::PlatformID;
 use crate::opentype::requires::cmap::CmapEncodings;
 use crate::opentype::requires::hmtx::LongHorMetric;
 use crate::opentype::requires::*;
@@ -52,6 +55,7 @@ pub struct Font {
     pub(crate) hmtx: Option<hmtx::HMTX>,    // must
     pub(crate) maxp: Option<maxp::MAXP>,    // must
     pub(crate) name: Option<name::NAME>,    // must
+    pub(crate) name_table: Option<name::NameTable>,
     pub(crate) os2: Option<os2::OS2>,       // must
     pub(crate) post: Option<post::POST>,    // must
     pub(crate) loca: Option<loca::LOCA>,    // openType font, CFF/CFF2 none
@@ -62,6 +66,7 @@ pub struct Font {
     loca_pos: Option<Pointer>, // OpenType font, CFF/CFF2 none
     glyf_pos: Option<Pointer>, // OpenType font, CFF/CFF2 none
     pub(crate) more_fonts: Box<Vec<Font>>,
+    current_font: usize,
 }
 
 impl Font {
@@ -74,6 +79,7 @@ impl Font {
             hmtx: None,
             maxp: None,
             name: None,
+            name_table: None,
             os2: None,
             post: None,
             loca: None,
@@ -84,24 +90,54 @@ impl Font {
             loca_pos: None,
             glyf_pos: None,
             more_fonts: Box::<Vec<Font>>::default(),
+            current_font: 0,
         }
     }
+
+    pub fn get_name(&self, locale: &String) -> HashMap<u16, String> {
+        let name_table = 
+            if self.current_font == 0 {
+                self.name_table.as_ref().unwrap()
+            } else {
+                self.more_fonts[self.current_font - 1].name_table.as_ref().unwrap()
+            };
+        let platform_id = PlatformID::Windows;
+        let name = name_table.get_name_list(&locale, platform_id);
+        if name.len() == 0 {
+            let platform_id = PlatformID::Macintosh;
+            name_table.get_name_list(&locale, platform_id)
+        } else {
+            name
+        }
+    } 
 
     pub fn get_font_from_file(filename: &PathBuf) -> Option<Self> {
         font_load_from_file(filename)
     }
 
     pub(crate) fn get_h_metrix(&self, id: usize) -> LongHorMetric {
-        let hmtx = self.hmtx.as_ref().unwrap();
-        hmtx.get_metrix(id)
+        if self.current_font == 0 {
+            self.hmtx.as_ref().unwrap().get_metrix(id)
+        } else {
+            self.more_fonts[self.current_font - 1].hmtx.as_ref().unwrap().get_metrix(id)
+        }
     }
-    pub fn get_horizontal_layout(&self, id: usize) -> HorizontalLayout {
-        let lsb = self.get_h_metrix(id).left_side_bearing as isize;
-        let advance_width = self.get_h_metrix(id).advance_width as isize;
 
-        let accender = self.hhea.as_ref().unwrap().get_accender() as isize;
-        let descender = self.hhea.as_ref().unwrap().get_descender() as isize;
-        let line_gap = self.hhea.as_ref().unwrap().get_line_gap() as isize;
+    pub fn get_horizontal_layout(&self, id: usize) -> HorizontalLayout {
+        let h_metrix = self.get_h_metrix(id);
+
+        let hhea = if self.current_font == 0 {
+            self.hhea.as_ref().unwrap()
+        } else {
+            self.more_fonts[self.current_font - 1].hhea.as_ref().unwrap()
+        };
+        
+        let lsb = h_metrix.left_side_bearing as isize;
+        let advance_width = h_metrix.advance_width as isize;
+
+        let accender = hhea.get_accender() as isize;
+        let descender =hhea.get_descender() as isize;
+        let line_gap = hhea.get_line_gap() as isize;
 
         HorizontalLayout {
             lsb,
@@ -114,8 +150,17 @@ impl Font {
 
     pub fn get_gryph(&self, ch: char) -> GriphData {
         let code = ch as u32;
-        let pos = self.cmap.as_ref().unwrap().get_griph_position(code);
-        let glyph = self.grif.as_ref().unwrap().get_glyph(pos as usize).unwrap();
+        let (cmap, grif) = if self.current_font == 0 {
+            (self.cmap.as_ref().unwrap(), self.grif.as_ref().unwrap())
+        } else {
+            (
+                self.more_fonts[self.current_font - 1].cmap.as_ref().unwrap(),
+                self.more_fonts[self.current_font - 1].grif.as_ref().unwrap(),
+            )
+        };
+
+        let pos = cmap.get_griph_position(code);
+        let glyph = grif.get_glyph(pos as usize).unwrap();
         let layout: HorizontalLayout = self.get_horizontal_layout(pos as usize);
         let open_type_glyph = OpenTypeGlyph {
             layout: FontLayout::Horizontal(layout),
@@ -131,13 +176,25 @@ impl Font {
     pub fn get_svg(&self, ch: char) -> String {
         // utf-32
         let code = ch as u32;
-        let pos = self.cmap.as_ref().unwrap().get_griph_position(code);
-        let glyf = self.grif.as_ref().unwrap().get_glyph(pos as usize).unwrap();
+        let (cmap, grif,colr, cpal) = if self.current_font == 0 {
+            (self.cmap.as_ref().unwrap(), self.grif.as_ref().unwrap(),
+            self.colr.as_ref(), self.cpal.as_ref())
+        } else {
+            (
+                self.more_fonts[self.current_font - 1].cmap.as_ref().unwrap(),
+                self.more_fonts[self.current_font - 1].grif.as_ref().unwrap(),
+                self.more_fonts[self.current_font - 1].colr.as_ref(),
+                self.more_fonts[self.current_font - 1].cpal.as_ref(),
+            )
+        };
+
+        let pos = cmap.get_griph_position(code);
+        let glyf = grif.get_glyph(pos as usize).unwrap();
         let layout: HorizontalLayout = self.get_horizontal_layout(pos as usize);
         let fontsize = 24.0;
         let fontunit = "pt";
 
-        if let Some(colr) = self.colr.as_ref() {
+        if let Some(colr) = colr.as_ref() {
             let layers = colr.get_layer_record(pos as u16);
             if layers.is_empty() {
                 return glyf.to_svg(fontsize, fontunit, &layout)
@@ -150,14 +207,10 @@ impl Font {
 
             for layer in layers {
                 let glyf_id = layer.glyph_id as u32;
-                let glyf = self
-                    .grif
-                    .as_ref()
-                    .unwrap()
+                let glyf = grif
                     .get_glyph(glyf_id as usize)
                     .unwrap();
-                let pallet = self
-                    .cpal
+                let pallet = cpal
                     .as_ref()
                     .unwrap()
                     .get_pallet(layer.palette_index as usize);
@@ -221,6 +274,24 @@ impl Font {
             string += &format!("Font famiry: {} {}\n", font_famiry, subfamily_name);
         }
         string
+    }
+
+    pub fn get_font_count(&self) -> usize {
+        self.more_fonts.len() + 1
+    }
+
+    pub fn get_font_number(&self) -> usize {
+        self.current_font
+    }
+
+    pub fn set_font(&mut self, number:usize) -> Result<(),String>{
+        print!("set_font: {} {}", number, self.more_fonts.len());
+        if number <= self.more_fonts.len() {
+            self.current_font = number;
+            Ok(())
+        } else {
+            Err("font number is out of range".to_owned())
+        }
     }
 }
 
@@ -333,7 +404,7 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Option<Font> {
             let font = from_opentype(file, &header);
             #[cfg(debug_assertions)]
             {
-                font_debug(font.as_ref().unwrap());
+            //    font_debug(font.as_ref().unwrap());
             }
             font
         }
@@ -356,7 +427,7 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Option<Font> {
             font.as_mut().unwrap().more_fonts = Box::new(fonts);
             #[cfg(debug_assertions)]
             {
-                font_debug(font.as_ref().unwrap());
+            //    font_debug(font.as_ref().unwrap());
             }
             font
         }
@@ -412,7 +483,9 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Option<Font> {
                     b"name" => {
                         let mut reader = BytesReader::new(&table.data);
                         let name = name::NAME::new(&mut reader, 0, table.data.len() as u32);
+                        let name_table = name::NameTable::new(&name);
                         font.name = Some(name);
+                        font.name_table = Some(name_table);
                     }
                     b"post" => {
                         let mut reader = BytesReader::new(&table.data);
@@ -472,7 +545,10 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Option<Font> {
             Some(font)
         }
         fontheader::FontHeaders::WOFF2(_) => todo!(),
-        fontheader::FontHeaders::Unknown => todo!(),
+        fontheader::FontHeaders::Unknown => {
+            //todo!(),
+            None
+        }
     }
 }
 
@@ -517,7 +593,9 @@ fn from_opentype<R: BinaryReader>(file: &mut R, header: &OTFHeader) -> Option<Fo
             }
             b"name" => {
                 let name = name::NAME::new(file, record.offset, record.length);
+                let name_table = name::NameTable::new(&name);
                 font.name = Some(name);
+                font.name_table = Some(name_table);
             }
             b"OS/2" => {
                 let os2 = os2::OS2::new(file, record.offset, record.length);

@@ -13,7 +13,12 @@ fn main() {
 
     let output_file = "./test/read.html";
     let filename: PathBuf = PathBuf::from(fontname);
-    let font = Font::get_font_from_file(&filename).unwrap();
+    let mut font = Font::get_font_from_file(&filename).unwrap();
+    let res = font.set_font(2);
+    if res.is_err() {
+        print!("error: {:?}", res);
+        }
+
     let string = font.get_info();
     println!("{}", string);
     let text_file = "./test/read.txt";

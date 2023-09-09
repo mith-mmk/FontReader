@@ -1,13 +1,81 @@
 // name is a table that contains font name information.
 
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[repr(u16)]
+pub enum NameID {
+    CopyRightNotice = 0,
+    FontFamilyName = 1,
+    FontSubfamilyName = 2,
+    UniqueFontIdentifier = 3,
+    FullFontName = 4,
+    VersionString = 5,
+    PostScriptName = 6,
+    Trademark = 7,
+    ManufacturerName = 8,
+    Designer = 9,
+    Description = 10,
+    VendorURL = 11, 
+    DesignerURL = 12,
+    LicenseDescription = 13,
+    LicenseInfoURL = 14,
+    Reserved = 15,
+    TypographicFamilyName = 16,
+    TypographicSubfamilyName = 17,
+    CompatibleFullName = 18,
+    SampleText = 19,
+    PostScriptCIDFindfontName = 20,
+    WWSFamilyName = 21,
+    WWSSubfamilyName = 22,
+    LightBackgroundPalette = 23,
+    DarkBackgroundPalette = 24,
+    VariationsPostScriptNamePrefix = 25,
+    OTHER,
+}
+
+impl NameID {
+    pub fn iter() -> [NameID;27] {
+        [
+        Self::CopyRightNotice,
+        Self::FontFamilyName,
+        Self::FontSubfamilyName,
+        Self::UniqueFontIdentifier,
+        Self::FullFontName,
+        Self::VersionString,
+        Self::PostScriptName,
+        Self::Trademark,
+        Self::ManufacturerName,
+        Self::Designer,
+        Self::Description,
+        Self::VendorURL,
+        Self::DesignerURL,
+        Self::LicenseDescription,
+        Self::LicenseInfoURL,
+        Self::Reserved,
+        Self::TypographicFamilyName,
+        Self::TypographicSubfamilyName,
+        Self::CompatibleFullName,
+        Self::SampleText,
+        Self::PostScriptCIDFindfontName,
+        Self::WWSFamilyName,
+        Self::WWSSubfamilyName,
+        Self::LightBackgroundPalette,
+        Self::DarkBackgroundPalette,
+        Self::VariationsPostScriptNamePrefix,
+        Self::OTHER]
+    }
+
+}
+
 use std::{
     fmt::{self, Display, Formatter},
-    io::SeekFrom,
+    io::SeekFrom, collections::HashMap,
 };
 
 use bin_rs::reader::BinaryReader;
 #[cfg(feature = "iconv")]
 use iconv::Iconv;
+
+use crate::opentype::platforms::{PlatformID, get_locale_to_language_id, self};
 
 enum EncodingEngine {
     UTF16BE,
@@ -19,6 +87,133 @@ enum EncodingEngine {
     Johab,
     Unknown,
 }
+
+#[derive(Debug, Clone)]
+pub(crate) struct NameTable {
+    // platform ID, Language ID, String
+    pub(crate) default_namelist: HashMap<u16, String>,
+    pub(crate) namelist: HashMap<(u16, u16),HashMap<u16, String>>
+}
+
+impl Default for NameTable {
+    fn default() -> Self {
+        Self {
+            default_namelist: HashMap::new(),
+            namelist: HashMap::new()
+        }
+    }
+}
+
+impl NameTable {
+    pub fn new(name: &NAME) -> Self {
+        let name_records = name.name_records.clone();
+        let mut default_namelist = HashMap::new();
+        let mut namelist: HashMap<(u16, u16), HashMap<u16, String>> = HashMap::new();
+        for name_record in name_records.iter() {
+            let platform_id = name_record.platform_id;
+            let language_id = name_record.language_id;
+            let name_id = name_record.name_id;
+            let string = name_record.string.clone();
+            match platform_id {
+                1 => {
+                    if language_id == 0 {
+                        default_namelist.insert(name_id, string);
+                    } else {
+                        let key = (platform_id, language_id);
+                        if let Some(names) = namelist.get_mut(&key) {
+                            names.insert(name_id, string);
+                        } else {
+                            let mut names = HashMap::new();
+                            names.insert(name_id, string);
+                            namelist.insert(key, names);
+                        }
+                    }
+                }
+                3 => {
+                    if language_id == 0x409 {
+                        default_namelist.insert(name_id, string);
+                    } else {
+                        let key = (platform_id, language_id);
+                        if let Some(names) = namelist.get_mut(&key) {
+                            names.insert(name_id, string);
+                        } else {
+                            let mut names = HashMap::new();
+                            names.insert(name_id, string);
+                            namelist.insert(key, names);
+                        }
+                    }
+                }
+                _ => {
+                    default_namelist.insert(name_id, string);
+                }
+            }
+        }
+        Self {
+            default_namelist,
+            namelist
+        }
+    }
+
+    pub fn get_name_list(&self, locale: &String, platform_id: PlatformID) -> HashMap<u16, String> {
+        let language_id = get_locale_to_language_id(locale, platform_id);
+        let language_id = if let Some(language_id) = language_id {
+            language_id
+        } else {
+            0
+        };
+        let key = (platform_id as u16, language_id);
+        #[cfg(debug_assertions)]
+        {
+            println!("locale: {}", locale);
+            println!("platform_id: {:?}", platform_id);
+            println!("language_id: {:?}", language_id);
+            println!("key: {:?}", key);
+        }
+        
+        match self.namelist.get(&key) {
+            Some(names) => {
+                names.clone()
+            }
+            None => {
+                self.default_namelist.clone()
+            }
+        }
+    }
+
+    pub fn get_name(&self,name_id: NameID , locale: &String, platform_id: PlatformID) -> String {
+        let language_id = get_locale_to_language_id(locale, platform_id);
+        let language_id = if let Some(language_id) = language_id {
+            language_id
+        } else {
+            0
+        };
+
+        let key = (platform_id as u16, language_id);
+        match self.namelist.get(&key) {
+            Some(names) => {
+                let name_id = name_id as u16;
+                if let Some(name) = names.get(&name_id) {
+                    name.clone()
+                } else {
+                    if let Some(name) = self.default_namelist.get(&name_id) {
+                        name.clone()
+                    } else {
+                        "".to_string()
+                    }
+                }
+            }
+            None => {
+                let name_id = name_id as u16;
+                if let Some(name) = self.default_namelist.get(&name_id) {
+                    name.clone()
+                } else {
+                    "".to_string()
+                }
+            }
+        }
+    }
+}
+
 
 #[derive(Debug, Clone)]
 pub(crate) struct NAME {
