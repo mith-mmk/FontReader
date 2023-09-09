@@ -285,7 +285,6 @@ impl Font {
     }
 
     pub fn set_font(&mut self, number:usize) -> Result<(),String>{
-        print!("set_font: {} {}", number, self.more_fonts.len());
         if number <= self.more_fonts.len() {
             self.current_font = number;
             Ok(())
