@@ -1,4 +1,4 @@
-use std::default;
+
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 #[repr(u16)]
@@ -432,8 +432,8 @@ pub enum WindowsLanguageID {
 /// Ja or Ja_JP, Windows -> Some(0x0411)
 pub fn get_locale_to_language_id(locale: &String, platform_id: PlatformID) -> Option<u16> {
     let binding = locale.to_uppercase();
-    let binding = binding.split(".").collect::<Vec<&str>>()[0].replace('_', "-");
-    let locale: Vec<&str> = binding.split("-").collect();
+    let binding = binding.split('.').collect::<Vec<&str>>()[0].replace('_', "-");
+    let locale: Vec<&str> = binding.split('-').collect();
     let primary_language = locale[0];
     let extended_language = if locale.len() > 1 {
         Some(locale[1])

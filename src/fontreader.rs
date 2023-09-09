@@ -1,7 +1,7 @@
 use bin_rs::reader::{BinaryReader, BytesReader, StreamReader};
 use std::collections::HashMap;
-use std::error::Error;
-use std::io::{BufReader, ErrorKind};
+
+use std::io::{BufReader};
 use std::{fs::File, path::PathBuf};
 
 use crate::fontheader;
@@ -104,10 +104,10 @@ impl Font {
                 .unwrap()
         };
         let platform_id = PlatformID::Windows;
-        let name = name_table.get_name_list(&locale, platform_id);
-        if name.len() == 0 {
+        let name = name_table.get_name_list(locale, platform_id);
+        if name.is_empty() {
             let platform_id = PlatformID::Macintosh;
-            name_table.get_name_list(&locale, platform_id)
+            name_table.get_name_list(locale, platform_id)
         } else {
             name
         }

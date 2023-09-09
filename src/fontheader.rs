@@ -146,7 +146,7 @@ impl FontHeaders {
                     string.push_str(&header.ul_dsig_offset.to_string());
                 }
                 for (font_index, font) in header.font_collection.iter().enumerate() {
-                    string.push_str(&format!("font[{}]:\n {}\n", font_index, font.to_string()));
+                    string.push_str(&format!("font[{}]:\n {}\n", font_index, font));
                 }
 
                 string

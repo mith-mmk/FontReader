@@ -73,7 +73,7 @@ impl CPAL {
         } else {
             self.color_records.len()
         };
-        for i in 0..len as usize {
+        for i in 0..len {
             string.push_str(&format!(
                 "color_record[{}]: {} {} {} {}\n",
                 i,

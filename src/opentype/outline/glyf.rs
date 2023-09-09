@@ -303,7 +303,7 @@ impl Glyph {
                     start_y = (y + next_y) / 2;
                 }
                 if i != 0 {
-                    svg += &format!("Z ");
+                    svg += "Z ";
                 }
 
                 svg += &format!("M{} {}", start_x, y_max - start_y);

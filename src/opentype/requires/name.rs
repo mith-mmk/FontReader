@@ -76,7 +76,7 @@ use bin_rs::reader::BinaryReader;
 #[cfg(feature = "iconv")]
 use iconv::Iconv;
 
-use crate::opentype::platforms::{self, get_locale_to_language_id, PlatformID};
+use crate::opentype::platforms::{get_locale_to_language_id, PlatformID};
 
 enum EncodingEngine {
     UTF16BE,
@@ -90,20 +90,14 @@ enum EncodingEngine {
 }
 
 #[derive(Debug, Clone)]
+#[derive(Default)]
 pub(crate) struct NameTable {
     // platform ID, Language ID, String
     pub(crate) default_namelist: HashMap<u16, String>,
     pub(crate) namelist: HashMap<(u16, u16), HashMap<u16, String>>,
 }
 
-impl Default for NameTable {
-    fn default() -> Self {
-        Self {
-            default_namelist: HashMap::new(),
-            namelist: HashMap::new(),
-        }
-    }
-}
+
 
 impl NameTable {
     pub fn new(name: &NAME) -> Self {
@@ -191,12 +185,10 @@ impl NameTable {
                 let name_id = name_id as u16;
                 if let Some(name) = names.get(&name_id) {
                     name.clone()
+                } else if let Some(name) = self.default_namelist.get(&name_id) {
+                    name.clone()
                 } else {
-                    if let Some(name) = self.default_namelist.get(&name_id) {
-                        name.clone()
-                    } else {
-                        "".to_string()
-                    }
+                    "".to_string()
                 }
             }
             None => {

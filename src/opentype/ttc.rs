@@ -85,7 +85,7 @@ impl TTCHeader {
             string += &format!("ul_dsig_offset: {:08X}\n", self.ul_dsig_offset);
         }
         for (i, font) in self.font_collection.iter().enumerate() {
-            string += &format!("font[{}]:\n {}\n", i, font.to_string());
+            string += &format!("font[{}]:\n {}\n", i, font);
         }
         string
     }
