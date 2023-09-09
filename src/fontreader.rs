@@ -56,10 +56,10 @@ pub struct Font {
     pub(crate) maxp: Option<maxp::MAXP>,    // must
     pub(crate) name: Option<name::NAME>,    // must
     pub(crate) name_table: Option<name::NameTable>,
-    pub(crate) os2: Option<os2::OS2>,       // must
-    pub(crate) post: Option<post::POST>,    // must
-    pub(crate) loca: Option<loca::LOCA>,    // openType font, CFF/CFF2 none
-    pub(crate) grif: Option<glyf::GLYF>,    // openType font, CFF/CFF2 none
+    pub(crate) os2: Option<os2::OS2>,    // must
+    pub(crate) post: Option<post::POST>, // must
+    pub(crate) loca: Option<loca::LOCA>, // openType font, CFF/CFF2 none
+    pub(crate) grif: Option<glyf::GLYF>, // openType font, CFF/CFF2 none
     pub(crate) colr: Option<colr::COLR>,
     pub(crate) cpal: Option<cpal::CPAL>,
     hmtx_pos: Option<Pointer>,
@@ -95,12 +95,14 @@ impl Font {
     }
 
     pub fn get_name(&self, locale: &String) -> HashMap<u16, String> {
-        let name_table = 
-            if self.current_font == 0 {
-                self.name_table.as_ref().unwrap()
-            } else {
-                self.more_fonts[self.current_font - 1].name_table.as_ref().unwrap()
-            };
+        let name_table = if self.current_font == 0 {
+            self.name_table.as_ref().unwrap()
+        } else {
+            self.more_fonts[self.current_font - 1]
+                .name_table
+                .as_ref()
+                .unwrap()
+        };
         let platform_id = PlatformID::Windows;
         let name = name_table.get_name_list(&locale, platform_id);
         if name.len() == 0 {
@@ -109,7 +111,7 @@ impl Font {
         } else {
             name
         }
-    } 
+    }
 
     pub fn get_font_from_file(filename: &PathBuf) -> Option<Self> {
         font_load_from_file(filename)
@@ -119,7 +121,11 @@ impl Font {
         if self.current_font == 0 {
             self.hmtx.as_ref().unwrap().get_metrix(id)
         } else {
-            self.more_fonts[self.current_font - 1].hmtx.as_ref().unwrap().get_metrix(id)
+            self.more_fonts[self.current_font - 1]
+                .hmtx
+                .as_ref()
+                .unwrap()
+                .get_metrix(id)
         }
     }
 
@@ -129,14 +135,17 @@ impl Font {
         let hhea = if self.current_font == 0 {
             self.hhea.as_ref().unwrap()
         } else {
-            self.more_fonts[self.current_font - 1].hhea.as_ref().unwrap()
+            self.more_fonts[self.current_font - 1]
+                .hhea
+                .as_ref()
+                .unwrap()
         };
-        
+
         let lsb = h_metrix.left_side_bearing as isize;
         let advance_width = h_metrix.advance_width as isize;
 
         let accender = hhea.get_accender() as isize;
-        let descender =hhea.get_descender() as isize;
+        let descender = hhea.get_descender() as isize;
         let line_gap = hhea.get_line_gap() as isize;
 
         HorizontalLayout {
@@ -154,8 +163,14 @@ impl Font {
             (self.cmap.as_ref().unwrap(), self.grif.as_ref().unwrap())
         } else {
             (
-                self.more_fonts[self.current_font - 1].cmap.as_ref().unwrap(),
-                self.more_fonts[self.current_font - 1].grif.as_ref().unwrap(),
+                self.more_fonts[self.current_font - 1]
+                    .cmap
+                    .as_ref()
+                    .unwrap(),
+                self.more_fonts[self.current_font - 1]
+                    .grif
+                    .as_ref()
+                    .unwrap(),
             )
         };
 
@@ -176,13 +191,23 @@ impl Font {
     pub fn get_svg(&self, ch: char) -> String {
         // utf-32
         let code = ch as u32;
-        let (cmap, grif,colr, cpal) = if self.current_font == 0 {
-            (self.cmap.as_ref().unwrap(), self.grif.as_ref().unwrap(),
-            self.colr.as_ref(), self.cpal.as_ref())
+        let (cmap, grif, colr, cpal) = if self.current_font == 0 {
+            (
+                self.cmap.as_ref().unwrap(),
+                self.grif.as_ref().unwrap(),
+                self.colr.as_ref(),
+                self.cpal.as_ref(),
+            )
         } else {
             (
-                self.more_fonts[self.current_font - 1].cmap.as_ref().unwrap(),
-                self.more_fonts[self.current_font - 1].grif.as_ref().unwrap(),
+                self.more_fonts[self.current_font - 1]
+                    .cmap
+                    .as_ref()
+                    .unwrap(),
+                self.more_fonts[self.current_font - 1]
+                    .grif
+                    .as_ref()
+                    .unwrap(),
                 self.more_fonts[self.current_font - 1].colr.as_ref(),
                 self.more_fonts[self.current_font - 1].cpal.as_ref(),
             )
@@ -197,7 +222,7 @@ impl Font {
         if let Some(colr) = colr.as_ref() {
             let layers = colr.get_layer_record(pos as u16);
             if layers.is_empty() {
-                return glyf.to_svg(fontsize, fontunit, &layout)
+                return glyf.to_svg(fontsize, fontunit, &layout);
             }
             let mut string = glyf.get_svg_heder(fontsize, fontunit, &layout);
             #[cfg(debug_assertions)]
@@ -207,9 +232,7 @@ impl Font {
 
             for layer in layers {
                 let glyf_id = layer.glyph_id as u32;
-                let glyf = grif
-                    .get_glyph(glyf_id as usize)
-                    .unwrap();
+                let glyf = grif.get_glyph(glyf_id as usize).unwrap();
                 let pallet = cpal
                     .as_ref()
                     .unwrap()
@@ -284,7 +307,7 @@ impl Font {
         self.current_font
     }
 
-    pub fn set_font(&mut self, number:usize) -> Result<(),String>{
+    pub fn set_font(&mut self, number: usize) -> Result<(), String> {
         if number <= self.more_fonts.len() {
             self.current_font = number;
             Ok(())
@@ -403,7 +426,7 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Option<Font> {
             let font = from_opentype(file, &header);
             #[cfg(debug_assertions)]
             {
-            //    font_debug(font.as_ref().unwrap());
+                //    font_debug(font.as_ref().unwrap());
             }
             font
         }
@@ -426,7 +449,7 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Option<Font> {
             font.as_mut().unwrap().more_fonts = Box::new(fonts);
             #[cfg(debug_assertions)]
             {
-            //    font_debug(font.as_ref().unwrap());
+                //    font_debug(font.as_ref().unwrap());
             }
             font
         }

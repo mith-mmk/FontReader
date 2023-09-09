@@ -145,15 +145,13 @@ impl FontHeaders {
                     string.push_str(" ul_dsig_offset: ");
                     string.push_str(&header.ul_dsig_offset.to_string());
                 }
-                for(font_index, font) in header.font_collection.iter().enumerate() {
+                for (font_index, font) in header.font_collection.iter().enumerate() {
                     string.push_str(&format!("font[{}]:\n {}\n", font_index, font.to_string()));
                 }
 
                 string
             }
-            FontHeaders::OTF(header) => {
-                Self::get_otf_string(header)
-            }
+            FontHeaders::OTF(header) => Self::get_otf_string(header),
             FontHeaders::WOFF(header) => {
                 let mut string = String::new();
                 string.push_str("WOFF: ");

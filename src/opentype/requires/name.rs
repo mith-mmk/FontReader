@@ -14,7 +14,7 @@ pub enum NameID {
     ManufacturerName = 8,
     Designer = 9,
     Description = 10,
-    VendorURL = 11, 
+    VendorURL = 11,
     DesignerURL = 12,
     LicenseDescription = 13,
     LicenseInfoURL = 14,
@@ -33,49 +33,50 @@ pub enum NameID {
 }
 
 impl NameID {
-    pub fn iter() -> [NameID;27] {
+    pub fn iter() -> [NameID; 27] {
         [
-        Self::CopyRightNotice,
-        Self::FontFamilyName,
-        Self::FontSubfamilyName,
-        Self::UniqueFontIdentifier,
-        Self::FullFontName,
-        Self::VersionString,
-        Self::PostScriptName,
-        Self::Trademark,
-        Self::ManufacturerName,
-        Self::Designer,
-        Self::Description,
-        Self::VendorURL,
-        Self::DesignerURL,
-        Self::LicenseDescription,
-        Self::LicenseInfoURL,
-        Self::Reserved,
-        Self::TypographicFamilyName,
-        Self::TypographicSubfamilyName,
-        Self::CompatibleFullName,
-        Self::SampleText,
-        Self::PostScriptCIDFindfontName,
-        Self::WWSFamilyName,
-        Self::WWSSubfamilyName,
-        Self::LightBackgroundPalette,
-        Self::DarkBackgroundPalette,
-        Self::VariationsPostScriptNamePrefix,
-        Self::OTHER]
+            Self::CopyRightNotice,
+            Self::FontFamilyName,
+            Self::FontSubfamilyName,
+            Self::UniqueFontIdentifier,
+            Self::FullFontName,
+            Self::VersionString,
+            Self::PostScriptName,
+            Self::Trademark,
+            Self::ManufacturerName,
+            Self::Designer,
+            Self::Description,
+            Self::VendorURL,
+            Self::DesignerURL,
+            Self::LicenseDescription,
+            Self::LicenseInfoURL,
+            Self::Reserved,
+            Self::TypographicFamilyName,
+            Self::TypographicSubfamilyName,
+            Self::CompatibleFullName,
+            Self::SampleText,
+            Self::PostScriptCIDFindfontName,
+            Self::WWSFamilyName,
+            Self::WWSSubfamilyName,
+            Self::LightBackgroundPalette,
+            Self::DarkBackgroundPalette,
+            Self::VariationsPostScriptNamePrefix,
+            Self::OTHER,
+        ]
     }
-
 }
 
 use std::{
+    collections::HashMap,
     fmt::{self, Display, Formatter},
-    io::SeekFrom, collections::HashMap,
+    io::SeekFrom,
 };
 
 use bin_rs::reader::BinaryReader;
 #[cfg(feature = "iconv")]
 use iconv::Iconv;
 
-use crate::opentype::platforms::{PlatformID, get_locale_to_language_id, self};
+use crate::opentype::platforms::{self, get_locale_to_language_id, PlatformID};
 
 enum EncodingEngine {
     UTF16BE,
@@ -92,14 +93,14 @@ enum EncodingEngine {
 pub(crate) struct NameTable {
     // platform ID, Language ID, String
     pub(crate) default_namelist: HashMap<u16, String>,
-    pub(crate) namelist: HashMap<(u16, u16),HashMap<u16, String>>
+    pub(crate) namelist: HashMap<(u16, u16), HashMap<u16, String>>,
 }
 
 impl Default for NameTable {
     fn default() -> Self {
         Self {
             default_namelist: HashMap::new(),
-            namelist: HashMap::new()
+            namelist: HashMap::new(),
         }
     }
 }
@@ -150,7 +151,7 @@ impl NameTable {
         }
         Self {
             default_namelist,
-            namelist
+            namelist,
         }
     }
 
@@ -169,18 +170,14 @@ impl NameTable {
             println!("language_id: {:?}", language_id);
             println!("key: {:?}", key);
         }
-        
+
         match self.namelist.get(&key) {
-            Some(names) => {
-                names.clone()
-            }
-            None => {
-                self.default_namelist.clone()
-            }
+            Some(names) => names.clone(),
+            None => self.default_namelist.clone(),
         }
     }
 
-    pub fn get_name(&self,name_id: NameID , locale: &String, platform_id: PlatformID) -> String {
+    pub fn get_name(&self, name_id: NameID, locale: &String, platform_id: PlatformID) -> String {
         let language_id = get_locale_to_language_id(locale, platform_id);
         let language_id = if let Some(language_id) = language_id {
             language_id
@@ -213,7 +210,6 @@ impl NameTable {
         }
     }
 }
-
 
 #[derive(Debug, Clone)]
 pub(crate) struct NAME {

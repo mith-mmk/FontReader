@@ -6,7 +6,7 @@ pub enum PlatformID {
     Unicode = 0,
     Macintosh = 1,
     ISO = 2, // deprecated
-    Windows =3,
+    Windows = 3,
     Custom = 4,
 }
 
@@ -26,13 +26,12 @@ pub enum LanguageID {
     Unknown(u16),
 }
 
-
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 #[repr(u16)]
 pub enum UnicodeEncordingId {
     Unicode1_0 = 0, // deprecated
     Unicode1_1 = 1, // deprecated
-    ISO10646 = 2, // deprecated
+    ISO10646 = 2,   // deprecated
     Unicode2_0BMP = 3,
     Unicode2_0Full = 4,
 }
@@ -47,7 +46,7 @@ pub enum WindowsEndoridingId {
     Big5 = 4,
     Wansung = 5,
     Johab = 6,
-    UnicodeFullRepertoire = 10,   
+    UnicodeFullRepertoire = 10,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
@@ -432,790 +431,340 @@ pub enum WindowsLanguageID {
 
 /// Ja or Ja_JP, Windows -> Some(0x0411)
 pub fn get_locale_to_language_id(locale: &String, platform_id: PlatformID) -> Option<u16> {
-  let binding = locale.to_uppercase();
-  let binding = binding.split(".").collect::<Vec<&str>>()[0].replace('_', "-");
-  let locale:Vec<&str> = binding.split("-").collect();
-  let primary_language = locale[0];
-  let extended_language = if locale.len() > 1 {
-    Some(locale[1])
-  } else {
-    None
-  };
+    let binding = locale.to_uppercase();
+    let binding = binding.split(".").collect::<Vec<&str>>()[0].replace('_', "-");
+    let locale: Vec<&str> = binding.split("-").collect();
+    let primary_language = locale[0];
+    let extended_language = if locale.len() > 1 {
+        Some(locale[1])
+    } else {
+        None
+    };
 
-  match platform_id {
-    PlatformID::Unicode => {
-      None
-    },
-    PlatformID::Macintosh => {
-      let default =MacintoshLanguageID::English;
-      match primary_language {
-        "C" => {
-          Some(MacintoshLanguageID::English as u16)
-        }
-        "POSIX" => {
-          Some(MacintoshLanguageID::English as u16)
-        }
-        "AF" => {
-          if let Some(extended_language) = extended_language {
-            match extended_language {
-              "ZA" => {
-                Some(MacintoshLanguageID::Afrikaans as u16)
-              }              
-              _ => {
-                Some(default as u16)
-              }
-            }
-          } else {
-            Some(default as u16)
-          }
-        }
-        "AR" => {
-            Some(MacintoshLanguageID::Arabic as u16)
-        }
-        "AS" => {
-          Some(MacintoshLanguageID::Assamese as u16)
-        }
-        "EU" => {
-          Some(MacintoshLanguageID::Basque as u16)
-        }
-        "BE" => {
-          Some(default as u16)
-        }
-        "BN" => {
-          Some(MacintoshLanguageID::Bengali as u16)
-        }
-        "BG" => {
-          Some(MacintoshLanguageID::Bulgarian as u16)
-        }
-        "CA" => {
-          Some(MacintoshLanguageID::Catalan as u16)
-        }
-        "ZH" => {
-          if let Some(extended_language) = extended_language {
-            match extended_language {
-              "CN" => {
-                Some(MacintoshLanguageID::ChineseSimplified as u16)
-              }
-              "HK" => {
-                Some(MacintoshLanguageID::ChineseTraditional as u16)
-              }
-              "MO" => {
-                Some(MacintoshLanguageID::ChineseTraditional as u16)
-              }
-              "SG" => {
-                Some(MacintoshLanguageID::ChineseSimplified as u16)
-              }
-              "TW" => {
-                Some(MacintoshLanguageID::ChineseTraditional as u16)
-              }
-              _ => {
-                Some(MacintoshLanguageID::ChineseSimplified as u16)
-              }
-            }
-          } else {
-            Some(MacintoshLanguageID::ChineseSimplified as u16)
-          }
-        }
-        "HR" => {
-          Some(MacintoshLanguageID::Croatian as u16)
-        }
-        "CS" => {
-          Some(MacintoshLanguageID::Czech as u16)
-        }
-        "DA" => {
-          Some(MacintoshLanguageID::Danish as u16)
-        }
-        "NL" => {
-          Some(MacintoshLanguageID::Dutch as u16)
-        }
-        "EN" => {
-          Some(MacintoshLanguageID::English as u16)
-        }
-        "ET" => {
-          Some(MacintoshLanguageID::Estonian as u16)
-        }
-        "FO" => {
-          Some(MacintoshLanguageID::Faroese as u16)
-        }
-        "FI" => {
-          Some(MacintoshLanguageID::Finnish as u16)
-        }
-        "FR" => {
-          Some(MacintoshLanguageID::French as u16)
-        }
-        "GD" => {
-          Some(default as u16)
-        }
-        "GL" => {
-          Some(MacintoshLanguageID::Galician as u16)
-        }
-        "JA" => {
-          Some(MacintoshLanguageID::Japanese as u16)
-        }
-        "KA" => {
-          Some(MacintoshLanguageID::Georgian as u16)
-        }
-        "DE" => {
-          Some(MacintoshLanguageID::German as u16)
-        }
-        "EL" => {
-          Some(MacintoshLanguageID::Greek as u16)
-        }
-        "GU" => {
-          Some(MacintoshLanguageID::Gujarati as u16)
-        }
-        "HE" => {
-          Some(MacintoshLanguageID::Hebrew as u16)
-        }
-        "HI" => {
-          Some(MacintoshLanguageID::Hindi as u16)
-        }
-        "HU" => {
-          Some(MacintoshLanguageID::Hungarian as u16)
-        }
-        "IS" => {
-          Some(MacintoshLanguageID::Icelandic as u16)
-        }
-        "ID" => {
-          Some(MacintoshLanguageID::Indonesian as u16)
-        }
-        "GA" => {
-          Some(default as u16)
-        }
-        "IT" => {
-          Some(MacintoshLanguageID::Italian as u16)
-        }
-        "KN" => {
-          Some(MacintoshLanguageID::Kannada as u16)
-        }
-        "KK" => {
-          Some(MacintoshLanguageID::Kazakh as u16)
-        }
-        "KM" => {
-          Some(MacintoshLanguageID::Khmer as u16)
-        }
-        "KO" => {
-          Some(MacintoshLanguageID::Korean as u16)
-        }
-        "LA" => {
-          Some(MacintoshLanguageID::Latin as u16)
-        }
-        "LV" => {
-          Some(MacintoshLanguageID::Latvian as u16)
-        }
-        "LT" => {
-          Some(MacintoshLanguageID::Lithuanian as u16)
-        }
-        "MS" => {
-          Some(default as u16)
-        }
-        "ML" => {
-          Some(MacintoshLanguageID::Malayalam as u16)
-        }
-        "MT" => {
-          Some(MacintoshLanguageID::Maltese as u16)
-        }
-        "MR" => {
-          Some(MacintoshLanguageID::Marathi as u16)
-        }
-        "MN" => {
-          Some(default as u16)
-        }
-        "NE" => {
-          Some(MacintoshLanguageID::Nepali as u16)
-        }
-        "NO" => {
-          Some(MacintoshLanguageID::Norwegian as u16)
-        }
-        "OR" => {
-          Some(MacintoshLanguageID::Oriya as u16)
-        }
-        "PL" => {
-          Some(MacintoshLanguageID::Polish as u16)
-        }
-        "PT" => {
-          Some(MacintoshLanguageID::Portuguese as u16)
-        }
-        "PA" => {
-          Some(MacintoshLanguageID::Punjabi as u16)
-        }
-        "RM" => {
-          Some(default as u16)
-        }
-        "RO" => {
-          Some(MacintoshLanguageID::Romanian as u16)
-        }
-        "RU" => {
-          Some(MacintoshLanguageID::Russian as u16)
-        }
-        "SA" => {
-          Some(MacintoshLanguageID::Sanskrit as u16)
-        }
-        "SR" => {
-          Some(MacintoshLanguageID::Serbian as u16)
-        }
-        "SK" => {
-          Some(MacintoshLanguageID::Slovak as u16)
-        }
-        "SL" => {
-          Some(MacintoshLanguageID::Slovenian as u16)
-        }
-        "ES" => {
-          Some(MacintoshLanguageID::Spanish as u16)
-        }
-        "SW" => {
-          Some(MacintoshLanguageID::Swahili as u16)
-        }
-        "SV" => {
-          Some(MacintoshLanguageID::Swedish as u16)
-        }
-        "TG" => {
-          Some(default as u16)
-        }
-        "TA" => {
-          Some(MacintoshLanguageID::Tamil as u16)
-        }
-        "TT" => {
-          Some(MacintoshLanguageID::Tatar as u16)
-        }
-        "TE" => {
-          Some(MacintoshLanguageID::Telugu as u16)
-        }
-        "TH" => {
-          Some(MacintoshLanguageID::Thai as u16)
-        }
-        "BO" => {
-          Some(MacintoshLanguageID::Tibetan as u16)
-        }
-        "TR" => {
-          Some(MacintoshLanguageID::Turkish as u16)
-        }
-        "UK" => {
-          Some(MacintoshLanguageID::Ukrainian as u16)
-        }
-        "UR" => {
-          Some(MacintoshLanguageID::Urdu as u16)
-        }
-        "UZ" => {
-          Some(MacintoshLanguageID::Uzbek as u16)
-        }
-        "VI" => {
-          Some(MacintoshLanguageID::Vietnamese as u16)
-        }
-        "CY" => {
-          Some(MacintoshLanguageID::Welsh as u16)
-        }
-        "XH" => {
-          Some(default as u16)
-        }
-        "YO" => {
-          Some(default as u16)
-        }
-        "ZA" => {
-          Some(default as u16)
-        }
-        "ZU" => {
-          Some(default as u16)
-        }
-        _ => {
-          Some(default as u16)
-        }
-      }
-    },
-    PlatformID::Windows => {
-      let default = WindowsLanguageID::EnglishUnitedStates;
-      match primary_language {
-        "C" => {
-          Some(WindowsLanguageID::EnglishUnitedStates as u16)
-        }
-        "POSIX" => {
-          Some(WindowsLanguageID::EnglishUnitedStates as u16)
-        }
-        "AF" => {
-          if let Some(extended_language) = extended_language {
-            match extended_language {
-              "ZA" => {
-                Some(WindowsLanguageID::AfrikaansSouthAfrica as u16)
-              }              
-              _ => {
-                Some(default as u16)
-              }
-            }
-          } else {
-            Some(default as u16)
-          }
-        }
-        "AR" => {
-            if let Some(extend_language) = extended_language {
-              match extend_language {
-                "AE" => {
-                  Some(WindowsLanguageID::ArabicUAE as u16)
+    match platform_id {
+        PlatformID::Unicode => None,
+        PlatformID::Macintosh => {
+            let default = MacintoshLanguageID::English;
+            match primary_language {
+                "C" => Some(MacintoshLanguageID::English as u16),
+                "POSIX" => Some(MacintoshLanguageID::English as u16),
+                "AF" => {
+                    if let Some(extended_language) = extended_language {
+                        match extended_language {
+                            "ZA" => Some(MacintoshLanguageID::Afrikaans as u16),
+                            _ => Some(default as u16),
+                        }
+                    } else {
+                        Some(default as u16)
+                    }
                 }
-                "BH" => {
-                  Some(WindowsLanguageID::ArabicBahrain as u16)
+                "AR" => Some(MacintoshLanguageID::Arabic as u16),
+                "AS" => Some(MacintoshLanguageID::Assamese as u16),
+                "EU" => Some(MacintoshLanguageID::Basque as u16),
+                "BE" => Some(default as u16),
+                "BN" => Some(MacintoshLanguageID::Bengali as u16),
+                "BG" => Some(MacintoshLanguageID::Bulgarian as u16),
+                "CA" => Some(MacintoshLanguageID::Catalan as u16),
+                "ZH" => {
+                    if let Some(extended_language) = extended_language {
+                        match extended_language {
+                            "CN" => Some(MacintoshLanguageID::ChineseSimplified as u16),
+                            "HK" => Some(MacintoshLanguageID::ChineseTraditional as u16),
+                            "MO" => Some(MacintoshLanguageID::ChineseTraditional as u16),
+                            "SG" => Some(MacintoshLanguageID::ChineseSimplified as u16),
+                            "TW" => Some(MacintoshLanguageID::ChineseTraditional as u16),
+                            _ => Some(MacintoshLanguageID::ChineseSimplified as u16),
+                        }
+                    } else {
+                        Some(MacintoshLanguageID::ChineseSimplified as u16)
+                    }
                 }
-                "DZ" => {
-                  Some(WindowsLanguageID::ArabicAlgeria as u16)
-                }
-                "EG" => {
-                  Some(WindowsLanguageID::ArabicEgypt as u16)
-                }
-                "IQ" => {
-                  Some(WindowsLanguageID::ArabicIraq as u16)
-                }
-                "JO" => {
-                  Some(WindowsLanguageID::ArabicJordan as u16)
-                }
-                "KW" => {
-                  Some(WindowsLanguageID::ArabicKuwait as u16)
-                }
-                "LB" => {
-                  Some(WindowsLanguageID::ArabicLebanon as u16)
-                }
-                "LY" => {
-                  Some(WindowsLanguageID::ArabicLibya as u16)
-                }
-                "MA" => {
-                  Some(WindowsLanguageID::ArabicMorocco as u16)
-                }
-                "OM" => {
-                  Some(WindowsLanguageID::ArabicOman as u16)
-                }
-                "QA" => {
-                  Some(WindowsLanguageID::ArabicQatar as u16)
-                }
-                "SA" => {
-                  Some(WindowsLanguageID::ArabicSaudiArabia as u16)
-                }
-                "SY" => {
-                  Some(WindowsLanguageID::ArabicSyria as u16)
-                }
-                "TN" => {
-                  Some(WindowsLanguageID::ArabicTunisia as u16)
-                }
-                "YE" => {
-                  Some(WindowsLanguageID::ArabicYemen as u16)
-                }
-                _ => {
-                  Some(WindowsLanguageID::ArabicUAE as u16)
-                }                
-              }
-            } else {
-              Some(WindowsLanguageID::ArabicUAE as u16)
+                "HR" => Some(MacintoshLanguageID::Croatian as u16),
+                "CS" => Some(MacintoshLanguageID::Czech as u16),
+                "DA" => Some(MacintoshLanguageID::Danish as u16),
+                "NL" => Some(MacintoshLanguageID::Dutch as u16),
+                "EN" => Some(MacintoshLanguageID::English as u16),
+                "ET" => Some(MacintoshLanguageID::Estonian as u16),
+                "FO" => Some(MacintoshLanguageID::Faroese as u16),
+                "FI" => Some(MacintoshLanguageID::Finnish as u16),
+                "FR" => Some(MacintoshLanguageID::French as u16),
+                "GD" => Some(default as u16),
+                "GL" => Some(MacintoshLanguageID::Galician as u16),
+                "JA" => Some(MacintoshLanguageID::Japanese as u16),
+                "KA" => Some(MacintoshLanguageID::Georgian as u16),
+                "DE" => Some(MacintoshLanguageID::German as u16),
+                "EL" => Some(MacintoshLanguageID::Greek as u16),
+                "GU" => Some(MacintoshLanguageID::Gujarati as u16),
+                "HE" => Some(MacintoshLanguageID::Hebrew as u16),
+                "HI" => Some(MacintoshLanguageID::Hindi as u16),
+                "HU" => Some(MacintoshLanguageID::Hungarian as u16),
+                "IS" => Some(MacintoshLanguageID::Icelandic as u16),
+                "ID" => Some(MacintoshLanguageID::Indonesian as u16),
+                "GA" => Some(default as u16),
+                "IT" => Some(MacintoshLanguageID::Italian as u16),
+                "KN" => Some(MacintoshLanguageID::Kannada as u16),
+                "KK" => Some(MacintoshLanguageID::Kazakh as u16),
+                "KM" => Some(MacintoshLanguageID::Khmer as u16),
+                "KO" => Some(MacintoshLanguageID::Korean as u16),
+                "LA" => Some(MacintoshLanguageID::Latin as u16),
+                "LV" => Some(MacintoshLanguageID::Latvian as u16),
+                "LT" => Some(MacintoshLanguageID::Lithuanian as u16),
+                "MS" => Some(default as u16),
+                "ML" => Some(MacintoshLanguageID::Malayalam as u16),
+                "MT" => Some(MacintoshLanguageID::Maltese as u16),
+                "MR" => Some(MacintoshLanguageID::Marathi as u16),
+                "MN" => Some(default as u16),
+                "NE" => Some(MacintoshLanguageID::Nepali as u16),
+                "NO" => Some(MacintoshLanguageID::Norwegian as u16),
+                "OR" => Some(MacintoshLanguageID::Oriya as u16),
+                "PL" => Some(MacintoshLanguageID::Polish as u16),
+                "PT" => Some(MacintoshLanguageID::Portuguese as u16),
+                "PA" => Some(MacintoshLanguageID::Punjabi as u16),
+                "RM" => Some(default as u16),
+                "RO" => Some(MacintoshLanguageID::Romanian as u16),
+                "RU" => Some(MacintoshLanguageID::Russian as u16),
+                "SA" => Some(MacintoshLanguageID::Sanskrit as u16),
+                "SR" => Some(MacintoshLanguageID::Serbian as u16),
+                "SK" => Some(MacintoshLanguageID::Slovak as u16),
+                "SL" => Some(MacintoshLanguageID::Slovenian as u16),
+                "ES" => Some(MacintoshLanguageID::Spanish as u16),
+                "SW" => Some(MacintoshLanguageID::Swahili as u16),
+                "SV" => Some(MacintoshLanguageID::Swedish as u16),
+                "TG" => Some(default as u16),
+                "TA" => Some(MacintoshLanguageID::Tamil as u16),
+                "TT" => Some(MacintoshLanguageID::Tatar as u16),
+                "TE" => Some(MacintoshLanguageID::Telugu as u16),
+                "TH" => Some(MacintoshLanguageID::Thai as u16),
+                "BO" => Some(MacintoshLanguageID::Tibetan as u16),
+                "TR" => Some(MacintoshLanguageID::Turkish as u16),
+                "UK" => Some(MacintoshLanguageID::Ukrainian as u16),
+                "UR" => Some(MacintoshLanguageID::Urdu as u16),
+                "UZ" => Some(MacintoshLanguageID::Uzbek as u16),
+                "VI" => Some(MacintoshLanguageID::Vietnamese as u16),
+                "CY" => Some(MacintoshLanguageID::Welsh as u16),
+                "XH" => Some(default as u16),
+                "YO" => Some(default as u16),
+                "ZA" => Some(default as u16),
+                "ZU" => Some(default as u16),
+                _ => Some(default as u16),
             }
         }
-        "AS" => {
-          Some(WindowsLanguageID::Assamese as u16)
-        }
-        "EU" => {
-          Some(WindowsLanguageID::Basque as u16)
-        }
-        "BE" => {
-          Some(default as u16)
-        }
-        "BN" => {
-          Some(WindowsLanguageID::BengaliBangladesh as u16)
-        }
-        "BG" => {
-          Some(WindowsLanguageID::Bulgarian as u16)
-        }
-        "CA" => {
-          Some(WindowsLanguageID::Catalan as u16)
-        }
-        "CS" => {
-          Some(WindowsLanguageID::Czech as u16)
-        }
-        "DA" => {
-          Some(WindowsLanguageID::Danish as u16)
-        }
-        "DE" => {
-          if let Some(extend_language) = extended_language {
-            match extend_language {
-              "AT" => {
-                Some(WindowsLanguageID::GermanAustria as u16)
-              }
-              "BE" => {
-                Some(WindowsLanguageID::GermanGermany as u16)
-              }
-              "CH" => {
-                Some(WindowsLanguageID::GermanSwitzerland as u16)
-              }
-              "LI" => {
-                Some(WindowsLanguageID::GermanLiechtenstein as u16)
-              }
-              "LU" => {
-                Some(WindowsLanguageID::GermanLuxembourg as u16)
-              }
-              _ => {
-                Some(WindowsLanguageID::GermanGermany as u16)
-              }
+        PlatformID::Windows => {
+            let default = WindowsLanguageID::EnglishUnitedStates;
+            match primary_language {
+                "C" => Some(WindowsLanguageID::EnglishUnitedStates as u16),
+                "POSIX" => Some(WindowsLanguageID::EnglishUnitedStates as u16),
+                "AF" => {
+                    if let Some(extended_language) = extended_language {
+                        match extended_language {
+                            "ZA" => Some(WindowsLanguageID::AfrikaansSouthAfrica as u16),
+                            _ => Some(default as u16),
+                        }
+                    } else {
+                        Some(default as u16)
+                    }
+                }
+                "AR" => {
+                    if let Some(extend_language) = extended_language {
+                        match extend_language {
+                            "AE" => Some(WindowsLanguageID::ArabicUAE as u16),
+                            "BH" => Some(WindowsLanguageID::ArabicBahrain as u16),
+                            "DZ" => Some(WindowsLanguageID::ArabicAlgeria as u16),
+                            "EG" => Some(WindowsLanguageID::ArabicEgypt as u16),
+                            "IQ" => Some(WindowsLanguageID::ArabicIraq as u16),
+                            "JO" => Some(WindowsLanguageID::ArabicJordan as u16),
+                            "KW" => Some(WindowsLanguageID::ArabicKuwait as u16),
+                            "LB" => Some(WindowsLanguageID::ArabicLebanon as u16),
+                            "LY" => Some(WindowsLanguageID::ArabicLibya as u16),
+                            "MA" => Some(WindowsLanguageID::ArabicMorocco as u16),
+                            "OM" => Some(WindowsLanguageID::ArabicOman as u16),
+                            "QA" => Some(WindowsLanguageID::ArabicQatar as u16),
+                            "SA" => Some(WindowsLanguageID::ArabicSaudiArabia as u16),
+                            "SY" => Some(WindowsLanguageID::ArabicSyria as u16),
+                            "TN" => Some(WindowsLanguageID::ArabicTunisia as u16),
+                            "YE" => Some(WindowsLanguageID::ArabicYemen as u16),
+                            _ => Some(WindowsLanguageID::ArabicUAE as u16),
+                        }
+                    } else {
+                        Some(WindowsLanguageID::ArabicUAE as u16)
+                    }
+                }
+                "AS" => Some(WindowsLanguageID::Assamese as u16),
+                "EU" => Some(WindowsLanguageID::Basque as u16),
+                "BE" => Some(default as u16),
+                "BN" => Some(WindowsLanguageID::BengaliBangladesh as u16),
+                "BG" => Some(WindowsLanguageID::Bulgarian as u16),
+                "CA" => Some(WindowsLanguageID::Catalan as u16),
+                "CS" => Some(WindowsLanguageID::Czech as u16),
+                "DA" => Some(WindowsLanguageID::Danish as u16),
+                "DE" => {
+                    if let Some(extend_language) = extended_language {
+                        match extend_language {
+                            "AT" => Some(WindowsLanguageID::GermanAustria as u16),
+                            "BE" => Some(WindowsLanguageID::GermanGermany as u16),
+                            "CH" => Some(WindowsLanguageID::GermanSwitzerland as u16),
+                            "LI" => Some(WindowsLanguageID::GermanLiechtenstein as u16),
+                            "LU" => Some(WindowsLanguageID::GermanLuxembourg as u16),
+                            _ => Some(WindowsLanguageID::GermanGermany as u16),
+                        }
+                    } else {
+                        Some(WindowsLanguageID::GermanGermany as u16)
+                    }
+                }
+                "EL" => Some(WindowsLanguageID::Greek as u16),
+                "EN" => {
+                    if let Some(extend_language) = extended_language {
+                        match extend_language {
+                            "AU" => Some(WindowsLanguageID::EnglishAustralia as u16),
+                            "BW" => Some(WindowsLanguageID::EnglishUnitedStates as u16),
+                            "BZ" => Some(WindowsLanguageID::EnglishBelize as u16),
+                            "CA" => Some(WindowsLanguageID::EnglishCanada as u16),
+                            "CB" => Some(WindowsLanguageID::EnglishCaribbean as u16),
+                            "GB" => Some(WindowsLanguageID::EnglishUnitedKingdom as u16),
+                            "HK" => Some(WindowsLanguageID::EnglishUnitedStates as u16),
+                            "IE" => Some(WindowsLanguageID::EnglishIreland as u16),
+                            "IN" => Some(WindowsLanguageID::EnglishIndia as u16),
+                            "MT" => Some(WindowsLanguageID::EnglishMalaysia as u16),
+                            "JM" => Some(WindowsLanguageID::EnglishJamaica as u16),
+                            "NZ" => Some(WindowsLanguageID::EnglishNewZealand as u16),
+                            "PH" => Some(WindowsLanguageID::EnglishPhilippines as u16),
+                            "SG" => Some(WindowsLanguageID::EnglishSingapore as u16),
+                            "TT" => Some(WindowsLanguageID::EnglishTrinidadTobago as u16),
+                            "US" => Some(WindowsLanguageID::EnglishUnitedStates as u16),
+                            "ZA" => Some(WindowsLanguageID::EnglishSouthAfrica as u16),
+                            "ZW" => Some(WindowsLanguageID::EnglishZimbabwe as u16),
+                            _ => Some(WindowsLanguageID::EnglishUnitedStates as u16),
+                        }
+                    } else {
+                        Some(WindowsLanguageID::EnglishUnitedStates as u16)
+                    }
+                }
+                "ES" => {
+                    if let Some(extend_language) = extended_language {
+                        match extend_language {
+                            "AR" => Some(WindowsLanguageID::SpanishArgentina as u16),
+                            "BO" => Some(WindowsLanguageID::SpanishBolivia as u16),
+                            "CL" => Some(WindowsLanguageID::SpanishChile as u16),
+                            "CO" => Some(WindowsLanguageID::SpanishColombia as u16),
+                            "CR" => Some(WindowsLanguageID::SpanishCostaRica as u16),
+                            "DO" => Some(WindowsLanguageID::SpanishDominicanRepublic as u16),
+                            "EC" => Some(WindowsLanguageID::SpanishEcuador as u16),
+                            "ES" => Some(WindowsLanguageID::SpanishSpain as u16),
+                            "GT" => Some(WindowsLanguageID::SpanishGuatemala as u16),
+                            "HN" => Some(WindowsLanguageID::SpanishHonduras as u16),
+                            "MX" => Some(WindowsLanguageID::SpanishMexico as u16),
+                            "NI" => Some(WindowsLanguageID::SpanishNicaragua as u16),
+                            "PA" => Some(WindowsLanguageID::SpanishPanama as u16),
+                            "PE" => Some(WindowsLanguageID::SpanishPeru as u16),
+                            "PR" => Some(WindowsLanguageID::SpanishPuertoRico as u16),
+                            "PY" => Some(WindowsLanguageID::SpanishParaguay as u16),
+                            "SV" => Some(WindowsLanguageID::SpanishElSalvador as u16),
+                            "UY" => Some(WindowsLanguageID::SpanishUruguay as u16),
+                            "VE" => Some(WindowsLanguageID::SpanishVenezuela as u16),
+                            _ => Some(WindowsLanguageID::SpanishSpain as u16),
+                        }
+                    } else {
+                        Some(WindowsLanguageID::SpanishSpain as u16)
+                    }
+                }
+                "ET" => Some(WindowsLanguageID::Estonian as u16),
+                "FI" => Some(WindowsLanguageID::Finnish as u16),
+                "FR" => {
+                    if let Some(extend_language) = extended_language {
+                        match extend_language {
+                            "BE" => Some(WindowsLanguageID::FrenchBelgium as u16),
+                            "CA" => Some(WindowsLanguageID::FrenchCanada as u16),
+                            "CH" => Some(WindowsLanguageID::FrenchSwitzerland as u16),
+                            "FR" => Some(WindowsLanguageID::FrenchFrance as u16),
+                            "LU" => Some(WindowsLanguageID::FrenchLuxembourg as u16),
+                            "MC" => Some(WindowsLanguageID::FrenchMonaco as u16),
+                            _ => Some(WindowsLanguageID::FrenchFrance as u16),
+                        }
+                    } else {
+                        Some(WindowsLanguageID::FrenchFrance as u16)
+                    }
+                }
+                "GU" => Some(WindowsLanguageID::Gujarati as u16),
+                "HE" => Some(WindowsLanguageID::Hebrew as u16),
+                "HI" => Some(WindowsLanguageID::Hindi as u16),
+                "HR" => Some(WindowsLanguageID::Croatian as u16),
+                "HU" => Some(WindowsLanguageID::Hungarian as u16),
+                "IS" => Some(WindowsLanguageID::Icelandic as u16),
+                "ID" => Some(WindowsLanguageID::Indonesian as u16),
+                "IT" => {
+                    if let Some(extend_language) = extended_language {
+                        match extend_language {
+                            "CH" => Some(WindowsLanguageID::ItalianSwitzerland as u16),
+                            "IT" => Some(WindowsLanguageID::ItalianItaly as u16),
+                            _ => Some(WindowsLanguageID::ItalianItaly as u16),
+                        }
+                    } else {
+                        Some(WindowsLanguageID::ItalianItaly as u16)
+                    }
+                }
+                "JA" => Some(WindowsLanguageID::Japanese as u16),
+                "KN" => Some(WindowsLanguageID::Kannada as u16),
+                "KO" => Some(WindowsLanguageID::Korean as u16),
+                "LA" => Some(WindowsLanguageID::Latin as u16),
+                "LV" => Some(WindowsLanguageID::Latvian as u16),
+                "LT" => Some(WindowsLanguageID::Lithuanian as u16),
+                "MS" => Some(WindowsLanguageID::MalayMalaysia as u16),
+                "ML" => Some(WindowsLanguageID::Malayalam as u16),
+                "MT" => Some(WindowsLanguageID::Maltese as u16),
+                "MR" => Some(WindowsLanguageID::Marathi as u16),
+                "MN" => Some(WindowsLanguageID::MongolianCyrillic as u16),
+                "NE" => Some(WindowsLanguageID::Nepali as u16),
+                "NO" => Some(WindowsLanguageID::NorwegianBokmål as u16),
+                "OR" => Some(WindowsLanguageID::Oriya as u16),
+                "PL" => Some(WindowsLanguageID::Polish as u16),
+                "PT" => {
+                    if let Some(extend_language) = extended_language {
+                        match extend_language {
+                            "BR" => Some(WindowsLanguageID::PortugueseBrazil as u16),
+                            "PT" => Some(WindowsLanguageID::PortuguesePortugal as u16),
+                            _ => Some(WindowsLanguageID::PortuguesePortugal as u16),
+                        }
+                    } else {
+                        Some(WindowsLanguageID::PortuguesePortugal as u16)
+                    }
+                }
+                "PA" => Some(WindowsLanguageID::Punjabi as u16),
+                "RM" => Some(WindowsLanguageID::RhaetoRomanic as u16),
+                "RO" => Some(WindowsLanguageID::Romanian as u16),
+                "RU" => Some(WindowsLanguageID::Russian as u16),
+                "SA" => Some(WindowsLanguageID::Sanskrit as u16),
+                "SR" => Some(WindowsLanguageID::SerbianCyrillic as u16),
+                "SK" => Some(WindowsLanguageID::Slovak as u16),
+                "SL" => Some(WindowsLanguageID::Slovenian as u16),
+                "SW" => Some(WindowsLanguageID::Kiswahili as u16),
+                "SV" => {
+                    if let Some(extend_language) = extended_language {
+                        match extend_language {
+                            "FI" => Some(WindowsLanguageID::SwedishFinland as u16),
+                            "SE" => Some(WindowsLanguageID::SwedishSweden as u16),
+                            _ => Some(WindowsLanguageID::SwedishSweden as u16),
+                        }
+                    } else {
+                        Some(WindowsLanguageID::SwedishSweden as u16)
+                    }
+                }
+                "TA" => Some(WindowsLanguageID::Tamil as u16),
+                "TT" => Some(WindowsLanguageID::Tatar as u16),
+                "TE" => Some(WindowsLanguageID::Telugu as u16),
+                "TH" => Some(WindowsLanguageID::Thai as u16),
+                "BO" => Some(WindowsLanguageID::TibetanPRC as u16),
+                "TR" => Some(WindowsLanguageID::Turkish as u16),
+                "UK" => Some(WindowsLanguageID::Ukrainian as u16),
+                "UR" => Some(WindowsLanguageID::Urdu as u16),
+                "UZ" => Some(WindowsLanguageID::UzbekCyrillic as u16),
+                "VI" => Some(WindowsLanguageID::Vietnamese as u16),
+                "CY" => Some(WindowsLanguageID::Welsh as u16),
+                "XH" => Some(default as u16),
+                "YO" => Some(WindowsLanguageID::Yoruba as u16),
+                "ZA" => Some(default as u16),
+                _ => Some(default as u16),
             }
-          } else {
-            Some(WindowsLanguageID::GermanGermany as u16)
-          }
         }
-        "EL" => {
-            Some(WindowsLanguageID::Greek as u16)
-        }
-        "EN" => {
-          if let Some(extend_language) = extended_language {
-            match extend_language {
-              "AU" => {
-                Some(WindowsLanguageID::EnglishAustralia as u16)
-              }
-              "BW" => {
-                Some(WindowsLanguageID::EnglishUnitedStates as u16)
-              }
-              "BZ" => {
-                Some(WindowsLanguageID::EnglishBelize as u16)
-              }
-              "CA" => {
-                Some(WindowsLanguageID::EnglishCanada as u16)
-              }
-              "CB" => {
-                Some(WindowsLanguageID::EnglishCaribbean as u16)
-              }
-              "GB" => {
-                Some(WindowsLanguageID::EnglishUnitedKingdom as u16)
-              }
-              "HK" => {
-                Some(WindowsLanguageID::EnglishUnitedStates as u16)
-              }
-              "IE" => {
-                Some(WindowsLanguageID::EnglishIreland as u16)
-              }
-              "IN" => {
-                Some(WindowsLanguageID::EnglishIndia as u16)
-              }
-              "MT" => {
-                Some(WindowsLanguageID::EnglishMalaysia as u16)
-              }
-              "JM" => {
-                Some(WindowsLanguageID::EnglishJamaica as u16)
-              }
-              "NZ" => {
-                Some(WindowsLanguageID::EnglishNewZealand as u16)
-              }
-              "PH" => {
-                Some(WindowsLanguageID::EnglishPhilippines as u16)
-              }
-              "SG" => {
-                Some(WindowsLanguageID::EnglishSingapore as u16)
-              }
-              "TT" => {
-                Some(WindowsLanguageID::EnglishTrinidadTobago as u16)
-              }
-              "US" => {
-                Some(WindowsLanguageID::EnglishUnitedStates as u16)
-              }
-              "ZA" => {
-                Some(WindowsLanguageID::EnglishSouthAfrica as u16)
-              }
-              "ZW" => {
-                Some(WindowsLanguageID::EnglishZimbabwe as u16)
-              }
-              _ => {
-                Some(WindowsLanguageID::EnglishUnitedStates as u16)
-              }
-            }
-          } else {
-            Some(WindowsLanguageID::EnglishUnitedStates as u16)
-          }
-        }
-        "ES" => {
-          if let Some(extend_language) = extended_language {
-            match extend_language {
-              "AR" => {
-                Some(WindowsLanguageID::SpanishArgentina as u16)
-              }
-              "BO" => {
-                Some(WindowsLanguageID::SpanishBolivia as u16)
-              }
-              "CL" => {
-                Some(WindowsLanguageID::SpanishChile as u16)
-              }
-              "CO" => {
-                Some(WindowsLanguageID::SpanishColombia as u16)
-              }
-              "CR" => {
-                Some(WindowsLanguageID::SpanishCostaRica as u16)
-              }
-              "DO" => {
-                Some(WindowsLanguageID::SpanishDominicanRepublic as u16)
-              }
-              "EC" => {
-                Some(WindowsLanguageID::SpanishEcuador as u16)
-              }
-              "ES" => {
-                Some(WindowsLanguageID::SpanishSpain as u16)
-              }
-              "GT" => {
-                Some(WindowsLanguageID::SpanishGuatemala as u16)
-              }
-              "HN" => {
-                Some(WindowsLanguageID::SpanishHonduras as u16)
-              }
-              "MX" => {
-                Some(WindowsLanguageID::SpanishMexico as u16)
-              }
-              "NI" => {
-                Some(WindowsLanguageID::SpanishNicaragua as u16)
-              }
-              "PA" => {
-                Some(WindowsLanguageID::SpanishPanama as u16)
-              }
-              "PE" => {
-                Some(WindowsLanguageID::SpanishPeru as u16)
-              }
-              "PR" => {
-                Some(WindowsLanguageID::SpanishPuertoRico as u16)
-              }
-              "PY" => {
-                Some(WindowsLanguageID::SpanishParaguay as u16)
-              }
-              "SV" => {
-                Some(WindowsLanguageID::SpanishElSalvador as u16)
-              }
-              "UY" => {
-                Some(WindowsLanguageID::SpanishUruguay as u16)
-              }
-              "VE" => {
-                Some(WindowsLanguageID::SpanishVenezuela as u16)
-              }
-              _ => {
-                Some(WindowsLanguageID::SpanishSpain as u16)
-              }
-            }
-          } else {
-              Some(WindowsLanguageID::SpanishSpain as u16)
-          }
-        }
-        "ET" => {
-          Some(WindowsLanguageID::Estonian as u16)
-        }
-        "FI" => {
-          Some(WindowsLanguageID::Finnish as u16)
-        }
-        "FR" => {
-          if let Some(extend_language) = extended_language {
-            match extend_language {
-              "BE" => {
-                Some(WindowsLanguageID::FrenchBelgium as u16)
-              }
-              "CA" => {
-                Some(WindowsLanguageID::FrenchCanada as u16)
-              }
-              "CH" => {
-                Some(WindowsLanguageID::FrenchSwitzerland as u16)
-              }
-              "FR" => {
-                Some(WindowsLanguageID::FrenchFrance as u16)
-              }
-              "LU" => {
-                Some(WindowsLanguageID::FrenchLuxembourg as u16)
-              }
-              "MC" => {
-                Some(WindowsLanguageID::FrenchMonaco as u16)
-              }
-              _ => {
-                Some(WindowsLanguageID::FrenchFrance as u16)
-              }
-            }
-          } else {
-            Some(WindowsLanguageID::FrenchFrance as u16)
-          }
-        }
-        "GU" => {
-          Some(WindowsLanguageID::Gujarati as u16)
-        }
-        "HE" => {
-          Some(WindowsLanguageID::Hebrew as u16)
-        }
-        "HI" => {
-          Some(WindowsLanguageID::Hindi as u16)
-        }
-        "HR" => {
-          Some(WindowsLanguageID::Croatian as u16)
-        }
-        "HU" => {
-          Some(WindowsLanguageID::Hungarian as u16)
-        }
-        "IS" => {
-          Some(WindowsLanguageID::Icelandic as u16)
-        }
-        "ID" => {
-          Some(WindowsLanguageID::Indonesian as u16)
-        }
-        "IT" => {
-          if let Some(extend_language) = extended_language {
-            match extend_language {
-              "CH" => {
-                Some(WindowsLanguageID::ItalianSwitzerland as u16)
-              }
-              "IT" => {
-                Some(WindowsLanguageID::ItalianItaly as u16)
-              }
-              _ => {
-                Some(WindowsLanguageID::ItalianItaly as u16)
-              }
-            }
-          } else {
-            Some(WindowsLanguageID::ItalianItaly as u16)
-          }
-        }
-        "JA" => {
-          Some(WindowsLanguageID::Japanese as u16)
-        }
-        "KN" => {
-          Some(WindowsLanguageID::Kannada as u16)
-        }
-        "KO" => {
-          Some(WindowsLanguageID::Korean as u16)
-        }
-        "LA" => {
-          Some(WindowsLanguageID::Latin as u16)
-        }
-        "LV" => {
-          Some(WindowsLanguageID::Latvian as u16)
-        }
-        "LT" => {
-          Some(WindowsLanguageID::Lithuanian as u16)
-        }
-        "MS" => {
-          Some(WindowsLanguageID::MalayMalaysia as u16)
-        }
-        "ML" => {
-          Some(WindowsLanguageID::Malayalam as u16)
-        }
-        "MT" => {
-          Some(WindowsLanguageID::Maltese as u16)
-        }
-        "MR" => {
-          Some(WindowsLanguageID::Marathi as u16)
-        }
-        "MN" => {
-          Some(WindowsLanguageID::MongolianCyrillic as u16)
-        }
-        "NE" => {
-          Some(WindowsLanguageID::Nepali as u16)
-        }
-        "NO" => {
-          Some(WindowsLanguageID::NorwegianBokmål as u16)
-        }
-        "OR" => {
-          Some(WindowsLanguageID::Oriya as u16)
-        }
-        "PL" => {
-          Some(WindowsLanguageID::Polish as u16)
-        }
-        "PT" => {
-          if let Some(extend_language) = extended_language {
-            match extend_language {
-              "BR" => {
-                Some(WindowsLanguageID::PortugueseBrazil as u16)
-              }
-              "PT" => {
-                Some(WindowsLanguageID::PortuguesePortugal as u16)
-              }
-              _ => {
-                Some(WindowsLanguageID::PortuguesePortugal as u16)
-              }
-            }
-          } else {
-            Some(WindowsLanguageID::PortuguesePortugal as u16)
-          }
-        }
-        "PA" => {
-          Some(WindowsLanguageID::Punjabi as u16)
-        }
-        "RM" => {
-          Some(WindowsLanguageID::RhaetoRomanic as u16)
-        }
-        "RO" => {
-          Some(WindowsLanguageID::Romanian as u16)
-        }
-        "RU" => {
-          Some(WindowsLanguageID::Russian as u16)
-        }
-        "SA" => {
-          Some(WindowsLanguageID::Sanskrit as u16)
-        }
-        "SR" => {
-          Some(WindowsLanguageID::SerbianCyrillic as u16)
-        }
-        "SK" => {
-          Some(WindowsLanguageID::Slovak as u16)
-        }
-        "SL" => {
-          Some(WindowsLanguageID::Slovenian as u16)
-        }
-        "SW" => {
-          Some(WindowsLanguageID::Kiswahili as u16)
-        }
-        "SV" => {
-          if let Some(extend_language) = extended_language {
-            match extend_language {
-              "FI" => {
-                Some(WindowsLanguageID::SwedishFinland as u16)
-              }
-              "SE" => {
-                Some(WindowsLanguageID::SwedishSweden as u16)
-              }
-              _ => {
-                Some(WindowsLanguageID::SwedishSweden as u16)
-              }
-            }
-          } else {
-            Some(WindowsLanguageID::SwedishSweden as u16)
-          }
-        }
-        "TA" => {
-          Some(WindowsLanguageID::Tamil as u16)
-        }
-        "TT" => {
-          Some(WindowsLanguageID::Tatar as u16)
-        }
-        "TE" => {
-          Some(WindowsLanguageID::Telugu as u16)
-        }
-        "TH" => {
-          Some(WindowsLanguageID::Thai as u16)
-        }
-        "BO" => {
-          Some(WindowsLanguageID::TibetanPRC as u16)
-        }
-        "TR" => {
-          Some(WindowsLanguageID::Turkish as u16)
-        }
-        "UK" => {
-          Some(WindowsLanguageID::Ukrainian as u16)
-        }
-        "UR" => {
-          Some(WindowsLanguageID::Urdu as u16)
-        }
-        "UZ" => {
-          Some(WindowsLanguageID::UzbekCyrillic as u16)
-        }
-        "VI" => {
-          Some(WindowsLanguageID::Vietnamese as u16)
-        }
-        "CY" => {
-          Some(WindowsLanguageID::Welsh as u16)
-        }
-        "XH" => {
-          Some(default as u16)
-        }
-        "YO" => {
-          Some(WindowsLanguageID::Yoruba as u16)
-        }
-        "ZA" => {
-          Some(default as u16)
-        }
-        _ => {
-          Some(default as u16)
-        }
-      }
-    },
-    _ => None
-  }
+        _ => None,
+    }
 }

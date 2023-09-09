@@ -18,7 +18,7 @@ fn main() {
     let res = font.set_font(len - 1);
     if res.is_err() {
         print!("error: {:?}", res);
-        }
+    }
 
     let string = font.get_info();
     println!("{}", string);
