@@ -84,10 +84,13 @@ fn get_post<R: BinaryReader>(file: &mut R, offest: u32, length: u32) -> POST {
         let remain = (length - 34 - number_of_glyphs as u32 * 2) as usize;
         let buf = file.read_bytes_as_vec(remain as usize).unwrap();
         let mut offset: usize = 0;
-        while offest < remain as u32 {
+        while offset < buf.len() {
             let mut name = String::new();
             // PASCAL String
             let len = buf[offset];
+            if offset + len as usize + 1 >  buf.len() {
+                break;
+            }
             for i in 0..len {
                 let c = buf[offset + i as usize + 1];
                 name.push(c as char);

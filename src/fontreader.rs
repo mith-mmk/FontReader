@@ -440,7 +440,7 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Option<Font> {
             let mut font = from_opentype(file, table);
             #[cfg(debug_assertions)]
             {
-                font_debug(font.as_ref().unwrap());
+                // font_debug(font.as_ref().unwrap());
             }
 
 
@@ -709,14 +709,8 @@ fn from_opentype<R: BinaryReader>(file: &mut R, header: &OTFHeader) -> Option<Fo
         debug_assert!(true, "No name table");
         return None;
     }
-    if font.os2.is_none() {
-        debug_assert!(true, "No OS/2 table");
-        return None;
-    }
-    if font.post.is_none() {
-        debug_assert!(true, "No post table");
-        return None;
-    }
+
+
     /*
     if font.loca.is_none() {
         debug_assert!(true, "Not support no loca table, current only support OpenType font, not support CFF/CFF2/SVG font");
