@@ -244,6 +244,7 @@ impl Glyph {
                 "<!-- offset {} length {} lsb {} advanced width {} rsb {} -->",
                 parsed.offset, parsed.length, layout.lsb, layout.advance_width, rsb
             );
+
         }
         svg
     }
@@ -262,10 +263,15 @@ impl Glyph {
         #[cfg(debug_assertions)]
         {
             svg += "<!-- ";
+            let mut i = 0;
             for byte in &parsed.instructions {
+                if i % 16 == 0 {
+                    svg += "\n";
+                }
+                i += 1;
                 svg += &format!("{:02x} ", byte);
             }
-            svg += "-->\n";
+            svg += " -->\n";
         }
         svg += "<path d=\"";
         let mut pos = 0;

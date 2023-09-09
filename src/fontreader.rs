@@ -1,7 +1,7 @@
 use bin_rs::reader::{BinaryReader, BytesReader, StreamReader};
 use std::collections::HashMap;
 
-use std::io::{BufReader};
+use std::io::BufReader;
 use std::{fs::File, path::PathBuf};
 
 use crate::fontheader;
@@ -378,6 +378,9 @@ fn font_debug(_font: &Font) {
 
     if _font.loca.is_some() {
         writeln!(&mut writer, "{}", &_font.loca.as_ref().unwrap().to_string()).unwrap();
+    } else {
+        writeln!(&mut writer, "loca is none. it is not glyf font.").unwrap();
+        return;
     }
     if _font.cpal.is_some() {
         writeln!(&mut writer, "{}", &_font.cpal.as_ref().unwrap().to_string()).unwrap();
@@ -426,7 +429,7 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Option<Font> {
             let font = from_opentype(file, &header);
             #[cfg(debug_assertions)]
             {
-                //    font_debug(font.as_ref().unwrap());
+                font_debug(font.as_ref().unwrap());
             }
             font
         }
@@ -435,6 +438,12 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Option<Font> {
             let font_collection = header.font_collection.as_ref();
             let table = &font_collection[0];
             let mut font = from_opentype(file, table);
+            #[cfg(debug_assertions)]
+            {
+                font_debug(font.as_ref().unwrap());
+            }
+
+
             let mut fonts = Vec::new();
             for i in 1..num_fonts {
                 let table = &font_collection[i as usize];
@@ -446,10 +455,12 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Option<Font> {
                     false => (),
                 }
             }
-            font.as_mut().unwrap().more_fonts = Box::new(fonts);
-            #[cfg(debug_assertions)]
-            {
-                //    font_debug(font.as_ref().unwrap());
+            if let Some(font) = font.as_mut() {
+                font.more_fonts = Box::new(fonts);
+                #[cfg(debug_assertions)]
+                {
+                    //    font_debug(font.as_ref().unwrap());
+                }
             }
             font
         }
@@ -663,16 +674,16 @@ fn from_opentype<R: BinaryReader>(file: &mut R, header: &OTFHeader) -> Option<Fo
     let hmtx = hmtx::HMTX::new(file, offset, length, number_of_hmetrics, num_glyphs);
     font.hmtx = Some(hmtx);
 
-    let offset = font.loca_pos.as_ref().unwrap().offset;
-    let length = font.loca_pos.as_ref().unwrap().length;
-    let loca = loca::LOCA::new(file, offset, length, num_glyphs);
-    font.loca = Some(loca);
-
-    let offset = font.glyf_pos.as_ref().unwrap().offset;
-    let length = font.glyf_pos.as_ref().unwrap().length;
-    let loca = font.loca.as_ref().unwrap();
-    let glyf = glyf::GLYF::new(file, offset, length, loca);
-    font.grif = Some(glyf);
+    if let Some(offset) = font.loca_pos.as_ref() {
+        let length = font.loca_pos.as_ref().unwrap().length;
+        let loca = loca::LOCA::new(file, offset.offset, length, num_glyphs);
+        font.loca = Some(loca);
+        let offset = font.glyf_pos.as_ref().unwrap().offset;
+        let length = font.glyf_pos.as_ref().unwrap().length;
+        let loca = font.loca.as_ref().unwrap();
+        let glyf = glyf::GLYF::new(file, offset, length, loca);
+        font.grif = Some(glyf);   
+    }
 
     if font.cmap.is_none() {
         debug_assert!(true, "No cmap table");
@@ -706,6 +717,7 @@ fn from_opentype<R: BinaryReader>(file: &mut R, header: &OTFHeader) -> Option<Fo
         debug_assert!(true, "No post table");
         return None;
     }
+    /*
     if font.loca.is_none() {
         debug_assert!(true, "Not support no loca table, current only support OpenType font, not support CFF/CFF2/SVG font");
         return None;
@@ -714,5 +726,6 @@ fn from_opentype<R: BinaryReader>(file: &mut R, header: &OTFHeader) -> Option<Fo
         debug_assert!(true, "Not support no glyf table");
         return None;
     }
+    */
     Some(font)
 }
