@@ -35,7 +35,7 @@ fn main() {
             println!("\nfont number: {} ", i);
             NameID::iter().into_iter().for_each(|name_id| {
                 let name = font.get_name(name_id, &"ja".to_string());
-                if name != "" {
+                if !name.is_empty() {
                     println!("{:?}: {:?}", name_id, name);
                 }
             });
