@@ -29,10 +29,12 @@ fn main() {
     let filename: PathBuf = PathBuf::from(fontname);
     let mut font = Font::get_font_from_file(&filename).unwrap();
     let len = font.get_font_count();
+    /*
     let res = font.set_font(len - 1);
     if res.is_err() {
         print!("error: {:?}", res);
     }
+    */
 
     let string = font.get_info();
     println!("{}", string);

@@ -17,8 +17,7 @@ fn main() {
         }
         #[cfg(target_os = "macos")]
         {
-            let home = env::var("HOME").unwrap();
-            format!("{}/Library/Fonts/ヒラギノ角ゴシック W4.ttc", home)
+            format!("/System/Library/Fonts/ヒラギノ角ゴシック W4.ttc", home)
         }
         #[cfg(target_os = "linux")]
         {
@@ -34,10 +33,9 @@ fn main() {
         for i in 0..font_number {
             font.set_font(i).unwrap();
             println!("\nfont number: {} ", i);
-            let namelist = font.get_name(&"ja-JP".to_string());
             NameID::iter().into_iter().for_each(|name_id| {
-                let name = namelist.get(&(name_id as u16));
-                if let Some(name) = name {
+                let name = font.get_name(name_id, &"ja".to_string());
+                if name != "" {
                     println!("{:?}: {:?}", name_id, name);
                 }
             });

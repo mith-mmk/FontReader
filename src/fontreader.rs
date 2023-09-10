@@ -10,6 +10,7 @@ use crate::opentype::platforms::PlatformID;
 use crate::opentype::requires::cmap::CmapEncodings;
 use crate::opentype::requires::hmtx::LongHorMetric;
 use crate::opentype::requires::*;
+use crate::opentype::requires::name::NameID;
 use crate::opentype::{outline::*, OTFHeader};
 
 #[cfg(debug_assertions)]
@@ -94,7 +95,7 @@ impl Font {
         }
     }
 
-    pub fn get_name(&self, locale: &String) -> HashMap<u16, String> {
+    pub fn get_name_list(&self, locale: &String) -> HashMap<u16, String> {
         let name_table = if self.current_font == 0 {
             self.name_table.as_ref().unwrap()
         } else {
@@ -259,6 +260,19 @@ impl Font {
         }
     }
 
+    pub fn get_name(&self, name_id:NameID, locale:&String) -> String {
+        let name_table = if self.current_font == 0 {
+            self.name_table.as_ref().unwrap()
+        } else {
+            self.more_fonts[self.current_font - 1]
+                .name_table
+                .as_ref()
+                .unwrap()
+        };
+        let platform_id = PlatformID::Windows;
+        name_table.get_name(name_id, locale, platform_id)
+    }
+
     pub fn get_html(&self, string: &str) -> String {
         let mut html = String::new();
         html += "<html>\n";
@@ -357,7 +371,8 @@ fn font_load_from_file(filename: &PathBuf) -> Option<Font> {
 #[cfg(debug_assertions)]
 fn font_debug(_font: &Font) {
     // create or open file
-    let file = match File::create("test/font.txt") {
+    let filename = "test/font.txt";
+    let file = match File::create(filename) {
         Ok(it) => it,
         Err(_) => File::open("test/font.txt").unwrap(),
     };
@@ -372,9 +387,15 @@ fn font_debug(_font: &Font) {
     writeln!(&mut writer, "{}", &_font.hhea.as_ref().unwrap().to_string()).unwrap();
     writeln!(&mut writer, "{}", &_font.maxp.as_ref().unwrap().to_string()).unwrap();
     writeln!(&mut writer, "{}", &_font.hmtx.as_ref().unwrap().to_string()).unwrap();
-    writeln!(&mut writer, "{}", &_font.os2.as_ref().unwrap().to_string()).unwrap();
-    writeln!(&mut writer, "{}", &_font.post.as_ref().unwrap().to_string()).unwrap();
-    writeln!(&mut writer, "{}", &_font.name.as_ref().unwrap().to_string()).unwrap();
+    if _font.os2.is_some() {
+        writeln!(&mut writer, "{}", &_font.os2.as_ref().unwrap().to_string()).unwrap();
+    }
+    if _font.post.is_some() {
+        writeln!(&mut writer, "{}", &_font.post.as_ref().unwrap().to_string()).unwrap();
+    }
+    if _font.name.is_some() {
+        writeln!(&mut writer, "{}", &_font.name.as_ref().unwrap().to_string()).unwrap();
+    }
 
     if _font.loca.is_some() {
         writeln!(&mut writer, "{}", &_font.loca.as_ref().unwrap().to_string()).unwrap();
@@ -429,7 +450,7 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Option<Font> {
             let font = from_opentype(file, &header);
             #[cfg(debug_assertions)]
             {
-                font_debug(font.as_ref().unwrap());
+                // font_debug(font.as_ref().unwrap());
             }
             font
         }
