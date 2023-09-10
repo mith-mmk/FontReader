@@ -30,12 +30,10 @@ impl HMTX {
         let h_metric = self.h_metrics.get(i);
         match h_metric {
             Some(h_metric) => h_metric.clone(),
-            None => {
-                LongHorMetric {
-                    advance_width: 0,
-                    left_side_bearing: 0,
-                }
-            }
+            None => LongHorMetric {
+                advance_width: 0,
+                left_side_bearing: 0,
+            },
         }
     }
 

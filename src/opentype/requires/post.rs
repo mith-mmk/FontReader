@@ -88,7 +88,7 @@ fn get_post<R: BinaryReader>(file: &mut R, offest: u32, length: u32) -> POST {
             let mut name = String::new();
             // PASCAL String
             let len = buf[offset];
-            if offset + len as usize + 1 >  buf.len() {
+            if offset + len as usize + 1 > buf.len() {
                 break;
             }
             for i in 0..len {

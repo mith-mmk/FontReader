@@ -1,5 +1,5 @@
 use fontloader::Font;
-use std::{path::PathBuf, env};
+use std::{env, path::PathBuf};
 
 fn main() {
     // agrs[1] is the folder name

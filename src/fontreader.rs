@@ -9,8 +9,8 @@ use crate::opentype::color::{colr, cpal};
 use crate::opentype::platforms::PlatformID;
 use crate::opentype::requires::cmap::CmapEncodings;
 use crate::opentype::requires::hmtx::LongHorMetric;
-use crate::opentype::requires::*;
 use crate::opentype::requires::name::NameID;
+use crate::opentype::requires::*;
 use crate::opentype::{outline::*, OTFHeader};
 
 #[cfg(debug_assertions)]
@@ -260,7 +260,7 @@ impl Font {
         }
     }
 
-    pub fn get_name(&self, name_id:NameID, locale:&String) -> String {
+    pub fn get_name(&self, name_id: NameID, locale: &String) -> String {
         let name_table = if self.current_font == 0 {
             self.name_table.as_ref().unwrap()
         } else {
@@ -463,7 +463,6 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Option<Font> {
             {
                 // font_debug(font.as_ref().unwrap());
             }
-
 
             let mut fonts = Vec::new();
             for i in 1..num_fonts {
@@ -703,7 +702,7 @@ fn from_opentype<R: BinaryReader>(file: &mut R, header: &OTFHeader) -> Option<Fo
         let length = font.glyf_pos.as_ref().unwrap().length;
         let loca = font.loca.as_ref().unwrap();
         let glyf = glyf::GLYF::new(file, offset, length, loca);
-        font.grif = Some(glyf);   
+        font.grif = Some(glyf);
     }
 
     if font.cmap.is_none() {
@@ -730,7 +729,6 @@ fn from_opentype<R: BinaryReader>(file: &mut R, header: &OTFHeader) -> Option<Fo
         debug_assert!(true, "No name table");
         return None;
     }
-
 
     /*
     if font.loca.is_none() {

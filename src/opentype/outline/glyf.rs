@@ -244,7 +244,6 @@ impl Glyph {
                 "<!-- offset {} length {} lsb {} advanced width {} rsb {} -->",
                 parsed.offset, parsed.length, layout.lsb, layout.advance_width, rsb
             );
-
         }
         svg
     }

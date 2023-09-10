@@ -1,5 +1,3 @@
-
-
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 #[repr(u16)]
 pub enum PlatformID {

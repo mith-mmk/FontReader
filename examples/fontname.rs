@@ -21,7 +21,7 @@ fn main() {
         }
         #[cfg(target_os = "linux")]
         {
-          "/usr/share/fonts".to_string()
+            "/usr/share/fonts".to_string()
         }
     };
 

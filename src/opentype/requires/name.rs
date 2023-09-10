@@ -89,15 +89,12 @@ enum EncodingEngine {
     Unknown,
 }
 
-#[derive(Debug, Clone)]
-#[derive(Default)]
+#[derive(Debug, Clone, Default)]
 pub(crate) struct NameTable {
     // platform ID, Language ID, String
     pub(crate) default_namelist: HashMap<u16, String>,
     pub(crate) namelist: HashMap<(u16, u16), HashMap<u16, String>>,
 }
-
-
 
 impl NameTable {
     pub fn new(name: &NAME) -> Self {
@@ -202,7 +199,6 @@ impl NameTable {
         }
     }
 }
-
 
 #[derive(Debug, Clone)]
 pub(crate) struct NAME {
