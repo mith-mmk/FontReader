@@ -1,8 +1,8 @@
 pub mod color;
+pub mod extentions;
 pub mod outline;
 pub mod platforms;
 pub mod requires;
-pub mod extentions;
 mod ttc;
 use std::fmt;
 
