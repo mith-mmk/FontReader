@@ -450,7 +450,6 @@ pub fn get_locale_to_language_id(locale: &String, platform_id: PlatformID) -> Op
     match platform_id {
         PlatformID::Unicode => None,
         PlatformID::Macintosh => {
-            let default = MacintoshLanguageID::English;
             match primary_language {
                 "C" => Some(MacintoshLanguageID::English as u16),
                 "POSIX" => Some(MacintoshLanguageID::English as u16),
@@ -468,7 +467,8 @@ pub fn get_locale_to_language_id(locale: &String, platform_id: PlatformID) -> Op
                     Some(MacintoshLanguageID::AzerbaijaniCyrillicScript as u16)
                 }
                 "EU" => Some(MacintoshLanguageID::Basque as u16),
-                "BE" => Some(default as u16),
+                "BE" => Some(MacintoshLanguageID::Byelorussian as u16),
+
                 "BN" => Some(MacintoshLanguageID::Bengali as u16),
                 "BG" => Some(MacintoshLanguageID::Bulgarian as u16),
                 "CA" => Some(MacintoshLanguageID::Catalan as u16),
@@ -501,7 +501,7 @@ pub fn get_locale_to_language_id(locale: &String, platform_id: PlatformID) -> Op
                 "FO" => Some(MacintoshLanguageID::Faroese as u16),
                 "FI" => Some(MacintoshLanguageID::Finnish as u16),
                 "FR" => Some(MacintoshLanguageID::French as u16),
-                "GD" => None, // Some(MacintoshLanguageID::Gaelic as u16),
+                "GD" => Some(MacintoshLanguageID::IrishGaelic as u16),
                 "GL" => Some(MacintoshLanguageID::Galician as u16),
                 "JA" => Some(MacintoshLanguageID::Japanese as u16),
                 "KA" => Some(MacintoshLanguageID::Georgian as u16),
@@ -542,7 +542,6 @@ pub fn get_locale_to_language_id(locale: &String, platform_id: PlatformID) -> Op
                 "PL" => Some(MacintoshLanguageID::Polish as u16),
                 "PT" => Some(MacintoshLanguageID::Portuguese as u16),
                 "PA" => Some(MacintoshLanguageID::Punjabi as u16),
-                "RM" => Some(default as u16),
                 "RO" => Some(MacintoshLanguageID::Romanian as u16),
                 "RU" => Some(MacintoshLanguageID::Russian as u16),
                 "SA" => Some(MacintoshLanguageID::Sanskrit as u16),
@@ -564,15 +563,38 @@ pub fn get_locale_to_language_id(locale: &String, platform_id: PlatformID) -> Op
                 "UZ" => Some(MacintoshLanguageID::Uzbek as u16),
                 "VI" => Some(MacintoshLanguageID::Vietnamese as u16),
                 "CY" => Some(MacintoshLanguageID::Welsh as u16),
-                "XH" => None,
-                "YO" => None,
-                "ZA" => None,
-                "ZU" => None,
+                "AM" => Some(MacintoshLanguageID::Amharic as u16),
+                "AY" => Some(MacintoshLanguageID::Aymara as u16),
+                "BR" => Some(MacintoshLanguageID::Breton as u16),
+                "DZ" => Some(MacintoshLanguageID::Dzongkha as u16),
+                "EO" => Some(MacintoshLanguageID::Esperanto as u16),
+                "GN" => Some(MacintoshLanguageID::Guarani as u16),
+                "HY" => Some(MacintoshLanguageID::Armenian as u16),
+                "IN" => Some(MacintoshLanguageID::Indonesian as u16),
+                "IU" => Some(MacintoshLanguageID::Inuktitut as u16),
+                "IW" => Some(MacintoshLanguageID::Hebrew as u16),
+                "JI" => Some(MacintoshLanguageID::Yiddish as u16),
+                "KS" => Some(MacintoshLanguageID::Kashmiri as u16),
+                "KU" => Some(MacintoshLanguageID::Kurdish as u16),
+                "KY" => Some(MacintoshLanguageID::Kirghiz as u16),
+                "LO" => Some(MacintoshLanguageID::Lao as u16),
+                "MG" => Some(MacintoshLanguageID::Malagasy as u16),
+                "MK" => Some(MacintoshLanguageID::Macedonian as u16),
+                "MO" => Some(MacintoshLanguageID::Moldavian as u16),
+                "MY" => Some(MacintoshLanguageID::Burmese as u16),
+                "RN" => Some(MacintoshLanguageID::Rundi as u16),
+                "SD" => Some(MacintoshLanguageID::Sindhi as u16),
+                "SO" => Some(MacintoshLanguageID::Somali as u16),
+                "SQ" => Some(MacintoshLanguageID::Albanian as u16),
+                "TI" => Some(MacintoshLanguageID::Tigrinya as u16),
+                "TK" => Some(MacintoshLanguageID::Turkmen as u16),
+                "TL" => Some(MacintoshLanguageID::Tagalog as u16),
+                "UG" => Some(MacintoshLanguageID::Uighur as u16),
+                "YI" => Some(MacintoshLanguageID::Yiddish as u16),
                 _ => None,
             }
         }
         PlatformID::Windows => {
-            let default = WindowsLanguageID::EnglishUnitedStates;
             match primary_language {
                 "C" => Some(WindowsLanguageID::EnglishUnitedStates as u16),
                 "POSIX" => Some(WindowsLanguageID::EnglishUnitedStates as u16),
@@ -604,7 +626,7 @@ pub fn get_locale_to_language_id(locale: &String, platform_id: PlatformID) -> Op
                 }
                 "AS" => Some(WindowsLanguageID::Assamese as u16),
                 "EU" => Some(WindowsLanguageID::Basque as u16),
-                "BE" => Some(default as u16),
+                "BE" => Some(WindowsLanguageID::Belarusian as u16),
                 "BN" => Some(WindowsLanguageID::BengaliBangladesh as u16),
                 "BG" => Some(WindowsLanguageID::Bulgarian as u16),
                 "CA" => Some(WindowsLanguageID::Catalan as u16),
