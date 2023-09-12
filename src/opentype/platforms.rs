@@ -1,4 +1,6 @@
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+use num_derive::FromPrimitive;
+
+#[derive(FromPrimitive, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 #[repr(u16)]
 pub enum PlatformID {
     Unicode = 0,
@@ -13,7 +15,7 @@ pub enum EncordingId {
     UnicodeEncordingId(UnicodeEncordingId),
     WindowsEndoridingId(WindowsEndoridingId),
     MacintoshEncordingID(MacintoshEncordingID),
-    Unknown(u16),
+    Custom(u16), // > 0x8000
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
@@ -24,7 +26,7 @@ pub enum LanguageID {
     Unknown(u16),
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[derive(FromPrimitive,Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 #[repr(u16)]
 pub enum UnicodeEncordingId {
     Unicode1_0 = 0, // deprecated
@@ -34,7 +36,7 @@ pub enum UnicodeEncordingId {
     Unicode2_0Full = 4,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[derive(FromPrimitive, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 #[repr(u16)]
 pub enum WindowsEndoridingId {
     Symbol = 0,
@@ -47,7 +49,7 @@ pub enum WindowsEndoridingId {
     UnicodeFullRepertoire = 10,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[derive(FromPrimitive, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 #[repr(u16)]
 pub enum MacintoshEncordingID {
     Roman = 0,
@@ -85,7 +87,7 @@ pub enum MacintoshEncordingID {
     Uninterpreted = 32,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[derive(FromPrimitive, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 #[repr(u16)]
 pub enum MacintoshLanguageID {
     English = 0,
@@ -208,7 +210,7 @@ pub enum MacintoshLanguageID {
     AzerbaijaniRomanScript = 150,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[derive(FromPrimitive, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 #[repr(u16)]
 pub enum WindowsLanguageID {
     AfrikaansSouthAfrica = 0x0436,
@@ -427,7 +429,13 @@ pub enum WindowsLanguageID {
     KnownLanguage = 0x0000,
 }
 
-/// Ja or Ja_JP, Windows -> Some(0x0411)
+// RFC 5646 shortest ISO 639 code (POSIX)
+// ja or ja_JP, Windows -> Some(0x0411) language-region
+// sr-Latn-RS, Windows -> Some() language-script
+// 3rd,4th... variant is ignored  language-script-variant -> language-script
+//  language-script-region -> language-script
+// zh-yue-Hant ? language-extlang-script  => donot match Traditinal Chinese
+
 pub fn get_locale_to_language_id(locale: &String, platform_id: PlatformID) -> Option<u16> {
     let binding = locale.to_uppercase();
     let binding = binding.split('.').collect::<Vec<&str>>()[0].replace('_', "-");
@@ -446,18 +454,19 @@ pub fn get_locale_to_language_id(locale: &String, platform_id: PlatformID) -> Op
             match primary_language {
                 "C" => Some(MacintoshLanguageID::English as u16),
                 "POSIX" => Some(MacintoshLanguageID::English as u16),
-                "AF" => {
-                    if let Some(extended_language) = extended_language {
-                        match extended_language {
-                            "ZA" => Some(MacintoshLanguageID::Afrikaans as u16),
-                            _ => Some(default as u16),
-                        }
-                    } else {
-                        Some(default as u16)
-                    }
-                }
+                "AF" => Some(MacintoshLanguageID::Afrikaans as u16),
                 "AR" => Some(MacintoshLanguageID::Arabic as u16),
                 "AS" => Some(MacintoshLanguageID::Assamese as u16),
+                "AZ" => if let Some(extended_language) = extended_language {
+                    match extended_language {
+                        "CYRL" => Some(MacintoshLanguageID::AzerbaijaniCyrillicScript as u16),
+                        "LATN" => Some(MacintoshLanguageID::AzerbaijaniRomanScript as u16),
+                        "ARAB" => Some(MacintoshLanguageID::AzerbaijaniArabicScript as u16),
+                        _ => Some(MacintoshLanguageID::AzerbaijaniCyrillicScript as u16),
+                    }
+                } else {
+                    Some(MacintoshLanguageID::AzerbaijaniCyrillicScript as u16)
+                }
                 "EU" => Some(MacintoshLanguageID::Basque as u16),
                 "BE" => Some(default as u16),
                 "BN" => Some(MacintoshLanguageID::Bengali as u16),
@@ -466,10 +475,16 @@ pub fn get_locale_to_language_id(locale: &String, platform_id: PlatformID) -> Op
                 "ZH" => {
                     if let Some(extended_language) = extended_language {
                         match extended_language {
+                            // CCPC
                             "CN" => Some(MacintoshLanguageID::ChineseSimplified as u16),
+                            // Hong Kong
                             "HK" => Some(MacintoshLanguageID::ChineseTraditional as u16),
+                            // Mocoa
                             "MO" => Some(MacintoshLanguageID::ChineseTraditional as u16),
+                            "HANT" => Some(MacintoshLanguageID::ChineseTraditional as u16),
+                            // Singapore
                             "SG" => Some(MacintoshLanguageID::ChineseSimplified as u16),
+                            // Taiwan
                             "TW" => Some(MacintoshLanguageID::ChineseTraditional as u16),
                             _ => Some(MacintoshLanguageID::ChineseSimplified as u16),
                         }
@@ -486,7 +501,7 @@ pub fn get_locale_to_language_id(locale: &String, platform_id: PlatformID) -> Op
                 "FO" => Some(MacintoshLanguageID::Faroese as u16),
                 "FI" => Some(MacintoshLanguageID::Finnish as u16),
                 "FR" => Some(MacintoshLanguageID::French as u16),
-                "GD" => Some(default as u16),
+                "GD" => None, // Some(MacintoshLanguageID::Gaelic as u16),
                 "GL" => Some(MacintoshLanguageID::Galician as u16),
                 "JA" => Some(MacintoshLanguageID::Japanese as u16),
                 "KA" => Some(MacintoshLanguageID::Georgian as u16),
@@ -498,7 +513,7 @@ pub fn get_locale_to_language_id(locale: &String, platform_id: PlatformID) -> Op
                 "HU" => Some(MacintoshLanguageID::Hungarian as u16),
                 "IS" => Some(MacintoshLanguageID::Icelandic as u16),
                 "ID" => Some(MacintoshLanguageID::Indonesian as u16),
-                "GA" => Some(default as u16),
+                "GA" => Some(MacintoshLanguageID::IrishGaelic as u16),
                 "IT" => Some(MacintoshLanguageID::Italian as u16),
                 "KN" => Some(MacintoshLanguageID::Kannada as u16),
                 "KK" => Some(MacintoshLanguageID::Kazakh as u16),
@@ -507,11 +522,20 @@ pub fn get_locale_to_language_id(locale: &String, platform_id: PlatformID) -> Op
                 "LA" => Some(MacintoshLanguageID::Latin as u16),
                 "LV" => Some(MacintoshLanguageID::Latvian as u16),
                 "LT" => Some(MacintoshLanguageID::Lithuanian as u16),
-                "MS" => Some(default as u16),
+                "MS" => Some(MacintoshLanguageID::MalayRomanScript as u16),
                 "ML" => Some(MacintoshLanguageID::Malayalam as u16),
                 "MT" => Some(MacintoshLanguageID::Maltese as u16),
                 "MR" => Some(MacintoshLanguageID::Marathi as u16),
-                "MN" => Some(default as u16),
+                "MN"  => {
+                    if let Some(extended_language)  = extended_language {
+                        match extended_language {
+                            "Mong" => Some(MacintoshLanguageID::MongolianMongolianScript as u16),
+                            _ => Some(MacintoshLanguageID::MongolianCyrillicScript as u16),
+                        }
+                    } else {
+                        Some(MacintoshLanguageID::MongolianCyrillicScript as u16)
+                    }
+                }
                 "NE" => Some(MacintoshLanguageID::Nepali as u16),
                 "NO" => Some(MacintoshLanguageID::Norwegian as u16),
                 "OR" => Some(MacintoshLanguageID::Oriya as u16),
@@ -528,7 +552,7 @@ pub fn get_locale_to_language_id(locale: &String, platform_id: PlatformID) -> Op
                 "ES" => Some(MacintoshLanguageID::Spanish as u16),
                 "SW" => Some(MacintoshLanguageID::Swahili as u16),
                 "SV" => Some(MacintoshLanguageID::Swedish as u16),
-                "TG" => Some(default as u16),
+                "TG" => Some(MacintoshLanguageID::Tajiki as u16),
                 "TA" => Some(MacintoshLanguageID::Tamil as u16),
                 "TT" => Some(MacintoshLanguageID::Tatar as u16),
                 "TE" => Some(MacintoshLanguageID::Telugu as u16),
@@ -540,11 +564,11 @@ pub fn get_locale_to_language_id(locale: &String, platform_id: PlatformID) -> Op
                 "UZ" => Some(MacintoshLanguageID::Uzbek as u16),
                 "VI" => Some(MacintoshLanguageID::Vietnamese as u16),
                 "CY" => Some(MacintoshLanguageID::Welsh as u16),
-                "XH" => Some(default as u16),
-                "YO" => Some(default as u16),
-                "ZA" => Some(default as u16),
-                "ZU" => Some(default as u16),
-                _ => Some(default as u16),
+                "XH" => None,
+                "YO" => None,
+                "ZA" => None,
+                "ZU" => None,
+                _ => None,
             }
         }
         PlatformID::Windows => {
@@ -552,16 +576,7 @@ pub fn get_locale_to_language_id(locale: &String, platform_id: PlatformID) -> Op
             match primary_language {
                 "C" => Some(WindowsLanguageID::EnglishUnitedStates as u16),
                 "POSIX" => Some(WindowsLanguageID::EnglishUnitedStates as u16),
-                "AF" => {
-                    if let Some(extended_language) = extended_language {
-                        match extended_language {
-                            "ZA" => Some(WindowsLanguageID::AfrikaansSouthAfrica as u16),
-                            _ => Some(default as u16),
-                        }
-                    } else {
-                        Some(default as u16)
-                    }
-                }
+                "AF" => Some(WindowsLanguageID::AfrikaansSouthAfrica as u16),
                 "AR" => {
                     if let Some(extend_language) = extended_language {
                         match extend_language {
@@ -706,11 +721,20 @@ pub fn get_locale_to_language_id(locale: &String, platform_id: PlatformID) -> Op
                 "LA" => Some(WindowsLanguageID::Latin as u16),
                 "LV" => Some(WindowsLanguageID::Latvian as u16),
                 "LT" => Some(WindowsLanguageID::Lithuanian as u16),
+                "MN" => {
+                    if let Some(extend_language) = extended_language {
+                        match extend_language {
+                            "MN" => Some(WindowsLanguageID::MongolianTraditional as u16),
+                            _ => Some(WindowsLanguageID::MongolianCyrillic as u16), // "CYRL"
+                        }
+                    } else {
+                        Some(WindowsLanguageID::MongolianCyrillic as u16)
+                    }
+                }
                 "MS" => Some(WindowsLanguageID::MalayMalaysia as u16),
                 "ML" => Some(WindowsLanguageID::Malayalam as u16),
                 "MT" => Some(WindowsLanguageID::Maltese as u16),
                 "MR" => Some(WindowsLanguageID::Marathi as u16),
-                "MN" => Some(WindowsLanguageID::MongolianCyrillic as u16),
                 "NE" => Some(WindowsLanguageID::Nepali as u16),
                 "NO" => Some(WindowsLanguageID::NorwegianBokmål as u16),
                 "OR" => Some(WindowsLanguageID::Oriya as u16),
@@ -731,9 +755,55 @@ pub fn get_locale_to_language_id(locale: &String, platform_id: PlatformID) -> Op
                 "RO" => Some(WindowsLanguageID::Romanian as u16),
                 "RU" => Some(WindowsLanguageID::Russian as u16),
                 "SA" => Some(WindowsLanguageID::Sanskrit as u16),
-                "SR" => Some(WindowsLanguageID::SerbianCyrillic as u16),
+                "SR" => {
+                    if let Some(extend_language) = extended_language {
+                        match extend_language {
+                            "CYRL" => Some(WindowsLanguageID::SerbianCyrillic as u16),
+                            "LATN" => Some(WindowsLanguageID::SerbianLatin as u16),
+                            _ => Some(WindowsLanguageID::SerbianCyrillic as u16),
+                        }
+                    } else {
+                        Some(WindowsLanguageID::SerbianCyrillic as u16)
+                    }
+                }
                 "SK" => Some(WindowsLanguageID::Slovak as u16),
                 "SL" => Some(WindowsLanguageID::Slovenian as u16),
+                "SMN" => Some(WindowsLanguageID::SamiInariFinland as u16),
+                "SMS" => Some(WindowsLanguageID::SamiSkoltFinland as u16),
+                "SMJ" => {
+                    if let Some(extend_language) = extended_language {
+                        match extend_language {
+                            "SE" => Some(WindowsLanguageID::SamiLuleSweden as u16),
+                            "NO" => Some(WindowsLanguageID::SamiLuleNorway as u16),
+                            _ => Some(WindowsLanguageID::SamiLuleSweden as u16),
+                        }
+                    } else {
+                        Some(WindowsLanguageID::SamiLuleSweden as u16)
+                    }
+                }
+                "SMA" => {
+                    if let Some(extend_language) = extended_language {
+                        match extend_language {
+                            "SE" => Some(WindowsLanguageID::SamiSouthernSweden as u16),
+                            "NO" => Some(WindowsLanguageID::SamiSouthernNorway as u16),
+                            _ => Some(WindowsLanguageID::SamiSouthernSweden as u16),
+                        }
+                    } else {
+                        Some(WindowsLanguageID::SamiSouthernSweden as u16)
+                    }
+                }
+                "SE" =>  {
+                    if let Some(extend_language) = extended_language {
+                    match extend_language {
+                        "SE" => Some(WindowsLanguageID::SamiNorthernSweden as u16),
+                        "NO" => Some(WindowsLanguageID::SamiNorthernNorway as u16),
+                        "FI" => Some(WindowsLanguageID::SamiNorthernFinland as u16),
+                        _ => Some(WindowsLanguageID::SamiSouthernSweden as u16),
+                        }
+                    } else {
+                        Some(WindowsLanguageID::SamiSouthernSweden as u16)
+                    }
+                }
                 "SW" => Some(WindowsLanguageID::Kiswahili as u16),
                 "SV" => {
                     if let Some(extend_language) = extended_language {
@@ -750,6 +820,7 @@ pub fn get_locale_to_language_id(locale: &String, platform_id: PlatformID) -> Op
                 "TT" => Some(WindowsLanguageID::Tatar as u16),
                 "TE" => Some(WindowsLanguageID::Telugu as u16),
                 "TH" => Some(WindowsLanguageID::Thai as u16),
+                "TJ" => Some(WindowsLanguageID::Tajik as u16),
                 "BO" => Some(WindowsLanguageID::TibetanPRC as u16),
                 "TR" => Some(WindowsLanguageID::Turkish as u16),
                 "UK" => Some(WindowsLanguageID::Ukrainian as u16),
@@ -757,12 +828,53 @@ pub fn get_locale_to_language_id(locale: &String, platform_id: PlatformID) -> Op
                 "UZ" => Some(WindowsLanguageID::UzbekCyrillic as u16),
                 "VI" => Some(WindowsLanguageID::Vietnamese as u16),
                 "CY" => Some(WindowsLanguageID::Welsh as u16),
-                "XH" => Some(default as u16),
+                "XH" => Some(WindowsLanguageID::isiXhosa as u16),
                 "YO" => Some(WindowsLanguageID::Yoruba as u16),
-                "ZA" => Some(default as u16),
-                _ => Some(default as u16),
+                "ZA" => None,
+                "ZU" => Some(WindowsLanguageID::isiZulu as u16),
+                "BA" => Some(WindowsLanguageID::Bashkir as u16), /* Bashkir  */
+                "BS" => {
+                    if let Some(extend_language) = extended_language {
+                        match extend_language {
+                            "CYRL" => Some(WindowsLanguageID::BosnianCyrillic as u16),
+                            "LATN" => Some(WindowsLanguageID::BosnianLatin as u16),
+                            _ => Some(WindowsLanguageID::BosnianCyrillic as u16),
+                        }
+                    } else {
+                        Some(WindowsLanguageID::BosnianCyrillic as u16)
+                    }    
+
+                }, /* Bosnian  */
+                "CO" => Some(WindowsLanguageID::Corsican as u16),
+                "FO" => Some(WindowsLanguageID::Faroese as u16),
+                "GA" => Some(WindowsLanguageID::Irish as u16),
+                "GL" => Some(WindowsLanguageID::Galician as u16),
+                "GN" => Some(WindowsLanguageID::Guarani as u16),
+                "HA" => Some(WindowsLanguageID::Hausa as u16),
+                "HY" => Some(WindowsLanguageID::Armenian as u16),
+                "IG" => Some(WindowsLanguageID::Igbo as u16),
+                "IN" => Some(WindowsLanguageID::Indonesian as u16),
+                "IU" => Some(WindowsLanguageID::Inuktitut as u16),
+                "IW" => Some(WindowsLanguageID::Hebrew as u16),
+                "KA" => Some(WindowsLanguageID::Georgian as u16),
+                "LB" => Some(WindowsLanguageID::Luxembourgish as u16),
+                "LO" => Some(WindowsLanguageID::Lao as u16),
+                "MI" => Some(WindowsLanguageID::Maori as u16),
+                "MK" => Some(WindowsLanguageID::Macedonian as u16),
+                "NB" => Some(WindowsLanguageID::NorwegianBokmål as u16),
+                "NN" => Some(WindowsLanguageID::NorwegianNynorsk as u16),
+                "OC" => Some(WindowsLanguageID::Occitan as u16),
+                "RW" => Some(WindowsLanguageID::Kinyarwanda as u16),
+                "SO" => Some(WindowsLanguageID::Somali as u16),
+                "TG" => Some(WindowsLanguageID::Tajik as u16),
+                "TK" => Some(WindowsLanguageID::Turkmen as u16),
+                "UG" => Some(WindowsLanguageID::Uighur as u16),
+                "VE" => Some(WindowsLanguageID::Venda as u16),
+                "WO" => Some(WindowsLanguageID::Wolof as u16),
+                 _ => None,
             }
         }
         _ => None,
     }
+
 }
