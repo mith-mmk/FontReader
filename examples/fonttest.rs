@@ -27,7 +27,6 @@ fn main() {
 
     let filename: PathBuf = PathBuf::from(fontname);
     let font = Font::get_font_from_file(&filename).unwrap();
-    
-    print!("font: {:?}", font);
 
+    print!("font: {:?}", font);
 }

@@ -36,8 +36,8 @@ fn main() {
             println!("\nfont number: {} ", i);
             #[cfg(debug_assertions)]
             {
-                println!("{}",font.get_header_raw());
-                println!("{}",font.get_os2_raw());
+                println!("{}", font.get_header_raw());
+                println!("{}", font.get_os2_raw());
             }
         }
     }

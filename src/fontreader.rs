@@ -304,14 +304,10 @@ impl Font {
         let os2 = if self.current_font == 0 {
             self.os2.as_ref().unwrap()
         } else {
-            self.more_fonts[self.current_font - 1]
-                .os2
-                .as_ref()
-                .unwrap()
+            self.more_fonts[self.current_font - 1].os2.as_ref().unwrap()
         };
         os2.to_string()
     }
-
 
     pub fn get_html(&self, string: &str) -> String {
         let mut html = String::new();
