@@ -99,13 +99,13 @@ impl OS2 {
         }
         panose += "\n";
         string += &panose;
-        let ul_unicode_range1 = format!("ulUnicodeRange1 {}\n", self.ul_unicode_range1);
+        let ul_unicode_range1 = format!("ulUnicodeRange1 {:08X}\n", self.ul_unicode_range1);
         string += &ul_unicode_range1;
-        let ul_unicode_range2 = format!("ulUnicodeRange2 {}\n", self.ul_unicode_range2);
+        let ul_unicode_range2 = format!("ulUnicodeRange2 {:08X}\n", self.ul_unicode_range2);
         string += &ul_unicode_range2;
-        let ul_unicode_range3 = format!("ulUnicodeRange3 {}\n", self.ul_unicode_range3);
+        let ul_unicode_range3 = format!("ulUnicodeRange3 {:08X}\n", self.ul_unicode_range3);
         string += &ul_unicode_range3;
-        let ul_unicode_range4 = format!("ulUnicodeRange4 {}\n", self.ul_unicode_range4);
+        let ul_unicode_range4 = format!("ulUnicodeRange4 {:08X}\n", self.ul_unicode_range4);
         string += &ul_unicode_range4;
         let ach_vend_id = format!("achVendID {:?}\n", self.ach_vend_id);
         string += &ach_vend_id;

@@ -41,14 +41,17 @@ impl HEAD {
         let mut string = "head\n".to_string();
         let version = format!("Version {}.{}\n", self.major_version, self.minor_version);
         string += &version;
-        let font_revision = format!("Font Revision {}\n", self.font_revision);
-        string += &font_revision;
+        let mager = (self.font_revision >> 16) as f32;
+        let minor = (self.font_revision & 0xFFFF) as f32 / 0x10000 as f32;
+        let font_version = mager + minor;
+        let fort_minor_version = format!("Font Version {:.3}\n", font_version);
+        string += &fort_minor_version;
         let check_sum_adjustment =
             format!("Check Sum Adjustment {:08X}\n", self.check_sum_adjustment);
         string += &check_sum_adjustment;
         let magic_number = format!("Magic Number {:08X}\n", self.magic_number);
         string += &magic_number;
-        let flags = format!("Flags {:04X}\n", self.flags);
+        let flags = format!("Flags {:016b}\n", self.flags);
         string += &flags;
         let units_per_em = format!("Units Per EM {}\n", self.units_per_em);
         string += &units_per_em;
