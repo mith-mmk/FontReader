@@ -286,6 +286,33 @@ impl Font {
         name.to_string()
     }
 
+    #[cfg(debug_assertions)]
+    pub fn get_header_raw(&self) -> String {
+        let head = if self.current_font == 0 {
+            self.head.as_ref().unwrap()
+        } else {
+            self.more_fonts[self.current_font - 1]
+                .head
+                .as_ref()
+                .unwrap()
+        };
+        head.to_string()
+    }
+
+    #[cfg(debug_assertions)]
+    pub fn get_os2_raw(&self) -> String {
+        let os2 = if self.current_font == 0 {
+            self.os2.as_ref().unwrap()
+        } else {
+            self.more_fonts[self.current_font - 1]
+                .os2
+                .as_ref()
+                .unwrap()
+        };
+        os2.to_string()
+    }
+
+
     pub fn get_html(&self, string: &str) -> String {
         let mut html = String::new();
         html += "<html>\n";
