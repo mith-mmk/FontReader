@@ -1,4 +1,5 @@
 use fontloader::{opentype::NameID, Font};
+#[cfg(target_os = "windows")]
 use std::env;
 use std::path::PathBuf;
 
@@ -17,7 +18,7 @@ fn main() {
         }
         #[cfg(target_os = "macos")]
         {
-            format!("/System/Library/Fonts/ヒラギノ角ゴシック W4.ttc", home)
+            format!("/System/Library/Fonts/ヒラギノ角ゴシック W4.ttc")
         }
         #[cfg(target_os = "linux")]
         {
@@ -36,9 +37,11 @@ fn main() {
             NameID::iter().into_iter().for_each(|name_id| {
                 let name = font.get_name(name_id, &"ja".to_string());
                 if !name.is_empty() {
-                    println!("{:?}: {:?}", name_id, name);
+                    println!("{:?}: {:?}", name_id, name);                    
                 }
             });
+            #[cfg(debug_assertions)]
+            println!("{}",font.get_name_raw());
         }
     }
 }

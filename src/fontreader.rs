@@ -273,6 +273,19 @@ impl Font {
         name_table.get_name(name_id, locale, platform_id)
     }
 
+    #[cfg(debug_assertions)]
+    pub fn get_name_raw(&self) -> String {
+        let name = if self.current_font == 0 {
+            self.name.as_ref().unwrap()
+        } else {
+            self.more_fonts[self.current_font - 1]
+                .name
+                .as_ref()
+                .unwrap()
+        };
+        name.to_string()
+    }
+
     pub fn get_html(&self, string: &str) -> String {
         let mut html = String::new();
         html += "<html>\n";
