@@ -78,14 +78,14 @@ use iconv::Iconv;
 
 use crate::opentype::platforms::{get_locale_to_language_id, PlatformID};
 
+
+
+
 enum EncodingEngine {
     UTF16BE,
     ASCII,
-    ShiftJIS,
-    PRC,
-    Big5,
-    Wansung,
-    Johab,
+    MacintoshLegcy,
+    WindowsLegcy,
     Unknown,
 }
 
@@ -336,14 +336,84 @@ fn get_names<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> NAME {
     // platform id = 0,3,4  utf-16be
     // platform id = 2       ASCII
     // platform id = 1 0 = ASCII 1 == UTF-16BE
+    #[cfg(feature = "iconv")]
+/*  0	Roman
+    1	Japanese
+    2	Chinese (Traditional)
+    3	Korean
+    4	Arabic	  
+    5	Hebrew
+    6	Greek
+    7	Russian
+    8	RSymbol
+    9	Devanagari
+    10	Gurmukhi	
+    11	Gujarati	
+    12	Oriya	
+    13	Bengali	
+    14	Tamil	
+    15	Telugu
+    16	Kannada
+    17	Malayalam
+    18	Sinhalese
+    19	Burmese
+    20	Khmer
+    21	Thai
+    22	Laotian
+    23	Georgian
+    24	Armenian
+    25	Chinese (Simplified)
+    26	Tibetan
+    27	Mongolian
+    28	Geez
+    29	Slavic
+    30	Vietnamese
+    31	Sindhi
+    32	Uninterpreted
+	 */
+    let mac_convert_table = [
+        "ISO-8859-1", // Roman
+        "SJIS",     // Japanese
+        "BIG5",     // Traditional Chinese
+        "EUC-KR",   // Korean
+        "CP1256",   // Arabic
+        "CP1255",   // Hebrew
+        "ISO-8859-7",   // Greek
+        "ISO-8859-5",   // Russian
+        "Symbol",   // RSymbol
+        "CP1252",   // Devanagari
+        "CP1252",   // Gurmukhi
+        "CP1252",   // Gujarati
+        "CP1252",   // Oriya
+        "CP1252",   // Bengali
+        "CP1252",   // Tamil
+        "CP1252",   // Telugu
+        "CP1252",   // Kannada
+        "CP1252",   // Malayalam
+        "CP1252",   // Sinhalese
+        "CP1252",   // Burmese
+        "CP1252",   // Khmer
+        "MACTHAI",   // Thai
+        "CP1252",   // Laotian
+        "CP1252",   // Georgian
+        "CP1252",   // Armenian
+        "GB2312",   // Simplified Chinese
+        "CP1252",   // Tibetan
+        "CP1252",   // Mongolian
+        "CP1252",   // Geez
+        "CP1252",   // Slavic
+        "CP1252",   // Vietnamese
+        "CP1252",   // Sindhi
+        "CP1252",   // Uninterpreted
+    ];
 
     for i in 0..count as usize {
         let encoding_engine = match name_records[i].platform_id {
             0 | 3 | 4 => EncodingEngine::UTF16BE,
             2 => EncodingEngine::ASCII,
             1 => match name_records[i].encoding_id {
-                0 => EncodingEngine::ASCII,
-                _ => EncodingEngine::UTF16BE,
+                0 => EncodingEngine::ASCII,    // ROMAN
+                _ => EncodingEngine::MacintoshLegcy,
             },
             _ => EncodingEngine::Unknown,
         };
@@ -357,7 +427,11 @@ fn get_names<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> NAME {
                     let utf16 = file.read_u16_be().unwrap();
                     utf16s.push(utf16);
                 }
-                name_records[i].string = String::from_utf16(&utf16s).unwrap();
+                if let Ok(string) = String::from_utf16(&utf16s) {
+                    name_records[i].string = string;
+                } else {
+                    name_records[i].string = "this encoding is not support".to_string();
+                }
             }
             EncodingEngine::ASCII => {
                 let ascii = file
@@ -368,6 +442,27 @@ fn get_names<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> NAME {
                     utf16s.push(ascii[i] as u16);
                 }
                 name_records[i].string = String::from_utf16(&utf16s).unwrap();
+            }
+            #[cfg(feature = "iconv")]
+            EncodingEngine::MacintoshLegcy => {
+                let bytes = file
+                    .read_bytes_as_vec(name_records[i].length as usize)
+                    .unwrap();
+                if mac_convert_table.len() > name_records[i].encoding_id as usize  {
+                    name_records[i].string = 
+                        match iconv::decode(&bytes, mac_convert_table[name_records[i].encoding_id as usize]) {
+                        Ok(string) => {
+                            string
+                        }
+                        Err(_) => {
+                            "this encoding is not support".to_string()
+                        }
+                    };
+
+
+                } else {
+                    name_records[i].string = "this encoding is not support".to_string();
+                }
             }
             _ => {
                 name_records[i].string = "this encoding is not support".to_string();

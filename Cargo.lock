@@ -21,14 +21,37 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1bd4397ed51cf25473907e4f67156904fb18dda32d22f107c94be41b047e2461"
 
 [[package]]
+name = "dyn_buf"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "74c57ab96715773d9cb9789b38eb7cbf04b3c6f5624a9d98f51761603376767c"
+
+[[package]]
 name = "fontloader"
 version = "0.0.1"
 dependencies = [
  "bin-rs",
+ "iconv",
  "miniz_oxide",
  "num-derive",
  "num-traits",
 ]
+
+[[package]]
+name = "iconv"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "07e6a7db0df823ef299ef75b6951975c7a1f9019910b3665614bac4161bab1a9"
+dependencies = [
+ "dyn_buf",
+ "libc",
+]
+
+[[package]]
+name = "libc"
+version = "0.2.147"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b4668fb0ea861c1df094127ac5f1da3409a82116a4ba74fca2e58ef927159bb3"
 
 [[package]]
 name = "miniz_oxide"

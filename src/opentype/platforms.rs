@@ -52,7 +52,7 @@ pub enum WindowsEndoridingId {
 #[derive(FromPrimitive, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 #[repr(u16)]
 pub enum MacintoshEncordingID {
-    Roman = 0,
+    Roman = 0,  // ASCII 8bit
     Japanese = 1,
     TraditionalChinese = 2,
     Korean = 3,
@@ -63,7 +63,7 @@ pub enum MacintoshEncordingID {
     RSymbol = 8,
     Devanagari = 9,
     Gurmukhi = 10,
-    Gujarati = 11,
+    Gujarati = 11,  // 
     Oriya = 12,
     Bengali = 13,
     Tamil = 14,
