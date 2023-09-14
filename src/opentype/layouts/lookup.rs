@@ -14,8 +14,8 @@ pub(crate) struct LookupList {
 impl LookupList {
     pub(crate) fn to_string(&self) -> String {
         let mut string = format!("LookupCount: {}\n", self.lookups.len());
-        for lookup in self.lookups.iter() {
-            string += &format!("{}\n", lookup.to_string());
+        for (i,lookup) in self.lookups.iter().enumerate() {
+            string += &format!("Lookup[{}]\n{}\n", i, lookup.to_string());
         }
         string
     }
@@ -82,8 +82,8 @@ impl LookupList {
 
 
         let mut lookups = Vec::new();
-        for _ in 0..lookup_count {
-            let offset = offset + lookup_offsets.pop().unwrap() as u64;
+        for lookup_offset in lookup_offsets.iter() {
+            let offset = offset + *lookup_offset as u64;
             reader.seek(SeekFrom::Start(offset as u64)).unwrap();
             let lookup_type = reader.read_u16_be().unwrap();
             let lookup_flag = reader.read_u16_be().unwrap();

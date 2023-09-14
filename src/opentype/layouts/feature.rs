@@ -57,9 +57,13 @@ impl FeatureList {
         for feature in features.iter_mut() {
             let offset = offset + feature.feature_offset as u64;
             reader.seek(SeekFrom::Start(offset as u64)).unwrap();
+            let feature_params_offset = reader.read_u16_be().unwrap();
             let lookup_count = reader.read_u16_be().unwrap();
             for _ in 0..lookup_count {
                 feature.lookup_list_indices.push(reader.read_u16_be().unwrap());
+            }
+            if feature_params_offset > 0 {
+                todo!("FeatureParams")
             }
         }
 

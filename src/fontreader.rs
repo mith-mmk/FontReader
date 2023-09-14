@@ -285,6 +285,12 @@ impl Font {
             string += "</svg>";
             string
         } else {
+            #[cfg(debug_assertions)]
+            {
+                let string = glyf.to_svg(fontsize, fontunit, &layout);
+                return format!("<!-- {} glyf id: {} -->{}", ch, pos, string);
+            }
+            #[cfg(not(debug_assertions))]
             glyf.to_svg(fontsize, fontunit, &layout)
         }
     }

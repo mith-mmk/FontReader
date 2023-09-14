@@ -365,6 +365,7 @@ impl Glyph {
     ) -> String {
         let parsed = self.parse();
         let mut svg = Self::get_svg_header_from_parsed(&parsed, fonsize, fontunit, layout);
+
         // heightを後ろから読み出す
         svg += &Self::get_svg_path_parsed(&parsed, layout);
         svg += "\n</svg>";
