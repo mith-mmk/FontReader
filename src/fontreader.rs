@@ -6,6 +6,7 @@ use std::{fs::File, path::PathBuf};
 
 use crate::fontheader;
 use crate::opentype::color::{colr, cpal};
+use crate::opentype::extentions::gsub;
 use crate::opentype::platforms::PlatformID;
 use crate::opentype::requires::cmap::CmapEncodings;
 use crate::opentype::requires::hmtx::LongHorMetric;
@@ -63,6 +64,7 @@ pub struct Font {
     pub(crate) grif: Option<glyf::GLYF>, // openType font, CFF/CFF2 none
     pub(crate) colr: Option<colr::COLR>,
     pub(crate) cpal: Option<cpal::CPAL>,
+    pub(crate) gsub: Option<gsub::GSUB>,
     hmtx_pos: Option<Pointer>,
     loca_pos: Option<Pointer>, // OpenType font, CFF/CFF2 none
     glyf_pos: Option<Pointer>, // OpenType font, CFF/CFF2 none
@@ -87,6 +89,7 @@ impl Font {
             grif: None,
             colr: None,
             cpal: None,
+            gsub: None,
             hmtx_pos: None,
             loca_pos: None,
             glyf_pos: None,
@@ -155,6 +158,29 @@ impl Font {
             accender,
             descender,
             line_gap,
+        }
+    }
+
+    pub fn get_glyph_from_id(&self, gliph_id: usize) -> GriphData {
+        let grif = if self.current_font == 0 {
+            self.grif.as_ref().unwrap()
+        } else {
+                self.more_fonts[self.current_font - 1]
+                    .grif
+                    .as_ref()
+                    .unwrap()
+        };
+
+        let glyph = grif.get_glyph(gliph_id).unwrap();
+        let layout: HorizontalLayout = self.get_horizontal_layout(gliph_id);
+        let open_type_glyph = OpenTypeGlyph {
+            layout: FontLayout::Horizontal(layout),
+            glyph: Box::new(glyph.clone()),
+        };
+
+        GriphData {
+            format: GlyphFormat::OpenTypeGlyph,
+            open_type_glif: Some(open_type_glyph),
         }
     }
 
@@ -597,6 +623,11 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Option<Font> {
                         let cpal = cpal::CPAL::new(&mut reader, 0, table.data.len() as u32);
                         font.cpal = Some(cpal);
                     }
+                    b"GSUB" => {
+                        let mut reader = BytesReader::new(&table.data);
+                        let gsub = gsub::GSUB::new(&mut reader, 0, table.data.len() as u32);
+                        font.gsub = Some(gsub);
+                    }
                     _ => {
                         debug_assert!(true, "Unknown table tag")
                     }
@@ -715,6 +746,14 @@ fn from_opentype<R: BinaryReader>(file: &mut R, header: &OTFHeader) -> Option<Fo
             b"CPAL" => {
                 let cpal = cpal::CPAL::new(file, record.offset, record.length);
                 font.cpal = Some(cpal);
+            }
+            b"GSUB" => {
+                let gsub = gsub::GSUB::new(file, record.offset, record.length);
+                font.gsub = Some(gsub);
+                #[cfg(debug_assertions)]
+                {
+                    println!("{}", &font.gsub.as_ref().unwrap().to_string());
+                }
             }
             _ => {
                 debug_assert!(true, "Unknown table tag")
