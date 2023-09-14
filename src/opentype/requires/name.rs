@@ -73,7 +73,7 @@ use std::{
 };
 
 use bin_rs::reader::BinaryReader;
-#[cfg(feature = "iconv")]
+#[cfg(feature = "encoding")]
 use iconv::Iconv;
 
 use crate::opentype::platforms::{get_locale_to_language_id, PlatformID};
@@ -333,7 +333,7 @@ fn get_names<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> NAME {
     // platform id = 0,3,4  utf-16be
     // platform id = 2       ASCII
     // platform id = 1 0 = ASCII 1 == UTF-16BE
-    #[cfg(feature = "iconv")]
+    #[cfg(feature = "encoding")]
     /*  0	Roman
     1	Japanese
     2	Chinese (Traditional)
@@ -440,7 +440,7 @@ fn get_names<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> NAME {
                 }
                 name_records[i].string = String::from_utf16(&utf16s).unwrap();
             }
-            #[cfg(feature = "iconv")]
+            #[cfg(feature = "encoding")]
             EncodingEngine::MacintoshLegcy => {
                 let bytes = file
                     .read_bytes_as_vec(name_records[i].length as usize)

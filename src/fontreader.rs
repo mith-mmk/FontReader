@@ -6,6 +6,7 @@ use std::{fs::File, path::PathBuf};
 
 use crate::fontheader;
 use crate::opentype::color::{colr, cpal};
+#[cfg(feature = "layout")]
 use crate::opentype::extentions::gsub;
 use crate::opentype::platforms::PlatformID;
 use crate::opentype::requires::cmap::CmapEncodings;
@@ -65,6 +66,7 @@ pub struct Font {
     pub(crate) grif: Option<glyf::GLYF>, // openType font, CFF/CFF2 none
     pub(crate) colr: Option<colr::COLR>,
     pub(crate) cpal: Option<cpal::CPAL>,
+    #[cfg(feature = "layout")]
     pub(crate) gsub: Option<gsub::GSUB>,
     hmtx_pos: Option<Pointer>,
     loca_pos: Option<Pointer>, // OpenType font, CFF/CFF2 none
@@ -90,6 +92,7 @@ impl Font {
             grif: None,
             colr: None,
             cpal: None,
+            #[cfg(feature = "layout")]
             gsub: None,
             hmtx_pos: None,
             loca_pos: None,
@@ -632,6 +635,7 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Option<Font> {
                         let cpal = cpal::CPAL::new(&mut reader, 0, table.data.len() as u32);
                         font.cpal = Some(cpal);
                     }
+                    #[cfg(feature = "layout")]
                     b"GSUB" => {
                         let mut reader = BytesReader::new(&table.data);
                         let gsub = gsub::GSUB::new(&mut reader, 0, table.data.len() as u32);
@@ -756,6 +760,7 @@ fn from_opentype<R: BinaryReader>(file: &mut R, header: &OTFHeader) -> Option<Fo
                 let cpal = cpal::CPAL::new(file, record.offset, record.length);
                 font.cpal = Some(cpal);
             }
+            #[cfg(feature = "layout")]
             b"GSUB" => {
                 let gsub = gsub::GSUB::new(file, record.offset, record.length);
                 font.gsub = Some(gsub);

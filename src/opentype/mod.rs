@@ -1,8 +1,11 @@
 pub mod color;
-pub mod extentions;
 pub mod outline;
 pub mod platforms;
 pub mod requires;
+
+#[cfg(feature = "layout")]
+pub mod extentions;
+#[cfg(feature = "layout")]
 pub mod layouts;
 mod ttc;
 use std::fmt;
