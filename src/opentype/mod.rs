@@ -3,6 +3,7 @@ pub mod extentions;
 pub mod outline;
 pub mod platforms;
 pub mod requires;
+pub mod layouts;
 mod ttc;
 use std::fmt;
 
