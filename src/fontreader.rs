@@ -38,6 +38,7 @@ pub enum FontLayout {
 
 #[derive(Debug, Clone)]
 pub struct GriphData {
+    glyph_id: usize,
     format: GlyphFormat,
     pub(crate) open_type_glif: Option<OpenTypeGlyph>,
 }
@@ -161,7 +162,7 @@ impl Font {
         }
     }
 
-    pub fn get_glyph_from_id(&self, gliph_id: usize) -> GriphData {
+    pub fn get_glyph_from_id(&self, glyph_id: usize) -> GriphData {
         let grif = if self.current_font == 0 {
             self.grif.as_ref().unwrap()
         } else {
@@ -171,14 +172,15 @@ impl Font {
                     .unwrap()
         };
 
-        let glyph = grif.get_glyph(gliph_id).unwrap();
-        let layout: HorizontalLayout = self.get_horizontal_layout(gliph_id);
+        let glyph = grif.get_glyph(glyph_id).unwrap();
+        let layout: HorizontalLayout = self.get_horizontal_layout(glyph_id);
         let open_type_glyph = OpenTypeGlyph {
             layout: FontLayout::Horizontal(layout),
             glyph: Box::new(glyph.clone()),
         };
 
         GriphData {
+            glyph_id,
             format: GlyphFormat::OpenTypeGlyph,
             open_type_glif: Some(open_type_glyph),
         }
@@ -210,6 +212,7 @@ impl Font {
         };
 
         GriphData {
+            glyph_id: pos as usize,
             format: GlyphFormat::OpenTypeGlyph,
             open_type_glif: Some(open_type_glyph),
         }
@@ -217,34 +220,34 @@ impl Font {
 
     pub fn get_svg(&self, ch: char) -> String {
         // utf-32
-        let code = ch as u32;
-        let (cmap, grif, colr, cpal) = if self.current_font == 0 {
-            (
-                self.cmap.as_ref().unwrap(),
-                self.grif.as_ref().unwrap(),
-                self.colr.as_ref(),
-                self.cpal.as_ref(),
-            )
+        let glyf_data= self.get_gryph(ch);
+        let pos = glyf_data.glyph_id;
+        let glyf = glyf_data.open_type_glif.as_ref().unwrap().glyph.as_ref();
+        let grif = if self.current_font == 0 {
+            self.grif.as_ref().unwrap()
         } else {
-            (
-                self.more_fonts[self.current_font - 1]
-                    .cmap
-                    .as_ref()
-                    .unwrap(),
-                self.more_fonts[self.current_font - 1]
-                    .grif
-                    .as_ref()
-                    .unwrap(),
-                self.more_fonts[self.current_font - 1].colr.as_ref(),
-                self.more_fonts[self.current_font - 1].cpal.as_ref(),
-            )
+            self.more_fonts[self.current_font - 1]
+                .grif
+                .as_ref()
+                .unwrap()
+        };
+        let layout = &glyf_data.open_type_glif.as_ref().unwrap().layout;
+        let layout = match layout {
+            FontLayout::Horizontal(layout) => layout,
+            _ => panic!("not support vertical layout"),
         };
 
-        let pos = cmap.get_griph_position(code);
-        let glyf = grif.get_glyph(pos as usize).unwrap();
-        let layout: HorizontalLayout = self.get_horizontal_layout(pos as usize);
         let fontsize = 24.0;
         let fontunit = "pt";
+
+        let (cpal, colr) = if self.current_font == 0 {
+            (self.cpal.as_ref(), self.colr.as_ref())
+        } else {
+            (
+                self.more_fonts[self.current_font - 1].cpal.as_ref(),
+                self.more_fonts[self.current_font - 1].colr.as_ref(),
+            )
+        };
 
         if let Some(colr) = colr.as_ref() {
             let layers = colr.get_layer_record(pos as u16);
