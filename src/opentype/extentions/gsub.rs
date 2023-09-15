@@ -80,8 +80,21 @@ impl GSUB {
     }
 
     // ccmp
-    pub fn lookup_ccmp(&self, griph_ids: Vec<usize>) -> usize{
-        todo!("lookup_ccmp")
+    pub fn lookup_ccmp(&self, griph_ids: usize) -> Option<usize> {
+        let features = self.features.get_features(b"ccmp");
+        for feature in features.iter() {
+            for lookup_index in feature.lookup_list_indices.iter() {
+                let lookup = self.lookups.lookups[*lookup_index as usize].clone();
+                for subtable in lookup.subtables.iter() {
+                    let (coverage,_) = subtable.get_coverage();
+                    if let Some(id) = coverage.contains(griph_ids) {
+                        
+                        return Some(id);
+                    }
+                }
+            }
+        }
+        None
     }
 
     // vert, vrt2, vrtr

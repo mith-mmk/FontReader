@@ -3,9 +3,9 @@ pub mod outline;
 pub mod platforms;
 pub mod requires;
 
-#[cfg(feature = "layout")]
+// #[cfg(feature = "layout")]
 pub mod extentions;
-#[cfg(feature = "layout")]
+// #[cfg(feature = "layout")]
 pub mod layouts;
 mod ttc;
 use std::fmt;

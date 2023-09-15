@@ -64,6 +64,8 @@ pub struct Font {
     pub(crate) post: Option<post::POST>, // must
     pub(crate) loca: Option<loca::LOCA>, // openType font, CFF/CFF2 none
     pub(crate) grif: Option<glyf::GLYF>, // openType font, CFF/CFF2 none
+    #[cfg(feature = "cff")]
+    pub(crate) cff: Option<cff::CFF>,   // CFF font, openType none
     pub(crate) colr: Option<colr::COLR>,
     pub(crate) cpal: Option<cpal::CPAL>,
     #[cfg(feature = "layout")]
@@ -90,6 +92,8 @@ impl Font {
             post: None,
             loca: None,
             grif: None,
+            #[cfg(feature = "cff")]
+            cff: None,
             colr: None,
             cpal: None,
             #[cfg(feature = "layout")]
@@ -635,6 +639,12 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Option<Font> {
                         let cpal = cpal::CPAL::new(&mut reader, 0, table.data.len() as u32);
                         font.cpal = Some(cpal);
                     }
+                    #[cfg(feature = "cff")]
+                    b"CFF " => {
+                        let mut reader = BytesReader::new(&table.data);
+                        let cff = cff::CFF::new(&mut reader, 0, table.data.len() as u32);
+                        font.cff = Some(cff.unwrap());
+                    }
                     #[cfg(feature = "layout")]
                     b"GSUB" => {
                         let mut reader = BytesReader::new(&table.data);
@@ -759,6 +769,11 @@ fn from_opentype<R: BinaryReader>(file: &mut R, header: &OTFHeader) -> Option<Fo
             b"CPAL" => {
                 let cpal = cpal::CPAL::new(file, record.offset, record.length);
                 font.cpal = Some(cpal);
+            }
+            #[cfg(feature = "cff")]
+            b"CFF " => {
+                let cff = cff::CFF::new(file, record.offset, record.length);
+                font.cff = Some(cff.unwrap());
             }
             #[cfg(feature = "layout")]
             b"GSUB" => {

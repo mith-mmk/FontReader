@@ -10,18 +10,21 @@ readme = "README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[feature]
-full = ["iconv",
-        "layout"]
+[features]
+full = ["encoding",
+        "layout",
+        "cff"]
 encoding = ["iconv"]
 layout = []
+cff = []
 
 [dependencies]
+# MUST
 bin-rs = "0.0.9"
-miniz_oxide = {version = "0.7.1"}
-# byteorder = "1.4.3"
-# iconv = "0.1"
 num-traits = "0.2"
 num-derive = "0.4"
+# for Woff
+miniz_oxide = {version = "0.7.1"}
+# for name table and PlatformID is 1 
 iconv = {version = "0.1", optional = true}
 

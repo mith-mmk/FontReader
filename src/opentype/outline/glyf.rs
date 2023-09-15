@@ -1,3 +1,4 @@
+// Glyph Data
 use std::{fmt, io::SeekFrom};
 
 use bin_rs::reader::BinaryReader;
@@ -35,6 +36,16 @@ pub struct ParsedGlyph {
     pub length: u32,
     pub end_pts_of_contours: Vec<usize>,
     pub instructions: Vec<u8>,
+    // bit 0 on curve -> true if on curve else off curve
+    // bit 1 x short -> X data is 1byte if flag else 2byte
+    // bit 2 y short -> Y data is 1byte if flag else 2byte
+    // bit 3 repeat -> repeat flag
+    // bit 4 x same -> X data is 0byte, same as previous
+    // bit 5 y same -> Y data is 0byte, same as previous
+    // bit 6 overlap simple -> overlap simple flag, also this flag is false using evenodd, but true using nonzero
+    //                         However, there is no problem if you use nonzero.
+    // bit 7 reserved
+    // bit 8 reserved
     pub flags: Vec<u8>,
     pub xs: Vec<i16>,
     pub ys: Vec<i16>,

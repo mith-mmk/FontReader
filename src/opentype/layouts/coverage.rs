@@ -5,6 +5,39 @@ pub(crate) enum Coverage {
     Format2(CoverageFormat2),
 }
 
+impl Coverage {
+    pub(crate) fn contains(&self, griph_id: usize) -> Option<usize> {
+        match self {
+            Coverage::Format1(coverage) => {
+                for (i, glyph_id) in coverage.glyph_ids.iter().enumerate() {
+                    if *glyph_id == griph_id as u16 {
+                        return Some(i);
+                    }
+                }
+                return None;
+            }
+            Coverage::Format2(coverage) => {
+                for range_record in coverage.range_records.iter() {
+                    if range_record.start_glyph_id <= griph_id as u16
+                        && range_record.end_glyph_id >= griph_id as u16
+                    {
+                        return Some(
+                            (range_record.start_coverage_index + (griph_id as u16 - range_record.start_glyph_id)) as usize,
+                        );
+                    }
+                }
+                return None;
+            }
+        }
+
+
+
+    }
+
+
+}
+
+
 #[derive(Debug, Clone)]
 pub(crate) struct CoverageFormat1 {
     pub(crate) coverage_format: u16,

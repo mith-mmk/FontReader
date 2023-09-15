@@ -8,21 +8,47 @@ use std::{fmt, io::SeekFrom};
 pub(crate) struct HEAD {
     pub(crate) major_version: u16,
     pub(crate) minor_version: u16,
+    // fot revision is fixed 16dot16 majorVersion + minorVersion / 0x10000
     pub(crate) font_revision: u32,
     pub(crate) check_sum_adjustment: u32,
+    // magic number is 0x5F0F3CF5
     pub(crate) magic_number: u32,
     pub(crate) flags: u16,
+    // em = max font width if 16pt = 16pt 
+    // units per em = 16pt / em
     pub(crate) units_per_em: u16,
     pub(crate) created: LONGDATETIME,
     pub(crate) modified: LONGDATETIME,
+    // x_min, y_min, x_max, y_max are the minimum and maximum x and y for all glyphs
     pub(crate) x_min: i16,
     pub(crate) y_min: i16,
     pub(crate) x_max: i16,
     pub(crate) y_max: i16,
+    // mac style is bit flag
+    // 0: bold
+    // 1: italic
+    // 2: underline
+    // 3: outline
+    // 4: shadow
+    // 5: condensed
+    // 6: extended   
     pub(crate) mac_style: u16,
+    // units per em = ppem = pixel per em
+    // 96dpi(Windows default) = 16ppem = 12pt
     pub(crate) lowest_rec_ppem: u16,
+    // 0: fully mixed directional glyphs
+    // 1: only strongly left to right
+    // 2: like 1 but also contains neutrals
+    // -1: only strongly right to left
+    // -2: like -1 but also contains neutrals
     pub(crate) font_direction_hint: i16,
+    // 0: short offsets
+    // 1: long offsets
     pub(crate) index_to_loc_format: i16,
+    // 0: current format 
+    // 1: compressed
+    // 2: mixed
+    // 3: composite   
     pub(crate) glyph_data_format: i16,
 }
 

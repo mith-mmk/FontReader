@@ -39,6 +39,8 @@ impl Lookup {
         }
         string
     }
+
+
 }
 
 
@@ -184,9 +186,10 @@ impl LookupList {
                 substitute_glyph_ids,
             });
         }
+        let coverage = Self::get_coverage(reader, offset + coverage_offset as u64);
         LookupSubstitution::Multiple(MultipleSubstitutionFormat1 {
             subst_format,
-            coverage_offset,
+            coverage,
             sequence_count,
             sequence_tables,
         })
@@ -209,9 +212,10 @@ impl LookupList {
                 alternate_glyph_ids,
             });
         }
+        let coverage = Self::get_coverage(reader, offset + coverage_offset as u64);
         LookupSubstitution::Alternate(AlternateSubstitutionFormat1 {
             subst_format,
-            coverage_offset,
+            coverage,
             alternate_set_count,
             alternate_set,
         })
@@ -603,9 +607,152 @@ pub(crate) enum LookupSubstitution {
     Unknown,
 }
 
+pub(crate) enum LookupResult {
+    Single(u16),
+    Multiple(Vec<u16>),
+    Ligature(Vec<LigatureTable>),
+    Context(Vec<Rule>),
+    Chaining(Vec<ChainSubRule>),
+    Chaing63(Vec<ChainSubRule>),
+    None,
+}
+
 impl LookupSubstitution {
     pub(crate) fn to_string(&self) -> String {
         format!("{:?}", self)
+    }
+
+    pub(crate) fn get_coverage(&self) -> (&Coverage, Option<(Vec<Coverage>,Vec<Coverage>, Vec<Coverage>)>) {
+        let coverage = match self {
+            Self::Single(single) => &single.coverage,
+            Self::Single2(single2) => &single2.coverage,
+            Self::Multiple(multiple) => &multiple.coverage,
+            Self::Alternate(alternate) => &alternate.coverage,
+            Self::Ligature(ligature) => &ligature.coverage,
+            Self::ContextSubstitution(context) => &context.coverage,
+            Self::ChainingContextSubstitution(chaining) => &chaining.coverage,
+            Self::ChainingContextSubstitution2(chaining2) => &chaining2.coverage,
+            Self::ChainingContextSubstitution3(chaining3) => &chaining3.backtrack_coverages[0],
+            _ => {
+                panic!("Unknown lookup type: {:?}", self);
+            }
+        };
+
+        let mut coverages = None;
+        if let Self::ChainingContextSubstitution3(chaining3) = self {
+            let coverages1 = chaining3.backtrack_coverages.clone();
+            let coverages2 = chaining3.input_coverages.clone();
+            let coverages3 = chaining3.lookahead_coverages.clone();
+            coverages = Some((coverages1, coverages2, coverages3));
+        }
+        (coverage, coverages)
+    }
+
+    pub(crate) fn get_lookup(&self, gliph_id: usize) -> LookupResult {
+        match self {
+            Self::Single(single) => {
+                let coverage = &single.coverage;
+                let id = coverage.contains(gliph_id);
+                if let Some(id) = id {
+                    let return_gliph = (single.delta_glyph_id as i32 + id as i32) & 0xFFFF;
+                    LookupResult::Single(return_gliph as u16)
+                } else {
+                    LookupResult::None
+                }
+            }
+            Self::Single2(single) => {
+                let coverage = &single.coverage;
+                let id = coverage.contains(gliph_id);
+                if let Some(id) = id {
+                    let return_gliph = single.substitute_glyph_ids[id];
+                    LookupResult::Single(return_gliph)
+                } else {
+                    LookupResult::None
+                }
+            }
+            Self::Multiple(multiple) => {
+                let coverage = &multiple.coverage;
+                let id = coverage.contains(gliph_id);
+                if let Some(id) = id {
+                    let sequence_table = &multiple.sequence_tables[id];
+                    let result = sequence_table.substitute_glyph_ids.clone();
+                    LookupResult::Multiple(result)
+                } else {
+                    LookupResult::None
+                }
+            }
+            Self::Alternate(alternate) => {
+                let coverage = &alternate.coverage;
+                let id = coverage.contains(gliph_id);
+                if let Some(id) = id {
+                    let alternate_set = &alternate.alternate_set[id];
+                    let result = alternate_set.alternate_glyph_ids.clone();
+                    LookupResult::Multiple(result)
+                } else {
+                    LookupResult::None
+                }
+            }
+            Self::Ligature(ligature) => {
+                let coverage = &ligature.coverage;
+                let id = coverage.contains(gliph_id);
+                if let Some(id) = id {
+                    let ligature_set = &ligature.ligature_set[id];
+                    let result = ligature_set.ligature_table.clone();
+                    LookupResult::Ligature(result)
+                } else {
+                    LookupResult::None
+                }
+            }
+            Self::ContextSubstitution(context) => {
+                let coverage = &context.coverage;
+                let id = coverage.contains(gliph_id);
+                if let Some(id) = id {
+                    let rule_set = &context.rule_set[id];
+                    let result = rule_set.rule.clone();
+                    LookupResult::Context(result)
+                } else {
+                    LookupResult::None
+                }
+            }
+            Self::ChainingContextSubstitution(chaining) => {
+                let coverage = &chaining.coverage;
+                let id = coverage.contains(gliph_id);
+                if let Some(id) = id {
+                    let chain_sub_rule_set = &chaining.chain_sub_rule_set[id];
+                    let result = chain_sub_rule_set.chain_sub_rule.clone();
+                    LookupResult::Chaining(result)
+
+                } else {
+                    LookupResult::None
+                }
+            }
+            Self::ChainingContextSubstitution2(chaining2) => {
+                let coverage = &chaining2.coverage;
+                let id = coverage.contains(gliph_id);
+                if let Some(id) = id {
+                    let class_range_record = &chaining2.class_range_records[id];
+                    let class = class_range_record.class;
+                    let result = vec![class];
+                    LookupResult::Multiple(result)
+                } else {
+                    LookupResult::None
+                }
+            }
+            Self::ChainingContextSubstitution3(chaining3) => {
+                todo!() // これ実装したやつ頭おかしいだろ
+
+            }
+            Self::ExtensionSubstitution(_) => {
+                panic!() // not 7
+            }
+            Self::ReverseChainSingle(_) => {
+                panic!()
+            }
+
+            _ => {
+                panic!("Unknown lookup type: {:?}", self);
+            }
+        }
     }
 
 }
@@ -629,7 +776,7 @@ pub(crate) struct SingleSubstitutionFormat2 {
 #[derive(Debug, Clone)]
 pub(crate) struct MultipleSubstitutionFormat1 {
     pub(crate) subst_format: u16,
-    pub(crate) coverage_offset: u16,
+    pub(crate) coverage: Coverage,
     pub(crate) sequence_count: u16,
     pub(crate) sequence_tables: Vec<SequenceTable>,
 }
@@ -643,7 +790,7 @@ pub(crate) struct SequenceTable {
 #[derive(Debug, Clone)]
 pub(crate) struct AlternateSubstitutionFormat1 {
     pub(crate) subst_format: u16,
-    pub(crate) coverage_offset: u16,
+    pub(crate) coverage: Coverage,
     pub(crate) alternate_set_count: u16,
     pub(crate) alternate_set: Vec<AlternateSet>,
 }
