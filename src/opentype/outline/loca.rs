@@ -27,12 +27,10 @@ impl LOCA {
         file: &mut R,
         offest: u32,
         length: u32,
-        index_to_loc_format  : usize,
+        index_to_loc_format: usize,
     ) -> Self {
         get_loca_by_size(file, offest, length, index_to_loc_format)
     }
-
-
 
     pub(crate) fn to_string(&self) -> String {
         let max_length = 10;
@@ -53,7 +51,12 @@ impl LOCA {
     }
 }
 
-fn get_loca_by_size<R: BinaryReader>(file: &mut R, offest: u32, length: u32, index_to_loc_format  : usize) -> LOCA {
+fn get_loca_by_size<R: BinaryReader>(
+    file: &mut R,
+    offest: u32,
+    length: u32,
+    index_to_loc_format: usize,
+) -> LOCA {
     file.seek(SeekFrom::Start(offest as u64)).unwrap();
 
     let mut offsets = Vec::new();
