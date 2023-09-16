@@ -67,7 +67,7 @@ impl OS2 {
         string += &us_weight_class;
         let us_width_class = format!("usWidthClass {}\n", self.us_width_class);
         string += &us_width_class;
-        let fs_type = format!("fsType {}\n", self.fs_type);
+        let fs_type = format!("fsType {:016b}\n", self.fs_type);
         string += &fs_type;
         let y_subscript_x_size = format!("ySubscriptXSize {}\n", self.y_subscript_x_size);
         string += &y_subscript_x_size;

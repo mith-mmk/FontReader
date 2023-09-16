@@ -592,9 +592,9 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Option<Font> {
                         font.head = Some(head);
                     }
                     b"OS/2" => {
-                        // let mut reader = BytesReader::new(&table.data);
-                        // let os2 = os2::OS2::new(&mut reader, 0, table.data.len() as u32);
-                        // font.os2 = Some(os2);
+                        let mut reader = BytesReader::new(&table.data);
+                        let os2 = os2::OS2::new(&mut reader, 0, table.data.len() as u32);
+                        font.os2 = Some(os2);
                     }
                     b"hhea" => {
                         let mut reader = BytesReader::new(&table.data);
@@ -666,11 +666,12 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Option<Font> {
             );
             font.hmtx = Some(hmtx);
             let mut reader = BytesReader::new(&loca_table.as_ref().unwrap().data);
-            let loca = loca::LOCA::new(
+            let index_to_loc_format = font.head.as_ref().unwrap().index_to_loc_format as usize;
+            let loca = loca::LOCA::new_by_size(
                 &mut reader,
                 0,
                 loca_table.as_ref().unwrap().data.len() as u32,
-                font.maxp.as_ref().unwrap().num_glyphs,
+                index_to_loc_format,
             );
             font.loca = Some(loca);
             let mut reader = BytesReader::new(&glyf_table.as_ref().unwrap().data);

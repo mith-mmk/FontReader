@@ -3,7 +3,7 @@
 use std::{collections::HashMap, error::Error, io::SeekFrom};
 
 // Compare this snippet from src/outline/cff.rs:
-use bin_rs::reader::{BinaryReader, BytesReader};
+use bin_rs::reader::BinaryReader;
 
 //
 // // CFF is Adobe Type 1 font format, which is a compact binary format.
@@ -24,16 +24,14 @@ pub(crate) struct CFF {
     pub(crate) name: String,
     pub(crate) top_dict_index: Index, // TopDict
     pub(crate) strings: Vec<String>,
-    pub(crate) global_subr_index: Index,
-    pub(crate) encordings: Index,
-    pub(crate) charset: Index,
-    pub(crate) fd_select: Option<Index>,
-    pub(crate) char_strings_index: Index,
-    pub(crate) char_strings: Vec<CharString>,
-    pub(crate) font_dict_index: Option<Index>,
-    pub(crate) private_dict: PrivateDict,
-    pub(crate) local_subr_index: Index,
+    pub(crate) charsets: Charsets,
+    pub(crate) char_string: CharString,
+    // pub(crate) fd_Select: FDSelect,
+    // pub(crate) fd_dict_index: FDDistIndex,
+    pub(crate) private_dict: Option<PrivateDict>,
 }
+
+
 
 impl CFF {
     pub(crate) fn new<R: BinaryReader>(
@@ -49,71 +47,129 @@ impl CFF {
         let name = String::from_utf8(name_index.data[0].clone())?;
         let top_dict_index = Index::parse(reader)?;
         let top_dict = Dict::parse(&top_dict_index.data[0])?;
-        let fd_array_offset = top_dict.get_i32(12, 36);
-        let fd_select_offset = top_dict.get_i32(12, 37);
-        let charsets_offset = top_dict.get_i32(0, 15);
-        let char_strings_offset = top_dict.get_i32(0, 17);
+        let n_glyphs = top_dict.get_i32(0, 15).unwrap() as usize;
+        let encording_offset = top_dict.get_i32(0, 16); // none
+        let global_subr_index_offset = top_dict.get_i32(12, 29); // none
+        let fd_array_offset = top_dict.get_i32(12, 36).unwrap();
+        let fd_select_offset = top_dict.get_i32(12, 37).unwrap();
+        let charsets_offset = top_dict.get_i32(0, 15).unwrap();
+        let char_strings_offset = top_dict.get_i32(0, 17).unwrap();
         #[cfg(debug_assertions)]
         {
+            println!("n_glyphs: {}", n_glyphs);
+            println!("encording: {:?}", encording_offset);
+            println!("global_subr_index: {:?}", global_subr_index_offset);
             println!("fd_array: {:?}", fd_array_offset);
             println!("fd_select: {:?}", fd_select_offset);
             println!("charsets: {:?}", charsets_offset);
             println!("char_strings: {:?}", char_strings_offset);
         }
 
-        let string_index = Index::parse(reader)?;
-        let mut strings = Vec::new();
-        for i in 0..string_index.count {
-            let buf = string_index.data[i as usize].clone();
-            strings.push(String::from_utf8(buf)?);
-        }
+        let charsets_offset = charsets_offset as u32 + offset;
 
-        let global_subr_index = Index::parse(reader)?;
-        println!("global_subr_index: {:?}", global_subr_index);
-        let encordings = Index::parse(reader)?;
-        println!("encordings: {:?}", encordings);
-        let charset = Index::parse(reader)?;
-        println!("charset: {:?}", charset);
-        let fd_select = Index::parse(reader)?;
-        println!("fd_select: {:?}", fd_select);
-        let char_strings_index = Index::parse(reader)?;
-        println!("char_strings_index: {:?}", char_strings_index);
-        let nglipys = char_strings_index.count;
-        panic!("nglipys: {}", nglipys);
-        // parce char_strings
-        let font_dict_index = Index::parse(reader)?;
-        // parse font_dict_index
+        let charsets = Charsets::new(reader, charsets_offset, n_glyphs as u32)?;
+        let char_strings_offset = char_strings_offset as u32 + offset;
+        let char_string = CharString::new(reader, char_strings_offset as u32)?;
+        println!("char_string: {:?}", char_string.data.data[0]);
+        let private = top_dict.get_i32_array(0, 18);
+        let private_dict = if let Some(private) = private {
+            println!("private: {:?}", private);
+            let private_dict_length = private[0] as u32;
+            let private_dict_offset = private[1] as u32;
+    
+            let private_dict_offset = private_dict_offset as u32 + offset;
+            let private_dict_index = Index::parse(reader)?;
+            let private_dict = Dict::parse(&private_dict_index.data[0])?;
+            println!("private_dict: {:?}", private_dict);
+            Some(private_dict)
+        } else {
+            None
+        };
 
-        let private_dict = Index::parse(reader)?;
-        // parse private_dict
-        let private_dict = Dict::parse(&private_dict.data[0])?;
-        let local_subr_index = Index::parse(reader)?;
-        Ok(Self {
+        Ok (Self {
             header,
             name,
             top_dict_index,
-            strings,
-            global_subr_index,
-            char_strings_index,
+            strings: Vec::new(),
+            charsets,
+            char_string,
+            // fd_Select: FDSelect,
+            // fd_dict_index: FDDistIndex,
             private_dict,
-            local_subr_index,
-            encordings,
-            charset,
-            fd_select: None,
-            char_strings: Vec::new(),
-            font_dict_index: None,
         })
     }
+}
+
+
+#[derive(Debug, Clone)]
+pub(crate) struct Charsets {
+    n_glyphs: usize,
+    format: u8,
+    sid: Vec<u16>,
+}
+
+impl Charsets {
+    fn new<R: BinaryReader>(reader: &mut R, offset: u32, n_glyphs: u32)  -> Result<Self, Box<dyn Error>> {
+        reader.seek(SeekFrom::Start(offset as u64)).unwrap();
+        let format = reader.read_u8().unwrap();
+        println!("format: {}", format);
+        let mut charsets = Self {
+            n_glyphs: n_glyphs as usize,
+            format,
+            sid: Vec::new(),
+        };
+
+        match format {
+            0 => charsets.parse_format0(reader, n_glyphs)?,
+            1..=2 => charsets.parse_format1(reader, n_glyphs)?,
+            _ => {panic!("Illegal format: {}", format) }
+        }
+        Ok(charsets)
+    }
+
+    fn parse_format0<R: BinaryReader>(&mut self, reader: &mut R, n_glyphs: u32) -> Result<(), Box<dyn Error>> {
+        let mut i = 1;
+        for _ in 0..n_glyphs as usize -1 {
+            let sid = reader.read_u16_be()?;
+            self.sid.push(sid);
+            i += 2;
+        }
+        Ok(())
+    }
+
+    fn parse_format1<R: BinaryReader>(&mut self, reader: &mut R, n_glyphs: u32) -> Result<(), Box<dyn Error>>
+    {
+        let mut i = 1;
+        while i < n_glyphs as usize -1 {
+            let mut sid = reader.read_u16_be()?;
+            let n_left = 
+                if self.format == 1 {
+                    reader.read_u8()? as usize
+                } else {
+                    reader.read_u16_be()? as usize
+                };
+            for _ in 0..=n_left {
+                self.sid.push(sid);
+                i += 1;
+                sid += 1;
+            }
+        }
+        Ok(())
+    }
+
+    fn parse_format2(&mut self) {
+        todo!()
+    }
+
+
 }
 
 #[derive(Debug, Clone)]
 pub(crate) enum Operand {
     Integer(i32),
     Real(f64),
-    SID(SID),
-    BCD(Vec<u8>),
-    None,
 }
+
 
 pub(crate) fn operand_encoding(b: &[u8]) -> Result<(Operand, usize), Box<dyn Error>> {
     if b.is_empty() {
@@ -279,45 +335,45 @@ impl Dict {
         Ok(Self { entries })
     }
 
-    pub(crate) fn get_sid(&self, key1: u8, key2: u8) -> Result<i32, Box<dyn Error>> {
+    pub(crate) fn get_sid(&self, key1: u8, key2: u8) -> Option<i32> {
         self.get_i32(key1, key2)
     }
 
-    pub(crate) fn get_i32(&self, key1: u8, key2: u8) -> Result<i32, Box<dyn Error>> {
+    pub(crate) fn get_i32(&self, key1: u8, key2: u8) -> Option<i32> {
         let key = (key1 as u16) << 8 | key2 as u16;
         match self.entries.get(&key) {
             Some(operands) => {
                 if operands.len() != 1 {
-                    return Err("Illegal operands".into());
+                    return None;
                 }
                 match operands[0] {
-                    Operand::Integer(value) => Ok(value),
-                    Operand::Real(value) => Ok(value as i32),
-                    _ => Err("Illegal operands".into()),
+                    Operand::Integer(value) => Some(value),
+                    Operand::Real(value) => Some(value as i32),
+                    _ => None,
                 }
             }
-            None => Err("not found".into()),
+            None => None,
         }
     }
 
-    pub fn get_f64(&self, key1: u8, key2: u8) -> Result<f64, Box<dyn Error>> {
+    pub fn get_f64(&self, key1: u8, key2: u8) -> Option<f64> {
         let key = (key1 as u16) << 8 | key2 as u16;
         match self.entries.get(&key) {
             Some(operands) => {
                 if operands.len() != 1 {
-                    return Err("Illegal operands".into());
+                    return None;
                 }
                 match operands[0] {
-                    Operand::Integer(value) => Ok(value as f64),
-                    Operand::Real(value) => Ok(value),
-                    _ => Err("Illegal operands".into()),
+                    Operand::Integer(value) => Some(value as f64),
+                    Operand::Real(value) => Some(value),
+                    _ => None,
                 }
             }
-            None => Err("not found".into()),
+            None => None,
         }
     }
 
-    pub(crate) fn get_i32_array(&self, key1: u8, key2: u8) -> Result<Vec<i32>, Box<dyn Error>> {
+    pub(crate) fn get_i32_array(&self, key1: u8, key2: u8) -> Option<Vec<i32>> {
         let key = (key1 as u16) << 8 | key2 as u16;
         match self.entries.get(&key) {
             Some(operands) => {
@@ -326,16 +382,16 @@ impl Dict {
                     match operand {
                         Operand::Integer(value) => r.push(*value),
                         Operand::Real(value) => r.push(*value as i32),
-                        _ => return Err("Illegal operands".into()),
+                        _ => return None,
                     }
                 }
-                Ok(r)
+                Some(r)
             }
-            None => Err("not found".into()),
+            None => None,
         }
     }
 
-    pub(crate) fn get_f64_array(&self, key1: u8, key2: u8) -> Result<Vec<f64>, Box<dyn Error>> {
+    pub(crate) fn get_f64_array(&self, key1: u8, key2: u8) -> Option<Vec<f64>> {
         let key = (key1 as u16) << 8 | key2 as u16;
         match self.entries.get(&key) {
             Some(operands) => {
@@ -344,21 +400,33 @@ impl Dict {
                     match operand {
                         Operand::Integer(value) => r.push(*value as f64),
                         Operand::Real(value) => r.push(*value),
-                        _ => return Err("Illegal operands".into()),
+                        _ => return None,
                     }
                 }
-                Ok(r)
+                Some(r)
             }
-            None => Err("not found".into()),
+            None => None,
         }
     }
 }
 
 #[derive(Debug, Clone)]
 pub(crate) struct CharString {
-    pub(crate) data: Vec<u8>,
-    pub(crate) instructions: Vec<u8>,
+    pub(crate) data: Index,
 }
+
+impl CharString {
+    pub(crate) fn new<R:BinaryReader>(reader: &mut R, offset: u32) -> Result<Self, Box<dyn Error>> {
+        reader.seek(SeekFrom::Start(offset as u64))?;
+        let index = Index::parse(reader)?;
+        Ok(Self {
+            data: index
+        })
+    }
+
+
+}
+
 
 impl Header {
     pub(crate) fn parse<R: BinaryReader>(r: &mut R) -> Result<Self, Box<dyn Error>> {

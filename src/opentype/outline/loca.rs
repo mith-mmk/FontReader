@@ -24,6 +24,15 @@ impl LOCA {
         get_loca(file, offest, length, num_glyphs)
     }
 
+    pub(crate) fn new_by_size<R: BinaryReader>(
+        file: &mut R,
+        offest: u32,
+        length: u32,
+        index_to_loc_format  : usize,
+    ) -> Self {
+        get_loca_by_size(file, offest, length, index_to_loc_format)
+    }
+
     pub(crate) fn set_number_of_print(&mut self, value: usize) {
         self.number_of_print = value;
     }
@@ -43,6 +52,28 @@ impl LOCA {
             string += &offset;
         }
         string
+    }
+}
+
+fn get_loca_by_size<R: BinaryReader>(file: &mut R, offest: u32, length: u32, index_to_loc_format  : usize) -> LOCA {
+    file.seek(SeekFrom::Start(offest as u64)).unwrap();
+
+    let mut offsets = Vec::new();
+    let mut i = 0;
+    while i < length {
+        let offset: u32 = if index_to_loc_format == 0 {
+            i += 2;
+            file.read_u16_be().unwrap() as u32 * 2
+        } else {
+            i += 4;
+            file.read_u32_be().unwrap()
+        };
+        offsets.push(offset);
+    }
+
+    LOCA {
+        offsets: Box::new(offsets),
+        number_of_print: 10,
     }
 }
 
