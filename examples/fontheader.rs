@@ -1,4 +1,4 @@
-use fontloader::{opentype::NameID, Font};
+use fontloader::Font;
 #[cfg(target_os = "windows")]
 use std::env;
 use std::path::PathBuf;

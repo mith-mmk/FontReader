@@ -11,7 +11,6 @@ pub(crate) struct Script {
 #[derive(Debug, Clone)]
 pub(crate) struct ParsedScript {
     pub(crate) script_tag: u32,
-    pub(crate) default_language_system_offset: u16,
     pub(crate) language_systems: Box<Vec<LanguageSystemRecord>>,
 }
 
@@ -45,7 +44,6 @@ impl ParsedScript {
 
         Self {
             script_tag: script.script_tag,
-            default_language_system_offset,
             language_systems: Box::new(language_systems),
         }
     }

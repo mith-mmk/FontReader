@@ -1,6 +1,6 @@
 // CFF is Adobe Type 1 font format, which is a compact binary format.
 
-use std::{collections::HashMap, error::Error, io::SeekFrom};
+use std::{collections::HashMap, error::Error, io::{SeekFrom, ErrorKind}};
 
 // Compare this snippet from src/outline/cff.rs:
 use bin_rs::reader::BinaryReader;
@@ -70,14 +70,13 @@ impl CFF {
         let charsets = Charsets::new(reader, charsets_offset, n_glyphs as u32)?;
         let char_strings_offset = char_strings_offset as u32 + offset;
         let char_string = CharString::new(reader, char_strings_offset as u32)?;
-        println!("char_string: {:?}", char_string.data.data[0]);
+        let fd_select = FDSelect::new(reader, fd_select_offset as u32 + offset, n_glyphs as u32)?;
+        println!("fd_select: {:?}", fd_select.fsds[0..10].to_vec());
         let private = top_dict.get_i32_array(0, 18);
         let private_dict = if let Some(private) = private {
-            println!("private: {:?}", private);
-            let private_dict_length = private[0] as u32;
             let private_dict_offset = private[1] as u32;
-    
             let private_dict_offset = private_dict_offset as u32 + offset;
+            reader.seek(SeekFrom::Start(private_dict_offset as u64))?;
             let private_dict_index = Index::parse(reader)?;
             let private_dict = Dict::parse(&private_dict_index.data[0])?;
             println!("private_dict: {:?}", private_dict);
@@ -99,6 +98,46 @@ impl CFF {
         })
     }
 }
+
+#[derive(Debug, Clone)]
+pub(crate) struct FDSelect {
+    fsds: Vec<u8>
+}
+
+impl FDSelect {
+    pub(crate) fn new<R: BinaryReader>(reader: &mut R,offset: u32, n_glyphs: u32) -> Result<Self,Box<dyn Error>>{      reader.seek(SeekFrom::Start(offset as u64))?;
+        let format = reader.read_u8()?;
+        let mut fsds = Vec::new();
+        match format {
+            0 => {
+                for _ in 0..n_glyphs {
+                    let fsd = reader.read_u8()?;
+                    fsds.push(fsd);
+                }
+            }
+            3 => {
+                let n_ranges = reader.read_u16_be()?;
+                let mut last_gid = 0;
+                let first_gid = reader.read_u16_be()?;
+                for _ in 0..n_ranges {
+                    let fd = reader.read_u8()?;
+                    let sentinel_gid = reader.read_u16_be()?;
+                    for _ in last_gid..sentinel_gid {
+                        fsds.push(fd);
+                    }
+                    last_gid = first_gid;
+                }
+            }
+            _ => {return Err("Illegal format".into()) }
+        }
+        Ok(Self {
+            fsds
+        })
+    }
+
+
+}
+
 
 
 #[derive(Debug, Clone)]
@@ -122,7 +161,7 @@ impl Charsets {
         match format {
             0 => charsets.parse_format0(reader, n_glyphs)?,
             1..=2 => charsets.parse_format1(reader, n_glyphs)?,
-            _ => {panic!("Illegal format: {}", format) }
+            _ => { return Err("Illegal format".into()) }
         }
         Ok(charsets)
     }
@@ -334,6 +373,10 @@ impl Dict {
 
         Ok(Self { entries })
     }
+
+    pub(crate) fn get(&self ,key: u16) -> Option<Vec<Operand>> {
+        self.entries.get(&key).cloned()
+    } 
 
     pub(crate) fn get_sid(&self, key1: u8, key2: u8) -> Option<i32> {
         self.get_i32(key1, key2)

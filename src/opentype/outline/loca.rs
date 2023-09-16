@@ -5,7 +5,6 @@ use bin_rs::reader::BinaryReader;
 #[derive(Debug, Clone)]
 pub(crate) struct LOCA {
     pub(crate) offsets: Box<Vec<u32>>,
-    number_of_print: usize,
 }
 
 impl fmt::Display for LOCA {
@@ -33,16 +32,15 @@ impl LOCA {
         get_loca_by_size(file, offest, length, index_to_loc_format)
     }
 
-    pub(crate) fn set_number_of_print(&mut self, value: usize) {
-        self.number_of_print = value;
-    }
+
 
     pub(crate) fn to_string(&self) -> String {
+        let max_length = 10;
         let mut string = "loca\n".to_string();
-        let length = if self.offsets.len() < self.number_of_print {
+        let length = if self.offsets.len() < 10 {
             self.offsets.len()
         } else {
-            self.number_of_print
+            max_length
         };
         for i in 0..length {
             if i % 16 == 0 {
@@ -73,7 +71,6 @@ fn get_loca_by_size<R: BinaryReader>(file: &mut R, offest: u32, length: u32, ind
 
     LOCA {
         offsets: Box::new(offsets),
-        number_of_print: 10,
     }
 }
 
@@ -96,6 +93,5 @@ fn get_loca<R: BinaryReader>(file: &mut R, offest: u32, length: u32, num_glyphs:
 
     LOCA {
         offsets: Box::new(offsets),
-        number_of_print: 10,
     }
 }
