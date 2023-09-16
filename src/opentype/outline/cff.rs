@@ -1,11 +1,11 @@
 // CFF is Adobe Type 1 font format, which is a compact binary format.
 
-use std::io::SeekFrom;
+use std::{io::SeekFrom, collections::HashMap, error::Error};
 
 // Compare this snippet from src/outline/cff.rs:
 use bin_rs::reader::{BinaryReader, BytesReader};
 
-use crate::opentype::requires::name;
+
 //
 // // CFF is Adobe Type 1 font format, which is a compact binary format.
 //
@@ -38,7 +38,7 @@ pub(crate) struct CFF {
 }
 
 impl CFF {
-    pub(crate) fn new<R:BinaryReader>(reader: &mut R, offset: u32, length: u32) -> Result<Self, Box<dyn std::error::Error>> {
+    pub(crate) fn new<R:BinaryReader>(reader: &mut R, offset: u32, length: u32) -> Result<Self, Box<dyn Error>> {
         println!("offset: {} length: {}", offset, length);
         reader.seek(SeekFrom::Start(offset as u64))?;
 
@@ -46,11 +46,19 @@ impl CFF {
         let name_index = Index::parse(reader)?;
         let name = String::from_utf8(name_index.data[0].clone())?;
         let top_dict_index = Index::parse(reader)?;
+        let top_dict = Dict::parse(&top_dict_index.data[0])?;
+        let fd_array_offset = top_dict.get_i32(12, 36);
+        let fd_select_offset = top_dict.get_i32(12, 37);
+        let charsets_offset = top_dict.get_i32(0, 15);
+        let char_strings_offset = top_dict.get_i32(0, 17);
         #[cfg(debug_assertions)]
         {
-        let top_dict = Dict::parse(&top_dict_index.data[0]);
-        println!("top_dict: {:?}", top_dict);
+            println!("fd_array: {:?}", fd_array_offset);
+            println!("fd_select: {:?}", fd_select_offset);
+            println!("charsets: {:?}", charsets_offset);
+            println!("char_strings: {:?}", char_strings_offset);
         }
+
         let string_index = Index::parse(reader)?;
         let mut strings = Vec::new();
         for i in 0..string_index.count {
@@ -74,7 +82,9 @@ impl CFF {
         let font_dict_index = Index::parse(reader)?;
         // parse font_dict_index
        
-        let private_dict = PrivateDict::parse(reader, top_dict_index.data[0].len() as u32)?;
+        let private_dict = Index::parse(reader)?;
+        // parse private_dict
+        let private_dict = Dict::parse(&private_dict.data[0])?;
         let local_subr_index = Index::parse(reader)?;
         Ok(Self {
             header,
@@ -95,49 +105,58 @@ impl CFF {
     }
 }
 
+#[derive(Debug, Clone)]
+pub(crate) enum Operand {
+    Integer(i32),
+    Real(f64),
+    SID(SID),
+    BCD(Vec<u8>),
+    None,
+}
 
 
-pub(crate) fn operand_encoding(b: &[u8]) -> Option<(f64,usize)> {
+pub(crate) fn operand_encoding(b: &[u8]) -> Result<(Operand,usize),Box<dyn Error>> {
     if b.is_empty() {
-        return None;
+        return Err("empty".into());
     }
     let b0 = b[0];
     if (32..=246).contains(&b0) {
-        return Some(((b0 as i32 - 139) as f64, 1));
+        return Ok((Operand::Integer(b0 as i32 - 139), 1));
     }
     if (247..=250).contains(&b0) {
         if b.len() < 2 {
-            return None;
+            return Err("buffer shotage".into());
         }
         let b1 = b[1];
-        return Some((((b0 as i32 - 247) * 256 + b1 as i32 + 108) as f64, 2));
+        return Ok((Operand::Integer((b0 as i32 - 247) * 256 + b1 as i32 + 108), 2));
     }
     if (251..=254).contains(&b0) {
         if b.len() < 2 {
-            return None;
+            return Err("buffer shotage".into());
         }
         let b1 = b[1];
-        return Some(((-(b0 as i32 - 251) * 256 - b1 as i32 - 108) as f64, 2));
+        return Ok((Operand::Integer(-(b0 as i32 - 251) * 256 - b1 as i32 - 108) , 2));
     }
     if b0 == 28 {
         if b.len() < 3 {
-            return None;
+            return Err("buffer shotage".into());
         }
         let value = i16::from_be_bytes([b[1], b[2]]) as i32;
-        return Some(((value) as f64, 3));
+        return Ok((Operand::Integer(value), 3));
     }
     if b0 == 29 {
         if b.len() < 5 {
-            return None;
+            return Err("buffer shotage".into());
         }
         let value = i32::from_be_bytes([b[1], b[2], b[3], b[4]]);
-        return Some(((value) as f64, 5));
+        return Ok((Operand::Integer(value), 5));
     }
     if b0 == 30 {
         let mut r = Vec::new();
-
+        let mut x = 1;
         for i in 1..b.len() {
             let b = b[i];
+            x += 1;
             let r0 = b >> 4;
             let r1 = b & 0x0f;
             match r0 {
@@ -190,13 +209,12 @@ pub(crate) fn operand_encoding(b: &[u8]) -> Option<(f64,usize)> {
             }
         }
         let str = r.iter().collect::<String>();
-        println!("str: {}", str);
         match str.parse::<f64>() {
-            Ok(f64value) => return Some((f64value, r.len() + 1)),
-            Err(_) => return None,
+            Ok(f64value) => return Ok((Operand::Real(f64value), x)),
+            Err(_) => return Err("Illegal value".into())
         }
     }
-    None
+    Err("Illegal value".into())
 }
 
 
@@ -212,162 +230,135 @@ pub(crate) struct Header {
 #[derive(Debug, Clone)]
 pub(crate) struct Index {
     pub(crate) count: u16,
-    pub(crate) off_size: u8,
-    pub(crate) offsets: Vec<u32>,
     pub(crate) data: Vec<Vec<u8>>,
 }
 
-pub(crate) struct TopDict {
-    pub(crate) version: Option<SID>,
-    pub(crate) notice: Option<SID>,
-    pub(crate) copy_right: Option<SID>,
-    pub(crate) full_name: Option<SID>,
-    pub(crate) family_name: Option<SID>,
-    pub(crate) weight: Option<SID>,
-    pub(crate) is_fixed_pitch: Option<bool>,
-    pub(crate) italic_angle: Option<f64>,
-    pub(crate) underline_position: Option<i16>,
-    pub(crate) underline_thickness: Option<i16>,
-    pub(crate) paint_type: Option<u16>,
-    pub(crate) char_string_type: Option<u16>,
-    pub(crate) font_matrix: Option<[f64; 6]>,
-    pub(crate) unique_id: Option<u32>,
-    pub(crate) font_bounding_box: Option<[i16; 4]>,
-    pub(crate) stroke_width: Option<f64>,
-    pub(crate) xuid: Option<Vec<u8>>,
-    pub(crate) charset: Option<u16>,
-    pub(crate) encoding: Option<u16>,
-    pub(crate) char_strings: Option<u16>,
-    pub(crate) private: Option<u16>,
-    pub(crate) synthetic_base: Option<u16>,
-    pub(crate) post_script: Option<String>,
-    pub(crate) base_font_name: Option<String>,
-    pub(crate) base_font_blend: Option<Vec<f64>>,
-}
-
-impl TopDict {
-    pub(crate) fn enpty() -> Self {
-        Self {
-            version: None,
-            notice: None,
-            copy_right: None,
-            full_name: None,
-            family_name: None,
-            weight: None,
-            is_fixed_pitch: None,
-            italic_angle: None,
-            underline_position: None,
-            underline_thickness: None,
-            paint_type: None,
-            char_string_type: None,
-            font_matrix: None,
-            unique_id: None,
-            font_bounding_box: None,
-            stroke_width: None,
-            xuid: None,
-            charset: None,
-            encoding: None,
-            char_strings: None,
-            private: None,
-            synthetic_base: None,
-            post_script: None,
-            base_font_name: None,
-            base_font_blend: None,
-        }
-
-    }
-    pub(crate) fn new(buffer: &Vec<u8>) -> Self {
-        let mut top_dict = Self::enpty();
-        
-        top_dict
-    }
-
-}
 
 
+type PrivateDict = Dict;
 
-
-
-
-#[derive(Debug, Clone)]
-pub(crate) struct PrivateDict {
-    pub(crate) data: Vec<u8>,
-    pub(crate) dict: Dict,
-}
 
 #[derive(Debug, Clone)]
 pub(crate) struct Dict {
-    pub(crate) entries: Vec<Entry>,
+    pub(crate) entries: HashMap<u16, Vec<Operand>>
 }
 
 impl Dict {
-    pub(crate) fn parse(buffer: &[u8]) -> Self {
-        let mut entries = Vec::new();
+    pub(crate) fn parse(buffer: &[u8]) -> Result<Self, Box<dyn Error>> {
+        let mut entries = HashMap::new();
         let mut i = 0;
-        loop {
+        let mut operator = 0;
+        let mut operands = Vec::new();
+        while i < buffer.len() {
             if buffer.len() <= i  {
                 break;
             }
             let b = buffer[i];
             if b == 12 {
-                let operator = (b as u16) << 8 | buffer[i + 1] as u16;
-                let operands = Vec::new();
-                entries.push(Entry { operator, operands });
+                operator = (b as u16) << 8 | buffer[i + 1] as u16;            
+                entries.insert(operator, operands);
+                operands = Vec::new();
                 i += 2;
+
             } else if b <=21 {
-                let operator = b as u16;
-                let operands = Vec::new();
-                entries.push(Entry { operator, operands });
+                operator = b as u16;
+                entries.insert(operator, operands);
+                operands = Vec::new();
                 i += 1;
-            } else if b >= 22 && b <= 27 {
-                let operator = (b as u16) << 8 | buffer[i + 1] as u16;
-                let operands = Vec::new();
-                entries.push(Entry { operator, operands });
-                i += 2;
-            } else if b >= 28 && b <= 31 {
-                let operator = (b as u16) << 8 | buffer[i + 1] as u16;
-                let operands = Vec::new();
-                entries.push(Entry { operator, operands });
-                i += 2;
-            } else if b >= 32 && b <= 246 {
-                let operator = 28;
-                let operands = Vec::new();
-                entries.push(Entry { operator, operands });
-                i += 1;
-            } else if b >= 247 && b <= 250 {
-                let operator = 29;
-                let operands = Vec::new();
-                entries.push(Entry { operator, operands });
-                i += 2;
-            } else if b >= 251 && b <= 254 {
-                let operator = 30;
-                let operands = Vec::new();
-                entries.push(Entry { operator, operands });
-                i += 2;
-            } else if b == 255 {
-                let operator = 30;
-                let operands = Vec::new();
-                entries.push(Entry { operator, operands });
-                i += 5;
-            } else {
+            }
+            if i >= buffer.len() {
                 break;
             }
 
+            let (operand, len) = operand_encoding(&buffer[i..])?;
+            operands.push(operand);
+
+            i += len;
         }
 
-        Self {
+
+        Ok(Self {
             entries,
-        }
+        })
     }
     
+    pub(crate) fn get_sid(&self, key1: u8, key2: u8) -> Result<i32, Box<dyn Error>> {
+        self.get_i32(key1, key2)
+    }
+
+    pub(crate) fn get_i32(&self, key1: u8, key2: u8) -> Result<i32, Box<dyn Error>> {
+        let key = (key1 as u16) << 8 | key2 as u16;
+        match self.entries.get(&key) {
+            Some(operands) => {
+                if operands.len() != 1 {
+                    return Err("Illegal operands".into());
+                }
+                match operands[0] {
+                    Operand::Integer(value) => Ok(value),
+                    Operand::Real(value) => Ok(value as i32),
+                    _ => Err("Illegal operands".into())
+                }
+            }
+            None => Err("not found".into())
+        }
+    }
+
+
+    pub fn get_f64(&self, key1: u8, key2: u8) -> Result<f64, Box<dyn Error>> {
+        let key = (key1 as u16) << 8 | key2 as u16;
+        match self.entries.get(&key) {
+            Some(operands) => {
+                if operands.len() != 1 {
+                    return Err("Illegal operands".into());
+                }
+                match operands[0] {
+                    Operand::Integer(value) => Ok(value as f64),
+                    Operand::Real(value) => Ok(value),
+                    _ => Err("Illegal operands".into())
+                }
+            }
+            None => Err("not found".into())
+        }
+    }
+
+    pub(crate) fn get_i32_array(&self, key1: u8, key2: u8) -> Result<Vec<i32>, Box<dyn Error>> {
+        let key = (key1 as u16) << 8 | key2 as u16;
+        match self.entries.get(&key) {
+            Some(operands) => {
+                let mut r = Vec::new();
+                for operand in operands {
+                    match operand {
+                        Operand::Integer(value) => r.push(*value),
+                        Operand::Real(value) => r.push(*value as i32),
+                        _ => return Err("Illegal operands".into())
+                    }
+                }
+                Ok(r)
+            }
+            None => Err("not found".into())
+        }
+    }
+
+    pub(crate) fn get_f64_array(&self, key1: u8, key2: u8) -> Result<Vec<f64>, Box<dyn Error>> {
+        let key = (key1 as u16) << 8 | key2 as u16;
+        match self.entries.get(&key) {
+            Some(operands) => {
+                let mut r = Vec::new();
+                for operand in operands {
+                    match operand {
+                        Operand::Integer(value) => r.push(*value as f64),
+                        Operand::Real(value) => r.push(*value),
+                        _ => return Err("Illegal operands".into())
+                    }
+                }
+                Ok(r)
+            }
+            None => Err("not found".into())
+        }
+    }
 
 }
 
-#[derive(Debug, Clone)]
-pub(crate) struct Entry {
-    pub(crate) operator: u16,
-    pub(crate) operands: Vec<u8>,
-}
 
 #[derive(Debug, Clone)]
 pub(crate) struct CharString {
@@ -376,7 +367,7 @@ pub(crate) struct CharString {
 }
 
 impl Header {
-    pub(crate) fn parse<R: BinaryReader>(r: &mut R) -> Result<Self, Box<dyn std::error::Error>> {
+    pub(crate) fn parse<R: BinaryReader>(r: &mut R) -> Result<Self, Box<dyn Error>> {
         let major = r.read_u8()?;
         let minor = r.read_u8()?;
         let hdr_size = r.read_u8()?;
@@ -391,13 +382,11 @@ impl Header {
 }
 
 impl Index {
-    pub(crate) fn parse<R: BinaryReader>(r: &mut R) -> Result<Self, Box<dyn std::error::Error>> {
+    pub(crate) fn parse<R: BinaryReader>(r: &mut R) -> Result<Self, Box<dyn Error>> {
         let count = r.read_u16_be()?;
         if count == 0 {
             return Ok(Self {
                 count,
-                off_size: 0,
-                offsets: Vec::new(),
                 data: Vec::new(),
             });
         }
@@ -406,7 +395,6 @@ impl Index {
 
         let mut offsets = Vec::new();
         for _ in 0..count + 1 {
-            println!("offsets.len(): {}", offsets.len());
             match off_size {
                 1 => offsets.push(r.read_u8()? as u32),
                 2 => offsets.push(r.read_u16_be()? as u32),
@@ -419,34 +407,20 @@ impl Index {
                 _ => {}
             }
         }
-        println!("offsets: {:?}", offsets);
 
         let mut data = Vec::new();
         for i in 0..count {
             let start = offsets[i as usize] as usize;
             let end = offsets[i as usize + 1] as usize;
-            println!("start: {} end: {}", start, end);
             let buf = r.read_bytes_as_vec(end - start)?;
             data.push(buf);
         }
         Ok(Self {
             count,
-            off_size,
-            offsets,
             data,
         })
     }
 }
 
-impl PrivateDict {
-    pub(crate) fn parse<R: BinaryReader>(
-        r: &mut R,
-        size: u32,
-    ) -> Result<Self, Box<dyn std::error::Error>> {
-        let mut buf = r.read_bytes_as_vec(size as usize)?;
-        let dict = Dict::parse(&buf);
-        Ok(Self { data: buf, dict })
-    } 
-}
 
 
