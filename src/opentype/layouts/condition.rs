@@ -6,7 +6,6 @@ pub(crate) struct ConditionTable {
     pub(crate) filter_range_max_value: f32,
 }
 
-
 #[derive(Debug, Clone)]
 pub(crate) struct ConditionSet {
     pub(crate) condition_count: u16,

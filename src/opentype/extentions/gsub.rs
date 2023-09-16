@@ -4,8 +4,8 @@
 
 use std::io::SeekFrom;
 
-use bin_rs::reader::BinaryReader;
 use crate::opentype::layouts::*;
+use bin_rs::reader::BinaryReader;
 
 #[derive(Debug, Clone)]
 pub(crate) struct GSUB {
@@ -86,9 +86,8 @@ impl GSUB {
             for lookup_index in feature.lookup_list_indices.iter() {
                 let lookup = self.lookups.lookups[*lookup_index as usize].clone();
                 for subtable in lookup.subtables.iter() {
-                    let (coverage,_) = subtable.get_coverage();
+                    let (coverage, _) = subtable.get_coverage();
                     if let Some(id) = coverage.contains(griph_ids) {
-                        
                         return Some(id);
                     }
                 }
@@ -98,28 +97,27 @@ impl GSUB {
     }
 
     // vert, vrt2, vrtr
-    pub fn lookup_vertical(&self, griph_ids: usize) -> usize{
+    pub fn lookup_vertical(&self, griph_ids: usize) -> usize {
         todo!("lookup_vertical")
     }
 
     // locl
-    pub fn lookup_locale(&self, griph_ids: usize,locale: &String) -> usize{
+    pub fn lookup_locale(&self, griph_ids: usize, locale: &String) -> usize {
         todo!("lookup_locale")
     }
 
     // liga
-    pub fn lookup_liga(&self, griph_ids: usize) -> usize{
+    pub fn lookup_liga(&self, griph_ids: usize) -> usize {
         todo!("lookup_liga")
     }
 
     // hwid, fwid, qwid, twid, pkna
-    pub fn lookup_width(&self, griph_ids: usize, tag: u32) -> usize{
+    pub fn lookup_width(&self, griph_ids: usize, tag: u32) -> usize {
         todo!("lookup_width")
     }
 
     // dnom, numr, frac, subs, sups, zero
-    pub fn lookup_number(&self, griph_ids: Vec<usize>) -> usize{
+    pub fn lookup_number(&self, griph_ids: Vec<usize>) -> usize {
         todo!("lookup_number")
     }
-
 }

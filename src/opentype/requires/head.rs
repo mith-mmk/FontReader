@@ -14,7 +14,7 @@ pub(crate) struct HEAD {
     // magic number is 0x5F0F3CF5
     pub(crate) magic_number: u32,
     pub(crate) flags: u16,
-    // em = max font width if 16pt = 16pt 
+    // em = max font width if 16pt = 16pt
     // units per em = 16pt / em
     pub(crate) units_per_em: u16,
     pub(crate) created: LONGDATETIME,
@@ -31,7 +31,7 @@ pub(crate) struct HEAD {
     // 3: outline
     // 4: shadow
     // 5: condensed
-    // 6: extended   
+    // 6: extended
     pub(crate) mac_style: u16,
     // units per em = ppem = pixel per em
     // 96dpi(Windows default) = 16ppem = 12pt
@@ -45,10 +45,10 @@ pub(crate) struct HEAD {
     // 0: short offsets
     // 1: long offsets
     pub(crate) index_to_loc_format: i16,
-    // 0: current format 
+    // 0: current format
     // 1: compressed
     // 2: mixed
-    // 3: composite   
+    // 3: composite
     pub(crate) glyph_data_format: i16,
 }
 

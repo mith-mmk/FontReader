@@ -1,4 +1,3 @@
-
 mod tests {
 
     #[cfg(target_feature = "impl")]
@@ -57,7 +56,6 @@ mod tests {
         } else {
             panic!("not integer");
         }
-       
 
         let b = [0x27];
         let (value, len) = operand_encoding(&b)?;

@@ -1,6 +1,6 @@
-use std::io::SeekFrom;
-use bin_rs::reader::BinaryReader;
 use super::*;
+use bin_rs::reader::BinaryReader;
+use std::io::SeekFrom;
 
 #[derive(Debug, Clone)]
 pub(crate) struct Feature {
@@ -12,7 +12,7 @@ pub(crate) struct Feature {
 
 impl Feature {
     pub(crate) fn to_string(&self) -> String {
-        let mut bytes = [0;4];
+        let mut bytes = [0; 4];
         for i in 0..4 {
             bytes[3 - i] = (self.feature_tag >> (i * 8)) as u8;
         }
@@ -22,16 +22,12 @@ impl Feature {
         string += &format!("LookupListIndices: {:?}\n", self.lookup_list_indices);
         string
     }
-
-
 }
 
 #[derive(Debug, Clone)]
 pub(crate) struct FeatureParams {
     pub(crate) feature_params: u16,
 }
-
-
 
 #[derive(Debug, Clone)]
 pub(crate) struct FeatureList {
@@ -60,7 +56,9 @@ impl FeatureList {
             let feature_params_offset = reader.read_u16_be().unwrap();
             let lookup_count = reader.read_u16_be().unwrap();
             for _ in 0..lookup_count {
-                feature.lookup_list_indices.push(reader.read_u16_be().unwrap());
+                feature
+                    .lookup_list_indices
+                    .push(reader.read_u16_be().unwrap());
             }
             if feature_params_offset > 0 {
                 todo!("FeatureParams")
@@ -73,7 +71,7 @@ impl FeatureList {
         }
     }
 
-    pub(crate) fn get_features(&self, tag: &[u8;4]) -> Vec<Feature> {
+    pub(crate) fn get_features(&self, tag: &[u8; 4]) -> Vec<Feature> {
         let tag_id = u32::from_be_bytes(*tag);
         let mut features = Vec::new();
         for feature in self.features.iter() {
@@ -82,7 +80,7 @@ impl FeatureList {
             }
         }
         features
-    }   
+    }
 
     pub(crate) fn to_string(&self) -> String {
         let mut string = format!("FeatureCount: {}\n", self.feature_count);
@@ -156,7 +154,6 @@ impl FeatureVariations {
             condition_sets: Box::new(condition_sets),
             feature_table_substitutions: Box::new(feature_table_substitutions),
         }
-
     }
 }
 

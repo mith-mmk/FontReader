@@ -1,10 +1,9 @@
 // CFF is Adobe Type 1 font format, which is a compact binary format.
 
-use std::{io::SeekFrom, collections::HashMap, error::Error};
+use std::{collections::HashMap, error::Error, io::SeekFrom};
 
 // Compare this snippet from src/outline/cff.rs:
 use bin_rs::reader::{BinaryReader, BytesReader};
-
 
 //
 // // CFF is Adobe Type 1 font format, which is a compact binary format.
@@ -18,7 +17,6 @@ type SID = u16;
 type Card32 = u32;
 */
 type SID = u16;
-
 
 #[derive(Debug, Clone)]
 pub(crate) struct CFF {
@@ -38,7 +36,11 @@ pub(crate) struct CFF {
 }
 
 impl CFF {
-    pub(crate) fn new<R:BinaryReader>(reader: &mut R, offset: u32, length: u32) -> Result<Self, Box<dyn Error>> {
+    pub(crate) fn new<R: BinaryReader>(
+        reader: &mut R,
+        offset: u32,
+        length: u32,
+    ) -> Result<Self, Box<dyn Error>> {
         println!("offset: {} length: {}", offset, length);
         reader.seek(SeekFrom::Start(offset as u64))?;
 
@@ -81,7 +83,7 @@ impl CFF {
         // parce char_strings
         let font_dict_index = Index::parse(reader)?;
         // parse font_dict_index
-       
+
         let private_dict = Index::parse(reader)?;
         // parse private_dict
         let private_dict = Dict::parse(&private_dict.data[0])?;
@@ -99,9 +101,8 @@ impl CFF {
             charset,
             fd_select: None,
             char_strings: Vec::new(),
-            font_dict_index: None,         
-
-        })     
+            font_dict_index: None,
+        })
     }
 }
 
@@ -114,8 +115,7 @@ pub(crate) enum Operand {
     None,
 }
 
-
-pub(crate) fn operand_encoding(b: &[u8]) -> Result<(Operand,usize),Box<dyn Error>> {
+pub(crate) fn operand_encoding(b: &[u8]) -> Result<(Operand, usize), Box<dyn Error>> {
     if b.is_empty() {
         return Err("empty".into());
     }
@@ -128,14 +128,20 @@ pub(crate) fn operand_encoding(b: &[u8]) -> Result<(Operand,usize),Box<dyn Error
             return Err("buffer shotage".into());
         }
         let b1 = b[1];
-        return Ok((Operand::Integer((b0 as i32 - 247) * 256 + b1 as i32 + 108), 2));
+        return Ok((
+            Operand::Integer((b0 as i32 - 247) * 256 + b1 as i32 + 108),
+            2,
+        ));
     }
     if (251..=254).contains(&b0) {
         if b.len() < 2 {
             return Err("buffer shotage".into());
         }
         let b1 = b[1];
-        return Ok((Operand::Integer(-(b0 as i32 - 251) * 256 - b1 as i32 - 108) , 2));
+        return Ok((
+            Operand::Integer(-(b0 as i32 - 251) * 256 - b1 as i32 - 108),
+            2,
+        ));
     }
     if b0 == 28 {
         if b.len() < 3 {
@@ -211,13 +217,11 @@ pub(crate) fn operand_encoding(b: &[u8]) -> Result<(Operand,usize),Box<dyn Error
         let str = r.iter().collect::<String>();
         match str.parse::<f64>() {
             Ok(f64value) => return Ok((Operand::Real(f64value), x)),
-            Err(_) => return Err("Illegal value".into())
+            Err(_) => return Err("Illegal value".into()),
         }
     }
     Err("Illegal value".into())
 }
-
-
 
 #[derive(Debug, Clone)]
 pub(crate) struct Header {
@@ -233,14 +237,11 @@ pub(crate) struct Index {
     pub(crate) data: Vec<Vec<u8>>,
 }
 
-
-
 type PrivateDict = Dict;
-
 
 #[derive(Debug, Clone)]
 pub(crate) struct Dict {
-    pub(crate) entries: HashMap<u16, Vec<Operand>>
+    pub(crate) entries: HashMap<u16, Vec<Operand>>,
 }
 
 impl Dict {
@@ -250,17 +251,16 @@ impl Dict {
         let mut operator = 0;
         let mut operands = Vec::new();
         while i < buffer.len() {
-            if buffer.len() <= i  {
+            if buffer.len() <= i {
                 break;
             }
             let b = buffer[i];
             if b == 12 {
-                operator = (b as u16) << 8 | buffer[i + 1] as u16;            
+                operator = (b as u16) << 8 | buffer[i + 1] as u16;
                 entries.insert(operator, operands);
                 operands = Vec::new();
                 i += 2;
-
-            } else if b <=21 {
+            } else if b <= 21 {
                 operator = b as u16;
                 entries.insert(operator, operands);
                 operands = Vec::new();
@@ -276,12 +276,9 @@ impl Dict {
             i += len;
         }
 
-
-        Ok(Self {
-            entries,
-        })
+        Ok(Self { entries })
     }
-    
+
     pub(crate) fn get_sid(&self, key1: u8, key2: u8) -> Result<i32, Box<dyn Error>> {
         self.get_i32(key1, key2)
     }
@@ -296,13 +293,12 @@ impl Dict {
                 match operands[0] {
                     Operand::Integer(value) => Ok(value),
                     Operand::Real(value) => Ok(value as i32),
-                    _ => Err("Illegal operands".into())
+                    _ => Err("Illegal operands".into()),
                 }
             }
-            None => Err("not found".into())
+            None => Err("not found".into()),
         }
     }
-
 
     pub fn get_f64(&self, key1: u8, key2: u8) -> Result<f64, Box<dyn Error>> {
         let key = (key1 as u16) << 8 | key2 as u16;
@@ -314,10 +310,10 @@ impl Dict {
                 match operands[0] {
                     Operand::Integer(value) => Ok(value as f64),
                     Operand::Real(value) => Ok(value),
-                    _ => Err("Illegal operands".into())
+                    _ => Err("Illegal operands".into()),
                 }
             }
-            None => Err("not found".into())
+            None => Err("not found".into()),
         }
     }
 
@@ -330,12 +326,12 @@ impl Dict {
                     match operand {
                         Operand::Integer(value) => r.push(*value),
                         Operand::Real(value) => r.push(*value as i32),
-                        _ => return Err("Illegal operands".into())
+                        _ => return Err("Illegal operands".into()),
                     }
                 }
                 Ok(r)
             }
-            None => Err("not found".into())
+            None => Err("not found".into()),
         }
     }
 
@@ -348,17 +344,15 @@ impl Dict {
                     match operand {
                         Operand::Integer(value) => r.push(*value as f64),
                         Operand::Real(value) => r.push(*value),
-                        _ => return Err("Illegal operands".into())
+                        _ => return Err("Illegal operands".into()),
                     }
                 }
                 Ok(r)
             }
-            None => Err("not found".into())
+            None => Err("not found".into()),
         }
     }
-
 }
-
 
 #[derive(Debug, Clone)]
 pub(crate) struct CharString {
@@ -415,12 +409,6 @@ impl Index {
             let buf = r.read_bytes_as_vec(end - start)?;
             data.push(buf);
         }
-        Ok(Self {
-            count,
-            data,
-        })
+        Ok(Self { count, data })
     }
 }
-
-
-

@@ -65,7 +65,7 @@ pub struct Font {
     pub(crate) loca: Option<loca::LOCA>, // openType font, CFF/CFF2 none
     pub(crate) grif: Option<glyf::GLYF>, // openType font, CFF/CFF2 none
     #[cfg(feature = "cff")]
-    pub(crate) cff: Option<cff::CFF>,   // CFF font, openType none
+    pub(crate) cff: Option<cff::CFF>, // CFF font, openType none
     pub(crate) colr: Option<colr::COLR>,
     pub(crate) cpal: Option<cpal::CPAL>,
     #[cfg(feature = "layout")]
@@ -173,10 +173,10 @@ impl Font {
         let grif = if self.current_font == 0 {
             self.grif.as_ref().unwrap()
         } else {
-                self.more_fonts[self.current_font - 1]
-                    .grif
-                    .as_ref()
-                    .unwrap()
+            self.more_fonts[self.current_font - 1]
+                .grif
+                .as_ref()
+                .unwrap()
         };
 
         let glyph = grif.get_glyph(glyph_id).unwrap();
@@ -227,7 +227,7 @@ impl Font {
 
     pub fn get_svg(&self, ch: char) -> String {
         // utf-32
-        let glyf_data= self.get_gryph(ch);
+        let glyf_data = self.get_gryph(ch);
         let pos = glyf_data.glyph_id;
         let glyf = glyf_data.open_type_glif.as_ref().unwrap().glyph.as_ref();
         let grif = if self.current_font == 0 {

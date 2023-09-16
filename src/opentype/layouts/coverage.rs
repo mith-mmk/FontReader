@@ -22,21 +22,17 @@ impl Coverage {
                         && range_record.end_glyph_id >= griph_id as u16
                     {
                         return Some(
-                            (range_record.start_coverage_index + (griph_id as u16 - range_record.start_glyph_id)) as usize,
+                            (range_record.start_coverage_index
+                                + (griph_id as u16 - range_record.start_glyph_id))
+                                as usize,
                         );
                     }
                 }
                 return None;
             }
         }
-
-
-
     }
-
-
 }
-
 
 #[derive(Debug, Clone)]
 pub(crate) struct CoverageFormat1 {

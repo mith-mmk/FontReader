@@ -15,10 +15,7 @@ impl LanguageSystem {
         }
         string
     }
-
-
 }
-
 
 #[derive(Debug, Clone)]
 pub(crate) struct LanguageSystemTable {
@@ -27,9 +24,6 @@ pub(crate) struct LanguageSystemTable {
     pub(crate) feature_index_count: u16,
     pub(crate) feature_indexes: Vec<u16>,
 }
-
-
-
 
 #[derive(Debug, Clone)]
 pub(crate) struct LanguageSystemRecord {
@@ -42,7 +36,5 @@ impl LanguageSystemRecord {
         let mut string = format!("LanguageSystem: {}\n", self.language_system_tag);
         string += &format!("{}\n", self.language_system.to_string());
         string
-        
     }
 }
-
