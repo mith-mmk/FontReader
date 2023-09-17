@@ -226,9 +226,9 @@ impl Glyph {
     ) -> String {
         let rsb = (layout.advance_width - parsed.x_max as isize) as i16;
         let x_min = parsed.x_min - layout.lsb as i16;
-        let y_min = -layout.line_gap;
         let x_max = parsed.x_max + rsb;
-        let y_max = layout.accender - layout.descender + layout.line_gap * 2;
+        let y_max = layout.accender - layout.descender + layout.line_gap;
+        let y_min = if y_max > (parsed.y_max - parsed.y_min) as isize { 0 } else { y_max - (parsed.y_max - parsed.y_min) as isize};
         let height = fontsize;
         let width = x_min as f32 + x_max as f32;
         let width = width * height / y_max as f32;
@@ -268,7 +268,7 @@ impl Glyph {
         parsed: &ParsedGlyph,
         layout: &crate::fontreader::HorizontalLayout,
     ) -> String {
-        let y_max = layout.accender as i16;
+        let y_max = layout.accender as i16 + layout.line_gap as i16;
         let mut svg = String::new();
         #[cfg(debug_assertions)]
         {

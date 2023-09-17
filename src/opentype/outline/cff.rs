@@ -23,6 +23,10 @@ pub(crate) struct CFF {
     pub(crate) header: Header,
     pub(crate) name: String,
     pub(crate) top_dict: Dict, // TopDict
+    #[cfg(feature = "cff2")]
+    pub(crate) global_subr: Option<GlobalSubr>, // CFF2
+    #[cfg(feature = "cff2")]
+    pub(crate) variation_store: Vec<VariationStore>, // CFF2
     pub(crate) strings: Vec<String>,
     pub(crate) charsets: Charsets,
     pub(crate) char_string: CharString,
@@ -96,9 +100,9 @@ impl CFF {
         })
     }
 
-    pub(crate) fn to_code(&self, gid: u16) -> String {
-        let cid = self.charsets.sid[gid as usize];
-        let data = &self.char_string.data.data[cid as usize];
+    pub(crate) fn to_code(&self, gid: u32) -> String {
+//        let cid = self.charsets.sid[gid as usize];
+        let data = &self.char_string.data.data[gid as usize];
         /*
            0..=11 =>  operators
            12 => escape get next byte
@@ -118,75 +122,145 @@ impl CFF {
         let mut i = 0;
         let mut string = String::new();
         let mut stacks: Vec<f64> = Vec::new();
-        let mut width = self.top_dict.get_f64(0, 20).unwrap();
+        // let mut width = self.private_dict.unwap().get_f64(0, 20).unwrap();
+        let mut width = 0.0;
         let mut first = true;
         while i < data.len() {
             let b0 = data[i];
+            i += 1;
+            println!("x: {} y: {}", x, y);
             match b0 {
                 1 => {
                     // hstem |- y dy {dya dyb}* hstem (1) |
-                    let mut i = 0;
-                    let y = stacks[i];
+                    let mut command = "hstem".to_string();
+                    let mut i = stacks.len() % 2;
+                    y = stacks[i];
+                    command += &format!(" {}", y);
                     i += 1;
                     let dy = stacks[i];
+                    y += dy;
+                    command += &format!(" {}", y);
                     i += 1;
-                    let mut command = format!("hstem {} {}", y, dy);
-                    while i < stacks.len() {
+                    while i + 1 < stacks.len() {
                         let dya = stacks[i];
+                        y += dya;
+                        command += &format!(" {}", y);
                         i += 1;
                         let dyb = stacks[i];
+                        y += dyb;
+                        command += &format!(" {}", y);
                         i += 1;
-                        command += &format!(" {} {}", dya, dyb);
                     }
                     command += "\n";
                     string += &command;
+
+                    stacks.truncate(i)
                 }
                 3 => {
                     // vstem |- v dx {dxa dxb}* vstem (3) |
-                    let mut i = 0;
-                    let x = stacks[i];
+                    let mut command = "vstem".to_string();
+                    let mut i = stacks.len() % 2;
+                    x = stacks[i];
+                    command += &format!(" {}", x);
                     i += 1;
                     let dx = stacks[i];
+                    x += dx;
+                    command += &format!(" {}", x);
                     i += 1;
-                    let mut command = format!("vstem {} {}", x, dx);
-                    while i < stacks.len() {
+                    while i + 2 < stacks.len() {
                         let dxa = stacks[i];
+                        x += dxa;
+                        command += &format!(" {}", x);
                         i += 1;
                         let dxb = stacks[i];
+                        x += dxb;
+                        command += &format!(" {}", x);
                         i += 1;
-                        command += &format!(" {} {}", dxa, dxb);
                     }
                     command += "\n";
                     string += &command;
+                    // stacks.len() - i..stacks(i) までの要素を削除
+                    stacks.truncate(i);
                 }
                 18 => {
                     // hstemhm |- y dy {dya dyb}* hstemhm (18) |-
-                    todo!()
+                    let mut command = "hstemhm".to_string();
+                    y = stacks[0];
+                    command += &format!(" {}", y);
+                    let dy = stacks[1];
+                    y += dy;
+                    command += &format!(" {}", y);
+                    let mut i = stacks.len() % 2 +2;
+                    while i < stacks.len() {
+                        let dya = stacks[i];
+                        y += dya;
+                        command += &format!(" {}", y);
+                        i += 1;
+                        let dyb = stacks[i];
+                        y += dyb;
+                        command += &format!(" {}", y);
+                        i += 1;
+                    }
+                    command += "\n";
+                    string += &command;                   
+                    stacks.truncate(i)
+
                 }
                 23 => {
                     // vstemhm |- x dx {dxa dxb}* vstemhm (23) |-
-                    todo!()
+                    let mut command = "vstemhm".to_string();
+                    x = stacks[0];
+                    command += &format!(" {}", x);
+                    let dx = stacks[1];
+                    x += dx;
+                    command += &format!(" {}", x);
+                    let mut i = stacks.len() % 2 + 2;
+                    while i < stacks.len() {
+                        let dxa = stacks[i];
+                        x += dxa;
+                        command += &format!(" {}", x);
+                        i += 1;
+                        let dxb = stacks[i];
+                        x += dxb;
+                        command += &format!(" {}", x);
+                        i += 1;
+                    }
+                    command += "\n";
+                    string += &command;
+                    stacks.truncate(i);
                 }
                 19 => {
                     // hintmask |- hintmask (19 + mask) |
-                    todo!()
+                    let mask = data[i + 1];
+                    i += 1;
+                    let mut command = "hintmask".to_string();
+                    command += &format!(" {:08b}", mask);
+                    command += "\n";
+                    string += &command;
                 }
                 20 => {
                     // cntrmask |- cntrmask (20 + mask) |-
-                    todo!()
+                    let mask = data[i + 1];
+                    i += 1;
+                    let mut command = "cntrmask".to_string();
+                    command += &format!(" {:08b}", mask);
+                    command += "\n";
+                    string += &command;
                 }
 
                 21 => {
                     // rmoveto |- dx1 dy1 rmoveto (21) |-
                     let dy = stacks.pop().unwrap();
                     let dx = stacks.pop().unwrap();
+                    x += dx;
+                    y += dy;
                     string += &format!("rmoveto {} {}\n", dx, dy);
 
                     if stacks.len() > 0 && first == true {
                         width = stacks.pop().unwrap();
                         first = false;
+                        string += &format!("width {}\n", width);
                     }
-
                 }
                 22 => {
                     // hmoveto |- dx1 hmoveto (22) |-
@@ -196,8 +270,9 @@ impl CFF {
                     if stacks.len() > 0 && first == true {
                         width = stacks.pop().unwrap();
                         first = false;
+                        string += &format!("width {}\n", width);
                     }
-
+                    string += &format!("hmoveto {}\n", dy);
                 }
                 4 => {
                     // vmoveto |- dy1 vmoveto (4) |-
@@ -208,55 +283,393 @@ impl CFF {
                     if stacks.len() > 0 && first == true {
                         width = stacks.pop().unwrap();
                         first = false;
+                        string += &format!("width {}\n", width);
+
                     }
                 }
                 5 => {
                     // rlineto |- {dxa dya}+ rlineto (5) |-
-                    todo!()
+                    let mut command = "rlineto".to_string();
+                    let mut i = 0;
+                    while i  + 1 < stacks.len() {
+                        let dxa = stacks[i];
+                        x += dxa;
+                        command += &format!(" {}", dxa);
+                        i += 1;
+                        let dya = stacks[i];
+                        y += dya;
+                        command += &format!(" {}", dya);
+                        i += 1;
+                    }
+                    command += "\n";
+                    string += &command;                    
+                    stacks.truncate(i);
                 }
                 6 => {
                     //  |- dx1 {dya dxb}* hlineto (6) |- odd
                     // |- {dxa dyb}+ hlineto (6) |-      even
-                    todo!()
+                    let mut command = "hlineto".to_string();
+                    let mut i = 0;
+                    if stacks.len() % 2 == 1 {
+                        let dx = stacks[i];
+                        x += dx;
+                        command += &format!(" dx1 {}", dx);
+                        i += 1;
+                    }
+                    while i + 2< stacks.len() {
+                        let dxa = stacks[i];
+                        x += dxa;
+                        command += &format!(" {}", dxa);
+                        i += 1;
+                        let dyb = stacks[i];
+                        y += dyb;
+                        command += &format!(" {}", dyb);
+                        i += 1;
+                    }
+                    command += "\n";
+                    string += &command;
+                    stacks.truncate(i);
                 }
                 7 => {
                     // vlineto - dy1 {dxa dyb}* vlineto (7) |- odd
                     // |- {dya dxb}+ vlineto (7) |-  even
+                    let mut command = "vlineto".to_string();
+                    let mut i = 0;
+                    if stacks.len() % 2 == 1 {
+                        let dy = stacks[i];
+                        y += dy;
+                        command += &format!(" dy1 {}", dy);
+                        i += 1;
+                    }
+                    while i + 1 < stacks.len() {
+                        let dya = stacks[i];
+                        y += dya;
+                        command += &format!(" {}", dya);
+                        i += 1;
+                        let dxb = stacks[i];
+                        x += dxb;
+                        command += &format!(" {}", dxb);
+                        i += 1;
+                    }
+                    command += "\n";
+                    string += &command;
+                    stacks.truncate(i);
 
-                    todo!()
                 }
                 8 => {
                     // rrcurveto |- {dxa dya dxb dyb dxc dyc}+ rrcurveto (8) |-
-
-                    todo!()
+                    let mut command = "rrcurveto".to_string();
+                    let mut i = 0;
+                    while i + 5 < stacks.len() {
+                        let dxa = stacks[i];
+                        x += dxa;
+                        command += &format!(" {}", dxa);
+                        i += 1;
+                        let dya = stacks[i];
+                        y += dya;
+                        command += &format!(" {}", dya);
+                        i += 1;
+                        let dxb = stacks[i];
+                        x += dxb;
+                        command += &format!(" {}", dxb);
+                        i += 1;
+                        let dyb = stacks[i];
+                        y += dyb;
+                        command += &format!(" {}", dyb);
+                        i += 1;
+                        let dxc = stacks[i];
+                        x += dxc;
+                        command += &format!(" {}", dxc);
+                        i += 1;
+                        let dyc = stacks[i];
+                        y += dyc;
+                        command += &format!(" {}", dyc);
+                        i += 1;
+                    }
+                    stacks.truncate(i);
                 }
                 27 => {
                     //hhcurveto|- dy1? {dxa dxb dyb dxc}+ hhcurveto (27) |-
-                    todo!()
+                    let mut command = "hhcurveto".to_string();
+                    let mut i = 0;
+                    if stacks.len() % 4 == 1 {
+                        let dy = stacks[i];
+                        y += dy;
+                        command += &format!(" dy1 {}", dy);
+                        i += 1;
+                    }
+                    while i + 3 < stacks.len() {
+                        let dxa = stacks[i];
+                        x += dxa;
+                        command += &format!(" {}", dxa);
+                        i += 1;
+                        let dxb = stacks[i];
+                        x += dxb;
+                        command += &format!(" {}", dxb);
+                        i += 1;
+                        let dyb = stacks[i];
+                        y += dyb;
+                        command += &format!(" {}", dyb);
+                        i += 1;
+                        let dxc = stacks[i];
+                        x += dxc;
+                        command += &format!(" {}", dxc);
+                        i += 1;
+                    }
+                    command += "\n";
+                    string += &command;
+                    stacks.truncate(i);
+             
                 }
                 31 => {
                     // hvcurveto |- dx1 dx2 dy2 dy3 {dya dxb dyb dxc dxd dxe dye dyf}* dxf?
                     //                hvcurveto (31) |-
                     // |- {dxa dxb dyb dyc dyd dxe dye dxf}+ dyf? hvcurveto (31) |-
-                    todo!()
+                    let mut command = "hvcurveto".to_string();
+                    let mut i = 0;
+                    if stacks.len() % 8 == 4 || stacks.len() % 8 == 5 {
+                        let dx = stacks[i];
+                        x += dx;
+                        command += &format!(" dx1 {}", dx);
+                        i += 1;
+                        let dx = stacks[i];
+                        x += dx;
+                        command += &format!(" dx2 {}", dx);
+                        i += 1;
+                        let dy = stacks[i];
+                        y += dy;
+                        command += &format!(" dy2 {}", dy);
+                        i += 1;
+                        let dy = stacks[i];
+                        y += dy;
+                        command += &format!(" dy3 {}", dy);
+                        i += 1;
+                    }
+                    while i + 7 < stacks.len() {
+                        let dxa = stacks[i];
+                        x += dxa;
+                        command += &format!(" {}", dxa);
+                        i += 1;
+                        let dxb = stacks[i];
+                        x += dxb;
+                        command += &format!(" {}", dxb);
+                        i += 1;
+                        let dyb = stacks[i];
+                        y += dyb;
+                        command += &format!(" {}", dyb);
+                        i += 1;
+                        let dyc = stacks[i];
+                        y += dyc;
+                        command += &format!(" {}", dyc);
+                        i += 1;
+                        let dyd = stacks[i];
+                        y += dyd;
+                        command += &format!(" {}", dyd);
+                        i += 1;
+                        let dxe = stacks[i];
+                        x += dxe;
+                        command += &format!(" {}", dxe);
+                        i += 1;
+                        let dye = stacks[i];
+                        y += dye;
+                        command += &format!(" {}", dye);
+                        i += 1;
+                        let dxf = stacks[i];
+                        x += dxf;
+                        command += &format!(" {}", dxf);
+                        i += 1;
+                    }
+                    if i < stacks.len() {
+                        let dyf = stacks[i];
+                        y += dyf;
+                        command += &format!(" dxf {}", dyf);
+                        i += 1;
+                    }
+                    command += "\n";
+                    string += &command;
+                    stacks.truncate(i);
                 }
                 24 => {
                     // rcurveline rcurveline |- {dxa dya dxb dyb dxc dyc}+ dxd dyd rcurveline (24) |-
-                    todo!()
+                    let mut command = "rcurveline".to_string();
+                    let mut i = 0;
+                    while i + 6 < stacks.len() {
+                        let dxa = stacks[i];
+                        x += dxa;
+                        command += &format!(" {}", dxa);
+                        i += 1;
+                        let dya = stacks[i];
+                        y += dya;
+                        command += &format!(" {}", dya);
+                        i += 1;
+                        let dxb = stacks[i];
+                        x += dxb;
+                        command += &format!(" {}", dxb);
+                        i += 1;
+                        let dyb = stacks[i];
+                        y += dyb;
+                        command += &format!(" {}", dyb);
+                        i += 1;
+                        let dxc = stacks[i];
+                        x += dxc;
+                        command += &format!(" {}", dxc);
+                        i += 1;
+                        let dyc = stacks[i];
+                        y += dyc;
+                        command += &format!(" {}", dyc);
+                        i += 1;
+                    }
+                    if i + 2 == stacks.len() {
+                        let dxd = stacks[i];
+                        x += dxd;
+                        command += &format!(" dxd {}", dxd);
+                        i += 1;
+                        let dyd = stacks[i];
+                        y += dyd;
+                        command += &format!(" dyd {}", dyd);
+                        i += 1;
+                    }
+                    command += "\n";
+                    string += &command;
+                    stacks.truncate(i);
                 }
-                25 => {
+                25 => {                  
                     // rlinecurve rlinecurve |- {dxa dya}+ dxb dyb dxc dyc dxd dyd rlinecurve (25) |-
-                    todo!()
+                    let mut command = "rlinecurve".to_string();
+                    let mut i = 0;
+                    while i + 6 < stacks.len() {
+                        let dxa = stacks[i];
+                        x += dxa;
+                        command += &format!(" {}", dxa);
+                        i += 1;
+                        let dya = stacks[i];
+                        y += dya;
+                        command += &format!(" {}", dya);
+                        i += 1;
+                    }
+                    let dxb = stacks[i];
+                    x += dxb;
+                    command += &format!(" {}", dxb);
+                    i += 1;
+                    let dyb = stacks[i];
+                    y += dyb;
+                    command += &format!(" {}", dyb);
+                    i += 1;
+                    let dxc = stacks[i];
+                    x += dxc;
+                    command += &format!(" {}", dxc);
+                    i += 1;
+                    let dyc = stacks[i];
+                    y += dyc;
+                    command += &format!(" {}", dyc);
+                    i += 1;
+                    let dxd = stacks[i];
+                    x += dxd;
+                    command += &format!(" {}", dxd);
+                    i += 1;
+                    let dyd = stacks[i];
+                    y += dyd;
+                    command += &format!(" {}", dyd);
+                    command += "\n";
+                    string += &command;
+                    stacks.clear();
                 }
                 30 => {
                     // vhcurveto |- dy1 dx2 dy2 dx3 {dxa dxb dyb dyc dyd dxe dye dxf}* dyf?
                     // vhcurveto (30) |-
                     // |- {dya dxb dyb dxc dxd dxe dye dyf}+ dxf? vhcurveto (30) |-
-                    todo!()
+                    let mut command = "vhcurveto".to_string();
+                    let mut i = 0;
+                    if stacks.len() % 8 == 4 || stacks.len() % 8 == 5 {
+                        let dy = stacks[i];
+                        y += dy;
+                        command += &format!(" dy1 {}", dy);
+                        i += 1;
+                        let dx = stacks[i];
+                        x += dx;
+                        command += &format!(" dx2 {}", dx);
+                        i += 1;
+                        let dy = stacks[i];
+                        y += dy;
+                        command += &format!(" dy2 {}", dy);
+                        i += 1;
+                        let dx = stacks[i];
+                        x += dx;
+                        command += &format!(" dx3 {}", dx);
+                        i += 1;
+                    }
+                    while i + 7 < stacks.len() {
+                        let dya = stacks[i];
+                        y += dya;
+                        command += &format!(" {}", dya);
+                        i += 1;
+                        let dxb = stacks[i];
+                        x += dxb;
+                        command += &format!(" {}", dxb);
+                        i += 1;
+                        let dyb = stacks[i];
+                        y += dyb;
+                        command += &format!(" {}", dyb);
+                        i += 1;
+                        let dxc = stacks[i];
+                        x += dxc;
+                        command += &format!(" {}", dxc);
+                        i += 1;
+                        let dxd = stacks[i];
+                        x += dxd;
+                        command += &format!(" {}", dxd);
+                        i += 1;
+                        let dxe = stacks[i];
+                        x += dxe;
+                        command += &format!(" {}", dxe);
+                        i += 1;
+                        let dye = stacks[i];
+                        y += dye;
+                        command += &format!(" {}", dye);
+                        i += 1;
+                        let dxf = stacks[i];
+                        x += dxf;
+                        command += &format!(" {}", dxf);
+                        i += 1;
+                    }
+                    if i < stacks.len() {
+                        let dyf = stacks[i];
+                        y += dyf;
+                        command += &format!(" dxf {}", dyf);
+                    }
+                    command += "\n";
+                    string += &command;                   
+                    stacks.clear();
                 }
                 26 => {
                     // vvcurveto |- dx1? {dya dxb dyb dyc}+ vvcurveto (26) |-
-                    todo!()
+                    let mut command = "vvcurveto".to_string();
+                    let mut i = 0;
+                    if stacks.len() % 4 == 1 {
+                        let dx = stacks[i];
+                        x += dx;
+                        command += &format!(" dx1 {}", dx);
+                        i += 1;
+                    }
+                    while i + 3 < stacks.len() {
+                        let dya = stacks[i];
+                        y += dya;
+                        command += &format!(" {}", dya);
+                        i += 1;
+                        let dxb = stacks[i];
+                        x += dxb;
+                        command += &format!(" {}", dxb);
+                        i += 1;
+                        let dyb = stacks[i];
+                        y += dyb;
+                        command += &format!(" {}", dyb);
+                        i += 1;
+                        let dyc = stacks[i];
+                        y += dyc;
+                        command += &format!(" {}", dyc);
+                        i += 1;
+                    }
+                    command += "\n";
                 }
 
                 28 => {
@@ -264,21 +677,82 @@ impl CFF {
                     let value = i16::from_be_bytes([b0, b1]) as i32;
                     stacks.push(value as f64);
                     i += 1;
+                    stacks.clear();
                 }
                 14 => {
                     // endchar – endchar (14) |–
                     break;
                 }
                 12 => {
-                    let b1 = data[i + 1];
+                    let b1 = data[i];
+                    i += 1;
                     match b1 {
                         35 => { // flex |- dx1 dy1 dx2 dy2 dx3 dy3 dx4 dy4 dx5 dy5 dx6 dy6 fd flex (12 35) |-
+                            let mut command = "flex".to_string();
+                            let fd = stacks.pop().unwrap();
+                            let dy6 = stacks.pop().unwrap();
+                            let dx6 = stacks.pop().unwrap();
+                            let dy5 = stacks.pop().unwrap();
+                            let dx5 = stacks.pop().unwrap();
+                            let dy4 = stacks.pop().unwrap();
+                            let dx4 = stacks.pop().unwrap();
+                            let dy3 = stacks.pop().unwrap();
+                            let dx3 = stacks.pop().unwrap();
+                            let dy2 = stacks.pop().unwrap();
+                            let dx2 = stacks.pop().unwrap();
+                            let dy1 = stacks.pop().unwrap();
+                            let dx1 = stacks.pop().unwrap();
+                            x += dx1 + dx2 + dx3 + dx4 + dx5 + dx6;
+                            y += dy1 + dy2 + dy3 + dy4 + dy5 + dy6;
+                            command += &format!(" {} {} {} {} {} {} {} {} {} {} {} {} fd {}\n", dx1, dy1, dx2, dy2, dx3, dy3, dx4, dy4, dx5, dy5, dx6, dy6, fd);
+                            string += &command;
+                           
                         }
                         34 => { // hflex |- dx1 dx2 dy2 dx3 dx4 dx5 dx6 hflex (12 34) |
+                            let mut command = "hflex".to_string();
+                            let dx6 = stacks.pop().unwrap();
+                            let dx5 = stacks.pop().unwrap();
+                            let dx4 = stacks.pop().unwrap();
+                            let dx3 = stacks.pop().unwrap();
+                            let dx2 = stacks.pop().unwrap();
+                            let dx1 = stacks.pop().unwrap();
+                            x += dx1 + dx2 + dx3 + dx4 + dx5 + dx6;
+                            command += &format!(" {} {} {} {} {} {}\n", dx1, dx2, dx3, dx4, dx5, dx6);
+                            string += &command;                           
                         }
                         36 => { // hflex1 |- dx1 dy1 dx2 dy2 dx3 dx4 dx5 dy5 dx6 hflex1 (12 36) |
+                            let mut command = "hflex1".to_string();
+                            let dx6 = stacks.pop().unwrap();
+                            let dy5 = stacks.pop().unwrap();
+                            let dx5 = stacks.pop().unwrap();
+                            let dx4 = stacks.pop().unwrap();
+                            let dx3 = stacks.pop().unwrap();
+                            let dy2 = stacks.pop().unwrap();
+                            let dx2 = stacks.pop().unwrap();
+                            let dy1 = stacks.pop().unwrap();
+                            let dx1 = stacks.pop().unwrap();
+                            x += dx1 + dx2 + dx3 + dx4 + dx5 + dx6;
+                            y += dy1 + dy2 + dy5;
+                            command += &format!(" {} {} {} {} {} {} {} {} {}\n", dx1, dy1, dx2, dy2, dx3, dx4, dx5, dy5, dx6);
+                            string += &command; 
                         }
                         37 => { // flex1 |- dx1 dy1 dx2 dy2 dx3 dy3 dx4 dy4 dx5 dy5 d6 flex1 (12 37) |-
+                            let mut command = "flex1".to_string();
+                            let dy6 = stacks.pop().unwrap();
+                            let dx6 = stacks.pop().unwrap();
+                            let dy5 = stacks.pop().unwrap();
+                            let dx5 = stacks.pop().unwrap();
+                            let dy4 = stacks.pop().unwrap();
+                            let dx4 = stacks.pop().unwrap();
+                            let dy3 = stacks.pop().unwrap();
+                            let dx3 = stacks.pop().unwrap();
+                            let dy2 = stacks.pop().unwrap();
+                            let dx2 = stacks.pop().unwrap();
+                            let dy1 = stacks.pop().unwrap();
+                            let dx1 = stacks.pop().unwrap();
+                            x += dx1 + dx2 + dx3 + dx4 + dx5 + dx6;
+                            y += dy1 + dy2 + dy3 + dy4 + dy5 + dy6;
+                            command += &format!(" {} {} {} {} {} {} {} {} {} {} {} {}\n", dx1, dy1, dx2, dy2, dx3, dy3, dx4, dy4, dx5, dy5, dx6, dy6);
                         }
 
                         19 => {
@@ -371,58 +845,53 @@ impl CFF {
                             stacks.push(num);
                         }
 
-                        20 => { // put
+                        20 => {
+                            // put
                             let index = stacks.pop().unwrap();
                             let num = stacks.pop().unwrap();
                             string += &format!("put {} {}\n", index, num);
                             stacks[index as usize] = num;
-
                         }
-                        21 => { // get
+                        21 => {
+                            // get
                             let index = stacks.pop().unwrap();
                             let num = stacks[index as usize];
                             string += &format!("get {} {}\n", index, num);
                             stacks.push(num);
-
                         }
-                        3 => { // and
+                        3 => {
+                            // and
                             let num2 = stacks.pop().unwrap();
                             let num1 = stacks.pop().unwrap();
                             string += &format!("and {} {}\n", num1, num2);
-                            let num = if num1 == 0.0 || num2 == 0.0 {
-                                0
-                            } else {
-                                1
-                            };
+                            let num = if num1 == 0.0 || num2 == 0.0 { 0 } else { 1 };
                             stacks.push(num as f64);
                         }
-                        4 => { // or
+                        4 => {
+                            // or
                             let num2 = stacks.pop().unwrap();
                             let num1 = stacks.pop().unwrap();
                             string += &format!("or {} {}\n", num1, num2);
-                            let num = if num1 == 0.0 && num2 == 0.0 {
-                                0
-                            } else {
-                                1
-                            };
+                            let num = if num1 == 0.0 && num2 == 0.0 { 0 } else { 1 };
                             stacks.push(num as f64);
-
                         }
-                        5 => { // not
+                        5 => {
+                            // not
                             let num = stacks.pop().unwrap();
                             string += &format!("not {}\n", num);
                             let num = if num == 0.0 { 1 } else { 0 };
                             stacks.push(num as f64);
                         }
-                        15 => { // eq
+                        15 => {
+                            // eq
                             let num2 = stacks.pop().unwrap();
                             let num1 = stacks.pop().unwrap();
                             string += &format!("eq {} {}\n", num1, num2);
                             let num = if num1 == num2 { 1 } else { 0 };
                             stacks.push(num as f64);
-
                         }
-                        22 => { // if else
+                        22 => {
+                            // if else
                             let num2 = stacks.pop().unwrap();
                             let num1 = stacks.pop().unwrap();
                             let res2 = stacks.pop().unwrap();
@@ -430,24 +899,27 @@ impl CFF {
                             string += &format!("ifelse {} {} {} {}\n", num1, num2, res1, res2);
                             let num = if num1 > num2 { res1 } else { res2 };
                             stacks.push(num);
-
                         }
-
 
                         _ => { // reserved
                         }
                     }
                 }
-                10 => { // call callsubr
-                    todo!()
-
+                10 => {                  
+                    // call callsubr
+                    let command = "callsubr\n".to_string();
+                    string += &command;
                 }
-                29 => { // callgsubr
-                    todo!()
+                29 => {                  
+                    // callgsubr
+                    let command = "callgsubr\n".to_string();
+                    string += &command;
                 }
-                11 => { // return
-                    todo!()
-                }      
+                11 => {
+                    // return
+                    let command = "return\n".to_string();
+                    string += &command;
+                }
 
                 32..=246 => {
                     let value = b0 as i32 - 139;
@@ -476,8 +948,8 @@ impl CFF {
                     stacks.push(value);
                     i += 4;
                 }
-                _ => { // 0,2,9,13,15,16,17 reserved
-                    todo!()
+                _ => {
+                    // 0,2,9,13,15,16,17 reserved
                 }
             }
         }
@@ -716,6 +1188,8 @@ pub(crate) struct Header {
     pub(crate) minor: u8,
     pub(crate) hdr_size: u8,
     pub(crate) off_size: u8,
+    #[cfg(feature = "cff2")]
+    pub(crate) top_dict_index_offset: u32,
 }
 
 #[derive(Debug, Clone)]
@@ -863,15 +1337,35 @@ impl CharString {
 
 impl Header {
     pub(crate) fn parse<R: BinaryReader>(r: &mut R) -> Result<Self, Box<dyn Error>> {
-        let major = r.read_u8()?;
+        let major = r.read_u8()?; // CFF = 1 / CFF2 = 2
         let minor = r.read_u8()?;
-        let hdr_size = r.read_u8()?;
-        let off_size = r.read_u8()?;
+        let hdr_size = r.read_u8()?; // CFF = 4 / CFF2 = 5
+        let off_size = // CFF only
+        if major == 1 {
+            r.read_u8()?
+        } else {
+            #[cfg(not(feature = "cff2"))]
+            r.skip_ptr(hdr_size as usize - 3)?;
+            0
+        };
+        #[cfg(feature = "cff2")]
+        if major == 2 {
+            let top_dict_index_offset = r.read_u32_be()?;
+            return Ok(Self {
+                major,
+                minor,
+                hdr_size,
+                off_size,
+                top_dict_index_offset,
+            });
+        }
         Ok(Self {
             major,
             minor,
             hdr_size,
             off_size,
+            #[cfg(feature = "cff2")]
+            top_dict_index_offset: 0,
         })
     }
 }

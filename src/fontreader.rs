@@ -195,6 +195,35 @@ impl Font {
 
     pub fn get_gryph(&self, ch: char) -> GriphData {
         let code = ch as u32;
+
+        #[cfg(feature = "cff")]
+        {
+            if self.cff.is_some() {
+                let (cmap, cff) = if self.current_font == 0 {
+                    (self.cmap.as_ref().unwrap(), self.cff.as_ref().unwrap())
+                } else {
+                    (
+                        self.more_fonts[self.current_font - 1]
+                            .cmap
+                            .as_ref()
+                            .unwrap(),
+                        self.more_fonts[self.current_font - 1]
+                            .cff
+                            .as_ref()
+                            .unwrap(),
+                    )
+                };
+                let pos = cmap.get_griph_position(code);
+                let string = self.cff.as_ref().unwrap().to_code(pos);
+                println!("cff string: {}", string);
+                return GriphData {
+                    glyph_id: 0,
+                    format: GlyphFormat::CFF,
+                    open_type_glif: None,
+                };
+            }
+        }
+ 
         let (cmap, grif) = if self.current_font == 0 {
             (self.cmap.as_ref().unwrap(), self.grif.as_ref().unwrap())
         } else {
