@@ -107,7 +107,8 @@ impl OS2 {
         string += &ul_unicode_range3;
         let ul_unicode_range4 = format!("ulUnicodeRange4 {:08X}\n", self.ul_unicode_range4);
         string += &ul_unicode_range4;
-        let ach_vend_id = format!("achVendID {:?}\n", self.ach_vend_id);
+        let vend_id = String::from_utf8_lossy(&self.ach_vend_id);
+        let ach_vend_id = format!("achVendID {:?} '{}'\n", self.ach_vend_id , vend_id);
         string += &ach_vend_id;
         let fs_selection = format!("fsSelection {}\n", self.fs_selection);
         string += &fs_selection;
