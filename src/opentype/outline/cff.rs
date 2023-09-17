@@ -55,6 +55,10 @@ impl CFF {
         let fd_select_offset = top_dict.get_i32(12, 37).unwrap();
         let charsets_offset = top_dict.get_i32(0, 15).unwrap();
         let char_strings_offset = top_dict.get_i32(0, 17).unwrap();
+        let vsstore_offset = top_dict.get_i32(0,24); // none
+        let roc = top_dict.get_i32(12, 30);
+        let private = top_dict.get_i32_array(0, 18);
+        let subrtn = top_dict.get_i32(0, 19);
         #[cfg(debug_assertions)]
         {
             println!("n_glyphs: {}", n_glyphs);
@@ -64,6 +68,10 @@ impl CFF {
             println!("fd_select: {:?}", fd_select_offset);
             println!("charsets: {:?}", charsets_offset);
             println!("char_strings: {:?}", char_strings_offset);
+            println!("vsstore: {:?}", vsstore_offset);
+            println!("roc: {:?}", roc);
+            println!("private: {:?}", private);
+            println!("subrtn: {:?}", subrtn);
         }
 
         let charsets_offset = charsets_offset as u32 + offset;
@@ -917,12 +925,16 @@ impl CFF {
                 }
                 10 => {
                     // call callsubr
-                    let command = "callsubr\n".to_string();
+                    let mut command = "callsubr\n".to_string();
+                    let num = stacks.pop().unwrap();
+                    command += &format!("{}\n", num);
                     string += &command;
                 }
                 29 => {
                     // callgsubr
-                    let command = "callgsubr\n".to_string();
+                    let mut command = "callgsubr\n".to_string();
+                    let num = stacks.pop().unwrap();
+                    command += &format!("{}\n", num);
                     string += &command;
                 }
                 11 => {

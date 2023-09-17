@@ -264,6 +264,12 @@ impl Font {
         // svg ?
         // sbix ?
         // cff ?
+        if let Some(cff) = self.cff.as_ref() {
+            let gid = self.cmap.as_ref().unwrap().get_glyph_position(ch as u32);
+            let string = cff.to_code(gid);
+            return Ok(string)
+        }
+
 
         if self.glyf.is_none() {
             return Err(Error::new(
