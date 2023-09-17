@@ -137,7 +137,10 @@ impl CFF {
         while i < data.len() {
             let b0 = data[i];
             i += 1;
-
+            #[cfg(debug_assertions)]
+            {
+                println!("b0: {} , {}", b0, string);
+            }
             match b0 {
                 1 => {
                     // hstem |- y dy {dya dyb}* hstem (1) |
@@ -494,7 +497,7 @@ impl CFF {
                     // rcurveline rcurveline |- {dxa dya dxb dyb dxc dyc}+ dxd dyd rcurveline (24) |-
                     let mut command = "rcurveline".to_string();
                     let mut i = 0;
-                    while i + 6 < stacks.len() {
+                    while i + 7 < stacks.len() {
                         let dxa = stacks[i];
                         x += dxa;
                         command += &format!(" {}", dxa);
@@ -538,7 +541,7 @@ impl CFF {
                     // rlinecurve rlinecurve |- {dxa dya}+ dxb dyb dxc dyc dxd dyd rlinecurve (25) |-
                     let mut command = "rlinecurve".to_string();
                     let mut i = 0;
-                    while i + 6 < stacks.len() {
+                    while i + 7 < stacks.len() {
                         let dxa = stacks[i];
                         x += dxa;
                         command += &format!(" {}", dxa);
@@ -548,6 +551,7 @@ impl CFF {
                         command += &format!(" {}", dya);
                         i += 1;
                     }
+                    println!("rlinecurve {} {}", i, stacks.len());
                     let dxb = stacks[i];
                     x += dxb;
                     command += &format!(" {}", dxb);
@@ -601,6 +605,7 @@ impl CFF {
                         command += &format!(" dx3 {}", dx);
                         i += 1;
                     }
+
                     while i + 7 < stacks.len() {
                         let dya = stacks[i];
                         y += dya;
