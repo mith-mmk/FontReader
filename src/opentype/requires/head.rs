@@ -1,6 +1,7 @@
 use crate::fontheader::{self, LONGDATETIME};
 use bin_rs::reader::BinaryReader;
 use std::{fmt, io::SeekFrom};
+use std::io::Error;
 
 // head table
 
@@ -59,7 +60,7 @@ impl fmt::Display for HEAD {
 }
 
 impl HEAD {
-    pub(crate) fn new<B: BinaryReader>(file: &mut B, offest: u32, length: u32) -> Self {
+    pub(crate) fn new<B: BinaryReader>(file: &mut B, offest: u32, length: u32) -> Result<Self, Error> {
         get_head(file, offest, length)
     }
 
@@ -135,28 +136,28 @@ impl HEAD {
     }
 }
 
-fn get_head<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> HEAD {
-    file.seek(SeekFrom::Start(offest as u64)).unwrap();
+fn get_head<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> Result<HEAD, Error> {
+    file.seek(SeekFrom::Start(offest as u64))?;
 
-    let major_version = file.read_u16_be().unwrap();
-    let minor_version = file.read_u16_be().unwrap();
-    let font_revision = file.read_u32_be().unwrap();
-    let check_sum_adjustment = file.read_u32_be().unwrap();
-    let magic_number = file.read_u32_be().unwrap();
-    let flags = file.read_u16_be().unwrap();
-    let units_per_em = file.read_u16_be().unwrap();
-    let created = file.read_i64_be().unwrap();
-    let modified = file.read_i64_be().unwrap();
-    let x_min = file.read_i16_be().unwrap();
-    let y_min = file.read_i16_be().unwrap();
-    let x_max = file.read_i16_be().unwrap();
-    let y_max = file.read_i16_be().unwrap();
-    let mac_style = file.read_u16_be().unwrap();
-    let lowest_rec_ppem = file.read_u16_be().unwrap();
-    let font_direction_hint = file.read_i16_be().unwrap();
-    let index_to_loc_format = file.read_i16_be().unwrap();
-    let glyph_data_format = file.read_i16_be().unwrap();
-    HEAD {
+    let major_version = file.read_u16_be()?;
+    let minor_version = file.read_u16_be()?;
+    let font_revision = file.read_u32_be()?;
+    let check_sum_adjustment = file.read_u32_be()?;
+    let magic_number = file.read_u32_be()?;
+    let flags = file.read_u16_be()?;
+    let units_per_em = file.read_u16_be()?;
+    let created = file.read_i64_be()?;
+    let modified = file.read_i64_be()?;
+    let x_min = file.read_i16_be()?;
+    let y_min = file.read_i16_be()?;
+    let x_max = file.read_i16_be()?;
+    let y_max = file.read_i16_be()?;
+    let mac_style = file.read_u16_be()?;
+    let lowest_rec_ppem = file.read_u16_be()?;
+    let font_direction_hint = file.read_i16_be()?;
+    let index_to_loc_format = file.read_i16_be()?;
+    let glyph_data_format = file.read_i16_be()?;
+    Ok(HEAD {
         major_version,
         minor_version,
         font_revision,
@@ -175,5 +176,5 @@ fn get_head<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> HEAD {
         font_direction_hint,
         index_to_loc_format,
         glyph_data_format,
-    }
+    })
 }

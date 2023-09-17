@@ -1,5 +1,5 @@
 // name is a table that contains font name information.
-
+use std::io::Error;
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 #[repr(u16)]
 pub enum NameID {
@@ -165,7 +165,7 @@ impl NameTable {
         }
     }
 
-    pub fn get_name(&self, name_id: NameID, locale: &String, platform_id: PlatformID) -> String {
+    pub fn get_name(&self, name_id: NameID, locale: &String, platform_id: PlatformID) -> Result<String, Error> {
         let language_id = get_locale_to_language_id(locale, platform_id);
         let language_id = if let Some(language_id) = language_id {
             language_id
@@ -178,19 +178,19 @@ impl NameTable {
             Some(names) => {
                 let name_id = name_id as u16;
                 if let Some(name) = names.get(&name_id) {
-                    name.clone()
+                    Ok(name.clone())
                 } else if let Some(name) = self.default_namelist.get(&name_id) {
-                    name.clone()
+                    Ok(name.clone())
                 } else {
-                    "".to_string()
+                    Ok("".to_string())
                 }
             }
             None => {
                 let name_id = name_id as u16;
                 if let Some(name) = self.default_namelist.get(&name_id) {
-                    name.clone()
+                    Ok(name.clone())
                 } else {
-                    "".to_string()
+                    Ok("".to_string())
                 }
             }
         }
@@ -217,7 +217,7 @@ impl Display for NAME {
 }
 
 impl NAME {
-    pub(crate) fn new<R: BinaryReader>(file: &mut R, offest: u32, length: u32) -> Self {
+    pub(crate) fn new<R: BinaryReader>(file: &mut R, offest: u32, length: u32) -> Result<Self, Error> {
         get_names(file, offest, length)
     }
 
@@ -295,20 +295,20 @@ pub(crate) struct NameRecord {
     pub(crate) string: String,
 }
 
-fn get_names<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> NAME {
-    file.seek(SeekFrom::Start(offest as u64)).unwrap();
-    let current_position = file.offset().unwrap();
-    let version = file.read_u16_be().unwrap();
-    let count = file.read_u16_be().unwrap();
-    let storage_offset = file.read_u16_be().unwrap();
+fn get_names<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> Result<NAME, Error> {
+    file.seek(SeekFrom::Start(offest as u64))?;
+    let current_position = file.offset()?;
+    let version = file.read_u16_be()?;
+    let count = file.read_u16_be()?;
+    let storage_offset = file.read_u16_be()?;
     let mut name_records = Vec::new();
     for _ in 0..count {
-        let platform_id = file.read_u16_be().unwrap();
-        let encoding_id = file.read_u16_be().unwrap();
-        let language_id = file.read_u16_be().unwrap();
-        let name_id = file.read_u16_be().unwrap();
-        let length = file.read_u16_be().unwrap();
-        let string_offset = file.read_u16_be().unwrap();
+        let platform_id = file.read_u16_be()?;
+        let encoding_id = file.read_u16_be()?;
+        let language_id = file.read_u16_be()?;
+        let name_id = file.read_u16_be()?;
+        let length = file.read_u16_be()?;
+        let string_offset = file.read_u16_be()?;
         name_records.push(NameRecord {
             platform_id,
             encoding_id,
@@ -322,10 +322,10 @@ fn get_names<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> NAME {
     let mut lang_tag_count = 0;
     let mut lang_tag_record = Vec::new();
     if version > 0 {
-        lang_tag_count = file.read_u16_be().unwrap();
+        lang_tag_count = file.read_u16_be()?;
         for _ in 0..lang_tag_count {
-            let length = file.read_u16_be().unwrap();
-            let offset = file.read_u16_be().unwrap();
+            let length = file.read_u16_be()?;
+            let offset = file.read_u16_be()?;
             lang_tag_record.push(LangTagRecord { length, offset });
         }
     }
@@ -416,12 +416,12 @@ fn get_names<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> NAME {
         };
 
         let string_offset = name_records[i].string_offset as u64 + current_position;
-        file.seek(SeekFrom::Start(string_offset)).unwrap();
+        file.seek(SeekFrom::Start(string_offset))?;
         match encoding_engine {
             EncodingEngine::UTF16BE => {
                 let mut utf16s = Vec::new();
                 for _ in 0..name_records[i].length / 2 {
-                    let utf16 = file.read_u16_be().unwrap();
+                    let utf16 = file.read_u16_be()?;
                     utf16s.push(utf16);
                 }
                 if let Ok(string) = String::from_utf16(&utf16s) {
@@ -433,18 +433,23 @@ fn get_names<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> NAME {
             EncodingEngine::ASCII => {
                 let ascii = file
                     .read_bytes_as_vec(name_records[i].length as usize)
-                    .unwrap();
+                    ?;
                 let mut utf16s = Vec::new();
                 for i in 0..ascii.len() {
                     utf16s.push(ascii[i] as u16);
                 }
-                name_records[i].string = String::from_utf16(&utf16s).unwrap();
+                let string = String::from_utf16(&utf16s);
+                if let Ok(string) = string {
+                    name_records[i].string = string;
+                } else {
+                    name_records[i].string = "this encoding is not support".to_string();
+                }
             }
             #[cfg(feature = "encoding")]
             EncodingEngine::MacintoshLegcy => {
                 let bytes = file
                     .read_bytes_as_vec(name_records[i].length as usize)
-                    .unwrap();
+                    ?;
                 if mac_convert_table.len() > name_records[i].encoding_id as usize {
                     name_records[i].string = match iconv::decode(
                         &bytes,
@@ -466,16 +471,16 @@ fn get_names<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> NAME {
     let mut lang_tag_string = Vec::new();
     for i in 0..lang_tag_count {
         let string_offset = lang_tag_record[i as usize].offset + current_position as u16;
-        file.seek(SeekFrom::Start(string_offset as u64)).unwrap();
+        file.seek(SeekFrom::Start(string_offset as u64))?;
         let string = file
             .read_utf16be_string(lang_tag_record[i as usize].length as usize)
-            .unwrap();
+            ?;
         lang_tag_record[i as usize].offset = string_offset;
         lang_tag_record[i as usize].length = lang_tag_record[i as usize].length;
         lang_tag_string.push(string);
     }
 
-    NAME {
+    Ok(NAME {
         version,
         count,
         storage_offset,
@@ -483,5 +488,5 @@ fn get_names<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> NAME {
         lang_tag_count,
         lang_tag_records: Box::new(lang_tag_record),
         lang_tag_string: Box::new(lang_tag_string),
-    }
+    })
 }

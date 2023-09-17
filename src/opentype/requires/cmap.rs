@@ -1,5 +1,5 @@
 use bin_rs::reader::BinaryReader;
-use std::fmt;
+use std::{fmt, io::Error};
 
 // cmap is a table that maps character codes to glyph index values
 
@@ -18,7 +18,7 @@ impl fmt::Display for CMAP {
 }
 
 impl CMAP {
-    pub(crate) fn new<R: BinaryReader>(file: &mut R, offset: u32, length: u32) -> Self {
+    pub(crate) fn new<R: BinaryReader>(file: &mut R, offset: u32, length: u32) -> Result<Self, Error> {
         load_cmap_table(file, offset, length)
     }
 
@@ -152,14 +152,14 @@ pub(crate) struct CmapEncodings {
 }
 
 impl CmapEncodings {
-    pub(crate) fn new<R: BinaryReader>(file: &mut R, offset: u32, length: u32) -> Self {
-        let cmap = load_cmap_table(file, offset, length);
+    pub(crate) fn new<R: BinaryReader>(file: &mut R, offset: u32, length: u32) -> Result<Self, Error> {
+        let cmap = load_cmap_table(file, offset, length)?;
         let cmap_encodings = get_cmap_maps(&cmap);
 
-        CmapEncodings {
+        Ok(CmapEncodings {
             cmap: Box::new(cmap),
             cmap_encodings: Box::new(cmap_encodings),
-        }
+        })
     }
 
     pub(crate) fn get_encoding_engine(&self) -> Box<Vec<EncodingRecord>> {
@@ -712,31 +712,31 @@ impl UVSMapping {
 }
 
 // load_cmap_table(buffer.clone(), record.offset, record.length) -> CMAP
-fn load_cmap_table<R: BinaryReader>(file: &mut R, offset: u32, length: u32) -> CMAP {
-    file.seek(std::io::SeekFrom::Start(offset as u64)).unwrap();
+fn load_cmap_table<R: BinaryReader>(file: &mut R, offset: u32, length: u32) -> Result<CMAP, Error> {
+    file.seek(std::io::SeekFrom::Start(offset as u64))?;
 
-    let version = file.read_u16_be().unwrap();
-    let num_tables = file.read_u16_be().unwrap();
+    let version = file.read_u16_be()?;
+    let num_tables = file.read_u16_be()?;
     let mut encoding_records = Vec::new();
     for _ in 0..num_tables {
-        let platform_id = file.read_u16_be().unwrap();
-        let encoding_id = file.read_u16_be().unwrap();
-        let subtable_offset = file.read_u32_be().unwrap();
+        let platform_id = file.read_u16_be()?;
+        let encoding_id = file.read_u16_be()?;
+        let subtable_offset = file.read_u32_be()?;
         encoding_records.push(EncodingRecord {
             platform_id,
             encoding_id,
             subtable_offset,
         });
     }
-    file.seek(std::io::SeekFrom::Start(offset as u64)).unwrap();
-    let buffer = file.read_bytes_as_vec(length as usize).unwrap();
+    file.seek(std::io::SeekFrom::Start(offset as u64))?;
+    let buffer = file.read_bytes_as_vec(length as usize)?;
 
-    CMAP {
+    Ok(CMAP {
         version,
         num_tables,
         encoding_records: Box::new(encoding_records),
         buffer,
-    }
+    })
 }
 
 #[derive(Debug, Clone)]

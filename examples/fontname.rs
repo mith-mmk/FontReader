@@ -28,7 +28,7 @@ fn main() {
 
     let filename = PathBuf::from(filename);
     let font = Font::get_font_from_file(&filename);
-    if let Some(mut font) = font {
+    if let Ok(mut font) = font {
         let font_number = font.get_font_count();
         println!("fontfile: {:?} {}", filename, font_number);
         for i in 0..font_number {
@@ -36,8 +36,8 @@ fn main() {
             println!("\nfont number: {} ", i);
             NameID::iter().into_iter().for_each(|name_id| {
                 let name = font.get_name(name_id, &"ja".to_string());
-                if !name.is_empty() {
-                    println!("{:?}: {:?}", name_id, name);
+                if !name.is_err() {
+                    println!("{:?}: {:?}", name_id, name.unwrap());
                 }
             });
             #[cfg(debug_assertions)]

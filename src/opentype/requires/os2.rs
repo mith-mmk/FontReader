@@ -1,5 +1,5 @@
 use bin_rs::reader::BinaryReader;
-use std::{fmt, io::SeekFrom};
+use std::{fmt, io::{SeekFrom, Error}};
 
 // OS/2 table OS/2 and Windows specific metrics
 
@@ -53,7 +53,7 @@ impl fmt::Display for OS2 {
 }
 
 impl OS2 {
-    pub(crate) fn new<R: BinaryReader>(file: &mut R, offest: u32, length: u32) -> Self {
+    pub(crate) fn new<R: BinaryReader>(file: &mut R, offest: u32, length: u32) -> Result<Self, Error> {
         get_os2(file, offest, length)
     }
 
@@ -163,66 +163,66 @@ impl OS2 {
     }
 }
 
-fn get_os2<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> OS2 {
+fn get_os2<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> Result<OS2, Error> {
     let file = file;
-    file.seek(SeekFrom::Start(offest as u64)).unwrap();
-    let version = file.read_u16_be().unwrap();
-    let x_avg_char_width = file.read_i16_be().unwrap();
-    let us_weight_class = file.read_u16_be().unwrap();
-    let us_width_class = file.read_u16_be().unwrap();
-    let fs_type = file.read_u16_be().unwrap();
-    let y_subscript_x_size = file.read_i16_be().unwrap();
-    let y_subscript_y_size = file.read_i16_be().unwrap();
-    let y_subscript_x_offset = file.read_i16_be().unwrap();
-    let y_subscript_y_offset = file.read_i16_be().unwrap();
-    let y_superscript_x_size = file.read_i16_be().unwrap();
-    let y_superscript_y_size = file.read_i16_be().unwrap();
-    let y_superscript_x_offset = file.read_i16_be().unwrap();
-    let y_superscript_y_offset = file.read_i16_be().unwrap();
-    let y_strikeout_size = file.read_i16_be().unwrap();
-    let y_strikeout_position = file.read_i16_be().unwrap();
-    let s_family_class = file.read_i16_be().unwrap();
+    file.seek(SeekFrom::Start(offest as u64))?;
+    let version = file.read_u16_be()?;
+    let x_avg_char_width = file.read_i16_be()?;
+    let us_weight_class = file.read_u16_be()?;
+    let us_width_class = file.read_u16_be()?;
+    let fs_type = file.read_u16_be()?;
+    let y_subscript_x_size = file.read_i16_be()?;
+    let y_subscript_y_size = file.read_i16_be()?;
+    let y_subscript_x_offset = file.read_i16_be()?;
+    let y_subscript_y_offset = file.read_i16_be()?;
+    let y_superscript_x_size = file.read_i16_be()?;
+    let y_superscript_y_size = file.read_i16_be()?;
+    let y_superscript_x_offset = file.read_i16_be()?;
+    let y_superscript_y_offset = file.read_i16_be()?;
+    let y_strikeout_size = file.read_i16_be()?;
+    let y_strikeout_position = file.read_i16_be()?;
+    let s_family_class = file.read_i16_be()?;
     // 16 * 2 = 32
     let mut panose = [0; 10];
-    file.read_bytes(&mut panose).unwrap();
+    file.read_bytes(&mut panose)?;
     // 42
-    let ul_unicode_range1 = file.read_u32_be().unwrap();
-    let ul_unicode_range2 = file.read_u32_be().unwrap();
-    let ul_unicode_range3 = file.read_u32_be().unwrap();
-    let ul_unicode_range4 = file.read_u32_be().unwrap();
+    let ul_unicode_range1 = file.read_u32_be()?;
+    let ul_unicode_range2 = file.read_u32_be()?;
+    let ul_unicode_range3 = file.read_u32_be()?;
+    let ul_unicode_range4 = file.read_u32_be()?;
     // 58
 
     let mut ach_vend_id = [0; 4];
-    file.read_bytes(&mut ach_vend_id).unwrap();
+    file.read_bytes(&mut ach_vend_id)?;
     // 62
-    let fs_selection = file.read_u16_be().unwrap();
-    let us_first_char_index = file.read_u16_be().unwrap();
-    let us_last_char_index = file.read_u16_be().unwrap();
-    let s_typo_ascender = file.read_i16_be().unwrap();
-    let s_typo_descender = file.read_i16_be().unwrap();
-    let s_typo_line_gap = file.read_i16_be().unwrap();
+    let fs_selection = file.read_u16_be()?;
+    let us_first_char_index = file.read_u16_be()?;
+    let us_last_char_index = file.read_u16_be()?;
+    let s_typo_ascender = file.read_i16_be()?;
+    let s_typo_descender = file.read_i16_be()?;
+    let s_typo_line_gap = file.read_i16_be()?;
     // 76
-    let us_win_ascent = file.read_u16_be().unwrap();
-    let _us_win_descent = file.read_u16_be().unwrap();
-    let _ul_code_page_range1 = file.read_u32_be().unwrap();
-    let _ul_code_page_range2 = file.read_u32_be().unwrap();
-    let _sx_height = file.read_i16_be().unwrap();
-    let _s_cap_height = file.read_i16_be().unwrap();
-    let _us_default_char = file.read_u16_be().unwrap();
-    let _us_break_char = file.read_u16_be().unwrap();
-    let _us_max_context = file.read_u16_be().unwrap();
+    let us_win_ascent = file.read_u16_be()?;
+    let _us_win_descent = file.read_u16_be()?;
+    let _ul_code_page_range1 = file.read_u32_be()?;
+    let _ul_code_page_range2 = file.read_u32_be()?;
+    let _sx_height = file.read_i16_be()?;
+    let _s_cap_height = file.read_i16_be()?;
+    let _us_default_char = file.read_u16_be()?;
+    let _us_break_char = file.read_u16_be()?;
+    let _us_max_context = file.read_u16_be()?;
     // 96
 
-    let _us_lower_optical_point_size = file.read_u16_be().unwrap();
-    let _us_upper_optical_point_size = file.read_u16_be().unwrap();
+    let _us_lower_optical_point_size = file.read_u16_be()?;
+    let _us_upper_optical_point_size = file.read_u16_be()?;
 
     let mut us_win_descent = 0;
     let mut ul_code_page_range1 = 0;
     let mut ul_code_page_range2 = 0;
     if version >= 1 {
-        us_win_descent = file.read_u16_be().unwrap();
-        ul_code_page_range1 = file.read_u32_be().unwrap();
-        ul_code_page_range2 = file.read_u32_be().unwrap();
+        us_win_descent = file.read_u16_be()?;
+        ul_code_page_range1 = file.read_u32_be()?;
+        ul_code_page_range2 = file.read_u32_be()?;
     }
 
     let mut sx_height = 0;
@@ -232,19 +232,19 @@ fn get_os2<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> OS2 {
     let mut us_max_context = 0;
 
     if version >= 2 {
-        sx_height = file.read_i16_be().unwrap();
-        s_cap_height = file.read_i16_be().unwrap();
-        us_default_char = file.read_u16_be().unwrap();
-        us_break_char = file.read_u16_be().unwrap();
-        us_max_context = file.read_u16_be().unwrap();
+        sx_height = file.read_i16_be()?;
+        s_cap_height = file.read_i16_be()?;
+        us_default_char = file.read_u16_be()?;
+        us_break_char = file.read_u16_be()?;
+        us_max_context = file.read_u16_be()?;
     }
     let mut us_lower_optical_point_size = 0;
     let mut us_upper_optical_point_size = 0;
     if version >= 5 {
-        us_lower_optical_point_size = file.read_u16_be().unwrap();
-        us_upper_optical_point_size = file.read_u16_be().unwrap();
+        us_lower_optical_point_size = file.read_u16_be()?;
+        us_upper_optical_point_size = file.read_u16_be()?;
     }
-    OS2 {
+    Ok(OS2 {
         version,
         x_avg_char_width,
         us_weight_class,
@@ -284,5 +284,5 @@ fn get_os2<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> OS2 {
         us_max_context,
         us_lower_optical_point_size,
         us_upper_optical_point_size,
-    }
+    })
 }

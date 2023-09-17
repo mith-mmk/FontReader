@@ -5,7 +5,7 @@ use std::{fmt, io::SeekFrom};
 
 #[derive(Debug, Clone)]
 pub(crate) struct VMTX {
-    pub(crate) h_metrics: Box<Vec<LongHorMetric>>,
+    pub(crate) v_metrics: Box<Vec<LongHorMetric>>,
     pub(crate) top_side_bearings: Box<Vec<u16>>,
 }
 
@@ -22,22 +22,28 @@ impl VMTX {
         length: u32,
         number_of_hmetrics: u16,
         num_glyphs: u16,
-    ) -> Self {
+    ) -> Result<Self, std::io::Error> {
         get_hdmx(file, offest, length, number_of_hmetrics, num_glyphs)
     }
 
     pub(crate) fn get_metrix(&self, i: usize) -> LongHorMetric {
-        let h_metric = self.h_metrics.get(i).unwrap();
-        h_metric.clone()
+        let v_metric = self.v_metrics.get(i);
+        if v_metric.is_none() {
+            return LongHorMetric {
+                advance_width: 0,
+                top_side_bearing: 0,
+            };
+        }
+        v_metric.unwrap().clone()
     }
 
     pub(crate) fn to_string(&self) -> String {
         let mut string = "hmtx\n".to_string();
         let max_len = 10;
-        for (i, h_metric) in self.h_metrics.iter().enumerate() {
-            let advance_width = format!("{i} Advance Width {} ", h_metric.advance_width);
+        for (i, v_metric) in self.v_metrics.iter().enumerate() {
+            let advance_width = format!("{i} Advance Height {} ", v_metric.advance_width);
             string += &advance_width;
-            let top_side_bearing = format!("Left Side Bearing {}\n", h_metric.top_side_bearing);
+            let top_side_bearing = format!("Top Side Bearing {}\n", v_metric.top_side_bearing);
             string += &top_side_bearing;
             if max_len < i {
                 break;
@@ -66,14 +72,14 @@ fn get_hdmx<R: bin_rs::reader::BinaryReader>(
     _length: u32,
     number_of_hmetrics: u16,
     num_glyphs: u16,
-) -> VMTX {
+) -> Result<VMTX, std::io::Error> {
     let file = file;
-    file.seek(SeekFrom::Start(offest as u64)).unwrap();
-    let mut h_metrics = Vec::new();
+    file.seek(SeekFrom::Start(offest as u64))?;
+    let mut v_metrics = Vec::new();
     for _ in 0..number_of_hmetrics {
-        let advance_width = file.read_u16_be().unwrap();
-        let top_side_bearing = file.read_i16_be().unwrap();
-        h_metrics.push(LongHorMetric {
+        let advance_width = file.read_u16_be()?;
+        let top_side_bearing = file.read_i16_be()?;
+        v_metrics.push(LongHorMetric {
             advance_width,
             top_side_bearing,
         });
@@ -81,11 +87,11 @@ fn get_hdmx<R: bin_rs::reader::BinaryReader>(
     let mut top_side_bearings = Vec::new();
     let number = num_glyphs - number_of_hmetrics;
     for _ in 0..number {
-        let top_side_bearing = file.read_u16_be().unwrap();
+        let top_side_bearing = file.read_u16_be()?;
         top_side_bearings.push(top_side_bearing);
     }
-    VMTX {
-        h_metrics: Box::new(h_metrics),
+    Ok(VMTX {
+        v_metrics: Box::new(v_metrics),
         top_side_bearings: Box::new(top_side_bearings),
-    }
+    })
 }

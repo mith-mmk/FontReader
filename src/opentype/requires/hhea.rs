@@ -1,5 +1,6 @@
 use bin_rs::reader::BinaryReader;
 use std::{fmt, io::SeekFrom};
+use std::io::Error;
 
 // hhea table Font horizontal metrics header
 
@@ -34,7 +35,7 @@ impl fmt::Display for HHEA {
 }
 
 impl HHEA {
-    pub(crate) fn new<R: BinaryReader>(file: &mut R, offest: u32, length: u32) -> Self {
+    pub(crate) fn new<R: BinaryReader>(file: &mut R, offest: u32, length: u32) -> Result<Self, Error> {
         get_hhea(file, offest, length)
     }
 
@@ -92,28 +93,28 @@ impl HHEA {
     }
 }
 
-fn get_hhea<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> HHEA {
+fn get_hhea<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> Result<HHEA, Error> {
     let file = file;
-    file.seek(SeekFrom::Start(offest as u64)).unwrap();
-    let major_version = file.read_u16_be().unwrap();
-    let minor_version = file.read_u16_be().unwrap();
-    let ascender = file.read_i16_be().unwrap();
-    let descender = file.read_i16_be().unwrap();
-    let line_gap = file.read_i16_be().unwrap();
-    let advance_width_max = file.read_u16_be().unwrap();
-    let min_left_side_bearing = file.read_i16_be().unwrap();
-    let min_right_side_bearing = file.read_i16_be().unwrap();
-    let x_max_extent = file.read_i16_be().unwrap();
-    let caret_slope_rise = file.read_i16_be().unwrap();
-    let caret_slope_run = file.read_i16_be().unwrap();
-    let caret_offset = file.read_i16_be().unwrap();
-    let reserved1 = file.read_i16_be().unwrap();
-    let reserved2 = file.read_i16_be().unwrap();
-    let reserved3 = file.read_i16_be().unwrap();
-    let reserved4 = file.read_i16_be().unwrap();
-    let metric_data_format = file.read_i16_be().unwrap();
-    let number_of_hmetrics = file.read_u16_be().unwrap();
-    HHEA {
+    file.seek(SeekFrom::Start(offest as u64))?;
+    let major_version = file.read_u16_be()?;
+    let minor_version = file.read_u16_be()?;
+    let ascender = file.read_i16_be()?;
+    let descender = file.read_i16_be()?;
+    let line_gap = file.read_i16_be()?;
+    let advance_width_max = file.read_u16_be()?;
+    let min_left_side_bearing = file.read_i16_be()?;
+    let min_right_side_bearing = file.read_i16_be()?;
+    let x_max_extent = file.read_i16_be()?;
+    let caret_slope_rise = file.read_i16_be()?;
+    let caret_slope_run = file.read_i16_be()?;
+    let caret_offset = file.read_i16_be()?;
+    let reserved1 = file.read_i16_be()?;
+    let reserved2 = file.read_i16_be()?;
+    let reserved3 = file.read_i16_be()?;
+    let reserved4 = file.read_i16_be()?;
+    let metric_data_format = file.read_i16_be()?;
+    let number_of_hmetrics = file.read_u16_be()?;
+    Ok(HHEA {
         major_version,
         minor_version,
         ascender,
@@ -132,5 +133,5 @@ fn get_hhea<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> HHEA {
         reserved4,
         metric_data_format,
         number_of_hmetrics,
-    }
+    })
 }

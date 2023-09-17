@@ -1,6 +1,6 @@
 use bin_rs::reader::BinaryReader;
 use std::{fmt, io::SeekFrom};
-
+use std::io::Error;
 // hmtx table Font horizontal metrics
 
 #[derive(Debug, Clone)]
@@ -22,7 +22,7 @@ impl HMTX {
         length: u32,
         number_of_hmetrics: u16,
         num_glyphs: u16,
-    ) -> Self {
+    ) -> Result<Self, Error> {
         get_hdmx(file, offest, length, number_of_hmetrics, num_glyphs)
     }
 
@@ -72,13 +72,13 @@ fn get_hdmx<R: bin_rs::reader::BinaryReader>(
     _length: u32,
     number_of_hmetrics: u16,
     num_glyphs: u16,
-) -> HMTX {
+) -> Result<HMTX, Error> {
     let file = file;
-    file.seek(SeekFrom::Start(offest as u64)).unwrap();
+    file.seek(SeekFrom::Start(offest as u64))?;
     let mut h_metrics = Vec::new();
     for _ in 0..number_of_hmetrics {
-        let advance_width = file.read_u16_be().unwrap();
-        let left_side_bearing = file.read_i16_be().unwrap();
+        let advance_width = file.read_u16_be()?;
+        let left_side_bearing = file.read_i16_be()?;
         h_metrics.push(LongHorMetric {
             advance_width,
             left_side_bearing,
@@ -87,11 +87,11 @@ fn get_hdmx<R: bin_rs::reader::BinaryReader>(
     let mut left_side_bearings = Vec::new();
     let number = num_glyphs - number_of_hmetrics;
     for _ in 0..number {
-        let left_side_bearing = file.read_u16_be().unwrap();
+        let left_side_bearing = file.read_u16_be()?;
         left_side_bearings.push(left_side_bearing);
     }
-    HMTX {
+    Ok(HMTX {
         h_metrics: Box::new(h_metrics),
         left_side_bearings: Box::new(left_side_bearings),
-    }
+    })
 }

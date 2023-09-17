@@ -1,5 +1,6 @@
 use bin_rs::reader::BinaryReader;
 use std::{fmt, io::SeekFrom};
+use std::io::Error;
 
 // maxp table Maximum profile
 
@@ -30,7 +31,7 @@ impl fmt::Display for MAXP {
 }
 
 impl MAXP {
-    pub(crate) fn new<R: BinaryReader>(file: &mut R, offest: u32, length: u32) -> Self {
+    pub(crate) fn new<R: BinaryReader>(file: &mut R, offest: u32, length: u32) -> Result<Self, Error> {
         get_maxp(file, offest, length)
     }
 
@@ -77,13 +78,13 @@ impl MAXP {
     }
 }
 
-fn get_maxp<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> MAXP {
+fn get_maxp<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> Result<MAXP, Error> {
     let file = file;
-    file.seek(SeekFrom::Start(offest as u64)).unwrap();
-    let version = file.read_u32_be().unwrap();
-    let num_glyphs = file.read_u16_be().unwrap();
+    file.seek(SeekFrom::Start(offest as u64))?;
+    let version = file.read_u32_be()?;
+    let num_glyphs = file.read_u16_be()?;
     if version == 0x00005000 {
-        return MAXP {
+        return Ok(MAXP {
             version,
             num_glyphs,
             max_points: 0,
@@ -99,23 +100,23 @@ fn get_maxp<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> MAXP {
             max_size_of_instructions: 0,
             max_component_elements: 0,
             max_component_depth: 0,
-        };
+        });
     }
-    let max_points = file.read_u16_be().unwrap();
-    let max_contours = file.read_u16_be().unwrap();
-    let max_composite_points = file.read_u16_be().unwrap();
-    let max_composite_contours = file.read_u16_be().unwrap();
-    let max_zones = file.read_u16_be().unwrap();
-    let max_twilight_points = file.read_u16_be().unwrap();
-    let max_storage = file.read_u16_be().unwrap();
-    let max_function_defs = file.read_u16_be().unwrap();
-    let max_instruction_defs = file.read_u16_be().unwrap();
-    let max_stack_elements = file.read_u16_be().unwrap();
-    let max_size_of_instructions = file.read_u16_be().unwrap();
-    let max_component_elements = file.read_u16_be().unwrap();
-    let max_component_depth = file.read_u16_be().unwrap();
+    let max_points = file.read_u16_be()?;
+    let max_contours = file.read_u16_be()?;
+    let max_composite_points = file.read_u16_be()?;
+    let max_composite_contours = file.read_u16_be()?;
+    let max_zones = file.read_u16_be()?;
+    let max_twilight_points = file.read_u16_be()?;
+    let max_storage = file.read_u16_be()?;
+    let max_function_defs = file.read_u16_be()?;
+    let max_instruction_defs = file.read_u16_be()?;
+    let max_stack_elements = file.read_u16_be()?;
+    let max_size_of_instructions = file.read_u16_be()?;
+    let max_component_elements = file.read_u16_be()?;
+    let max_component_depth = file.read_u16_be()?;
 
-    MAXP {
+    Ok(MAXP {
         version,
         num_glyphs,
         max_points,
@@ -131,5 +132,5 @@ fn get_maxp<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> MAXP {
         max_size_of_instructions,
         max_component_elements,
         max_component_depth,
-    }
+    })
 }
