@@ -174,7 +174,7 @@ impl CmapEncodings {
         self.cmap.encoding_records.clone()
     }
 
-    pub(crate) fn get_griph_position(&self, code_number: u32) -> u32 {
+    pub(crate) fn get_glyph_position(&self, code_number: u32) -> u32 {
         let cmap_encodings = &self.cmap_encodings;
         let mut current_encoding = 0;
         for i in 0..cmap_encodings.len() {

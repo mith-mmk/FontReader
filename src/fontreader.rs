@@ -202,7 +202,7 @@ impl Font {
         }
     }
 
-    pub fn get_gryph(&self, ch: char) -> GriphData {
+    pub fn get_glyph(&self, ch: char) -> GriphData {
         let code = ch as u32;
 
         #[cfg(feature = "cff")]
@@ -219,7 +219,7 @@ impl Font {
                         self.more_fonts[self.current_font - 1].cff.as_ref().unwrap(),
                     )
                 };
-                let pos = cmap.get_griph_position(code);
+                let pos = cmap.get_glyph_position(code);
                 let string = cff.to_code(pos);
                 println!("cff string: {}", string);
                 return GriphData {
@@ -245,7 +245,7 @@ impl Font {
             )
         };
 
-        let pos = cmap.get_griph_position(code);
+        let pos = cmap.get_glyph_position(code);
         let glyph = glyf.get_glyph(pos as usize).unwrap();
         let layout: HorizontalLayout = self.get_horizontal_layout(pos as usize);
         let open_type_glyph = OpenTypeGlyph {
@@ -273,7 +273,7 @@ impl Font {
         }
 
         // utf-32
-        let glyf_data = self.get_gryph(ch);
+        let glyf_data = self.get_glyph(ch);
         let pos = glyf_data.glyph_id;
         if let FontData::Glyph(glyph) = &glyf_data.open_type_glyf.as_ref().unwrap().glyph {
             let glyf = if self.current_font == 0 {
@@ -564,7 +564,7 @@ fn font_debug(_font: &Font) {
     let cmap_encodings = &_font.cmap.as_ref().unwrap().clone();
     let glyf = _font.glyf.as_ref().unwrap();
     for i in 0x0020..0x0ff {
-        let pos = cmap_encodings.get_griph_position(i);
+        let pos = cmap_encodings.get_glyph_position(i);
         let glyph = glyf.get_glyph(pos as usize).unwrap();
         let layout = _font.get_horizontal_layout(pos as usize);
         let svg = glyph.to_svg(32.0, "pt", &layout);
@@ -579,7 +579,7 @@ fn font_debug(_font: &Font) {
         if i as u32 % 16 == 0 {
             writeln!(&mut writer).unwrap();
         }
-        let pos = cmap_encodings.get_griph_position(i as u32);
+        let pos = cmap_encodings.get_glyph_position(i as u32);
         let glyph = glyf.get_glyph(pos as usize).unwrap();
         let layout = _font.get_horizontal_layout(pos as usize);
         let svg = glyph.to_svg(100.0, "px", &layout);
@@ -589,7 +589,7 @@ fn font_debug(_font: &Font) {
     }
     writeln!(&mut writer).unwrap();
     let i = 0x2a6b2;
-    let pos = cmap_encodings.get_griph_position(i as u32);
+    let pos = cmap_encodings.get_glyph_position(i as u32);
     let ch = char::from_u32(i as u32).unwrap();
     writeln!(&mut writer, "{}:{:04} ", ch, pos).unwrap();
 }
