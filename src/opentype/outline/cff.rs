@@ -71,7 +71,10 @@ impl CFF {
         let charsets = Charsets::new(reader, charsets_offset, n_glyphs as u32)?;
         let char_strings_offset = char_strings_offset as u32 + offset;
         let char_string = CharString::new(reader, char_strings_offset as u32)?;
-        println!("char_string: {:?}", char_string.data.data[0]);
+        #[cfg(debug_assertions)]
+        {
+            println!("char_string: {:?}", char_string.data.data[0]);
+        }
         // let fd_select = FDSelect::new(reader, fd_select_offset as u32 + offset, n_glyphs as u32)?;
         // println!("fd_select: {:?}", fd_select.fsds[0..10].to_vec());
         let private = top_dict.get_i32_array(0, 18);
@@ -81,7 +84,6 @@ impl CFF {
             reader.seek(SeekFrom::Start(private_dict_offset as u64))?;
             let private_dict_index = Index::parse(reader)?;
             let private_dict = Dict::parse(&private_dict_index.data[0])?;
-            println!("private_dict: {:?}", private_dict);
             Some(private_dict)
         } else {
             None
@@ -122,25 +124,22 @@ impl CFF {
         let mut i = 0;
         let mut string = String::new();
         let mut stacks: Vec<f64> = Vec::new();
-        // let mut width = self.private_dict.unwap().get_f64(0, 20).unwrap();
-        let mut width = 0.0;
+        let mut width = self.top_dict.get_f64(0, 15).unwrap();  // nomarl width
         let mut first = true;
         while i < data.len() {
             let b0 = data[i];
             i += 1;
-            println!("x: {} y: {}", x, y);
+
             match b0 {
                 1 => {
                     // hstem |- y dy {dya dyb}* hstem (1) |
                     let mut command = "hstem".to_string();
-                    let mut i = stacks.len() % 2;
-                    y = stacks[i];
+                    y = stacks[0];
                     command += &format!(" {}", y);
-                    i += 1;
-                    let dy = stacks[i];
+                    let dy = stacks[1];
                     y += dy;
                     command += &format!(" {}", y);
-                    i += 1;
+                    let mut i = stacks.len() % 2  + 2;
                     while i + 1 < stacks.len() {
                         let dya = stacks[i];
                         y += dya;
@@ -154,19 +153,17 @@ impl CFF {
                     command += "\n";
                     string += &command;
 
-                    stacks.truncate(i)
+                    stacks.truncate(stacks.len() - i + 1);
                 }
                 3 => {
                     // vstem |- v dx {dxa dxb}* vstem (3) |
                     let mut command = "vstem".to_string();
-                    let mut i = stacks.len() % 2;
-                    x = stacks[i];
+                    x = stacks[0];
                     command += &format!(" {}", x);
-                    i += 1;
-                    let dx = stacks[i];
+                    let dx = stacks[1];
                     x += dx;
                     command += &format!(" {}", x);
-                    i += 1;
+                    let mut i = stacks.len() % 2 + 2;
                     while i + 2 < stacks.len() {
                         let dxa = stacks[i];
                         x += dxa;
@@ -180,7 +177,7 @@ impl CFF {
                     command += "\n";
                     string += &command;
                     // stacks.len() - i..stacks(i) までの要素を削除
-                    stacks.truncate(i);
+                    stacks.truncate(stacks.len() - i + 1);
                 }
                 18 => {
                     // hstemhm |- y dy {dya dyb}* hstemhm (18) |-
@@ -203,7 +200,7 @@ impl CFF {
                     }
                     command += "\n";
                     string += &command;                   
-                    stacks.truncate(i)
+                    stacks.truncate(stacks.len() - i + 1)
 
                 }
                 23 => {
@@ -227,7 +224,7 @@ impl CFF {
                     }
                     command += "\n";
                     string += &command;
-                    stacks.truncate(i);
+                    stacks.truncate(stacks.len() - i + 1);
                 }
                 19 => {
                     // hintmask |- hintmask (19 + mask) |
@@ -257,7 +254,7 @@ impl CFF {
                     string += &format!("rmoveto {} {}\n", dx, dy);
 
                     if stacks.len() > 0 && first == true {
-                        width = stacks.pop().unwrap();
+                        width += stacks.pop().unwrap();
                         first = false;
                         string += &format!("width {}\n", width);
                     }
@@ -268,7 +265,7 @@ impl CFF {
                     y += dy;
                     string += &format!("hmoveto {}\n", dy);
                     if stacks.len() > 0 && first == true {
-                        width = stacks.pop().unwrap();
+                        width += stacks.pop().unwrap();
                         first = false;
                         string += &format!("width {}\n", width);
                     }
@@ -281,7 +278,7 @@ impl CFF {
                     string += &format!("vmoveto {}\n", dx);
 
                     if stacks.len() > 0 && first == true {
-                        width = stacks.pop().unwrap();
+                        width += stacks.pop().unwrap();
                         first = false;
                         string += &format!("width {}\n", width);
 
@@ -303,7 +300,7 @@ impl CFF {
                     }
                     command += "\n";
                     string += &command;                    
-                    stacks.truncate(i);
+                    stacks.truncate(stacks.len() - i + 1);
                 }
                 6 => {
                     //  |- dx1 {dya dxb}* hlineto (6) |- odd
@@ -328,7 +325,7 @@ impl CFF {
                     }
                     command += "\n";
                     string += &command;
-                    stacks.truncate(i);
+                    stacks.truncate(stacks.len() - i + 1);
                 }
                 7 => {
                     // vlineto - dy1 {dxa dyb}* vlineto (7) |- odd
@@ -353,7 +350,7 @@ impl CFF {
                     }
                     command += "\n";
                     string += &command;
-                    stacks.truncate(i);
+                    stacks.truncate(stacks.len() - i + 1);
 
                 }
                 8 => {
@@ -386,7 +383,7 @@ impl CFF {
                         command += &format!(" {}", dyc);
                         i += 1;
                     }
-                    stacks.truncate(i);
+                    stacks.truncate(stacks.len() - i + 1);
                 }
                 27 => {
                     //hhcurveto|- dy1? {dxa dxb dyb dxc}+ hhcurveto (27) |-
@@ -418,7 +415,7 @@ impl CFF {
                     }
                     command += "\n";
                     string += &command;
-                    stacks.truncate(i);
+                    stacks.truncate(stacks.len() - i + 1);
              
                 }
                 31 => {
@@ -487,7 +484,7 @@ impl CFF {
                     }
                     command += "\n";
                     string += &command;
-                    stacks.truncate(i);
+                    stacks.truncate(stacks.len() - i + 1);
                 }
                 24 => {
                     // rcurveline rcurveline |- {dxa dya dxb dyb dxc dyc}+ dxd dyd rcurveline (24) |-
@@ -531,7 +528,7 @@ impl CFF {
                     }
                     command += "\n";
                     string += &command;
-                    stacks.truncate(i);
+                    stacks.truncate(stacks.len() - i + 1);
                 }
                 25 => {                  
                     // rlinecurve rlinecurve |- {dxa dya}+ dxb dyb dxc dyc dxd dyd rlinecurve (25) |-
@@ -568,11 +565,13 @@ impl CFF {
                     command += &format!(" {}", dxd);
                     i += 1;
                     let dyd = stacks[i];
+                    i += 1;
                     y += dyd;
+                    
                     command += &format!(" {}", dyd);
                     command += "\n";
                     string += &command;
-                    stacks.clear();
+                    stacks.truncate(stacks.len() - i + 1);
                 }
                 30 => {
                     // vhcurveto |- dy1 dx2 dy2 dx3 {dxa dxb dyb dyc dyd dxe dye dxf}* dyf?
@@ -636,10 +635,11 @@ impl CFF {
                         let dyf = stacks[i];
                         y += dyf;
                         command += &format!(" dxf {}", dyf);
+                        i += 1;
                     }
                     command += "\n";
                     string += &command;                   
-                    stacks.clear();
+                    stacks.truncate(stacks.len() - i + 1);
                 }
                 26 => {
                     // vvcurveto |- dx1? {dya dxb dyb dyc}+ vvcurveto (26) |-
@@ -673,11 +673,10 @@ impl CFF {
                 }
 
                 28 => {
-                    let b1 = data[i + 1];
+                    let b1 = data[i];
                     let value = i16::from_be_bytes([b0, b1]) as i32;
                     stacks.push(value as f64);
                     i += 1;
-                    stacks.clear();
                 }
                 14 => {
                     // endchar – endchar (14) |–
@@ -753,6 +752,8 @@ impl CFF {
                             x += dx1 + dx2 + dx3 + dx4 + dx5 + dx6;
                             y += dy1 + dy2 + dy3 + dy4 + dy5 + dy6;
                             command += &format!(" {} {} {} {} {} {} {} {} {} {} {} {}\n", dx1, dy1, dx2, dy2, dx3, dy3, dx4, dy4, dx5, dy5, dx6, dy6);
+                            string += &command;
+                            stacks.clear();
                         }
 
                         19 => {
@@ -953,7 +954,7 @@ impl CFF {
                 }
             }
         }
-        let string = format!("{} {} {} {}", x, y, width, string);
+        let string = format!("\nx {} y {} width {}\n {}", x, y, width, string);
         string
     }
 }
@@ -1012,7 +1013,6 @@ impl Charsets {
     ) -> Result<Self, Box<dyn Error>> {
         reader.seek(SeekFrom::Start(offset as u64)).unwrap();
         let format = reader.read_u8().unwrap();
-        println!("format: {}", format);
         let mut charsets = Self {
             n_glyphs: n_glyphs as usize,
             format,
@@ -1380,7 +1380,6 @@ impl Index {
             });
         }
         let off_size = r.read_u8()?;
-        println!("count: {} off_size: {}", count, off_size);
 
         let mut offsets = Vec::new();
         for _ in 0..count + 1 {
