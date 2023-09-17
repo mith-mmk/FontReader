@@ -264,6 +264,7 @@ impl Font {
         // svg ?
         // sbix ?
         // cff ?
+        #[cfg(feature = "cff")]
         if let Some(cff) = self.cff.as_ref() {
             let gid = self.cmap.as_ref().unwrap().get_glyph_position(ch as u32);
             let string = cff.to_code(gid);
