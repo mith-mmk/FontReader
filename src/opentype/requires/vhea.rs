@@ -1,10 +1,10 @@
 // vhea is Vertical Metrics Header Table (optional)
 // https://docs.microsoft.com/en-us/typography/opentype/spec/vhea
 
-use bin_rs::reader::BinaryReader;
-use std::{fmt, io::SeekFrom};
-use std::io::Error;
 use crate::fontheader::{FWORD, UFWORD};
+use bin_rs::reader::BinaryReader;
+use std::io::Error;
+use std::{fmt, io::SeekFrom};
 
 #[derive(Debug, Clone)]
 pub(crate) struct VHEA {
@@ -35,7 +35,11 @@ impl fmt::Display for VHEA {
 }
 
 impl VHEA {
-    pub(crate) fn new<R: BinaryReader>(file: &mut R, offest: u32, length: u32) -> Result<Self, Error> {
+    pub(crate) fn new<R: BinaryReader>(
+        file: &mut R,
+        offest: u32,
+        length: u32,
+    ) -> Result<Self, Error> {
         get_vhea(file, offest, length)
     }
 

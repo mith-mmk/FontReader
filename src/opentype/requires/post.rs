@@ -1,6 +1,6 @@
 use bin_rs::reader::BinaryReader;
-use std::{fmt, io::SeekFrom};
 use std::io::Error;
+use std::{fmt, io::SeekFrom};
 
 // post table for PostScript
 
@@ -28,7 +28,11 @@ impl fmt::Display for POST {
 }
 
 impl POST {
-    pub(crate) fn new<R: BinaryReader>(file: &mut R, offest: u32, length: u32) -> Result<Self, Error> {
+    pub(crate) fn new<R: BinaryReader>(
+        file: &mut R,
+        offest: u32,
+        length: u32,
+    ) -> Result<Self, Error> {
         get_post(file, offest, length)
     }
 

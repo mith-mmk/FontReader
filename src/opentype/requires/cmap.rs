@@ -18,7 +18,11 @@ impl fmt::Display for CMAP {
 }
 
 impl CMAP {
-    pub(crate) fn new<R: BinaryReader>(file: &mut R, offset: u32, length: u32) -> Result<Self, Error> {
+    pub(crate) fn new<R: BinaryReader>(
+        file: &mut R,
+        offset: u32,
+        length: u32,
+    ) -> Result<Self, Error> {
         load_cmap_table(file, offset, length)
     }
 
@@ -152,7 +156,11 @@ pub(crate) struct CmapEncodings {
 }
 
 impl CmapEncodings {
-    pub(crate) fn new<R: BinaryReader>(file: &mut R, offset: u32, length: u32) -> Result<Self, Error> {
+    pub(crate) fn new<R: BinaryReader>(
+        file: &mut R,
+        offset: u32,
+        length: u32,
+    ) -> Result<Self, Error> {
         let cmap = load_cmap_table(file, offset, length)?;
         let cmap_encodings = get_cmap_maps(&cmap);
 

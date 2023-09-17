@@ -1,6 +1,6 @@
 use bin_rs::reader::BinaryReader;
-use std::{fmt, io::SeekFrom};
 use std::io::Error;
+use std::{fmt, io::SeekFrom};
 // hmtx table Font horizontal metrics
 
 #[derive(Debug, Clone)]

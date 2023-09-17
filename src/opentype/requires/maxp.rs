@@ -1,6 +1,6 @@
 use bin_rs::reader::BinaryReader;
-use std::{fmt, io::SeekFrom};
 use std::io::Error;
+use std::{fmt, io::SeekFrom};
 
 // maxp table Maximum profile
 
@@ -31,7 +31,11 @@ impl fmt::Display for MAXP {
 }
 
 impl MAXP {
-    pub(crate) fn new<R: BinaryReader>(file: &mut R, offest: u32, length: u32) -> Result<Self, Error> {
+    pub(crate) fn new<R: BinaryReader>(
+        file: &mut R,
+        offest: u32,
+        length: u32,
+    ) -> Result<Self, Error> {
         get_maxp(file, offest, length)
     }
 

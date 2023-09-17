@@ -103,7 +103,7 @@ impl CFF {
     }
 
     pub(crate) fn to_code(&self, gid: u32) -> String {
-//        let cid = self.charsets.sid[gid as usize];
+        //        let cid = self.charsets.sid[gid as usize];
         let data = &self.char_string.data.data[gid as usize];
         /*
            0..=11 =>  operators
@@ -124,7 +124,7 @@ impl CFF {
         let mut i = 0;
         let mut string = String::new();
         let mut stacks: Vec<f64> = Vec::new();
-        let mut width = self.top_dict.get_f64(0, 15).unwrap();  // nomarl width
+        let mut width = self.top_dict.get_f64(0, 15).unwrap(); // nomarl width
         let mut first = true;
         while i < data.len() {
             let b0 = data[i];
@@ -139,7 +139,7 @@ impl CFF {
                     let dy = stacks[1];
                     y += dy;
                     command += &format!(" {}", y);
-                    let mut i = stacks.len() % 2  + 2;
+                    let mut i = stacks.len() % 2 + 2;
                     while i + 1 < stacks.len() {
                         let dya = stacks[i];
                         y += dya;
@@ -187,7 +187,7 @@ impl CFF {
                     let dy = stacks[1];
                     y += dy;
                     command += &format!(" {}", y);
-                    let mut i = stacks.len() % 2 +2;
+                    let mut i = stacks.len() % 2 + 2;
                     while i < stacks.len() {
                         let dya = stacks[i];
                         y += dya;
@@ -199,9 +199,8 @@ impl CFF {
                         i += 1;
                     }
                     command += "\n";
-                    string += &command;                   
+                    string += &command;
                     stacks.truncate(stacks.len() - i + 1)
-
                 }
                 23 => {
                     // vstemhm |- x dx {dxa dxb}* vstemhm (23) |-
@@ -281,14 +280,13 @@ impl CFF {
                         width += stacks.pop().unwrap();
                         first = false;
                         string += &format!("width {}\n", width);
-
                     }
                 }
                 5 => {
                     // rlineto |- {dxa dya}+ rlineto (5) |-
                     let mut command = "rlineto".to_string();
                     let mut i = 0;
-                    while i  + 1 < stacks.len() {
+                    while i + 1 < stacks.len() {
                         let dxa = stacks[i];
                         x += dxa;
                         command += &format!(" {}", dxa);
@@ -299,7 +297,7 @@ impl CFF {
                         i += 1;
                     }
                     command += "\n";
-                    string += &command;                    
+                    string += &command;
                     stacks.truncate(stacks.len() - i + 1);
                 }
                 6 => {
@@ -313,7 +311,7 @@ impl CFF {
                         command += &format!(" dx1 {}", dx);
                         i += 1;
                     }
-                    while i + 2< stacks.len() {
+                    while i + 2 < stacks.len() {
                         let dxa = stacks[i];
                         x += dxa;
                         command += &format!(" {}", dxa);
@@ -351,7 +349,6 @@ impl CFF {
                     command += "\n";
                     string += &command;
                     stacks.truncate(stacks.len() - i + 1);
-
                 }
                 8 => {
                     // rrcurveto |- {dxa dya dxb dyb dxc dyc}+ rrcurveto (8) |-
@@ -416,7 +413,6 @@ impl CFF {
                     command += "\n";
                     string += &command;
                     stacks.truncate(stacks.len() - i + 1);
-             
                 }
                 31 => {
                     // hvcurveto |- dx1 dx2 dy2 dy3 {dya dxb dyb dxc dxd dxe dye dyf}* dxf?
@@ -530,7 +526,7 @@ impl CFF {
                     string += &command;
                     stacks.truncate(stacks.len() - i + 1);
                 }
-                25 => {                  
+                25 => {
                     // rlinecurve rlinecurve |- {dxa dya}+ dxb dyb dxc dyc dxd dyd rlinecurve (25) |-
                     let mut command = "rlinecurve".to_string();
                     let mut i = 0;
@@ -567,7 +563,7 @@ impl CFF {
                     let dyd = stacks[i];
                     i += 1;
                     y += dyd;
-                    
+
                     command += &format!(" {}", dyd);
                     command += "\n";
                     string += &command;
@@ -638,7 +634,7 @@ impl CFF {
                         i += 1;
                     }
                     command += "\n";
-                    string += &command;                   
+                    string += &command;
                     stacks.truncate(stacks.len() - i + 1);
                 }
                 26 => {
@@ -686,7 +682,8 @@ impl CFF {
                     let b1 = data[i];
                     i += 1;
                     match b1 {
-                        35 => { // flex |- dx1 dy1 dx2 dy2 dx3 dy3 dx4 dy4 dx5 dy5 dx6 dy6 fd flex (12 35) |-
+                        35 => {
+                            // flex |- dx1 dy1 dx2 dy2 dx3 dy3 dx4 dy4 dx5 dy5 dx6 dy6 fd flex (12 35) |-
                             let mut command = "flex".to_string();
                             let fd = stacks.pop().unwrap();
                             let dy6 = stacks.pop().unwrap();
@@ -703,11 +700,14 @@ impl CFF {
                             let dx1 = stacks.pop().unwrap();
                             x += dx1 + dx2 + dx3 + dx4 + dx5 + dx6;
                             y += dy1 + dy2 + dy3 + dy4 + dy5 + dy6;
-                            command += &format!(" {} {} {} {} {} {} {} {} {} {} {} {} fd {}\n", dx1, dy1, dx2, dy2, dx3, dy3, dx4, dy4, dx5, dy5, dx6, dy6, fd);
+                            command += &format!(
+                                " {} {} {} {} {} {} {} {} {} {} {} {} fd {}\n",
+                                dx1, dy1, dx2, dy2, dx3, dy3, dx4, dy4, dx5, dy5, dx6, dy6, fd
+                            );
                             string += &command;
-                           
                         }
-                        34 => { // hflex |- dx1 dx2 dy2 dx3 dx4 dx5 dx6 hflex (12 34) |
+                        34 => {
+                            // hflex |- dx1 dx2 dy2 dx3 dx4 dx5 dx6 hflex (12 34) |
                             let mut command = "hflex".to_string();
                             let dx6 = stacks.pop().unwrap();
                             let dx5 = stacks.pop().unwrap();
@@ -716,10 +716,12 @@ impl CFF {
                             let dx2 = stacks.pop().unwrap();
                             let dx1 = stacks.pop().unwrap();
                             x += dx1 + dx2 + dx3 + dx4 + dx5 + dx6;
-                            command += &format!(" {} {} {} {} {} {}\n", dx1, dx2, dx3, dx4, dx5, dx6);
-                            string += &command;                           
+                            command +=
+                                &format!(" {} {} {} {} {} {}\n", dx1, dx2, dx3, dx4, dx5, dx6);
+                            string += &command;
                         }
-                        36 => { // hflex1 |- dx1 dy1 dx2 dy2 dx3 dx4 dx5 dy5 dx6 hflex1 (12 36) |
+                        36 => {
+                            // hflex1 |- dx1 dy1 dx2 dy2 dx3 dx4 dx5 dy5 dx6 hflex1 (12 36) |
                             let mut command = "hflex1".to_string();
                             let dx6 = stacks.pop().unwrap();
                             let dy5 = stacks.pop().unwrap();
@@ -732,10 +734,14 @@ impl CFF {
                             let dx1 = stacks.pop().unwrap();
                             x += dx1 + dx2 + dx3 + dx4 + dx5 + dx6;
                             y += dy1 + dy2 + dy5;
-                            command += &format!(" {} {} {} {} {} {} {} {} {}\n", dx1, dy1, dx2, dy2, dx3, dx4, dx5, dy5, dx6);
-                            string += &command; 
+                            command += &format!(
+                                " {} {} {} {} {} {} {} {} {}\n",
+                                dx1, dy1, dx2, dy2, dx3, dx4, dx5, dy5, dx6
+                            );
+                            string += &command;
                         }
-                        37 => { // flex1 |- dx1 dy1 dx2 dy2 dx3 dy3 dx4 dy4 dx5 dy5 d6 flex1 (12 37) |-
+                        37 => {
+                            // flex1 |- dx1 dy1 dx2 dy2 dx3 dy3 dx4 dy4 dx5 dy5 d6 flex1 (12 37) |-
                             let mut command = "flex1".to_string();
                             let dy6 = stacks.pop().unwrap();
                             let dx6 = stacks.pop().unwrap();
@@ -751,7 +757,10 @@ impl CFF {
                             let dx1 = stacks.pop().unwrap();
                             x += dx1 + dx2 + dx3 + dx4 + dx5 + dx6;
                             y += dy1 + dy2 + dy3 + dy4 + dy5 + dy6;
-                            command += &format!(" {} {} {} {} {} {} {} {} {} {} {} {}\n", dx1, dy1, dx2, dy2, dx3, dy3, dx4, dy4, dx5, dy5, dx6, dy6);
+                            command += &format!(
+                                " {} {} {} {} {} {} {} {} {} {} {} {}\n",
+                                dx1, dy1, dx2, dy2, dx3, dy3, dx4, dy4, dx5, dy5, dx6, dy6
+                            );
                             string += &command;
                             stacks.clear();
                         }
@@ -906,12 +915,12 @@ impl CFF {
                         }
                     }
                 }
-                10 => {                  
+                10 => {
                     // call callsubr
                     let command = "callsubr\n".to_string();
                     string += &command;
                 }
-                29 => {                  
+                29 => {
                     // callgsubr
                     let command = "callgsubr\n".to_string();
                     string += &command;

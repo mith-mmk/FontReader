@@ -1,5 +1,8 @@
 use bin_rs::reader::BinaryReader;
-use std::{fmt, io::{SeekFrom, Error}};
+use std::{
+    fmt,
+    io::{Error, SeekFrom},
+};
 
 // OS/2 table OS/2 and Windows specific metrics
 
@@ -53,7 +56,11 @@ impl fmt::Display for OS2 {
 }
 
 impl OS2 {
-    pub(crate) fn new<R: BinaryReader>(file: &mut R, offest: u32, length: u32) -> Result<Self, Error> {
+    pub(crate) fn new<R: BinaryReader>(
+        file: &mut R,
+        offest: u32,
+        length: u32,
+    ) -> Result<Self, Error> {
         get_os2(file, offest, length)
     }
 
@@ -108,7 +115,7 @@ impl OS2 {
         let ul_unicode_range4 = format!("ulUnicodeRange4 {:08X}\n", self.ul_unicode_range4);
         string += &ul_unicode_range4;
         let vend_id = String::from_utf8_lossy(&self.ach_vend_id);
-        let ach_vend_id = format!("achVendID {:?} '{}'\n", self.ach_vend_id , vend_id);
+        let ach_vend_id = format!("achVendID {:?} '{}'\n", self.ach_vend_id, vend_id);
         string += &ach_vend_id;
         let fs_selection = format!("fsSelection {}\n", self.fs_selection);
         string += &fs_selection;

@@ -1,7 +1,7 @@
 use fontloader::Font;
 use std::{env, path::PathBuf};
 
-fn main() -> Result<(), Box<dyn std::error::Error>>{
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     // agrs[1] is the folder name
     let args: Vec<String> = std::env::args().collect();
     // argv.len()?

@@ -1,7 +1,7 @@
 use crate::fontheader::{self, LONGDATETIME};
 use bin_rs::reader::BinaryReader;
-use std::{fmt, io::SeekFrom};
 use std::io::Error;
+use std::{fmt, io::SeekFrom};
 
 // head table
 
@@ -60,7 +60,11 @@ impl fmt::Display for HEAD {
 }
 
 impl HEAD {
-    pub(crate) fn new<B: BinaryReader>(file: &mut B, offest: u32, length: u32) -> Result<Self, Error> {
+    pub(crate) fn new<B: BinaryReader>(
+        file: &mut B,
+        offest: u32,
+        length: u32,
+    ) -> Result<Self, Error> {
         get_head(file, offest, length)
     }
 

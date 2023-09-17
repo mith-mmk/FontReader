@@ -1,7 +1,7 @@
 use bin_rs::reader::{BinaryReader, BytesReader, StreamReader};
 use std::collections::HashMap;
-use std::io::Error;
 use std::io::BufReader;
+use std::io::Error;
 use std::{fs::File, path::PathBuf};
 
 use crate::fontheader;
@@ -56,8 +56,7 @@ pub enum FontData {
     CFF(Vec<u8>),
     CFF2(Vec<u8>),
     SVG(String),
-    Bitmap(String,Vec<u8>),
-
+    Bitmap(String, Vec<u8>),
 }
 
 #[derive(Debug, Clone)]
@@ -135,7 +134,7 @@ impl Font {
         }
     }
 
-    pub fn get_font_from_file(filename: &PathBuf) -> Result<Self,Error> {
+    pub fn get_font_from_file(filename: &PathBuf) -> Result<Self, Error> {
         font_load_from_file(filename)
     }
 
@@ -217,10 +216,7 @@ impl Font {
                             .cmap
                             .as_ref()
                             .unwrap(),
-                        self.more_fonts[self.current_font - 1]
-                            .cff
-                            .as_ref()
-                            .unwrap(),
+                        self.more_fonts[self.current_font - 1].cff.as_ref().unwrap(),
                     )
                 };
                 let pos = cmap.get_griph_position(code);
@@ -264,7 +260,7 @@ impl Font {
         }
     }
 
-    pub fn get_svg(&self, ch: char) -> Result<String,Error> {
+    pub fn get_svg(&self, ch: char) -> Result<String, Error> {
         // svg ?
         // sbix ?
         // cff ?
@@ -275,7 +271,7 @@ impl Font {
                 "glyf is none".to_string(),
             ));
         }
-               
+
         // utf-32
         let glyf_data = self.get_gryph(ch);
         let pos = glyf_data.glyph_id;
@@ -291,70 +287,70 @@ impl Font {
             let layout = &glyf_data.open_type_glyf.as_ref().unwrap().layout;
             let layout = match layout {
                 FontLayout::Horizontal(layout) => layout,
-             _ => panic!("not support vertical layout"),
+                _ => panic!("not support vertical layout"),
             };
-        let fontsize = 24.0;
-        let fontunit = "pt";
+            let fontsize = 24.0;
+            let fontunit = "pt";
 
-        let (cpal, colr) = if self.current_font == 0 {
-            (self.cpal.as_ref(), self.colr.as_ref())
-        } else {
-            (
-                self.more_fonts[self.current_font - 1].cpal.as_ref(),
-                self.more_fonts[self.current_font - 1].colr.as_ref(),
-            )
-        };
+            let (cpal, colr) = if self.current_font == 0 {
+                (self.cpal.as_ref(), self.colr.as_ref())
+            } else {
+                (
+                    self.more_fonts[self.current_font - 1].cpal.as_ref(),
+                    self.more_fonts[self.current_font - 1].colr.as_ref(),
+                )
+            };
 
-        if let Some(colr) = colr.as_ref() {
-            let layers = colr.get_layer_record(pos as u16);
-            if layers.is_empty() {
-                return Ok(glyph.to_svg(fontsize, fontunit, &layout));
-            }
-            let mut string = glyph.get_svg_heder(fontsize, fontunit, &layout);
-            #[cfg(debug_assertions)]
-            {
-                string += &format!("\n<!-- {} glyf id: {} -->", ch, pos);
-            }
-
-            for layer in layers {
-                let glyf_id = layer.glyph_id as u32;
-                let glyf = glyf.get_glyph(glyf_id as usize).unwrap();
-                let pallet = cpal
-                    .as_ref()
-                    .unwrap()
-                    .get_pallet(layer.palette_index as usize);
+            if let Some(colr) = colr.as_ref() {
+                let layers = colr.get_layer_record(pos as u16);
+                if layers.is_empty() {
+                    return Ok(glyph.to_svg(fontsize, fontunit, &layout));
+                }
+                let mut string = glyph.get_svg_heder(fontsize, fontunit, &layout);
                 #[cfg(debug_assertions)]
                 {
-                    string += &format!("<!-- pallet index {} -->\n", layer.palette_index);
+                    string += &format!("\n<!-- {} glyf id: {} -->", ch, pos);
+                }
+
+                for layer in layers {
+                    let glyf_id = layer.glyph_id as u32;
+                    let glyf = glyf.get_glyph(glyf_id as usize).unwrap();
+                    let pallet = cpal
+                        .as_ref()
+                        .unwrap()
+                        .get_pallet(layer.palette_index as usize);
+                    #[cfg(debug_assertions)]
+                    {
+                        string += &format!("<!-- pallet index {} -->\n", layer.palette_index);
+                        string += &format!(
+                            "<!-- Red {} Green {} Blue {} Alpha {} -->\n",
+                            pallet.red, pallet.green, pallet.blue, pallet.alpha
+                        );
+                    }
                     string += &format!(
-                        "<!-- Red {} Green {} Blue {} Alpha {} -->\n",
+                        "<g fill=\"rgba({}, {}, {}, {})\">\n",
                         pallet.red, pallet.green, pallet.blue, pallet.alpha
                     );
+                    string += &glyf.get_svg_path(&layout);
+                    string += "</g>\n";
                 }
-                string += &format!(
-                    "<g fill=\"rgba({}, {}, {}, {})\">\n",
-                    pallet.red, pallet.green, pallet.blue, pallet.alpha
-                );
-                string += &glyf.get_svg_path(&layout);
-                string += "</g>\n";
+                string += "</svg>";
+                Ok(string)
+            } else {
+                #[cfg(debug_assertions)]
+                {
+                    let string = glyph.to_svg(fontsize, fontunit, &layout);
+                    return Ok(format!("<!-- {} glyf id: {} -->{}", ch, pos, string));
+                }
+                #[cfg(not(debug_assertions))]
+                Ok(glyph.to_svg(fontsize, fontunit, &layout))
             }
-            string += "</svg>";
-            Ok(string)
         } else {
-            #[cfg(debug_assertions)]
-            {
-                let string = glyph.to_svg(fontsize, fontunit, &layout);
-                return Ok(format!("<!-- {} glyf id: {} -->{}", ch, pos, string));
-            }
-            #[cfg(not(debug_assertions))]
-            Ok(glyph.to_svg(fontsize, fontunit, &layout))
+            return Err(Error::new(
+                std::io::ErrorKind::Other,
+                "glyf is none".to_string(),
+            ));
         }
-    } else {
-        return Err(Error::new(
-            std::io::ErrorKind::Other,
-            "glyf is none".to_string(),
-        ));
-    }
     }
 
     pub fn get_name(&self, name_id: NameID, locale: &String) -> Result<String, Error> {
@@ -515,7 +511,7 @@ struct Pointer {
     pub(crate) length: u32,
 }
 
-fn font_load_from_file(filename: &PathBuf) -> Result<Font,Error> {
+fn font_load_from_file(filename: &PathBuf) -> Result<Font, Error> {
     let file = File::open(filename)?;
     let reader = BufReader::new(file);
     let mut reader = StreamReader::new(reader);
@@ -598,7 +594,7 @@ fn font_debug(_font: &Font) {
     writeln!(&mut writer, "{}:{:04} ", ch, pos).unwrap();
 }
 
-fn font_load<R: BinaryReader>(file: &mut R) -> Result<Font,Error> {
+fn font_load<R: BinaryReader>(file: &mut R) -> Result<Font, Error> {
     match fontheader::get_font_type(file) {
         fontheader::FontHeaders::OTF(header) => {
             let font = from_opentype(file, &header);

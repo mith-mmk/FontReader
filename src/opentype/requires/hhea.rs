@@ -1,6 +1,6 @@
 use bin_rs::reader::BinaryReader;
-use std::{fmt, io::SeekFrom};
 use std::io::Error;
+use std::{fmt, io::SeekFrom};
 
 // hhea table Font horizontal metrics header
 
@@ -35,7 +35,11 @@ impl fmt::Display for HHEA {
 }
 
 impl HHEA {
-    pub(crate) fn new<R: BinaryReader>(file: &mut R, offest: u32, length: u32) -> Result<Self, Error> {
+    pub(crate) fn new<R: BinaryReader>(
+        file: &mut R,
+        offest: u32,
+        length: u32,
+    ) -> Result<Self, Error> {
         get_hhea(file, offest, length)
     }
 

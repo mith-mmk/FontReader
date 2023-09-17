@@ -228,7 +228,11 @@ impl Glyph {
         let x_min = parsed.x_min - layout.lsb as i16;
         let x_max = parsed.x_max + rsb;
         let y_max = layout.accender - layout.descender + layout.line_gap;
-        let y_min = if y_max > (parsed.y_max - parsed.y_min) as isize { 0 } else { y_max - (parsed.y_max - parsed.y_min) as isize};
+        let y_min = if y_max > (parsed.y_max - parsed.y_min) as isize {
+            0
+        } else {
+            y_max - (parsed.y_max - parsed.y_min) as isize
+        };
         let height = fontsize;
         let width = x_min as f32 + x_max as f32;
         let width = width * height / y_max as f32;
