@@ -1,6 +1,5 @@
 use bin_rs::reader::{BinaryReader, BytesReader, StreamReader};
 use std::collections::HashMap;
-use std::f32::consts::E;
 use std::io::Error;
 use std::io::BufReader;
 use std::{fs::File, path::PathBuf};
@@ -42,13 +41,23 @@ pub enum FontLayout {
 pub struct GriphData {
     glyph_id: usize,
     format: GlyphFormat,
-    pub(crate) open_type_glif: Option<OpenTypeGlyph>,
+    pub(crate) open_type_glyf: Option<OpenTypeGlyph>,
 }
 
 #[derive(Debug, Clone)]
 pub struct OpenTypeGlyph {
     layout: FontLayout,
-    glyph: Box<glyf::Glyph>,
+    glyph: FontData,
+}
+
+#[derive(Debug, Clone)]
+pub enum FontData {
+    Glyph(glyf::Glyph),
+    CFF(Vec<u8>),
+    CFF2(Vec<u8>),
+    SVG(String),
+    Bitmap(String,Vec<u8>),
+
 }
 
 #[derive(Debug, Clone)]
@@ -64,7 +73,7 @@ pub struct Font {
     pub(crate) os2: Option<os2::OS2>,    // must
     pub(crate) post: Option<post::POST>, // must
     pub(crate) loca: Option<loca::LOCA>, // openType font, CFF/CFF2 none
-    pub(crate) grif: Option<glyf::GLYF>, // openType font, CFF/CFF2 none
+    pub(crate) glyf: Option<glyf::GLYF>, // openType font, CFF/CFF2 none
     #[cfg(feature = "cff")]
     pub(crate) cff: Option<cff::CFF>, // CFF font, openType none
     pub(crate) colr: Option<colr::COLR>,
@@ -92,7 +101,7 @@ impl Font {
             os2: None,
             post: None,
             loca: None,
-            grif: None,
+            glyf: None,
             #[cfg(feature = "cff")]
             cff: None,
             colr: None,
@@ -171,26 +180,26 @@ impl Font {
     }
 
     pub fn get_glyph_from_id(&self, glyph_id: usize) -> GriphData {
-        let grif = if self.current_font == 0 {
-            self.grif.as_ref().unwrap()
+        let glyf = if self.current_font == 0 {
+            self.glyf.as_ref().unwrap()
         } else {
             self.more_fonts[self.current_font - 1]
-                .grif
+                .glyf
                 .as_ref()
                 .unwrap()
         };
 
-        let glyph = grif.get_glyph(glyph_id).unwrap();
+        let glyph = glyf.get_glyph(glyph_id).unwrap();
         let layout: HorizontalLayout = self.get_horizontal_layout(glyph_id);
         let open_type_glyph = OpenTypeGlyph {
             layout: FontLayout::Horizontal(layout),
-            glyph: Box::new(glyph.clone()),
+            glyph: FontData::Glyph(glyph.clone()),
         };
 
         GriphData {
             glyph_id,
             format: GlyphFormat::OpenTypeGlyph,
-            open_type_glif: Some(open_type_glyph),
+            open_type_glyf: Some(open_type_glyph),
         }
     }
 
@@ -215,18 +224,18 @@ impl Font {
                     )
                 };
                 let pos = cmap.get_griph_position(code);
-                let string = self.cff.as_ref().unwrap().to_code(pos);
+                let string = cff.to_code(pos);
                 println!("cff string: {}", string);
                 return GriphData {
                     glyph_id: 0,
                     format: GlyphFormat::CFF,
-                    open_type_glif: None,
+                    open_type_glyf: None,
                 };
             }
         }
- 
-        let (cmap, grif) = if self.current_font == 0 {
-            (self.cmap.as_ref().unwrap(), self.grif.as_ref().unwrap())
+
+        let (cmap, glyf) = if self.current_font == 0 {
+            (self.cmap.as_ref().unwrap(), self.glyf.as_ref().unwrap())
         } else {
             (
                 self.more_fonts[self.current_font - 1]
@@ -234,52 +243,56 @@ impl Font {
                     .as_ref()
                     .unwrap(),
                 self.more_fonts[self.current_font - 1]
-                    .grif
+                    .glyf
                     .as_ref()
                     .unwrap(),
             )
         };
 
         let pos = cmap.get_griph_position(code);
-        let glyph = grif.get_glyph(pos as usize).unwrap();
+        let glyph = glyf.get_glyph(pos as usize).unwrap();
         let layout: HorizontalLayout = self.get_horizontal_layout(pos as usize);
         let open_type_glyph = OpenTypeGlyph {
             layout: FontLayout::Horizontal(layout),
-            glyph: Box::new(glyph.clone()),
+            glyph: FontData::Glyph(glyph.clone()),
         };
 
         GriphData {
             glyph_id: pos as usize,
             format: GlyphFormat::OpenTypeGlyph,
-            open_type_glif: Some(open_type_glyph),
+            open_type_glyf: Some(open_type_glyph),
         }
     }
 
     pub fn get_svg(&self, ch: char) -> Result<String,Error> {
-        if self.grif.is_none() {
+        // svg ?
+        // sbix ?
+        // cff ?
+
+        if self.glyf.is_none() {
             return Err(Error::new(
                 std::io::ErrorKind::Other,
                 "glyf is none".to_string(),
             ));
         }
+               
         // utf-32
         let glyf_data = self.get_gryph(ch);
         let pos = glyf_data.glyph_id;
-        let glyf = glyf_data.open_type_glif.as_ref().unwrap().glyph.as_ref();
-        let grif = if self.current_font == 0 {
-            self.grif.as_ref().unwrap()
-        } else {
-            self.more_fonts[self.current_font - 1]
-                .grif
-                .as_ref()
-                .unwrap()
-        };
-        let layout = &glyf_data.open_type_glif.as_ref().unwrap().layout;
-        let layout = match layout {
-            FontLayout::Horizontal(layout) => layout,
-            _ => panic!("not support vertical layout"),
-        };
-
+        if let FontData::Glyph(glyph) = &glyf_data.open_type_glyf.as_ref().unwrap().glyph {
+            let glyf = if self.current_font == 0 {
+                self.glyf.as_ref().unwrap()
+            } else {
+                self.more_fonts[self.current_font - 1]
+                    .glyf
+                    .as_ref()
+                    .unwrap()
+            };
+            let layout = &glyf_data.open_type_glyf.as_ref().unwrap().layout;
+            let layout = match layout {
+                FontLayout::Horizontal(layout) => layout,
+             _ => panic!("not support vertical layout"),
+            };
         let fontsize = 24.0;
         let fontunit = "pt";
 
@@ -295,9 +308,9 @@ impl Font {
         if let Some(colr) = colr.as_ref() {
             let layers = colr.get_layer_record(pos as u16);
             if layers.is_empty() {
-                return Ok(glyf.to_svg(fontsize, fontunit, &layout));
+                return Ok(glyph.to_svg(fontsize, fontunit, &layout));
             }
-            let mut string = glyf.get_svg_heder(fontsize, fontunit, &layout);
+            let mut string = glyph.get_svg_heder(fontsize, fontunit, &layout);
             #[cfg(debug_assertions)]
             {
                 string += &format!("\n<!-- {} glyf id: {} -->", ch, pos);
@@ -305,7 +318,7 @@ impl Font {
 
             for layer in layers {
                 let glyf_id = layer.glyph_id as u32;
-                let glyf = grif.get_glyph(glyf_id as usize).unwrap();
+                let glyf = glyf.get_glyph(glyf_id as usize).unwrap();
                 let pallet = cpal
                     .as_ref()
                     .unwrap()
@@ -330,12 +343,18 @@ impl Font {
         } else {
             #[cfg(debug_assertions)]
             {
-                let string = glyf.to_svg(fontsize, fontunit, &layout);
+                let string = glyph.to_svg(fontsize, fontunit, &layout);
                 return Ok(format!("<!-- {} glyf id: {} -->{}", ch, pos, string));
             }
             #[cfg(not(debug_assertions))]
-            Ok(glyf.to_svg(fontsize, fontunit, &layout))
+            Ok(glyph.to_svg(fontsize, fontunit, &layout))
         }
+    } else {
+        return Err(Error::new(
+            std::io::ErrorKind::Other,
+            "glyf is none".to_string(),
+        ));
+    }
     }
 
     pub fn get_name(&self, name_id: NameID, locale: &String) -> Result<String, Error> {
@@ -547,7 +566,7 @@ fn font_debug(_font: &Font) {
 
     writeln!(&mut writer, "long cmap -> griph").unwrap();
     let cmap_encodings = &_font.cmap.as_ref().unwrap().clone();
-    let glyf = _font.grif.as_ref().unwrap();
+    let glyf = _font.glyf.as_ref().unwrap();
     for i in 0x0020..0x0ff {
         let pos = cmap_encodings.get_griph_position(i);
         let glyph = glyf.get_glyph(pos as usize).unwrap();
@@ -738,7 +757,7 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Result<Font,Error> {
                 glyf_table.as_ref().unwrap().data.len() as u32,
                 font.loca.as_ref().unwrap(),
             );
-            font.grif = Some(glyf);
+            font.glyf = Some(glyf);
             #[cfg(debug_assertions)]
             {
                 font_debug(&font);
@@ -869,7 +888,7 @@ fn from_opentype<R: BinaryReader>(file: &mut R, header: &OTFHeader) -> Result<Fo
         let length = font.glyf_pos.as_ref().unwrap().length;
         let loca = font.loca.as_ref().unwrap();
         let glyf = glyf::GLYF::new(file, offset, length, loca);
-        font.grif = Some(glyf);
+        font.glyf = Some(glyf);
     }
 
     if font.cmap.is_none() {
