@@ -1,6 +1,6 @@
 // CFF is Adobe Type 1 font format, which is a compact binary format.
 
-use std::{collections::HashMap, error::Error, io::SeekFrom, env::args};
+use std::{collections::HashMap, env::args, error::Error, io::SeekFrom};
 
 // Compare this snippet from src/outline/cff.rs:
 use bin_rs::reader::BinaryReader;
@@ -184,7 +184,10 @@ impl CFF {
             let b0 = data[i];
             i += 1;
             // string += &format!("{} {}\n", b0, svg);
-            println!("{} {:?}\n",b0, stacks);
+            #[cfg(debug_assertions)]
+            {
+                println!("{} {:?}\n", b0, stacks);
+            }
             match b0 {
                 1 => {
                     // hstem |- y dy {dya dyb}* hstem (1) |
@@ -196,12 +199,11 @@ impl CFF {
                     }
 
                     while 2 <= stacks.len() {
-                        let d1= stacks.pop().unwrap();
+                        let d1 = stacks.pop().unwrap();
                         let d2 = stacks.pop().unwrap();
                         args.push(d1);
                         args.push(d2);
                     }
-
 
                     y = args.pop().unwrap();
                     command += &format!(" {}", y);
@@ -225,7 +227,7 @@ impl CFF {
                 }
                 3 => {
                     // vstem |- v dx {dxa dxb}* vstem (3) |
-               
+
                     let mut args = Vec::new();
                     args.push(stacks.pop().unwrap());
                     if 1 <= stacks.len() {
@@ -233,7 +235,7 @@ impl CFF {
                     }
                     while 2 <= stacks.len() {
                         let d1 = stacks.pop().unwrap();
-                        let d2= stacks.pop().unwrap();
+                        let d2 = stacks.pop().unwrap();
                         args.push(d1);
                         args.push(d2);
                     }
@@ -267,7 +269,7 @@ impl CFF {
                     args.push(stacks.pop().unwrap());
                     while 2 <= stacks.len() {
                         let d1 = stacks.pop().unwrap();
-                        let d2= stacks.pop().unwrap();
+                        let d2 = stacks.pop().unwrap();
                         args.push(d1);
                         args.push(d2);
                     }
@@ -279,7 +281,7 @@ impl CFF {
                     let dy = args.pop().unwrap();
                     y += dy;
                     command += &format!(" {}", y);
-                    while 2  <= args.len() {
+                    while 2 <= args.len() {
                         let dya = args.pop().unwrap();
                         y += dya;
                         command += &format!(" {}", y);
@@ -299,15 +301,15 @@ impl CFF {
                     args.push(stacks.pop().unwrap());
                     while 2 <= stacks.len() {
                         let d1 = stacks.pop().unwrap();
-                        let d2= stacks.pop().unwrap();
+                        let d2 = stacks.pop().unwrap();
                         args.push(d1);
                         args.push(d2);
                     }
                     hints += args.len();
                     let mut command = "vstemhm".to_string();
-                    let mut x =  args.pop().unwrap();;
+                    let mut x = args.pop().unwrap();
                     command += &format!(" {}", x);
-                    let dx =  args.pop().unwrap();
+                    let dx = args.pop().unwrap();
                     x += dx;
                     command += &format!(" {}", x);
                     let mut i = 2;
@@ -358,7 +360,9 @@ impl CFF {
                     }
                     let dy = if 2 <= stacks.len() {
                         stacks.pop().unwrap()
-                    } else { 0.0 };
+                    } else {
+                        0.0
+                    };
                     let dx = stacks.pop().unwrap();
                     x += dx;
                     y += dy;
@@ -513,7 +517,7 @@ impl CFF {
                             x += dxb;
                             command += &format!(" {}", dxb);
                             svg += &format!("L {} {}\n", x, accender - y);
-                        }    
+                        }
                     }
 
                     command += "\n";
@@ -536,7 +540,6 @@ impl CFF {
                         args.push(d5);
                         args.push(d6);
                     }
-
 
                     let mut command = "rrcurveto".to_string();
                     while 6 <= args.len() {
@@ -648,7 +651,7 @@ impl CFF {
                         args.push(d1);
                         args.push(d2);
                         args.push(d3);
-                        args.push(d4);    
+                        args.push(d4);
                     }
                     if 1 <= stacks.len() {
                         args.push(stacks.pop().unwrap());
@@ -675,7 +678,7 @@ impl CFF {
                         svg += &format!(" {} {}", x, accender - y); // P(c)
                         let mut lp = false;
                         while 8 <= args.len() {
-                            svg += &format!("{}",tmp);
+                            svg += &format!("{}", tmp);
                             lp = true;
                             let dya = args.pop().unwrap();
                             y += dya;
@@ -716,12 +719,12 @@ impl CFF {
                                 command += &format!(" dxf {}", dxf);
                                 svg += &format!(" {} {}", x, accender - y); // P(f)
                             } else {
-                                svg += &format!("{}",tmp);
+                                svg += &format!("{}", tmp);
                             }
                         }
                     } else {
                         while 8 <= args.len() {
-                            svg += &format!("{}",tmp);
+                            svg += &format!("{}", tmp);
                             let dxa = args.pop().unwrap();
                             x += dxa;
                             command += &format!(" {}", dxa);
@@ -760,7 +763,7 @@ impl CFF {
                             command += &format!(" dyf {}", dyf);
                             svg += &format!(" {} {}", x, accender - y); // P(f)
                         } else {
-                            svg += &format!("{}",tmp);
+                            svg += &format!("{}", tmp);
                         }
                     }
 
@@ -845,7 +848,7 @@ impl CFF {
                         x += dxa;
                         let dya = args.pop().unwrap();
                         y += dya;
-                        command += &format!("dxa {} dya {}",dxa, dya);
+                        command += &format!("dxa {} dya {}", dxa, dya);
                         svg += &format!("L {} {}", x, accender - y); // P(a)
                     }
                     let dxb = args.pop().unwrap();
@@ -907,18 +910,18 @@ impl CFF {
                         args.push(d1);
                         args.push(d2);
                         args.push(d3);
-                        args.push(d4);    
+                        args.push(d4);
                     }
                     if 1 <= stacks.len() {
                         args.push(stacks.pop().unwrap());
                     }
                     let mut command = "vhcurveto".to_string();
-                    if args.len() % 8 >= 4 {                        
+                    if args.len() % 8 >= 4 {
                         let dy1 = args.pop().unwrap();
                         y += dy1;
                         command += &format!(" dy1 {}", dy1);
                         svg += &format!("C {} {}", x, accender - y); // P(a)
- 
+
                         let dx2 = args.pop().unwrap();
                         x += dx2;
                         command += &format!(" dx2 {}", dx2);
@@ -979,12 +982,10 @@ impl CFF {
                                 command += &format!(" dyf {}", dyf);
                                 svg += &format!(" {} {}", x, accender - y); // P(f)
                             } else {
-                                svg += &format!("{}",tmp);
+                                svg += &format!("{}", tmp);
                             }
-    
                         }
                     } else {
-
                         while 8 <= args.len() {
                             svg += &tmp;
                             // {dya dxb dyb dxc dxd dxe dye dyf}+ dxf?
