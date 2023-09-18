@@ -120,36 +120,7 @@ impl FontHeaders {
     pub fn to_string(&self) -> String {
         match self {
             FontHeaders::TTC(header) => {
-                let mut string = String::new();
-                string.push_str("TTC:");
-                // ascii string
-                string.push_str(u32_to_string(header.sfnt_version).as_str());
-                string.push_str(" major version: ");
-                string.push_str(&header.major_version.to_string());
-                string.push_str(" minor version: ");
-                string.push_str(&header.minor_version.to_string());
-                string.push_str(" num fonts: ");
-                string.push_str(&header.num_fonts.to_string());
-                string.push_str(" table directory:\n");
-                for table in header.table_directory.iter() {
-                    let table_offset = format!("{:08x}", table);
-                    string.push_str(&table_offset);
-                    string.push('\n');
-                }
-
-                if header.major_version >= 2 {
-                    string.push_str(" ul_dsig_tag: ");
-                    string.push_str(&header.ul_dsig_tag.to_string());
-                    string.push_str(" ul_dsig_length: ");
-                    string.push_str(&header.ul_dsig_length.to_string());
-                    string.push_str(" ul_dsig_offset: ");
-                    string.push_str(&header.ul_dsig_offset.to_string());
-                }
-                for (font_index, font) in header.font_collection.iter().enumerate() {
-                    string.push_str(&format!("font[{}]:\n {}\n", font_index, font));
-                }
-
-                string
+                header.to_string()
             }
             FontHeaders::OTF(header) => Self::get_otf_string(header),
             FontHeaders::WOFF(header) => {

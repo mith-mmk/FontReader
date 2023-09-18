@@ -223,6 +223,16 @@ impl CmapEncodings {
                     }
                 }
             }
+
+            CmapSubtable::Format13(format13) => {
+                for i in 0..format13.groups.len() {
+                    let group = &format13.groups[i];
+                    if group.start_char_code <= code_number && code_number <= group.end_char_code {
+                        position = group.glyph_id;
+                        break;
+                    }
+                }
+            }
             _ => {
                 print!("{:?}", cmap_subtable);
                 panic!("Not support format");

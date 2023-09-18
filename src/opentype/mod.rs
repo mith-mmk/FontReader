@@ -67,9 +67,9 @@ impl OTFHeader {
         string += &format!("entry_selector: {}\n", self.entry_selector);
         string += &format!("range_shift: {}\n", self.range_shift);
         for table_record in self.table_records.iter() {
-            string += &format!("table_tag: {}\n", u32_to_string(table_record.table_tag));
-            string += &format!("check_sum: {}\n", table_record.check_sum);
-            string += &format!("offset: {}\n", table_record.offset);
+            string += &format!("table_tag: {} ", u32_to_string(table_record.table_tag));
+            string += &format!("check_sum: {} ", table_record.check_sum);
+            string += &format!("offset: {} ", table_record.offset);
             string += &format!("length: {}\n", table_record.length);
         }
         string

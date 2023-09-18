@@ -8,6 +8,7 @@ use crate::fontheader;
 use crate::opentype::color::{colr, cpal};
 #[cfg(feature = "layout")]
 use crate::opentype::extentions::gsub;
+use crate::opentype::layouts;
 use crate::opentype::platforms::PlatformID;
 use crate::opentype::requires::cmap::CmapEncodings;
 use crate::opentype::requires::hmtx::LongHorMetric;
@@ -219,13 +220,23 @@ impl Font {
                         self.more_fonts[self.current_font - 1].cff.as_ref().unwrap(),
                     )
                 };
-                let pos = cmap.get_glyph_position(code);
-                let string = cff.to_code(pos);
-                println!("cff string: {}", string);
+                let glyph_id = cmap.get_glyph_position(code) as usize;
+                let hhead = self.hhea.as_ref().unwrap();
+                let width = hhead.advance_width_max as f64;
+                let string = cff.to_code(glyph_id, width);
+                // println!("cff string: {}", string);
+                let hlayout = self.get_horizontal_layout(glyph_id as usize);
+                let open_type_glyf = Some(
+                    OpenTypeGlyph {
+                        layout: FontLayout::Horizontal(hlayout),
+                        glyph: FontData::CFF(string.as_bytes().to_vec()),
+                    },
+                );
+
                 return GriphData {
-                    glyph_id: 0,
+                    glyph_id,
                     format: GlyphFormat::CFF,
-                    open_type_glyf: None,
+                    open_type_glyf: open_type_glyf
                 };
             }
         }
@@ -266,8 +277,10 @@ impl Font {
         // cff ?
         #[cfg(feature = "cff")]
         if let Some(cff) = self.cff.as_ref() {
-            let gid = self.cmap.as_ref().unwrap().get_glyph_position(ch as u32);
-            let string = cff.to_code(gid);
+            let gid = self.cmap.as_ref().unwrap().get_glyph_position(ch as u32) as usize;
+            let hhea = self.hhea.as_ref().unwrap();
+            let width = hhea.advance_width_max as f64;
+            let string = cff.to_code(gid, width);
             return Ok(string)
         }
 
@@ -656,7 +669,7 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Result<Font, Error> {
                     (table.tag >> 8) as u8,
                     table.tag as u8,
                 ];
-                println!("tag: {}", crate::util::u32_to_string(table.tag));
+                // println!("tag: {}", crate::util::u32_to_string(table.tag));
                 match &tag {
                     b"cmap" => {
                         let mut reader = BytesReader::new(&table.data);
