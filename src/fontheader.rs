@@ -119,9 +119,7 @@ pub enum FontHeaders {
 impl FontHeaders {
     pub fn to_string(&self) -> String {
         match self {
-            FontHeaders::TTC(header) => {
-                header.to_string()
-            }
+            FontHeaders::TTC(header) => header.to_string(),
             FontHeaders::OTF(header) => Self::get_otf_string(header),
             FontHeaders::WOFF(header) => {
                 let mut string = String::new();

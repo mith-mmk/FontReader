@@ -226,17 +226,15 @@ impl Font {
                 let string = cff.to_code(glyph_id, width);
                 // println!("cff string: {}", string);
                 let hlayout = self.get_horizontal_layout(glyph_id as usize);
-                let open_type_glyf = Some(
-                    OpenTypeGlyph {
-                        layout: FontLayout::Horizontal(hlayout),
-                        glyph: FontData::CFF(string.as_bytes().to_vec()),
-                    },
-                );
+                let open_type_glyf = Some(OpenTypeGlyph {
+                    layout: FontLayout::Horizontal(hlayout),
+                    glyph: FontData::CFF(string.as_bytes().to_vec()),
+                });
 
                 return GriphData {
                     glyph_id,
                     format: GlyphFormat::CFF,
-                    open_type_glyf: open_type_glyf
+                    open_type_glyf: open_type_glyf,
                 };
             }
         }
@@ -281,9 +279,8 @@ impl Font {
             let hhea = self.hhea.as_ref().unwrap();
             let width = hhea.advance_width_max as f64;
             let string = cff.to_code(gid, width);
-            return Ok(string)
+            return Ok(string);
         }
-
 
         if self.glyf.is_none() {
             return Err(Error::new(
