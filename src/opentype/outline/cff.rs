@@ -1,6 +1,6 @@
 // CFF is Adobe Type 1 font format, which is a compact binary format.
 
-use std::{collections::HashMap, env::args, error::Error, io::SeekFrom};
+use std::{collections::HashMap, error::Error, io::SeekFrom};
 
 // Compare this snippet from src/outline/cff.rs:
 use bin_rs::reader::BinaryReader;
@@ -23,6 +23,7 @@ pub(crate) struct CFF {
     pub(crate) header: Header,
     pub(crate) names: Vec<String>,
     pub(crate) top_dict: Dict, // TopDict
+    pub(crate) bbox: [f64;4],
     #[cfg(feature = "cff2")]
     pub(crate) global_subr: Option<GlobalSubr>, // CFF2
     #[cfg(feature = "cff2")]
@@ -43,7 +44,9 @@ impl CFF {
         offset: u32,
         _length: u32,
     ) -> Result<Self, Box<dyn Error>> {
+
         reader.seek(SeekFrom::Start(offset as u64))?;
+        let mut bbox = [0.0 ,0.0, 1000.0, 1000.0];
 
         let header = Header::parse(reader)?;
         let name_index = Index::parse(reader)?;
@@ -54,17 +57,38 @@ impl CFF {
             .collect::<Result<Vec<String>, _>>()?;
         let top_dict_index = Index::parse(reader)?;
         let top_dict = Dict::parse(&top_dict_index.data[0])?;
+        let string_index = if header.major == 1 {
+                let index = Index::parse(reader)?;
+                let mut strings = Vec::new();
+                for data in &index.data {
+                    let string = String::from_utf8(data.clone())?;
+                    strings.push(string);
+                }
+                Some(strings)
+            } else {
+                None    // CFF2
+            };
+        // Global Index Subr
+        let gsbrtn = CharString::new(reader, 0)?;
+        let gsubr = Some(gsbrtn);
+        // cff2 
+        /*
+        let variation_store = VariationStore::new(reader)?;
+        */
+
         let n_glyphs = top_dict.get_i32(0, 15).unwrap() as usize;
         let encording_offset = top_dict.get_i32(0, 16); // none
-        let global_subr_index_offset = top_dict.get_i32(12, 29); // none
         let fd_array_offset = top_dict.get_i32(12, 36);
         let fd_select_offset = top_dict.get_i32(12, 37);
+        let opt_bbox = top_dict.get_f64_array(0, 5);
+        if let Some(some_bbox) = opt_bbox {
+            bbox = [some_bbox[0],  some_bbox[1], some_bbox[2], some_bbox[3]];
+        }
         let charsets_offset = top_dict.get_i32(0, 15).unwrap();
         let char_strings_offset = top_dict.get_i32(0, 17).unwrap();
         let vsstore_offset = top_dict.get_i32(0, 24); // none
         let ros = top_dict.get_i32_array(12, 30);
         let private = top_dict.get_i32_array(0, 18);
-        let gsubrtn = top_dict.get_i32(0, 19);
         #[cfg(debug_assertions)]
         {
             println!("header: {:?}", header);
@@ -72,18 +96,18 @@ impl CFF {
             for name in &names {
                 println!("  {}", name);
             }
+            println!("string_index: {:?}", string_index);
             println!("top_dict: {}", top_dict.to_string());
             println!("n_glyphs: {}", n_glyphs);
             println!("encording: {:?}", encording_offset);
-            println!("global_subr_index: {:?}", global_subr_index_offset);
             println!("fd_array: {:?}", fd_array_offset);
             println!("fd_select: {:?}", fd_select_offset);
             println!("charsets: {:?}", charsets_offset);
             println!("char_strings: {:?}", char_strings_offset);
             println!("vsstore: {:?}", vsstore_offset);
+            println!("bbox: {:?}", bbox);
             println!("ROS: {:?}", ros);
             println!("private: {:?}", private);
-            println!("gsubrtn: {:?}", gsubrtn);
         }
 
         let charsets_offset = charsets_offset as u32 + offset;
@@ -92,13 +116,6 @@ impl CFF {
         let char_strings_offset = char_strings_offset as u32 + offset;
         let char_string = CharString::new(reader, char_strings_offset as u32)?;
 
-        // let fd_select = FDSelect::new(reader, fd_select_offset as u32 + offset, n_glyphs as u32)?;
-        // println!("fd_select: {:?}", fd_select.fsds[0..10].to_vec());
-        let mut gsubr = None;
-        if let Some(gsbr_offset) = global_subr_index_offset {
-            let gsbrtn = CharString::new(reader, gsbr_offset as u32 + offset)?;
-            gsubr = Some(gsbrtn);
-        }
 
         let private = top_dict.get_i32_array(0, 18);
         let mut subr = None;
@@ -130,12 +147,17 @@ impl CFF {
             strings: Vec::new(),
             charsets,
             char_string,
+            bbox,
             // fd_Select: FDSelect,
             // fd_dict_index: FDDistIndex,
             private_dict,
             gsubr,
             subr,
         })
+    }
+
+    pub fn set_bbox(&mut self, min_x: f64, min_y: f64, max_x:f64, max_y :f64) {
+        self.bbox = [min_x, min_y, max_x, max_y];
     }
 
     pub fn to_code(&self, gid: usize, width: f64) -> String {
@@ -145,17 +167,28 @@ impl CFF {
         } else {
             width as f64
         };
-        self.parse_data(data, width, 1800.0, &mut Vec::new(), false)
+        self.parse_data(data, width, &mut Vec::new(), false)
     }
 
     fn parse_data(
         &self,
         data: &[u8],
         width: f64,
-        accender: f64,
         stacks: &mut Vec<f64>,
         is_svg: bool,
     ) -> String {
+
+        #[cfg(debug_assertions)]
+        {
+            for (i, b) in data.iter().enumerate() {
+                if i % 16 == 0 {
+                    print!("\n{:04x}:", i);
+                }
+               print!(" {}", b);
+            }
+            println!("");
+        }
+
         let mut width = width;
         //        let cid = self.charsets.sid[gid as usize];
         /*
@@ -174,29 +207,28 @@ impl CFF {
         */
         let mut x = 0.0;
         let mut y = 0.0;
-        let mut i = 0;
+        let accender = self.bbox[3];
         let mut string = String::new();
         let mut svg = String::new();
         // let mut stacks: Vec<f64> = Vec::new();
         let mut first = if width == 0.0 { false } else { true };
         let mut hints = 0;
+        let mut i = 0;
+        println!("data.len() = {}, {}", data.len(), i);
         while i < data.len() {
             let b0 = data[i];
-            i += 1;
-            // string += &format!("{} {}\n", b0, svg);
             #[cfg(debug_assertions)]
             {
-                println!("{} {:?}\n", b0, stacks);
+                println!("{} {:?}",b0, stacks);
             }
+            i += 1;
             match b0 {
                 1 => {
                     // hstem |- y dy {dya dyb}* hstem (1) |
                     let mut command = "hstem".to_string();
                     let mut args = Vec::new();
                     args.push(stacks.pop().unwrap());
-                    if 1 <= stacks.len() {
-                        args.push(stacks.pop().unwrap());
-                    }
+                    args.push(stacks.pop().unwrap());
 
                     while 2 <= stacks.len() {
                         let d1 = stacks.pop().unwrap();
@@ -216,11 +248,9 @@ impl CFF {
                         let dya = args.pop().unwrap();
                         y += dya;
                         command += &format!(" {}", y);
-                        i += 1;
                         let dyb = args.pop().unwrap();
                         y += dyb;
                         command += &format!(" {}", y);
-                        i += 1;
                     }
                     command += "\n";
                     string += &command;
@@ -230,9 +260,7 @@ impl CFF {
 
                     let mut args = Vec::new();
                     args.push(stacks.pop().unwrap());
-                    if 1 <= stacks.len() {
-                        args.push(stacks.pop().unwrap());
-                    }
+                    args.push(stacks.pop().unwrap());
                     while 2 <= stacks.len() {
                         let d1 = stacks.pop().unwrap();
                         let d2 = stacks.pop().unwrap();
@@ -253,11 +281,9 @@ impl CFF {
                         let dxa = args.pop().unwrap();
                         x += dxa;
                         command += &format!(" {}", x);
-                        i += 1;
                         let dxb = args.pop().unwrap();
                         x += dxb;
                         command += &format!(" {}", x);
-                        i += 1;
                     }
                     command += "\n";
                     string += &command;
@@ -285,11 +311,9 @@ impl CFF {
                         let dya = args.pop().unwrap();
                         y += dya;
                         command += &format!(" {}", y);
-                        i += 1;
                         let dyb = args.pop().unwrap();
                         y += dyb;
                         command += &format!(" {}", y);
-                        i += 1;
                     }
                     command += "\n";
                     string += &command;
@@ -312,16 +336,13 @@ impl CFF {
                     let dx = args.pop().unwrap();
                     x += dx;
                     command += &format!(" {}", x);
-                    let mut i = 2;
                     while 2 <= args.len() {
                         let dxa = args.pop().unwrap();
                         x += dxa;
                         command += &format!(" {}", x);
-                        i += 1;
                         let dxb = args.pop().unwrap();
                         x += dxb;
                         command += &format!(" {}", x);
-                        i += 1;
                         hints += 2;
                     }
                     command += "\n";
@@ -354,20 +375,16 @@ impl CFF {
                 }
 
                 21 => {
-                    // rmoveto |- dx1 dy1 rmoveto (21) |-
+                    // rmoveto |- dy1 dy1 rmoveto (21) |-
                     if !first {
                         svg += "Z\n";
                     }
-                    let dy = if 2 <= stacks.len() {
-                        stacks.pop().unwrap()
-                    } else {
-                        0.0
-                    };
+                    let dy = stacks.pop().unwrap();
                     let dx = stacks.pop().unwrap();
                     x += dx;
                     y += dy;
                     string += &format!("rmoveto {} {}\n", dx, dy);
-                    svg += &format!("M {} {}", x, accender - y);
+                    svg += &format!("M {} {}\n", x, accender - y);
 
                     if 1 <= stacks.len() && first == true {
                         width += stacks.pop().unwrap();
@@ -376,14 +393,14 @@ impl CFF {
                     }
                 }
                 22 => {
-                    // hmoveto |- dx1 hmoveto (22) |-
+                    // hmoveto |- dy1 hmoveto (22) |-
                     if !first {
-                        svg += "Z ";
+                        svg += "Z\n";
                     }
                     let dx = stacks.pop().unwrap();
                     x += dx;
                     string += &format!("hmoveto {}\n", dx);
-                    svg += &format!("M {} {}", x, accender - y);
+                    svg += &format!("M {} {}\n", x, accender - y);
                     if 1 <= stacks.len() && first == true {
                         width += stacks.pop().unwrap();
                         first = false;
@@ -394,12 +411,12 @@ impl CFF {
                 4 => {
                     // vmoveto |- dy1 vmoveto (4) |-
                     if !first {
-                        svg += "Z ";
+                        svg += "Z\n";
                     }
                     let dy = stacks.pop().unwrap();
                     y += dy;
                     string += &format!("vmoveto {}\n", dy);
-                    svg += &format!("M {} {}", x, accender - y);
+                    svg += &format!("M {} {}\n", x, accender - y);
 
                     if 1 <= stacks.len() && first == true {
                         width += stacks.pop().unwrap();
@@ -431,7 +448,7 @@ impl CFF {
                     string += &command;
                 }
                 6 => {
-                    //  |- dx1 {dya dxb}* hlineto (6) |- odd
+                    //  |- dy1 {dya dxb}* hlineto (6) |- odd
                     // |- {dxa dyb}+ hlineto (6) |-      even
                     let mut args = Vec::new();
                     while 2 <= stacks.len() {
@@ -446,9 +463,9 @@ impl CFF {
 
                     let mut command = "hlineto".to_string();
                     if args.len() % 2 == 1 {
-                        let dx1 = args.pop().unwrap();
-                        x += dx1;
-                        command += &format!(" dx1 {}", dx1);
+                        let dy1 = args.pop().unwrap();
+                        x += dy1;
+                        command += &format!(" dy1 {}", dy1);
                         svg += &format!("L {} {}\n", x, accender - y);
                         while 2 <= args.len() {
                             let dya = args.pop().unwrap();
@@ -458,14 +475,14 @@ impl CFF {
                             let dxb = args.pop().unwrap();
                             x += dxb;
                             command += &format!(" {}", dxb);
-                            svg += &format!("L {} {}", x, accender - y);
+                            svg += &format!("L {} {}\n", x, accender - y);
                         }
                     } else {
                         while 2 <= args.len() {
                             let dxa = args.pop().unwrap();
                             x += dxa;
                             command += &format!(" {}", dxa);
-                            svg += &format!("L {} {}", x, accender - y);
+                            svg += &format!("L {} {}\n", x, accender - y);
                             let dyb = args.pop().unwrap();
                             y += dyb;
                             command += &format!(" {}", dyb);
@@ -565,7 +582,7 @@ impl CFF {
                         let dyc = args.pop().unwrap();
                         y += dyc;
                         command += &format!(" {}", dyc);
-                        svg += &format!(" {} {}", x, accender - y); // P(c)
+                        svg += &format!(" {} {}\n", x, accender - y); // P(c)
                     }
                 }
                 27 => {
@@ -586,21 +603,18 @@ impl CFF {
                     }
 
                     let mut command = "hhcurveto".to_string();
-                    let mut dy1 = 0.0;
                     if args.len() % 4 == 1 {
-                        dy1 = args.pop().unwrap();
+                        let dy1 = args.pop().unwrap();
                         command += &format!(" dy1 {}", dy1);
                         y += dy1;
-
                         // svg += &format!("L {} {}", x, accender - y);
                     }
                     while 4 <= args.len() {
-                        svg += "C";
                         let dxa = args.pop().unwrap();
                         x += dxa;
 
                         command += &format!(" {}", dxa);
-                        svg += &format!(" {} {}", x, accender - y); // P(a)
+                        svg += &format!("C {} {}", x, accender - y); // P(a)
 
                         let dxb = args.pop().unwrap();
                         x += dxb;
@@ -614,13 +628,13 @@ impl CFF {
                         x += dxc;
 
                         command += &format!(" {}", dxc);
-                        svg += &format!(" {} {}", x, accender - y); // P(c)
+                        svg += &format!(" {} {}\n", x, accender - y); // P(c)
                     }
                     command += "\n";
                     string += &command;
                 }
                 31 => {
-                    // hvcurveto |- dx1 dx2 dy2 dy3 {dya dxb dyb dxc dxd dxe dye dyf}* dxf?
+                    // hvcurveto |- dy1 dx2 dy2 dy3 {dya dxb dyb dxc dxd dxe dye dyf}* dxf?
                     //                hvcurveto (31) |-
                     // |- {dxa dxb dyb dyc dyd dxe dye dxf}+ dyf? hvcurveto (31) |-
                     let mut args = Vec::new();
@@ -659,9 +673,9 @@ impl CFF {
 
                     let mut command = "hvcurveto".to_string();
                     if args.len() % 8 >= 4 {
-                        let dx1 = args.pop().unwrap();
-                        x += dx1;
-                        command += &format!(" dx1 {}", dx1);
+                        let dy1 = args.pop().unwrap();
+                        x += dy1;
+                        command += &format!(" dy1 {}", dy1);
                         let dx2 = args.pop().unwrap();
                         x += dx2;
                         svg += &format!("C{} {}", x, accender - y); // P(a)
@@ -675,7 +689,7 @@ impl CFF {
                         let dy3 = args.pop().unwrap();
                         y += dy3;
                         command += &format!(" dy3 {}", dy3);
-                        svg += &format!(" {} {}", x, accender - y); // P(c)
+                        svg += &format!(" {} {}\n", x, accender - y); // P(c)
                         let mut lp = false;
                         while 8 <= args.len() {
                             svg += &format!("{}", tmp);
@@ -694,7 +708,7 @@ impl CFF {
                             let dxc = args.pop().unwrap();
                             x += dxc;
                             command += &format!(" {}", dxc);
-                            svg += &format!(" {} {} ", x, accender - y); // P(c)
+                            svg += &format!(" {} {}\n", x, accender - y); // P(c)
                             let dxd = args.pop().unwrap();
                             x += dxd;
                             command += &format!(" {}", dxd);
@@ -710,14 +724,14 @@ impl CFF {
                             let dyf = args.pop().unwrap();
                             y += dyf;
                             command += &format!(" {}", dyf);
-                            tmp = format!(" {} {}", x, accender - y); // P(f)
+                            tmp = format!(" {} {}\n", x, accender - y); // P(f)
                         }
                         if lp {
                             if 1 <= args.len() {
                                 let dxf = args.pop().unwrap();
                                 x += dxf;
                                 command += &format!(" dxf {}", dxf);
-                                svg += &format!(" {} {}", x, accender - y); // P(f)
+                                svg += &format!(" {} {}\n", x, accender - y); // P(f)
                             } else {
                                 svg += &format!("{}", tmp);
                             }
@@ -739,7 +753,7 @@ impl CFF {
                             let dyc = args.pop().unwrap();
                             y += dyc;
                             command += &format!(" {}", dyc);
-                            svg += &format!(" {} {} ", x, accender - y); // P(c)
+                            svg += &format!(" {} {}\n", x, accender - y); // P(c)
                             let dyd = args.pop().unwrap();
                             y += dyd;
                             command += &format!(" {}", dyd);
@@ -755,13 +769,13 @@ impl CFF {
                             let dxf = args.pop().unwrap();
                             x += dxf;
                             command += &format!(" {}", dxf);
-                            tmp = format!(" {} {}", x, accender - y); // P(f)
+                            tmp = format!(" {} {}\n", x, accender - y); // P(f)
                         }
                         if 1 <= args.len() {
                             let dyf = args.pop().unwrap();
                             y += dyf;
                             command += &format!(" dyf {}", dyf);
-                            svg += &format!(" {} {}", x, accender - y); // P(f)
+                            svg += &format!(" {} {}\n", x, accender - y); // P(f)
                         } else {
                             svg += &format!("{}", tmp);
                         }
@@ -811,7 +825,7 @@ impl CFF {
                         let dyc = args.pop().unwrap();
                         y += dyc;
                         command += &format!(" {}", dyc);
-                        svg += &format!(" {} {}", x, accender - y); // P(c)
+                        svg += &format!(" {} {}\n", x, accender - y); // P(c)
                     }
                     let dxd = args.pop().unwrap();
                     x += dxd;
@@ -819,7 +833,7 @@ impl CFF {
                     let dyd = args.pop().unwrap();
                     y += dyd;
                     command += &format!(" dyd {}", dyd);
-                    svg += &format!("L {} {}", x, accender - y); // add line
+                    svg += &format!("L {} {}\n", x, accender - y); // add line
                     command += "\n";
                     string += &command;
                 }
@@ -849,7 +863,7 @@ impl CFF {
                         let dya = args.pop().unwrap();
                         y += dya;
                         command += &format!("dxa {} dya {}", dxa, dya);
-                        svg += &format!("L {} {}", x, accender - y); // P(a)
+                        svg += &format!("L {} {}\n", x, accender - y); // P(a)
                     }
                     let dxb = args.pop().unwrap();
                     x += dxb;
@@ -872,7 +886,7 @@ impl CFF {
                     let dyd = args.pop().unwrap();
                     y += dyd;
                     command += &format!(" {}", dyd);
-                    svg += &format!(" {} {}", x, accender - y); // P(d)
+                    svg += &format!(" {} {}\n", x, accender - y); // P(d)
 
                     command += "\n";
                     string += &command;
@@ -933,7 +947,7 @@ impl CFF {
                         let dx3 = args.pop().unwrap();
                         x += dx3;
                         command += &format!(" dx3 {}", dx3);
-                        svg += &format!(" {} {}", x, accender - y); // P(c)
+                        svg += &format!(" {} {}\n", x, accender - y); // P(c)
                         let mut lp = false;
                         while 8 <= args.len() {
                             lp = true;
@@ -980,7 +994,7 @@ impl CFF {
                                 let dyf = args.pop().unwrap();
                                 y += dyf;
                                 command += &format!(" dyf {}", dyf);
-                                svg += &format!(" {} {}", x, accender - y); // P(f)
+                                svg += &format!(" {} {}\n", x, accender - y); // P(f)
                             } else {
                                 svg += &format!("{}", tmp);
                             }
@@ -1006,7 +1020,7 @@ impl CFF {
                             let dxc = args.pop().unwrap();
                             x += dxc;
                             command += &format!(" {}", dxc);
-                            svg += &format!(" {} {}", x, accender - y); // P(c)
+                            svg += &format!(" {} {}\n", x, accender - y); // P(c)
 
                             let dxd = args.pop().unwrap();
                             x += dxd;
@@ -1031,7 +1045,7 @@ impl CFF {
                             let dxf = args.pop().unwrap();
                             x += dxf;
                             command += &format!(" dxf {}", dxf);
-                            svg += &format!(" {} {}", x, accender - y); // P(f)
+                            svg += &format!(" {} {}\n", x, accender - y); // P(f)
                         } else {
                             svg += &tmp;
                         }
@@ -1058,17 +1072,16 @@ impl CFF {
                     }
                     let mut command = "vvcurveto".to_string();
                     if args.len() % 4 == 1 {
-                        let dx = args.pop().unwrap();
-                        x += dx;
-                        command += &format!(" dx1 {}", dx);
+                        let dx1 = args.pop().unwrap();
+                        x += dx1;
+                        command += &format!(" dx1 {}", dx1);
                         // svg += &format!("L {} {}", x, accender - y); // P1
                     }
                     while 4 <= args.len() {
-                        svg += "C";
                         let dya = args.pop().unwrap();
                         y += dya;
                         command += &format!(" {}", dya);
-                        svg += &format!(" {} {}", x, accender - y); // P(a)
+                        svg += &format!("C {} {}", x, accender - y); // P(a)
                         let dxb = args.pop().unwrap();
                         x += dxb;
                         command += &format!(" {}", dxb);
@@ -1080,7 +1093,8 @@ impl CFF {
                         let dyc = args.pop().unwrap();
                         y += dyc;
                         command += &format!(" {}", dyc);
-                        svg += &format!(" {} {}", x, accender - y); // P(c)
+                        svg += &format!(" {} {}\n", x, accender - y); // P(c)
+
                     }
                     command += "\n";
                     string += &command;
@@ -1101,7 +1115,7 @@ impl CFF {
                     i += 1;
                     match b1 {
                         35 => {
-                            // flex |- dx1 dy1 dx2 dy2 dx3 dy3 dx4 dy4 dx5 dy5 dx6 dy6 fd flex (12 35) |-
+                            // flex |- dy1 dy1 dx2 dy2 dx3 dy3 dx4 dy4 dx5 dy5 dx6 dy6 fd flex (12 35) |-
                             let mut command = "flex".to_string();
                             let fd = stacks.pop().unwrap();
                             let dy6 = stacks.pop().unwrap();
@@ -1115,10 +1129,10 @@ impl CFF {
                             let dy2 = stacks.pop().unwrap();
                             let dx2 = stacks.pop().unwrap();
                             let dy1 = stacks.pop().unwrap();
-                            let dx1 = stacks.pop().unwrap();
+                            let dy1 = stacks.pop().unwrap();
                             let mut xx = x;
                             let mut yy = y;
-                            xx += dx1;
+                            xx += dy1;
                             yy += dy1;
                             svg += &format!("C {} {}", x, accender - y); // P(a)
                             xx += dx2;
@@ -1137,26 +1151,26 @@ impl CFF {
                             yy += dy6;
                             svg += &format!(" {} {}", xx, accender - yy); // P(f)
 
-                            x += dx1 + dx2 + dx3 + dx4 + dx5 + dx6;
+                            x += dy1 + dx2 + dx3 + dx4 + dx5 + dx6;
                             y += dy1 + dy2 + dy3 + dy4 + dy5 + dy6;
                             command += &format!(
                                 " {} {} {} {} {} {} {} {} {} {} {} {} fd {}\n",
-                                dx1, dy1, dx2, dy2, dx3, dy3, dx4, dy4, dx5, dy5, dx6, dy6, fd
+                                dy1, dy1, dx2, dy2, dx3, dy3, dx4, dy4, dx5, dy5, dx6, dy6, fd
                             );
                             string += &command;
                         }
                         34 => {
-                            // hflex |- dx1 dx2 dy2 dx3 dx4 dx5 dx6 hflex (12 34) |
+                            // hflex |- dy1 dx2 dy2 dx3 dx4 dx5 dx6 hflex (12 34) |
                             let mut command = "hflex".to_string();
                             let dx6 = stacks.pop().unwrap();
                             let dx5 = stacks.pop().unwrap();
                             let dx4 = stacks.pop().unwrap();
                             let dx3 = stacks.pop().unwrap();
                             let dx2 = stacks.pop().unwrap();
-                            let dx1 = stacks.pop().unwrap();
+                            let dy1 = stacks.pop().unwrap();
                             let mut xx = x;
                             let yy = y;
-                            xx += dx1;
+                            xx += dy1;
                             svg += &format!("C {} {}", xx, accender - yy); // P(a)
                             xx += dx2;
                             svg += &format!(" {} {}", xx, accender - yy); // P(b)
@@ -1169,13 +1183,13 @@ impl CFF {
                             xx += dx6;
                             svg += &format!(" {} {}", xx, accender - yy); // P(f)
 
-                            x += dx1 + dx2 + dx3 + dx4 + dx5 + dx6;
+                            x += dy1 + dx2 + dx3 + dx4 + dx5 + dx6;
                             command +=
-                                &format!(" {} {} {} {} {} {}\n", dx1, dx2, dx3, dx4, dx5, dx6);
+                                &format!(" {} {} {} {} {} {}\n", dy1, dx2, dx3, dx4, dx5, dx6);
                             string += &command;
                         }
                         36 => {
-                            // hflex1 |- dx1 dy1 dx2 dy2 dx3 dx4 dx5 dy5 dx6 hflex1 (12 36) |
+                            // hflex1 |- dy1 dy1 dx2 dy2 dx3 dx4 dx5 dy5 dx6 hflex1 (12 36) |
                             let mut command = "hflex1".to_string();
                             let dx6 = stacks.pop().unwrap();
                             let dy5 = stacks.pop().unwrap();
@@ -1185,10 +1199,10 @@ impl CFF {
                             let dy2 = stacks.pop().unwrap();
                             let dx2 = stacks.pop().unwrap();
                             let dy1 = stacks.pop().unwrap();
-                            let dx1 = stacks.pop().unwrap();
+                            let dy1 = stacks.pop().unwrap();
                             let mut xx = x;
                             let mut yy = y;
-                            xx += dx1;
+                            xx += dy1;
                             yy += dy1;
                             svg += &format!("C {} {}", xx, accender - yy); // P(a)
                             xx += dx2;
@@ -1204,16 +1218,16 @@ impl CFF {
                             xx += dx6;
                             svg += &format!(" {} {}", xx, accender - yy); // P(f)
 
-                            x += dx1 + dx2 + dx3 + dx4 + dx5 + dx6;
+                            x += dy1 + dx2 + dx3 + dx4 + dx5 + dx6;
                             y += dy1 + dy2 + dy5;
                             command += &format!(
                                 " {} {} {} {} {} {} {} {} {}\n",
-                                dx1, dy1, dx2, dy2, dx3, dx4, dx5, dy5, dx6
+                                dy1, dy1, dx2, dy2, dx3, dx4, dx5, dy5, dx6
                             );
                             string += &command;
                         }
                         37 => {
-                            // flex1 |- dx1 dy1 dx2 dy2 dx3 dy3 dx4 dy4 dx5 dy5 d6 flex1 (12 37) |-
+                            // flex1 |- dy1 dy1 dx2 dy2 dx3 dy3 dx4 dy4 dx5 dy5 d6 flex1 (12 37) |-
                             let mut command = "flex1".to_string();
                             let dy6 = stacks.pop().unwrap();
                             let dx6 = stacks.pop().unwrap();
@@ -1226,10 +1240,10 @@ impl CFF {
                             let dy2 = stacks.pop().unwrap();
                             let dx2 = stacks.pop().unwrap();
                             let dy1 = stacks.pop().unwrap();
-                            let dx1 = stacks.pop().unwrap();
+                            let dy1 = stacks.pop().unwrap();
                             let mut xx = x;
                             let mut yy = y;
-                            xx += dx1;
+                            xx += dy1;
                             yy += dy1;
                             svg += &format!("C {} {}", xx, accender - yy); // P(a)
                             xx += dx2;
@@ -1248,11 +1262,11 @@ impl CFF {
                             yy += dy6;
                             svg += &format!(" {} {}", xx, accender - yy); // P(f)
 
-                            x += dx1 + dx2 + dx3 + dx4 + dx5 + dx6;
+                            x += dy1 + dx2 + dx3 + dx4 + dx5 + dx6;
                             y += dy1 + dy2 + dy3 + dy4 + dy5 + dy6;
                             command += &format!(
                                 " {} {} {} {} {} {} {} {} {} {} {} {}\n",
-                                dx1, dy1, dx2, dy2, dx3, dy3, dx4, dy4, dx5, dy5, dx6, dy6
+                                dy1, dy1, dx2, dy2, dx3, dy3, dx4, dy4, dx5, dy5, dx6, dy6
                             );
                             string += &command;
                         }
@@ -1423,7 +1437,7 @@ impl CFF {
                         command += &format!("{}\n", num);
                         string += &command;
                         let data = &subr.data.data[num as usize];
-                        let subroutine = self.parse_data(&data, 0.0, accender, stacks, is_svg);
+                        let subroutine = self.parse_data(&data, 0.0,  stacks, is_svg);
                         string += &subroutine;
                     } else {
                         // no subr
@@ -1446,7 +1460,7 @@ impl CFF {
                         command += &format!("{}\n", num);
                         string += &command;
                         let data = &subr.data.data[num as usize];
-                        let subroutine = self.parse_data(&data, 0.0, accender, stacks, is_svg);
+                        let subroutine = self.parse_data(&data, 0.0,  stacks, is_svg);
                         string += &subroutine;
                     } else {
                         // no subr
@@ -1459,7 +1473,6 @@ impl CFF {
                     string += &command;
                     break;
                 }
-
                 32..=246 => {
                     let value = b0 as i32 - 139;
                     stacks.push(value as f64);
@@ -1495,7 +1508,12 @@ impl CFF {
             }
         }
         svg += "Z";
-        let mut svg2 = format!("<svg width=\"270.9375pt\" accender=\"240pt\" viewBox=\"0 0 2048 2048\" xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" stroke=\"black\" stroke-width=\"10pt\">\n");
+        let x_min = self.bbox[0];
+        let height = self.bbox[3] - self.bbox[1];
+
+        let viewbox = format!("viewBox=\"{} {} {} {}\"", x_min, 0, width - x_min, height);
+
+        let mut svg2 = format!("<svg width=\"270.9375pt\" height=\"240pt\" {} xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" stroke=\"black\" stroke-width=\"10pt\">\n", viewbox);
         svg2 += "<path d=\"";
         svg2 += &svg;
         svg2 += "\" />\n</svg>";
@@ -1889,7 +1907,9 @@ impl CharString {
         reader: &mut R,
         offset: u32,
     ) -> Result<Self, Box<dyn Error>> {
-        reader.seek(SeekFrom::Start(offset as u64))?;
+        if offset > 0 {
+            reader.seek(SeekFrom::Start(offset as u64))?;
+        }
         let index = Index::parse(reader)?;
         Ok(Self { data: index })
     }

@@ -48,6 +48,18 @@ mod tests {
         } else {
             panic!("not integer");
         }
+
+        for b in 32..246 {
+            let buf = [b];
+            let (value, len) = operand_encoding(&buf)?;
+            if let Operand::Integer(value) = value {
+                assert_eq!(value, b as i32 - 139);
+                assert_eq!(len, 1);
+            } else {
+                panic!("not integer");
+            }
+        }
+
         let b = [0xef];
         let (value, len) = operand_encoding(&b)?;
         if let Operand::Integer(value) = value {
