@@ -110,6 +110,8 @@ impl CFF {
             println!("private: {:?}", private);
         }
 
+
+        // must CID = GID
         let charsets_offset = charsets_offset as u32 + offset;
 
         let charsets = Charsets::new(reader, charsets_offset, n_glyphs as u32)?;
@@ -139,6 +141,37 @@ impl CFF {
         } else {
             None
         };
+        if ros.is_some() {
+            let fd_array_offset = (fd_array_offset.unwrap() as u32 + offset) as u64;
+            reader.seek(SeekFrom::Start(fd_array_offset))?;
+            let fd_arrays = Index::parse(reader)?;
+            let font_dict = Dict::parse(&fd_arrays.data[0])?;
+            #[cfg(debug_assertions)]
+            {
+                println!("font_dict:\n{}", font_dict.to_string());
+            }
+
+            if let Some(private) = font_dict.get_i32_array(0, 18) {
+                let private_dict_offset = private[1] as u32 + offset as u32;
+                reader.seek(SeekFrom::Start(private_dict_offset as u64))?;
+                let buffer = reader.read_bytes_as_vec(private[0] as usize);
+                let private_dict = Dict::parse(&buffer?)?;
+                #[cfg(debug_assertions)]
+                {
+                    println!("private_dict: {}", private_dict.to_string());
+                }
+                let subr_offset = private_dict.get_i32(0, 19);
+                if let Some(subr_offset) = subr_offset {
+                    let subr_offset = subr_offset as u32 + private_dict_offset as u32;
+                    let subrtn = CharString::new(reader, subr_offset)?;
+                    subr = Some(subrtn);
+    
+                }
+            }
+            // let fd_select = FDSelect::new(reader, fd_select_offset.unwrap() as u32 + offset, n_glyphs);
+            // println!("fd_select: {:?}", fd_select);
+        }
+
 
         Ok(Self {
             header,
@@ -161,6 +194,8 @@ impl CFF {
     }
 
     pub fn to_code(&self, gid: usize, width: f64) -> String {
+        let cid = self.charsets.sid[gid as usize];
+        println!("gid {} cid {}",gid, cid);
         let data = &self.char_string.data.data[gid as usize];
         let width = if width == 0.0 {
             self.top_dict.get_f64(0, 15).unwrap() // nomarl width
@@ -177,17 +212,6 @@ impl CFF {
         stacks: &mut Vec<f64>,
         is_svg: bool,
     ) -> String {
-
-        #[cfg(debug_assertions)]
-        {
-            for (i, b) in data.iter().enumerate() {
-                if i % 16 == 0 {
-                    print!("\n{:04x}:", i);
-                }
-               print!(" {}", b);
-            }
-            println!("");
-        }
 
         let mut width = width;
         //        let cid = self.charsets.sid[gid as usize];
@@ -214,13 +238,9 @@ impl CFF {
         let mut first = if width == 0.0 { false } else { true };
         let mut hints = 0;
         let mut i = 0;
-        println!("data.len() = {}, {}", data.len(), i);
+        // println!("data.len() = {}, {}", data.len(), i);
         while i < data.len() {
             let b0 = data[i];
-            #[cfg(debug_assertions)]
-            {
-                println!("{} {:?}",b0, stacks);
-            }
             i += 1;
             match b0 {
                 1 => {
@@ -1434,13 +1454,17 @@ impl CFF {
                         } else {
                             num += 32768
                         }
+
                         command += &format!("{}\n", num);
                         string += &command;
                         let data = &subr.data.data[num as usize];
-                        let subroutine = self.parse_data(&data, 0.0,  stacks, is_svg);
+                        let subroutine = self.parse_data(&data, width, stacks, is_svg);
                         string += &subroutine;
                     } else {
-                        // no subr
+                        #[cfg(debug_assertions)]
+                        {
+                            println!("no subr");
+                        }
                         break;
                     }
                 }
@@ -1460,10 +1484,13 @@ impl CFF {
                         command += &format!("{}\n", num);
                         string += &command;
                         let data = &subr.data.data[num as usize];
-                        let subroutine = self.parse_data(&data, 0.0,  stacks, is_svg);
+                        let subroutine = self.parse_data(&data, width,  stacks, is_svg);
                         string += &subroutine;
                     } else {
-                        // no subr
+                        #[cfg(debug_assertions)]
+                        {
+                            println!("no subr");
+                        }
                         break;
                     }
                 }
@@ -1471,7 +1498,7 @@ impl CFF {
                     // return
                     let command = "return\n".to_string();
                     string += &command;
-                    break;
+                    return string;
                 }
                 32..=246 => {
                     let value = b0 as i32 - 139;
@@ -1524,14 +1551,15 @@ impl CFF {
     }
 }
 
-/*
+
 #[derive(Debug, Clone)]
 pub(crate) struct FDSelect {
     fsds: Vec<u8>
 }
 
 impl FDSelect {
-    pub(crate) fn new<R: BinaryReader>(reader: &mut R,offset: u32, n_glyphs: u32) -> Result<Self,Box<dyn Error>>{      reader.seek(SeekFrom::Start(offset as u64))?;
+    pub(crate) fn new<R: BinaryReader>(reader: &mut R,offset: u32, n_glyphs: usize) -> Result<Self,Box<dyn Error>>{      reader.seek(SeekFrom::Start(offset as u64))?;
+        reader.seek(SeekFrom::Start(offset as u64))?;
         let format = reader.read_u8()?;
         let mut fsds = Vec::new();
         match format {
@@ -1561,11 +1589,10 @@ impl FDSelect {
         })
     }
 }
-*/
+
 
 #[derive(Debug, Clone)]
 pub(crate) struct Charsets {
-    n_glyphs: usize,
     format: u8,
     sid: Vec<u16>,
 }
@@ -1579,10 +1606,10 @@ impl Charsets {
         reader.seek(SeekFrom::Start(offset as u64)).unwrap();
         let format = reader.read_u8().unwrap();
         let mut charsets = Self {
-            n_glyphs: n_glyphs as usize,
             format,
             sid: Vec::new(),
         };
+        charsets.sid.push(0);
 
         match format {
             0 => charsets.parse_format0(reader, n_glyphs)?,

@@ -57,8 +57,12 @@ impl fmt::Display for EncodingRecord {
 impl EncodingRecord {
     pub(crate) fn to_string(&self) -> String {
         format!(
-            "platform_id: {}, encoding_id: {}, offset: {}",
-            self.platform_id, self.encoding_id, self.subtable_offset
+            "platform_id: {} {}, encoding_id: {} {}, offset: {}",
+            self.platform_id,
+            self.get_platform(),
+            self.encoding_id,
+            self.get_encoding(),
+            self.subtable_offset
         )
     }
 
@@ -233,6 +237,7 @@ impl CmapEncodings {
                     }
                 }
             }
+
             _ => {
                 print!("{:?}", cmap_subtable);
                 panic!("Not support format");
@@ -250,15 +255,15 @@ pub(crate) struct CmapEncoding {
 
 #[derive(Debug, Clone)]
 pub(crate) enum CmapSubtable {
-    Format0(ByteEncoding),
-    Format2(CmapHighByteEncoding),
-    Format4(SegmentMappingToDelta),
-    Format6(TrimmedTableMapping),
-    Format8(Mixed16and32Coverage),
-    Format10(TrimmedArray),
-    Format12(SegmentedCoverage),
-    Format13(ManyToOneRangeMapping),
-    Format14(UnicodeVariationSeauences),
+    Format0(ByteEncoding),          // do not use
+    Format2(CmapHighByteEncoding),  // also use
+    Format4(SegmentMappingToDelta), // use
+    Format6(TrimmedTableMapping),   // do not use
+    Format8(Mixed16and32Coverage),  // do not use
+    Format10(TrimmedArray),         // do not use
+    Format12(SegmentedCoverage),    // use
+    Format13(ManyToOneRangeMapping),        // use
+    Format14(UnicodeVariationSeauences),  // part of use
     FormatUnknown,
 }
 
@@ -482,7 +487,7 @@ impl CmapSubtable {
                 string += "var_selector_records:\n";
                 for i in 0..length {
                     string += &format!(
-                        "{} {:002}\n",
+                        "{:04x} {:002}\n",
                         i,
                         format14.var_selector_records[i].to_stirng()
                     );
@@ -651,7 +656,7 @@ pub(crate) struct VarSelectorRecord {
 
 impl VarSelectorRecord {
     fn to_stirng(&self) -> String {
-        format!("var_selector: {}, default_uvs_offset: {}, default_uvs: {}, non_default_uvs_offset: {}, non_default_uvs: {}", self.var_selector, self.default_uvs_offset, self.default_uvs.to_string(), self.non_default_uvs_offset, self.non_default_uvs.to_string())
+        format!("var_selector: {:04x}\n default_uvs_offset: {}, default_uvs: {}\n non_default_uvs_offset: {}, non_default_uvs: {}", self.var_selector, self.default_uvs_offset, self.default_uvs.to_string(), self.non_default_uvs_offset, self.non_default_uvs.to_string())
     }
 }
 

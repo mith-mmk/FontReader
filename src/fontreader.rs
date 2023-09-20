@@ -8,6 +8,7 @@ use crate::fontheader;
 use crate::opentype::color::{colr, cpal};
 #[cfg(feature = "layout")]
 use crate::opentype::extentions::gsub;
+#[cfg(feature = "layout")]
 use crate::opentype::layouts;
 use crate::opentype::platforms::PlatformID;
 use crate::opentype::requires::cmap::CmapEncodings;
@@ -430,6 +431,27 @@ impl Font {
         };
         os2.to_string()
     }
+
+    #[cfg(debug_assertions)]
+    pub fn get_cmap_raw(&self) -> String {
+        let cmap = if self.current_font == 0 {
+            self.cmap.as_ref().unwrap()
+        } else {
+            self.more_fonts[self.current_font - 1]
+                .cmap
+                .as_ref()
+                .unwrap()
+        };
+        let encodings = &cmap.cmap_encodings;
+        let mut string = String::new();
+        for encoding in encodings.as_ref().iter() {
+            string += &format!("Encording Record\n{}\n", encoding.encoding_record.to_string());
+            string += &format!("Subtable\n{}\n", encoding.cmap_subtable.get_part_of_string(10));
+        }
+        string
+        
+    }
+
 
     pub fn get_html(&self, string: &str) -> Result<String, Error> {
         let mut html = String::new();
