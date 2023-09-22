@@ -732,7 +732,7 @@ impl DefaultUVS {
             self.num_unicode_value_ranges
         );
         let length = if self.unicode_value_ranges.len() > 10 {
-            self.unicode_value_ranges.len()
+            10
         } else {
             self.unicode_value_ranges.len()
         };
