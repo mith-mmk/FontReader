@@ -178,6 +178,65 @@ impl CmapEncodings {
         self.cmap.encoding_records.clone()
     }
 
+    pub(crate) fn get_glyph_position_from_uvs(&self, code_number: u32, vs: u32) -> u32 {
+        let cmap_encodings = &self.cmap_encodings;
+        let mut current_encoding = -1;
+        for i in 0..cmap_encodings.len() {
+            if cmap_encodings[i].cmap_subtable.get_format() == 14 {
+                current_encoding = i as isize;
+                break;
+            }
+        }
+        if current_encoding == -1 {
+            return self.get_glyph_position(code_number);
+        }
+        let current_encoding = current_encoding as usize;
+        let cmap_encoding = &cmap_encodings[current_encoding];
+        let cmap_subtable = &cmap_encoding.cmap_subtable;
+        let mut position = 0;
+
+        match cmap_subtable.as_ref() {
+            CmapSubtable::Format14(format14) => {
+                'outer: for i in 0..format14.num_var_selector_records {
+                    let var_selector_record = &format14.var_selector_records[i as usize];
+                    if var_selector_record.var_selector == vs {
+                        let non_default_uvs = &var_selector_record.non_default_uvs;
+                        // let num_unicode_value_ranges = non_default_uvs.num_unicode_value_ranges;
+                        let i = non_default_uvs.unicode_value_ranges.binary_search_by(|x| {
+                            if x.unicode_value == code_number {
+                                std::cmp::Ordering::Equal
+                            } else if x.unicode_value < code_number {
+                                std::cmp::Ordering::Less
+                            } else {
+                                std::cmp::Ordering::Greater
+                            }
+                        });
+                        if let Ok(i) = i {
+                            position = non_default_uvs.unicode_value_ranges[i].glyph_id as u32;
+                            break 'outer;
+                        }
+                        /*
+                        for i in 0..num_unicode_value_ranges {
+                            let code = non_default_uvs.unicode_value_ranges[i as usize].unicode_value;
+                            if code == code_number {
+                                position =  non_default_uvs.unicode_value_ranges[i as usize].glyph_id as u32;
+                                break 'outer;
+                            }
+                        } */
+                    }
+                }
+            }
+            _ => {
+                print!("{:?}", cmap_subtable);
+            }
+        }
+        if position == 0 {
+            position = self.get_glyph_position(code_number);
+        }
+        position
+    }
+    
+
     pub(crate) fn get_glyph_position(&self, code_number: u32) -> u32 {
         let cmap_encodings = &self.cmap_encodings;
         let mut current_encoding = 0;
@@ -194,7 +253,7 @@ impl CmapEncodings {
         let cmap_subtable = &cmap_encoding.cmap_subtable;
         let mut position = 0;
 
-        match *cmap_subtable.clone() {
+        match cmap_subtable.as_ref() {
             CmapSubtable::Format12(format12) => {
                 for i in 0..format12.groups.len() {
                     let group = &format12.groups[i];
@@ -673,13 +732,13 @@ impl DefaultUVS {
             self.num_unicode_value_ranges
         );
         let length = if self.unicode_value_ranges.len() > 10 {
-            10
+            self.unicode_value_ranges.len()
         } else {
             self.unicode_value_ranges.len()
         };
         for i in 0..length {
             string += &format!(
-                "{} {} {}\n",
+                "{} {:06x} {}\n",
                 i,
                 self.unicode_value_ranges[i].start_unicode_value,
                 self.unicode_value_ranges[i].additional_count

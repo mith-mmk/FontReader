@@ -204,8 +204,9 @@ impl Font {
         }
     }
 
-    pub fn get_glyph(&self, ch: char) -> GriphData {
+    pub fn get_glyph_with_uvs(&self, ch: char, vs: char) -> GriphData {
         let code = ch as u32;
+        let vs = vs as u32;
 
         #[cfg(feature = "cff")]
         {
@@ -221,7 +222,7 @@ impl Font {
                         self.more_fonts[self.current_font - 1].cff.as_ref().unwrap(),
                     )
                 };
-                let glyph_id = cmap.get_glyph_position(code) as usize;
+                let glyph_id = cmap.get_glyph_position_from_uvs(code, vs) as usize;
                 let hhead = self.hhea.as_ref().unwrap();
                 let width = hhead.advance_width_max as f64;
                 let string = cff.to_code(glyph_id, width);
@@ -255,7 +256,8 @@ impl Font {
             )
         };
 
-        let pos = cmap.get_glyph_position(code);
+        let pos = cmap.get_glyph_position_from_uvs(code, vs);
+//        let pos = cmap.get_glyph_position(code);
         let glyph = glyf.get_glyph(pos as usize).unwrap();
         let layout: HorizontalLayout = self.get_horizontal_layout(pos as usize);
         let open_type_glyph = OpenTypeGlyph {
@@ -268,9 +270,14 @@ impl Font {
             format: GlyphFormat::OpenTypeGlyph,
             open_type_glyf: Some(open_type_glyph),
         }
+
     }
 
-    pub fn get_svg(&self, ch: char) -> Result<String, Error> {
+    pub fn get_glyph(&self, ch: char) -> GriphData {
+        self.get_glyph_with_uvs(ch, '\u{0}')
+    }
+
+    pub fn get_svg_with_uvs(&self, ch: char, vs: char) -> Result<String, Error> {
         // svg ?
         // sbix ?
         // cff ?
@@ -291,8 +298,9 @@ impl Font {
         }
 
         // utf-32
-        let glyf_data = self.get_glyph(ch);
+        let glyf_data = self.get_glyph_with_uvs(ch, vs);
         let pos = glyf_data.glyph_id;
+        
         if let FontData::Glyph(glyph) = &glyf_data.open_type_glyf.as_ref().unwrap().glyph {
             let glyf = if self.current_font == 0 {
                 self.glyf.as_ref().unwrap()
@@ -369,6 +377,11 @@ impl Font {
                 "glyf is none".to_string(),
             ));
         }
+
+    }
+
+    pub fn get_svg(&self, ch: char) -> Result<String, Error> {
+        self.get_svg_with_uvs(ch, '\u{0}')
     }
 
     pub fn get_name(&self, name_id: NameID, locale: &String) -> Result<String, Error> {
@@ -461,16 +474,30 @@ impl Font {
         html += "<title>fontreader</title>\n";
         html += "</head>\n";
         html += "<body>\n";
-        for ch in string.chars() {
+        let mut svgs = Vec::new();
+        for (i, ch) in string.chars().enumerate() {
             if ch == '\n' || ch == '\r' {
-                html += "<br>\n";
+                svgs.push("<br>\n".to_string());
                 continue;
             }
             if ch == '\t' {
-                html += "<span style=\"width: 4em; display: inline-block;\"></span>\n";
+                svgs.push("<span style=\"width: 4em; display: inline-block;\"></span>\n".to_string());
                 continue;
             }
-            let svg = self.get_svg(ch)?;
+
+            // variation selector 0xE0100 - 0xE01EF
+            // https://www.unicode.org/reports/tr37/#VS
+            if ch as u32 >= 0xfe00  && ch as u32 <= 0xfe0f || ch as u32 >= 0xE0100 && ch as u32 <= 0xE01EF {
+                let ch0 = string.chars().nth(i - 1).unwrap();
+                let svg = self.get_svg_with_uvs(ch0, ch)?;
+                svgs.pop();
+                svgs.push(svg);
+            } else {
+                let svg = self.get_svg(ch)?;
+                svgs.push(svg);
+            }
+        }
+        for svg in svgs {
             html += &svg;
         }
         html += "</body>\n";
