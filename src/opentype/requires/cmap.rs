@@ -200,22 +200,6 @@ impl CmapEncodings {
                 'outer: for i in 0..format14.num_var_selector_records {
                     let var_selector_record = &format14.var_selector_records[i as usize];
                     if var_selector_record.var_selector == vs {
-                        let default_uvs = &var_selector_record.default_uvs;
-                        let i = default_uvs.unicode_value_ranges.binary_search_by(|x| {
-                            if x.start_unicode_value < code_number {
-                                std::cmp::Ordering::Less
-                            } else if x.start_unicode_value + x.additional_count as u32 > code_number {
-                                std::cmp::Ordering::Greater
-                            } else {
-                                std::cmp::Ordering::Equal
-                            }
-                        });
-                        if let Ok(i) = i {
-                            position = self.get_glyph_position(code_number) + i as u32 + 1;
-                            println!("position: {}", position);
-                            break 'outer;
-                        }
-
                         let non_default_uvs = &var_selector_record.non_default_uvs;
                         // let num_unicode_value_ranges = non_default_uvs.num_unicode_value_ranges;
                         let i = non_default_uvs.unicode_value_ranges.binary_search_by(|x| {
@@ -239,6 +223,7 @@ impl CmapEncodings {
                                 break 'outer;
                             }
                         } */
+                        break;
                     }
                 }
             }
