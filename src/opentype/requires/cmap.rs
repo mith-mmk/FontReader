@@ -281,7 +281,7 @@ impl CmapEncodings {
                         std::cmp::Ordering::Greater
                     }
                 });
-                let i = if let Ok(i) = i { i } else { 0 };
+                let i = if let Ok(i) = i { i } else { return 0 };
 
                 let group = &format12.groups[i];
                 position = group.start_glyph_id + (code_number - group.start_char_code);
@@ -298,6 +298,30 @@ impl CmapEncodings {
             }
             CmapSubtable::Format4(format4) => {
                 let code_number = code_number as u16;
+                let i = format4.codes.binary_search_by(|x| {
+                    if x.0 <= code_number && code_number <= x.1 {
+                        std::cmp::Ordering::Equal
+                    } else if x.0 < code_number {
+                        std::cmp::Ordering::Less
+                    } else {
+                        std::cmp::Ordering::Greater
+                    }
+                });
+
+                let i = if let Ok(i) = i { i } else { return 0 };
+                let id_range_offset = format4.id_range_offset[i] as u32;
+                let gid = if id_range_offset == 0 {
+                    ((code_number as i32 + format4.id_delta[i] as i32) & 0xffff) as u32
+                } else {
+                    let mut offset = format4.id_range_offset[i] as u32 / 2 + i as u32
+                        - format4.seg_count_x2 as u32 / 2;
+                    // reverce calculation
+                    offset += code_number as u32 - format4.codes[i].0 as u32;
+                    format4.glyph_id_array[offset as usize] as u32
+                };
+                position = gid;
+
+                /*
 
                 for i in 0..format4.codes.len() {
                     match format4.codes[i].0 <= code_number && code_number <= format4.codes[i].1
@@ -319,6 +343,7 @@ impl CmapEncodings {
                         false => (),
                     }
                 }
+                */
             }
 
             CmapSubtable::Format13(format13) => {
