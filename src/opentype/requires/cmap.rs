@@ -200,6 +200,22 @@ impl CmapEncodings {
                 'outer: for i in 0..format14.num_var_selector_records {
                     let var_selector_record = &format14.var_selector_records[i as usize];
                     if var_selector_record.var_selector == vs {
+                        let default_uvs = &var_selector_record.default_uvs;
+                        let i = default_uvs.unicode_value_ranges.binary_search_by(|x| {
+                            if x.start_unicode_value < code_number {
+                                std::cmp::Ordering::Less
+                            } else if x.start_unicode_value + x.additional_count as u32 > code_number {
+                                std::cmp::Ordering::Greater
+                            } else {
+                                std::cmp::Ordering::Equal
+                            }
+                        });
+                        if let Ok(i) = i {
+                            position = self.get_glyph_position(code_number) + i as u32 + 1;
+                            println!("position: {}", position);
+                            break 'outer;
+                        }
+
                         let non_default_uvs = &var_selector_record.non_default_uvs;
                         // let num_unicode_value_ranges = non_default_uvs.num_unicode_value_ranges;
                         let i = non_default_uvs.unicode_value_ranges.binary_search_by(|x| {
@@ -255,6 +271,22 @@ impl CmapEncodings {
 
         match cmap_subtable.as_ref() {
             CmapSubtable::Format12(format12) => {
+
+                let i = format12.groups.binary_search_by(|x| {
+                    if x.start_char_code <= code_number && code_number <= x.end_char_code {
+                        std::cmp::Ordering::Equal
+                    } else if x.start_char_code < code_number {
+                        std::cmp::Ordering::Less
+                    } else {
+                        std::cmp::Ordering::Greater
+                    }
+                });
+                let i = if let Ok(i) = i { i } else { 0 };
+
+                let group = &format12.groups[i];
+                position = group.start_glyph_id + (code_number - group.start_char_code);
+
+                /* 
                 for i in 0..format12.groups.len() {
                     let group = &format12.groups[i];
                     if group.start_char_code <= code_number && code_number <= group.end_char_code {
@@ -262,11 +294,13 @@ impl CmapEncodings {
                         break;
                     }
                 }
+                */
             }
             CmapSubtable::Format4(format4) => {
                 let code_number = code_number as u16;
-                for i in 0..format4.end_code.len() {
-                    match format4.start_code[i] <= code_number && code_number <= format4.end_code[i]
+
+                for i in 0..format4.codes.len() {
+                    match format4.codes[i].0 <= code_number && code_number <= format4.codes[i].1
                     {
                         true => {
                             let id_range_offset = format4.id_range_offset[i] as u32;
@@ -276,7 +310,7 @@ impl CmapEncodings {
                                 let mut offset = format4.id_range_offset[i] as u32 / 2 + i as u32
                                     - format4.seg_count_x2 as u32 / 2;
                                 // reverce calculation
-                                offset += code_number as u32 - format4.start_code[i] as u32;
+                                offset += code_number as u32 - format4.codes[i].0 as u32;
                                 format4.glyph_id_array[offset as usize] as u32
                             };
                             position = gid;
@@ -387,8 +421,8 @@ impl CmapSubtable {
             CmapSubtable::Format4(format4) => {
                 let mut string = "Format 4: Segment mapping to delta values\n".to_string();
                 // SegmentMappingToDelta
-                let length = if length > format4.end_code.len() {
-                    format4.end_code.len()
+                let length = if length > format4.codes.len() {
+                    format4.codes.len()
                 } else {
                     length
                 };
@@ -401,10 +435,10 @@ impl CmapSubtable {
                 string += &format!("range_shift: {}\n", format4.range_shift);
                 string += "start_code end_code\n";
                 for i in 0..length {
-                    if i < format4.end_code.len() && i < format4.start_code.len() {
+                    if i < format4.codes.len() && i < format4.codes.len() {
                         string += &format!(
                             "{} {:04x} {:04x}\n",
-                            i, format4.start_code[i], format4.end_code[i]
+                            i, format4.codes[i].0, format4.codes[i].1
                         );
                     }
                 }
@@ -597,9 +631,9 @@ pub(crate) struct SegmentMappingToDelta {
     pub(crate) search_range: u16,
     pub(crate) entry_selector: u16,
     pub(crate) range_shift: u16,
-    pub(crate) end_code: Vec<u16>,
-    pub(crate) reserved_pad: u16,
-    pub(crate) start_code: Vec<u16>,
+    pub(crate) codes:Vec<(u16, u16)>, // start_code, end_code
+    // pub(crate) end_code: Vec<u16>,
+    // pub(crate) start_code: Vec<u16>,
     pub(crate) id_delta: Vec<i16>,
     pub(crate) id_range_offset: Vec<u16>,
     pub(crate) glyph_id_array: Vec<u16>,
@@ -995,28 +1029,28 @@ pub(crate) fn get_subtable(encoding_record: &EncodingRecord, buffer: &[u8]) -> C
             let search_range = u16::from_be_bytes([buffer[8], buffer[9]]);
             let entry_selector = u16::from_be_bytes([buffer[10], buffer[11]]);
             let range_shift: u16 = u16::from_be_bytes([buffer[12], buffer[13]]);
-            let mut end_code = Vec::new();
+            let mut end_code = Vec::with_capacity(seg_count as usize);
             let mut offset: usize = 14;
             for _ in 0..seg_count {
                 let code = u16::from_be_bytes([buffer[offset], buffer[offset + 1]]);
                 offset += 2;
                 end_code.push(code);
             }
-            let reserved_pad: u16 = u16::from_be_bytes([buffer[offset], buffer[offset + 1]]);
+            let _: u16 = u16::from_be_bytes([buffer[offset], buffer[offset + 1]]);
             offset += 2;
-            let mut start_code = Vec::new();
-            for _ in 0..seg_count {
+            let mut codes = Vec::with_capacity(seg_count as usize);
+            for i in 0..seg_count as usize {
                 let code = u16::from_be_bytes([buffer[offset], buffer[offset + 1]]);
                 offset += 2;
-                start_code.push(code);
+                codes.push((code, end_code[i]));
             }
-            let mut id_delta = Vec::new();
+            let mut id_delta = Vec::with_capacity(seg_count as usize);
             for _ in 0..seg_count {
                 let delta = i16::from_be_bytes([buffer[offset], buffer[offset + 1]]);
                 offset += 2;
                 id_delta.push(delta);
             }
-            let mut id_range_offset = Vec::new();
+            let mut id_range_offset = Vec::with_capacity(seg_count as usize);
             for _ in 0..seg_count {
                 let range_offset = u16::from_be_bytes([buffer[offset], buffer[offset + 1]]);
                 offset += 2;
@@ -1036,9 +1070,7 @@ pub(crate) fn get_subtable(encoding_record: &EncodingRecord, buffer: &[u8]) -> C
                 search_range,
                 entry_selector,
                 range_shift,
-                end_code,
-                reserved_pad,
-                start_code,
+                codes,
                 id_delta,
                 id_range_offset,
                 glyph_id_array,
