@@ -16,8 +16,6 @@ pub use outline::glyf::Glyph;
 pub use requires::name::NameID;
 pub use ttc::TTCHeader;
 
-use self::requires::cmap;
-
 #[derive(Debug, Clone)]
 pub struct OTFHeader {
     pub(crate) sfnt_version: u32,
@@ -80,77 +78,4 @@ impl fmt::Display for OTFHeader {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.to_stirng())
     }
-}
-
-pub(crate) enum FontTable {
-    // required
-    CMAP(cmap::CMAP),
-    HEAD,
-    HHEA,
-    HMTX,
-    MAXP,
-    NAME,
-    OS2,
-    POST,
-    // tables related to TrueType outlines
-    CVT,
-    FPGM,
-    GLYF,
-    LOCA,
-    PREP,
-    GASP,
-    // tables related to CFF outlines
-    CFF,
-    CFF2,
-    VORG,
-    // SVG
-    SVG,
-    // Bitmap Glyphs
-    EBDT,
-    EBLC,
-    EBSV,
-    // Color Bitmap Glyphs
-    CBDT,
-    CBLC,
-    COLR,
-    CPAL,
-    // Advanced Typographics
-    BASE,
-    GDEF,
-    GPOS,
-    GSUB,
-    JSTF,
-    MATH,
-    MERG,
-    PROP,
-    ZWJ,
-    // OpenType Font Variant
-    AVAR,
-    CVAR,
-    FVAR,
-    GVAR,
-    HVAR,
-    MVAR,
-    STAT,
-    VVAR,
-    // Color Fonts
-    // COLR,
-    // CPAL,
-    // CBDT,
-    // CBLC,
-    SBIX,
-    // SVG,
-    // Other OpenType Tables
-    DISG,
-    HDMX,
-    KERN,
-    LTSH,
-    //    MERG,
-    META,
-    //    STAT,
-    PCLT,
-    VDMX,
-    VHEA,
-    VMTX,
-    UNKNOWN,
 }

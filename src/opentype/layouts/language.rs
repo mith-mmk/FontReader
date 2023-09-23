@@ -18,14 +18,6 @@ impl LanguageSystem {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct LanguageSystemTable {
-    pub(crate) lookup_order: u16,
-    pub(crate) required_feature_index: u16,
-    pub(crate) feature_index_count: u16,
-    pub(crate) feature_indexes: Vec<u16>,
-}
-
-#[derive(Debug, Clone)]
 pub(crate) struct LanguageSystemRecord {
     pub(crate) language_system_tag: u32,
     pub(crate) language_system: LanguageSystem,

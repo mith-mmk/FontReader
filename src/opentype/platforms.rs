@@ -312,7 +312,9 @@ pub enum WindowsLanguageID {
     Indonesian = 0x0421,
     Inuktitut = 0x045d,
     Irish = 0x083c,
+    #[allow(non_camel_case_types)]
     isiXhosa = 0x0434,
+    #[allow(non_camel_case_types)]
     isiZulu = 0x0435,
     ItalianItaly = 0x0410,
     ItalianSwitzerland = 0x0810,

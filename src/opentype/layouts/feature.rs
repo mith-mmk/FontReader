@@ -36,7 +36,7 @@ pub(crate) struct FeatureList {
 }
 
 impl FeatureList {
-    pub(crate) fn new<R: BinaryReader>(reader: &mut R, offset: u64, length: u32) -> FeatureList {
+    pub(crate) fn new<R: BinaryReader>(reader: &mut R, offset: u64, _: u32) -> FeatureList {
         reader.seek(SeekFrom::Start(offset as u64)).unwrap();
         let feature_count = reader.read_u16_be().unwrap();
         let mut features = Vec::new();

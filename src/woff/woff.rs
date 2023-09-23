@@ -172,11 +172,6 @@ impl WOFF {
         }
     }
 
-    pub(crate) fn new<R: BinaryReader>(reader: &mut R) -> Self {
-        let header = WOFFHeader::new(reader);
-        Self::from(reader, header)
-    }
-
     pub fn get_metadata(&self) -> &str {
         &self.metadata
     }

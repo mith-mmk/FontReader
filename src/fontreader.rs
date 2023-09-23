@@ -8,8 +8,6 @@ use crate::fontheader;
 use crate::opentype::color::{colr, cpal};
 #[cfg(feature = "layout")]
 use crate::opentype::extentions::gsub;
-#[cfg(feature = "layout")]
-use crate::opentype::layouts;
 use crate::opentype::platforms::PlatformID;
 use crate::opentype::requires::cmap::CmapEncodings;
 use crate::opentype::requires::hmtx::LongHorMetric;
@@ -257,7 +255,7 @@ impl Font {
         };
 
         let pos = cmap.get_glyph_position_from_uvs(code, vs);
-//        let pos = cmap.get_glyph_position(code);
+        //        let pos = cmap.get_glyph_position(code);
         let glyph = glyf.get_glyph(pos as usize).unwrap();
         let layout: HorizontalLayout = self.get_horizontal_layout(pos as usize);
         let open_type_glyph = OpenTypeGlyph {
@@ -270,7 +268,6 @@ impl Font {
             format: GlyphFormat::OpenTypeGlyph,
             open_type_glyf: Some(open_type_glyph),
         }
-
     }
 
     pub fn get_glyph(&self, ch: char) -> GriphData {
@@ -300,7 +297,7 @@ impl Font {
         // utf-32
         let glyf_data = self.get_glyph_with_uvs(ch, vs);
         let pos = glyf_data.glyph_id;
-        
+
         if let FontData::Glyph(glyph) = &glyf_data.open_type_glyf.as_ref().unwrap().glyph {
             let glyf = if self.current_font == 0 {
                 self.glyf.as_ref().unwrap()
@@ -330,7 +327,7 @@ impl Font {
             if let Some(colr) = colr.as_ref() {
                 let layers = colr.get_layer_record(pos as u16);
                 if layers.is_empty() {
-                    return Ok(glyph.to_svg(fontsize, fontunit, &layout));
+                    return Ok(glyph.to_svg(fontsize, fontunit, &layout, 0.0, 0.0));
                 }
                 let mut string = glyph.get_svg_heder(fontsize, fontunit, &layout);
                 #[cfg(debug_assertions)]
@@ -365,7 +362,7 @@ impl Font {
             } else {
                 #[cfg(debug_assertions)]
                 {
-                    let string = glyph.to_svg(fontsize, fontunit, &layout);
+                    let string = glyph.to_svg(fontsize, fontunit, &layout, 0.0, 0.0);
                     return Ok(format!("<!-- {} glyf id: {} -->{}", ch, pos, string));
                 }
                 #[cfg(not(debug_assertions))]
@@ -377,7 +374,6 @@ impl Font {
                 "glyf is none".to_string(),
             ));
         }
-
     }
 
     pub fn get_svg(&self, ch: char) -> Result<String, Error> {
@@ -458,13 +454,17 @@ impl Font {
         let encodings = &cmap.cmap_encodings;
         let mut string = String::new();
         for encoding in encodings.as_ref().iter() {
-            string += &format!("Encording Record\n{}\n", encoding.encoding_record.to_string());
-            string += &format!("Subtable\n{}\n", encoding.cmap_subtable.get_part_of_string(10));
+            string += &format!(
+                "Encording Record\n{}\n",
+                encoding.encoding_record.to_string()
+            );
+            string += &format!(
+                "Subtable\n{}\n",
+                encoding.cmap_subtable.get_part_of_string(10)
+            );
         }
         string
-        
     }
-
 
     pub fn get_html(&self, string: &str) -> Result<String, Error> {
         let mut html = String::new();
@@ -476,18 +476,25 @@ impl Font {
         html += "<body>\n";
         let mut svgs = Vec::new();
         for (i, ch) in string.chars().enumerate() {
-            if ch == '\n' || ch == '\r' {
-                svgs.push("<br>\n".to_string());
+            if ch == '\n' {
+                svgs.push("<br>".to_string());
+                continue;
+            }
+            if ch == '\r' {
                 continue;
             }
             if ch == '\t' {
-                svgs.push("<span style=\"width: 4em; display: inline-block;\"></span>\n".to_string());
+                svgs.push(
+                    "<span style=\"width: 4em; display: inline-block;\"></span>\n".to_string(),
+                );
                 continue;
             }
 
             // variation selector 0xE0100 - 0xE01EF
             // https://www.unicode.org/reports/tr37/#VS
-            if ch as u32 >= 0xfe00  && ch as u32 <= 0xfe0f || ch as u32 >= 0xE0100 && ch as u32 <= 0xE01EF {
+            if ch as u32 >= 0xfe00 && ch as u32 <= 0xfe0f
+                || ch as u32 >= 0xE0100 && ch as u32 <= 0xE01EF
+            {
                 let ch0 = string.chars().nth(i - 1).unwrap();
                 let svg = self.get_svg_with_uvs(ch0, ch)?;
                 svgs.pop();
@@ -633,7 +640,7 @@ fn font_debug(_font: &Font) {
         let pos = cmap_encodings.get_glyph_position(i);
         let glyph = glyf.get_glyph(pos as usize).unwrap();
         let layout = _font.get_horizontal_layout(pos as usize);
-        let svg = glyph.to_svg(32.0, "pt", &layout);
+        let svg = glyph.to_svg(32.0, "pt", &layout, 0.0, 0.0);
         let ch = char::from_u32(i).unwrap();
         writeln!(&mut writer, "{}:{:04} ", ch, pos).unwrap();
         writeln!(&mut writer, "{}", glyph.to_string()).unwrap();
@@ -648,7 +655,7 @@ fn font_debug(_font: &Font) {
         let pos = cmap_encodings.get_glyph_position(i as u32);
         let glyph = glyf.get_glyph(pos as usize).unwrap();
         let layout = _font.get_horizontal_layout(pos as usize);
-        let svg = glyph.to_svg(100.0, "px", &layout);
+        let svg = glyph.to_svg(100.0, "px", &layout, 0.0, 0.0);
         let ch = char::from_u32(i as u32).unwrap();
         write!(&mut writer, "{}:{:04} ", ch, pos).unwrap();
         writeln!(&mut writer, "{}", svg).unwrap();

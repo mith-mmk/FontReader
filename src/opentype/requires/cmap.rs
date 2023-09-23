@@ -236,7 +236,6 @@ impl CmapEncodings {
         }
         position
     }
-    
 
     pub(crate) fn get_glyph_position(&self, code_number: u32) -> u32 {
         let cmap_encodings = &self.cmap_encodings;
@@ -256,7 +255,6 @@ impl CmapEncodings {
 
         match cmap_subtable.as_ref() {
             CmapSubtable::Format12(format12) => {
-
                 let i = format12.groups.binary_search_by(|x| {
                     if x.start_char_code <= code_number && code_number <= x.end_char_code {
                         std::cmp::Ordering::Equal
@@ -271,7 +269,7 @@ impl CmapEncodings {
                 let group = &format12.groups[i];
                 position = group.start_glyph_id + (code_number - group.start_char_code);
 
-                /* 
+                /*
                 for i in 0..format12.groups.len() {
                     let group = &format12.groups[i];
                     if group.start_char_code <= code_number && code_number <= group.end_char_code {
@@ -358,15 +356,15 @@ pub(crate) struct CmapEncoding {
 
 #[derive(Debug, Clone)]
 pub(crate) enum CmapSubtable {
-    Format0(ByteEncoding),          // do not use
-    Format2(CmapHighByteEncoding),  // also use
-    Format4(SegmentMappingToDelta), // use
-    Format6(TrimmedTableMapping),   // do not use
-    Format8(Mixed16and32Coverage),  // do not use
-    Format10(TrimmedArray),         // do not use
-    Format12(SegmentedCoverage),    // use
-    Format13(ManyToOneRangeMapping),        // use
-    Format14(UnicodeVariationSeauences),  // part of use
+    Format0(ByteEncoding),               // do not use
+    Format2(CmapHighByteEncoding),       // also use
+    Format4(SegmentMappingToDelta),      // use
+    Format6(TrimmedTableMapping),        // do not use
+    Format8(Mixed16and32Coverage),       // do not use
+    Format10(TrimmedArray),              // do not use
+    Format12(SegmentedCoverage),         // use
+    Format13(ManyToOneRangeMapping),     // use
+    Format14(UnicodeVariationSeauences), // part of use
     FormatUnknown,
 }
 
@@ -641,7 +639,7 @@ pub(crate) struct SegmentMappingToDelta {
     pub(crate) search_range: u16,
     pub(crate) entry_selector: u16,
     pub(crate) range_shift: u16,
-    pub(crate) codes:Vec<(u16, u16)>, // start_code, end_code
+    pub(crate) codes: Vec<(u16, u16)>, // start_code, end_code
     // pub(crate) end_code: Vec<u16>,
     // pub(crate) start_code: Vec<u16>,
     pub(crate) id_delta: Vec<i16>,
@@ -833,7 +831,9 @@ impl UVSMapping {
     fn to_string(&self) -> String {
         format!(
             "\nunicode_value: {:04X} {}, glyph_id: {}",
-            self.unicode_value, char::from_u32(self.unicode_value as u32).unwrap_or(' '), self.glyph_id
+            self.unicode_value,
+            char::from_u32(self.unicode_value as u32).unwrap_or(' '),
+            self.glyph_id
         )
     }
 }

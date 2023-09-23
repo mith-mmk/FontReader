@@ -1,6 +1,6 @@
 // CFF is Adobe Type 1 font format, which is a compact binary format.
 use bin_rs::reader::BinaryReader;
-use std::{collections::HashMap, error::Error, io::SeekFrom, rc::{Rc, self}, cell::RefCell};
+use std::{collections::HashMap, error::Error, io::SeekFrom};
 
 // Compare this snippet from src/outline/cff.rs:
 
@@ -22,7 +22,7 @@ pub(crate) struct CFF {
     pub(crate) header: Header,
     pub(crate) names: Vec<String>,
     pub(crate) top_dict: Dict, // TopDict
-    pub(crate) bbox: [f64;4],
+    pub(crate) bbox: [f64; 4],
     #[cfg(feature = "cff2")]
     pub(crate) global_subr: Option<GlobalSubr>, // CFF2
     #[cfg(feature = "cff2")]
@@ -37,7 +37,6 @@ pub(crate) struct CFF {
     pub(crate) subr: Option<CharString>,
 }
 
-
 struct ParcePack {
     x: f64,
     y: f64,
@@ -47,7 +46,6 @@ struct ParcePack {
     hints: usize,
     commands: Box<Commands>,
 }
-
 
 enum Operation {
     M(f64, f64),
@@ -65,9 +63,8 @@ impl Commands {
     fn new() -> Self {
         Self {
             operations: Vec::new(),
-            commands: Vec::new()
+            commands: Vec::new(),
         }
-
     }
 }
 
@@ -77,9 +74,8 @@ impl CFF {
         offset: u32,
         _length: u32,
     ) -> Result<Self, Box<dyn Error>> {
-
         reader.seek(SeekFrom::Start(offset as u64))?;
-        let mut bbox = [0.0 ,0.0, 1000.0, 1000.0];
+        let mut bbox = [0.0, 0.0, 1000.0, 1000.0];
 
         let header = Header::parse(reader)?;
         let name_index = Index::parse(reader)?;
@@ -91,20 +87,20 @@ impl CFF {
         let top_dict_index = Index::parse(reader)?;
         let top_dict = Dict::parse(&top_dict_index.data[0])?;
         let string_index = if header.major == 1 {
-                let index = Index::parse(reader)?;
-                let mut strings = Vec::new();
-                for data in &index.data {
-                    let string = String::from_utf8(data.clone())?;
-                    strings.push(string);
-                }
-                Some(strings)
-            } else {
-                None    // CFF2
-            };
+            let index = Index::parse(reader)?;
+            let mut strings = Vec::new();
+            for data in &index.data {
+                let string = String::from_utf8(data.clone())?;
+                strings.push(string);
+            }
+            Some(strings)
+        } else {
+            None // CFF2
+        };
         // Global Index Subr
         let gsbrtn = CharString::new(reader, 0)?;
         let gsubr = Some(gsbrtn);
-        // cff2 
+        // cff2
         /*
         let variation_store = VariationStore::new(reader)?;
         */
@@ -115,7 +111,7 @@ impl CFF {
         let fd_select_offset = top_dict.get_i32(12, 37);
         let opt_bbox = top_dict.get_f64_array(0, 5);
         if let Some(some_bbox) = opt_bbox {
-            bbox = [some_bbox[0],  some_bbox[1], some_bbox[2], some_bbox[3]];
+            bbox = [some_bbox[0], some_bbox[1], some_bbox[2], some_bbox[3]];
         }
         let charsets_offset = top_dict.get_i32(0, 15).unwrap();
         let char_strings_offset = top_dict.get_i32(0, 17).unwrap();
@@ -143,14 +139,12 @@ impl CFF {
             println!("private: {:?}", private);
         }
 
-
         // must CID = GID
         let charsets_offset = charsets_offset as u32 + offset;
 
         let charsets = Charsets::new(reader, charsets_offset, n_glyphs as u32)?;
         let char_strings_offset = char_strings_offset as u32 + offset;
         let char_string = CharString::new(reader, char_strings_offset as u32)?;
-
 
         let private = top_dict.get_i32_array(0, 18);
         let mut subr = None;
@@ -198,13 +192,11 @@ impl CFF {
                     let subr_offset = subr_offset as u32 + private_dict_offset as u32;
                     let subrtn = CharString::new(reader, subr_offset)?;
                     subr = Some(subrtn);
-    
                 }
             }
             // let fd_select = FDSelect::new(reader, fd_select_offset.unwrap() as u32 + offset, n_glyphs);
             // println!("fd_select: {:?}", fd_select);
         }
-
 
         Ok(Self {
             header,
@@ -222,24 +214,19 @@ impl CFF {
         })
     }
 
-    pub fn set_bbox(&mut self, min_x: f64, min_y: f64, max_x:f64, max_y :f64) {
-        self.bbox = [min_x, min_y, max_x, max_y];
-    }
-
     pub fn to_code(&self, gid: usize, width: f64) -> String {
         let cid = self.charsets.sid[gid as usize];
-        println!("gid {} cid {}",gid, cid);
+        println!("gid {} cid {}", gid, cid);
         let data = &self.char_string.data.data[gid as usize];
         let width = if width == 0.0 {
             self.top_dict.get_f64(0, 15).unwrap() // nomarl width
         } else {
             width as f64
         };
-        self.parse_data(data, width, true)
+        self.parse_data(gid, data, width, true)
     }
 
-
-    fn parse(&self,data: &[u8], parce_data :&mut ParcePack) -> Option<()> {
+    fn parse(&self, data: &[u8], parce_data: &mut ParcePack) -> Option<()> {
         let mut i = 0;
         // println!("data.len() = {}, {}", data.len(), i);
         while i < data.len() {
@@ -261,20 +248,20 @@ impl CFF {
                         args.push(d2);
                     }
 
-                    parce_data.y = args.pop()?;
-                    command += &format!(" {}", parce_data.y);
+                    let mut y = args.pop()?;
+                    command += &format!(" {}", y);
                     if 1 <= args.len() {
                         let dy = args.pop()?;
-                        parce_data.y += dy;
-                        command += &format!(" {}", parce_data.y);
+                        y += dy;
+                        command += &format!(" {}", y);
                     }
                     while 2 <= args.len() {
                         let dya = args.pop()?;
-                        parce_data.y += dya;
-                        command += &format!(" {}", parce_data.y);
+                        y += dya;
+                        command += &format!(" {}", y);
                         let dyb = args.pop()?;
-                        parce_data.y += dyb;
-                        command += &format!(" {}", parce_data.y);
+                        y += dyb;
+                        command += &format!(" {}", y);
                     }
                     parce_data.commands.as_mut().commands.push(command);
                 }
@@ -325,17 +312,17 @@ impl CFF {
 
                     let mut command = "hstemhm".to_string();
                     let mut y = args.pop()?;
-                    command += &format!(" {}", parce_data.y);
+                    command += &format!(" {}", y);
                     let dy = args.pop()?;
-                    parce_data.y += dy;
-                    command += &format!(" {}", parce_data.y);
+                    y += dy;
+                    command += &format!(" {}", y);
                     while 2 <= args.len() {
                         let dya = args.pop()?;
-                        parce_data.y += dya;
-                        command += &format!(" {}", parce_data.y);
+                        y += dya;
+                        command += &format!(" {}", y);
                         let dyb = args.pop()?;
-                        parce_data.y += dyb;
-                        command += &format!(" {}", parce_data.y);
+                        y += dyb;
+                        command += &format!(" {}", y);
                     }
                     parce_data.commands.as_mut().commands.push(command);
                 }
@@ -352,18 +339,18 @@ impl CFF {
                     }
                     parce_data.hints += args.len();
                     let mut command = "vstemhm".to_string();
-                    parce_data.x = args.pop()?;
-                    command += &format!(" {}", parce_data.x);
+                    let mut x = args.pop()?;
+                    command += &format!(" {}", x);
                     let dx = args.pop()?;
-                    parce_data.x += dx;
-                    command += &format!(" {}", parce_data.x);
+                    x += dx;
+                    command += &format!(" {}", x);
                     while 2 <= args.len() {
                         let dxa = args.pop()?;
-                        parce_data.x += dxa;
-                        command += &format!(" {}", parce_data.x);
+                        x += dxa;
+                        command += &format!(" {}", x);
                         let dxb = args.pop()?;
-                        parce_data.x += dxb;
-                        command += &format!(" {}", parce_data.x);
+                        x += dxb;
+                        command += &format!(" {}", x);
                         parce_data.hints += 2;
                     }
                     command += "\n";
@@ -393,22 +380,34 @@ impl CFF {
                 }
 
                 21 => {
-                    // rmoveto |- dy1 dy1 rmoveto (21) |-
+                    // rmoveto |- dx1 dy1 rmoveto (21) |-
+                    if !parce_data.is_first {
+                        parce_data.commands.as_mut().operations.push(Operation::Z);
+                    }
+
                     let dy = parce_data.stacks.pop()?;
                     let dx = parce_data.stacks.pop()?;
                     parce_data.x += dx;
                     parce_data.y += dy;
-                    let command = format!("rmoveto {} {}\n", dx, dy);
+                    let command = format!("rmoveto {} {}", dx, dy);
                     parce_data.commands.as_mut().commands.push(command);
                     let xx = parce_data.x;
                     let yy = parce_data.y;
-                    parce_data.commands.as_mut().operations.push(Operation::M(xx, yy));
+                    parce_data
+                        .commands
+                        .as_mut()
+                        .operations
+                        .push(Operation::M(xx, yy));
 
                     if 1 <= parce_data.stacks.len() && parce_data.is_first == true {
                         parce_data.width = parce_data.stacks.pop()?;
                         parce_data.is_first = false;
                         let width = parce_data.width;
-                        parce_data.commands.as_mut().commands.push(format!("width {}", width));
+                        parce_data
+                            .commands
+                            .as_mut()
+                            .commands
+                            .push(format!("width {}", width));
                     }
                 }
                 22 => {
@@ -422,12 +421,20 @@ impl CFF {
                     parce_data.commands.as_mut().commands.push(command);
                     let xx = parce_data.x;
                     let yy = parce_data.y;
-                    parce_data.commands.as_mut().operations.push(Operation::M(xx, yy));
+                    parce_data
+                        .commands
+                        .as_mut()
+                        .operations
+                        .push(Operation::M(xx, yy));
                     if 1 <= parce_data.stacks.len() && parce_data.is_first == true {
                         parce_data.width = parce_data.stacks.pop()?;
                         parce_data.is_first = false;
                         let width = parce_data.width;
-                        parce_data.commands.as_mut().commands.push(format!("width {}", width));
+                        parce_data
+                            .commands
+                            .as_mut()
+                            .commands
+                            .push(format!("width {}", width));
                     }
                 }
                 4 => {
@@ -441,13 +448,21 @@ impl CFF {
                     parce_data.commands.as_mut().commands.push(command);
                     let xx = parce_data.x;
                     let yy = parce_data.y;
-                    parce_data.commands.as_mut().operations.push(Operation::M(xx, yy));
+                    parce_data
+                        .commands
+                        .as_mut()
+                        .operations
+                        .push(Operation::M(xx, yy));
 
                     if 1 <= parce_data.stacks.len() && parce_data.is_first == true {
                         parce_data.width = parce_data.stacks.pop()?;
                         parce_data.is_first = false;
                         let width = parce_data.width;
-                        parce_data.commands.as_mut().commands.push(format!("width {}", width));
+                        parce_data
+                            .commands
+                            .as_mut()
+                            .commands
+                            .push(format!("width {}", width));
                     }
                 }
                 5 => {
@@ -470,7 +485,11 @@ impl CFF {
                         let yy = parce_data.y;
                         command += &format!(" {}", dxa);
                         command += &format!(" {}", dya);
-                        parce_data.commands.as_mut().operations.push(Operation::L(xx, yy));
+                        parce_data
+                            .commands
+                            .as_mut()
+                            .operations
+                            .push(Operation::L(xx, yy));
                     }
                     parce_data.commands.as_mut().commands.push(command);
                 }
@@ -494,21 +513,33 @@ impl CFF {
                         parce_data.x += dy1;
                         command += &format!(" dy1 {}", dy1);
                         let xx = parce_data.x;
-                        let yy = parce_data.y;                       
-                        parce_data.commands.as_mut().operations.push(Operation::L(xx, yy));
+                        let yy = parce_data.y;
+                        parce_data
+                            .commands
+                            .as_mut()
+                            .operations
+                            .push(Operation::L(xx, yy));
                         while 2 <= args.len() {
                             let dya = args.pop()?;
                             parce_data.y += dya;
                             let xx = parce_data.x;
                             let yy = parce_data.y;
                             command += &format!(" {}", dya);
-                            parce_data.commands.as_mut().operations.push(Operation::L(xx, yy));
+                            parce_data
+                                .commands
+                                .as_mut()
+                                .operations
+                                .push(Operation::L(xx, yy));
                             let dxb = args.pop()?;
                             parce_data.x += dxb;
                             let xx = parce_data.x;
                             let yy = parce_data.y;
                             command += &format!(" {}", dxb);
-                            parce_data.commands.as_mut().operations.push(Operation::L(xx, yy));
+                            parce_data
+                                .commands
+                                .as_mut()
+                                .operations
+                                .push(Operation::L(xx, yy));
                         }
                     } else {
                         while 2 <= args.len() {
@@ -517,13 +548,21 @@ impl CFF {
                             command += &format!(" {}", dxa);
                             let xx = parce_data.x;
                             let yy = parce_data.y;
-                            parce_data.commands.as_mut().operations.push(Operation::L(xx, yy));
+                            parce_data
+                                .commands
+                                .as_mut()
+                                .operations
+                                .push(Operation::L(xx, yy));
                             let dyb = args.pop()?;
                             parce_data.y += dyb;
                             let xx = parce_data.x;
                             let yy = parce_data.y;
                             command += &format!(" {}", dyb);
-                            parce_data.commands.as_mut().operations.push(Operation::L(xx, yy));
+                            parce_data
+                                .commands
+                                .as_mut()
+                                .operations
+                                .push(Operation::L(xx, yy));
                         }
                     }
                     parce_data.commands.as_mut().commands.push(command);
@@ -550,20 +589,32 @@ impl CFF {
                         command += &format!(" dy1 {}", dy1);
                         let xx = parce_data.x;
                         let yy = parce_data.y;
-                        parce_data.commands.as_mut().operations.push(Operation::L(xx, yy));
+                        parce_data
+                            .commands
+                            .as_mut()
+                            .operations
+                            .push(Operation::L(xx, yy));
                         while 2 <= args.len() {
                             let dxa = args.pop()?;
                             parce_data.x += dxa;
                             let xx = parce_data.x;
                             let yy = parce_data.y;
                             command += &format!(" {}", dxa);
-                            parce_data.commands.as_mut().operations.push(Operation::L(xx, yy));
+                            parce_data
+                                .commands
+                                .as_mut()
+                                .operations
+                                .push(Operation::L(xx, yy));
                             let dyb = args.pop()?;
                             parce_data.y += dyb;
                             let xx = parce_data.x;
                             let yy = parce_data.y;
                             command += &format!(" {}", dyb);
-                            parce_data.commands.as_mut().operations.push(Operation::L(xx, yy));
+                            parce_data
+                                .commands
+                                .as_mut()
+                                .operations
+                                .push(Operation::L(xx, yy));
                         }
                     } else {
                         while 2 <= args.len() {
@@ -572,13 +623,21 @@ impl CFF {
                             let xx = parce_data.x;
                             let yy = parce_data.y;
                             command += &format!(" {}", dya);
-                            parce_data.commands.as_mut().operations.push(Operation::L(xx, yy));
+                            parce_data
+                                .commands
+                                .as_mut()
+                                .operations
+                                .push(Operation::L(xx, yy));
                             let dxb = args.pop()?;
                             parce_data.x += dxb;
                             let xx = parce_data.x;
                             let yy = parce_data.y;
                             command += &format!(" {}", dxb);
-                            parce_data.commands.as_mut().operations.push(Operation::L(xx, yy));
+                            parce_data
+                                .commands
+                                .as_mut()
+                                .operations
+                                .push(Operation::L(xx, yy));
                         }
                     }
                     parce_data.commands.as_mut().commands.push(command);
@@ -629,7 +688,11 @@ impl CFF {
                         let xc = parce_data.x;
                         let yc = parce_data.y;
                         command += &format!(" {}", dyc);
-                        parce_data.commands.as_mut().operations.push(Operation::C(xa, ya, xb, yb, xc, yc));
+                        parce_data
+                            .commands
+                            .as_mut()
+                            .operations
+                            .push(Operation::C(xa, ya, xb, yb, xc, yc));
                     }
                     parce_data.commands.as_mut().commands.push(command);
                 }
@@ -680,7 +743,11 @@ impl CFF {
                         let yc = parce_data.y;
 
                         command += &format!(" {}", dxc);
-                        parce_data.commands.as_mut().operations.push(Operation::C(xa,ya,xb,yb,xc,yc));
+                        parce_data
+                            .commands
+                            .as_mut()
+                            .operations
+                            .push(Operation::C(xa, ya, xb, yb, xc, yc));
                     }
                     parce_data.commands.as_mut().commands.push(command);
                 }
@@ -689,7 +756,6 @@ impl CFF {
                     //                hvcurveto (31) |-
                     // |- {dxa dxb dyb dyc dyd dxe dye dxf}+ dyf? hvcurveto (31) |-
                     let mut args = Vec::new();
-                    let mut tmp = String::new();
                     while 8 <= parce_data.stacks.len() {
                         let d1 = parce_data.stacks.pop()?;
                         let d2 = parce_data.stacks.pop()?;
@@ -745,7 +811,11 @@ impl CFF {
                         let yc = parce_data.y;
                         command += &format!(" dy3 {}", dy3);
 
-                        parce_data.commands.as_mut().operations.push(Operation::C(xa,ya,xb,yb,xc,yc));
+                        parce_data
+                            .commands
+                            .as_mut()
+                            .operations
+                            .push(Operation::C(xa, ya, xb, yb, xc, yc));
                         let mut lp = false;
                         while 8 <= args.len() {
                             // tmp //
@@ -769,7 +839,11 @@ impl CFF {
                             let xc = parce_data.x;
                             let yc = parce_data.y;
                             command += &format!(" {}", dxc);
-                            parce_data.commands.as_mut().operations.push(Operation::C(xa,ya,xb,yb,xc,yc));
+                            parce_data
+                                .commands
+                                .as_mut()
+                                .operations
+                                .push(Operation::C(xa, ya, xb, yb, xc, yc));
 
                             let dxd = args.pop()?;
                             parce_data.x += dxd;
@@ -791,7 +865,11 @@ impl CFF {
                             let xf = parce_data.x;
                             let yf = parce_data.y;
                             command += &format!(" {}", dyf);
-                            parce_data.commands.as_mut().operations.push(Operation::C(xd, yd, xe, ye, xf, yf));                            
+                            parce_data
+                                .commands
+                                .as_mut()
+                                .operations
+                                .push(Operation::C(xd, yd, xe, ye, xf, yf));
                         }
                         if lp {
                             if 1 <= args.len() {
@@ -801,7 +879,11 @@ impl CFF {
                                 command += &format!(" dxf {}", dxf);
                                 let op = parce_data.commands.as_mut().operations.pop()?;
                                 if let Operation::C(xd, yd, xe, ye, _, yf) = op {
-                                    parce_data.commands.as_mut().operations.push(Operation::C(xd, yd, xe, ye, xf, yf));                            
+                                    parce_data
+                                        .commands
+                                        .as_mut()
+                                        .operations
+                                        .push(Operation::C(xd, yd, xe, ye, xf, yf));
                                 } else {
                                     parce_data.commands.as_mut().operations.push(op);
                                 }
@@ -826,7 +908,11 @@ impl CFF {
                             parce_data.y += dyc;
                             let xc = parce_data.x;
                             let yc = parce_data.y;
-                            parce_data.commands.as_mut().operations.push(Operation::C(xa,ya,xb,yb,xc,yc));
+                            parce_data
+                                .commands
+                                .as_mut()
+                                .operations
+                                .push(Operation::C(xa, ya, xb, yb, xc, yc));
                             command += &format!(" {}", dyc);
                             let dyd = args.pop()?;
                             parce_data.y += dyd;
@@ -846,7 +932,11 @@ impl CFF {
                             parce_data.x += dxf;
                             let xf = parce_data.x;
                             let yf = parce_data.x;
-                            parce_data.commands.as_mut().operations.push(Operation::C(xd, yd, xe, ye, xf, yf));
+                            parce_data
+                                .commands
+                                .as_mut()
+                                .operations
+                                .push(Operation::C(xd, yd, xe, ye, xf, yf));
                             command += &format!(" {}", dxf);
                         }
                         if 1 <= args.len() {
@@ -856,7 +946,11 @@ impl CFF {
                             command += &format!(" dyf {}", dyf);
                             let op = parce_data.commands.as_mut().operations.pop()?;
                             if let Operation::C(xd, yd, xe, ye, xf, _) = op {
-                                parce_data.commands.as_mut().operations.push(Operation::C(xd, yd, xe, ye, xf, yf));                            
+                                parce_data
+                                    .commands
+                                    .as_mut()
+                                    .operations
+                                    .push(Operation::C(xd, yd, xe, ye, xf, yf));
                             } else {
                                 parce_data.commands.as_mut().operations.push(op);
                             }
@@ -909,7 +1003,11 @@ impl CFF {
                         let yc = parce_data.y;
                         command += &format!(" {}", dxc);
                         command += &format!(" {}", dyc);
-                        parce_data.commands.as_mut().operations.push(Operation::C(xa,ya,xb,yb,xc,yc));
+                        parce_data
+                            .commands
+                            .as_mut()
+                            .operations
+                            .push(Operation::C(xa, ya, xb, yb, xc, yc));
                     }
                     let dxd = args.pop()?;
                     let dyd = args.pop()?;
@@ -919,7 +1017,11 @@ impl CFF {
                     let yy = parce_data.y;
                     command += &format!(" dxd {}", dxd);
                     command += &format!(" dyd {}", dyd);
-                    parce_data.commands.as_mut().operations.push(Operation::L(xx, yy));
+                    parce_data
+                        .commands
+                        .as_mut()
+                        .operations
+                        .push(Operation::L(xx, yy));
                     parce_data.commands.as_mut().commands.push(command);
                 }
                 25 => {
@@ -949,7 +1051,11 @@ impl CFF {
                         parce_data.y += dya;
                         let xx = parce_data.x;
                         let yy = parce_data.y;
-                        parce_data.commands.as_mut().operations.push(Operation::L(xx, yy));
+                        parce_data
+                            .commands
+                            .as_mut()
+                            .operations
+                            .push(Operation::L(xx, yy));
                         command += &format!("dxa {} dya {}", dxa, dya);
                     }
                     let dxb = args.pop()?;
@@ -977,7 +1083,11 @@ impl CFF {
                     let yc = parce_data.y;
                     command += &format!(" {}", dxd);
                     command += &format!(" {}", dyd);
-                    parce_data.commands.as_mut().operations.push(Operation::C(xa,ya,xb,yb,xc,yc));
+                    parce_data
+                        .commands
+                        .as_mut()
+                        .operations
+                        .push(Operation::C(xa, ya, xb, yb, xc, yc));
                     parce_data.commands.as_mut().commands.push(command);
                 }
                 30 => {
@@ -1039,7 +1149,11 @@ impl CFF {
                         let xc = parce_data.x;
                         let yc = parce_data.y;
                         command += &format!(" dx3 {}", dx3);
-                        parce_data.commands.as_mut().operations.push(Operation::C(xa,ya,xb,yb,xc,yc));
+                        parce_data
+                            .commands
+                            .as_mut()
+                            .operations
+                            .push(Operation::C(xa, ya, xb, yb, xc, yc));
                         let mut lp = false;
                         while 8 <= args.len() {
                             lp = true;
@@ -1058,13 +1172,16 @@ impl CFF {
                             command += &format!(" {}", dxb);
                             command += &format!(" {}", dyb);
 
-
                             let dyc = args.pop()?;
                             parce_data.y += dyc;
                             let xc = parce_data.x;
                             let yc = parce_data.y;
                             command += &format!(" {}", dyc);
-                            parce_data.commands.as_mut().operations.push(Operation::C(xa,ya,xb,yb,xc,yc));
+                            parce_data
+                                .commands
+                                .as_mut()
+                                .operations
+                                .push(Operation::C(xa, ya, xb, yb, xc, yc));
 
                             let dyd = args.pop()?;
                             parce_data.y += dyd;
@@ -1086,7 +1203,11 @@ impl CFF {
                             let xf = parce_data.x;
                             let yf = parce_data.y;
                             command += &format!(" {}", dxf);
-                            parce_data.commands.as_mut().operations.push(Operation::C(xd, yd, xe, ye, xf, yf));
+                            parce_data
+                                .commands
+                                .as_mut()
+                                .operations
+                                .push(Operation::C(xd, yd, xe, ye, xf, yf));
                         }
                         if lp {
                             if 1 <= args.len() {
@@ -1096,7 +1217,11 @@ impl CFF {
                                 command += &format!(" dyf {}", dyf);
                                 let op = parce_data.commands.as_mut().operations.pop()?;
                                 if let Operation::C(xd, yd, xe, ye, xf, _) = op {
-                                    parce_data.commands.as_mut().operations.push(Operation::C(xd, yd, xe, ye, xf, yf));                            
+                                    parce_data
+                                        .commands
+                                        .as_mut()
+                                        .operations
+                                        .push(Operation::C(xd, yd, xe, ye, xf, yf));
                                 } else {
                                     parce_data.commands.as_mut().operations.push(op);
                                 }
@@ -1125,7 +1250,11 @@ impl CFF {
                             let xc = parce_data.x;
                             let yc = parce_data.y;
                             command += &format!(" {}", dxc);
-                            parce_data.commands.as_mut().operations.push(Operation::C(xa,ya,xb,yb,xc,yc));
+                            parce_data
+                                .commands
+                                .as_mut()
+                                .operations
+                                .push(Operation::C(xa, ya, xb, yb, xc, yc));
 
                             let dxd = args.pop()?;
                             parce_data.x += dxd;
@@ -1147,7 +1276,11 @@ impl CFF {
                             let xf = parce_data.x;
                             let yf = parce_data.y;
                             command += &format!(" {}", dyf);
-                            parce_data.commands.as_mut().operations.push(Operation::C(xd, yd, xe, ye, xf, yf));
+                            parce_data
+                                .commands
+                                .as_mut()
+                                .operations
+                                .push(Operation::C(xd, yd, xe, ye, xf, yf));
                         }
                         if 1 <= args.len() {
                             let dxf = args.pop()?;
@@ -1156,7 +1289,11 @@ impl CFF {
                             command += &format!(" dxf {}", dxf);
                             let op = parce_data.commands.as_mut().operations.pop()?;
                             if let Operation::C(xd, yd, xe, ye, _, yf) = op {
-                                parce_data.commands.as_mut().operations.push(Operation::C(xd, yd, xe, ye, xf, yf));                            
+                                parce_data
+                                    .commands
+                                    .as_mut()
+                                    .operations
+                                    .push(Operation::C(xd, yd, xe, ye, xf, yf));
                             } else {
                                 parce_data.commands.as_mut().operations.push(op);
                             }
@@ -1206,7 +1343,11 @@ impl CFF {
                         let xc = parce_data.x;
                         let yc = parce_data.y;
                         command += &format!(" {}", dyc);
-                        parce_data.commands.as_mut().operations.push(Operation::C(xa,ya,xb,yb,xc,yc));
+                        parce_data
+                            .commands
+                            .as_mut()
+                            .operations
+                            .push(Operation::C(xa, ya, xb, yb, xc, yc));
                     }
                     parce_data.commands.as_mut().commands.push(command);
                 }
@@ -1217,7 +1358,11 @@ impl CFF {
                     i += 1;
                 }
                 14 => {
-                    parce_data.commands.as_mut().commands.push("endchar".to_string());
+                    parce_data
+                        .commands
+                        .as_mut()
+                        .commands
+                        .push("endchar".to_string());
                     parce_data.commands.as_mut().operations.push(Operation::Z);
                     return Some(());
                 }
@@ -1255,7 +1400,11 @@ impl CFF {
                             yy += dy3;
                             let xc = xx;
                             let yc = yy;
-                            parce_data.commands.as_mut().operations.push(Operation::C(xa,ya,xb,yb,xc,yc));
+                            parce_data
+                                .commands
+                                .as_mut()
+                                .operations
+                                .push(Operation::C(xa, ya, xb, yb, xc, yc));
                             xx += dx4;
                             yy += dy4;
                             let xd = xx;
@@ -1268,7 +1417,11 @@ impl CFF {
                             yy += dy6;
                             let xf = xx;
                             let yf = yy;
-                            parce_data.commands.as_mut().operations.push(Operation::C(xd, yd, xe, ye, xf, yf));
+                            parce_data
+                                .commands
+                                .as_mut()
+                                .operations
+                                .push(Operation::C(xd, yd, xe, ye, xf, yf));
 
                             parce_data.x += dy1 + dx2 + dx3 + dx4 + dx5 + dx6;
                             parce_data.y += dy1 + dy2 + dy3 + dy4 + dy5 + dy6;
@@ -1299,7 +1452,11 @@ impl CFF {
                             xx += dx3;
                             let xc = xx;
                             let yc = yy;
-                            parce_data.commands.as_mut().operations.push(Operation::C(xa,ya,xb,yb,xc,yc));
+                            parce_data
+                                .commands
+                                .as_mut()
+                                .operations
+                                .push(Operation::C(xa, ya, xb, yb, xc, yc));
                             xx += dx4;
                             let xd = xx;
                             let yd = yy;
@@ -1309,13 +1466,19 @@ impl CFF {
                             xx += dx6;
                             let xf = xx;
                             let yf = yy;
-                            parce_data.commands.as_mut().operations.push(Operation::C(xd, yd, xe, ye, xf, yf));
+                            parce_data
+                                .commands
+                                .as_mut()
+                                .operations
+                                .push(Operation::C(xd, yd, xe, ye, xf, yf));
 
                             parce_data.x = xx;
                             parce_data.y = yy;
 
-                            command +=
-                                &format!(" {} {} {} {} {} {} {}\n", dy1, dx2, dy2, dx3, dx4, dx5, dx6);
+                            command += &format!(
+                                " {} {} {} {} {} {} {}\n",
+                                dy1, dx2, dy2, dx3, dx4, dx5, dx6
+                            );
                             parce_data.commands.as_mut().commands.push(command);
                         }
                         36 => {
@@ -1343,7 +1506,11 @@ impl CFF {
                             xx += dx3;
                             let xc = xx;
                             let yc = yy;
-                            parce_data.commands.as_mut().operations.push(Operation::C(xa,ya,xb,yb,xc,yc));
+                            parce_data
+                                .commands
+                                .as_mut()
+                                .operations
+                                .push(Operation::C(xa, ya, xb, yb, xc, yc));
                             xx += dx4;
                             let xd = xx;
                             let yd = yy;
@@ -1354,7 +1521,11 @@ impl CFF {
                             xx += dx6;
                             let xf = xx;
                             let yf = yy;
-                            parce_data.commands.as_mut().operations.push(Operation::C(xd, yd, xe, ye, xf, yf));
+                            parce_data
+                                .commands
+                                .as_mut()
+                                .operations
+                                .push(Operation::C(xd, yd, xe, ye, xf, yf));
 
                             parce_data.x = xx;
                             parce_data.y = yy;
@@ -1392,7 +1563,11 @@ impl CFF {
                             yy += dy3;
                             let xc = xx;
                             let yc = yy;
-                            parce_data.commands.as_mut().operations.push(Operation::C(xa,ya,xb,yb,xc,yc));
+                            parce_data
+                                .commands
+                                .as_mut()
+                                .operations
+                                .push(Operation::C(xa, ya, xb, yb, xc, yc));
                             xx += dx4;
                             yy += dy4;
                             let xd = xx;
@@ -1417,41 +1592,65 @@ impl CFF {
                                 " {} {} {} {} {} {} {} {} {} {} {}\n",
                                 dx1, dy1, dx2, dy2, dx3, dy3, dx4, dy4, dx5, dy5, d6
                             );
-                            parce_data.commands.as_mut().operations.push(Operation::C(xd, yd, xe, ye, xf, yf));
+                            parce_data
+                                .commands
+                                .as_mut()
+                                .operations
+                                .push(Operation::C(xd, yd, xe, ye, xf, yf));
                         }
 
                         19 => {
                             // abs
                             let number = parce_data.stacks.pop()?;
-                           parce_data.commands.as_mut().commands.push(format!("abs {}", number));
-                             parce_data.stacks.push(number.abs());
+                            parce_data
+                                .commands
+                                .as_mut()
+                                .commands
+                                .push(format!("abs {}", number));
+                            parce_data.stacks.push(number.abs());
                         }
                         10 => {
                             // add
                             let num2 = parce_data.stacks.pop()?;
                             let num1 = parce_data.stacks.pop()?;
-                           parce_data.commands.as_mut().commands.push(format!("add {} {}", num1, num2));
-                             parce_data.stacks.push(num1 + num2);
+                            parce_data
+                                .commands
+                                .as_mut()
+                                .commands
+                                .push(format!("add {} {}", num1, num2));
+                            parce_data.stacks.push(num1 + num2);
                         }
                         11 => {
                             // sub
                             let num2 = parce_data.stacks.pop()?;
                             let num1 = parce_data.stacks.pop()?;
-                           parce_data.commands.as_mut().commands.push(format!("sub {} {}", num1, num2));
-                             parce_data.stacks.push(num1 - num2);
+                            parce_data
+                                .commands
+                                .as_mut()
+                                .commands
+                                .push(format!("sub {} {}", num1, num2));
+                            parce_data.stacks.push(num1 - num2);
                         }
                         12 => {
                             // div
                             let num2 = parce_data.stacks.pop()?;
                             let num1 = parce_data.stacks.pop()?;
-                           parce_data.commands.as_mut().commands.push(format!("div {} {}", num1, num2));
-                             parce_data.stacks.push(num1 / num2);
+                            parce_data
+                                .commands
+                                .as_mut()
+                                .commands
+                                .push(format!("div {} {}", num1, num2));
+                            parce_data.stacks.push(num1 / num2);
                         }
                         14 => {
                             // neg
                             let num = parce_data.stacks.pop()?;
-                           parce_data.commands.as_mut().commands.push(format!("neg {}", num));
-                             parce_data.stacks.push(-num);
+                            parce_data
+                                .commands
+                                .as_mut()
+                                .commands
+                                .push(format!("neg {}", num));
+                            parce_data.stacks.push(-num);
                         }
                         23 => {
                             // random
@@ -1459,33 +1658,53 @@ impl CFF {
                             // need rand crate
                             // let num = rand::random::<f64>();
                             let num = 0.5;
-                           parce_data.commands.as_mut().commands.push(format!("random {}", num));
-                             parce_data.stacks.push(num);
+                            parce_data
+                                .commands
+                                .as_mut()
+                                .commands
+                                .push(format!("random {}", num));
+                            parce_data.stacks.push(num);
                         }
                         24 => {
                             // mul
                             let num2 = parce_data.stacks.pop()?;
                             let num1 = parce_data.stacks.pop()?;
-                           parce_data.commands.as_mut().commands.push(format!("mul {} {}", num1, num2));
-                             parce_data.stacks.push(num1 * num2);
+                            parce_data
+                                .commands
+                                .as_mut()
+                                .commands
+                                .push(format!("mul {} {}", num1, num2));
+                            parce_data.stacks.push(num1 * num2);
                         }
                         26 => {
                             // sqrt
                             let num = parce_data.stacks.pop()?;
-                           parce_data.commands.as_mut().commands.push(format!("sqrt {}", num));
-                             parce_data.stacks.push(num.sqrt());
+                            parce_data
+                                .commands
+                                .as_mut()
+                                .commands
+                                .push(format!("sqrt {}", num));
+                            parce_data.stacks.push(num.sqrt());
                         }
                         18 => {
                             // drop
                             parce_data.stacks.pop();
-                           parce_data.commands.as_mut().commands.push("drop".to_string());
+                            parce_data
+                                .commands
+                                .as_mut()
+                                .commands
+                                .push("drop".to_string());
                         }
                         29 => {
                             // index
                             let index = parce_data.stacks.pop()?;
                             let num = parce_data.stacks[parce_data.stacks.len() - index as usize];
-                           parce_data.commands.as_mut().commands.push(format!("index {} {}", index, num));
-                             parce_data.stacks.push(num);
+                            parce_data
+                                .commands
+                                .as_mut()
+                                .commands
+                                .push(format!("index {} {}", index, num));
+                            parce_data.stacks.push(num);
                         }
                         30 => {
                             // roll
@@ -1498,62 +1717,94 @@ impl CFF {
                             }
                             for _ in 0..count as usize {
                                 let num = new_stacks.pop()?;
-                                 parce_data.stacks.push(num);
+                                parce_data.stacks.push(num);
                             }
-                           parce_data.commands.as_mut().commands.push(format!("roll {} {}", index, count));
+                            parce_data
+                                .commands
+                                .as_mut()
+                                .commands
+                                .push(format!("roll {} {}", index, count));
                         }
                         27 => {
                             // dup
                             let num = parce_data.stacks.pop()?;
-                           parce_data.commands.as_mut().commands.push(format!("dup {}", num));
-                             parce_data.stacks.push(num);
-                             parce_data.stacks.push(num);
+                            parce_data
+                                .commands
+                                .as_mut()
+                                .commands
+                                .push(format!("dup {}", num));
+                            parce_data.stacks.push(num);
+                            parce_data.stacks.push(num);
                         }
 
                         20 => {
                             // put
                             let index = parce_data.stacks.pop()?;
                             let num = parce_data.stacks.pop()?;
-                           parce_data.commands.as_mut().commands.push(format!("put {} {}", index, num));
-                           parce_data.stacks[index as usize] = num;
+                            parce_data
+                                .commands
+                                .as_mut()
+                                .commands
+                                .push(format!("put {} {}", index, num));
+                            parce_data.stacks[index as usize] = num;
                         }
                         21 => {
                             // get
                             let index = parce_data.stacks.pop()?;
                             let num = parce_data.stacks[index as usize];
-                           parce_data.commands.as_mut().commands.push(format!("get {} {}", index, num));
-                             parce_data.stacks.push(num);
+                            parce_data
+                                .commands
+                                .as_mut()
+                                .commands
+                                .push(format!("get {} {}", index, num));
+                            parce_data.stacks.push(num);
                         }
                         3 => {
                             // and
                             let num2 = parce_data.stacks.pop()?;
                             let num1 = parce_data.stacks.pop()?;
-                           parce_data.commands.as_mut().commands.push(format!("and {} {}", num1, num2));
+                            parce_data
+                                .commands
+                                .as_mut()
+                                .commands
+                                .push(format!("and {} {}", num1, num2));
                             let num = if num1 == 0.0 || num2 == 0.0 { 0 } else { 1 };
-                             parce_data.stacks.push(num as f64);
+                            parce_data.stacks.push(num as f64);
                         }
                         4 => {
                             // or
                             let num2 = parce_data.stacks.pop()?;
                             let num1 = parce_data.stacks.pop()?;
-                           parce_data.commands.as_mut().commands.push(format!("or {} {}", num1, num2));
+                            parce_data
+                                .commands
+                                .as_mut()
+                                .commands
+                                .push(format!("or {} {}", num1, num2));
                             let num = if num1 == 0.0 && num2 == 0.0 { 0 } else { 1 };
-                             parce_data.stacks.push(num as f64);
+                            parce_data.stacks.push(num as f64);
                         }
                         5 => {
                             // not
                             let num = parce_data.stacks.pop()?;
-                           parce_data.commands.as_mut().commands.push(format!("not {}", num));
+                            parce_data
+                                .commands
+                                .as_mut()
+                                .commands
+                                .push(format!("not {}", num));
                             let num = if num == 0.0 { 1 } else { 0 };
-                             parce_data.stacks.push(num as f64);
+                            parce_data.stacks.push(num as f64);
                         }
                         15 => {
                             // eq
                             let num2 = parce_data.stacks.pop()?;
                             let num1 = parce_data.stacks.pop()?;
-                           parce_data.commands.as_mut().commands.push(format!("eq {} {}", num1, num2));
+                            parce_data
+                                .commands
+                                .as_mut()
+                                .commands
+                                .push(format!("eq {} {}", num1, num2));
                             let num = if num1 == num2 { 1 } else { 0 };
-                             parce_data.stacks.push(num as f64);
+                            parce_data.stacks.push(num as f64);
                         }
                         22 => {
                             // if else
@@ -1561,9 +1812,13 @@ impl CFF {
                             let num1 = parce_data.stacks.pop()?;
                             let res2 = parce_data.stacks.pop()?;
                             let res1 = parce_data.stacks.pop()?;
-                           parce_data.commands.as_mut().commands.push(format!("ifelse {} {} {} {}", num1, num2, res1, res2));
+                            parce_data
+                                .commands
+                                .as_mut()
+                                .commands
+                                .push(format!("ifelse {} {} {} {}", num1, num2, res1, res2));
                             let num = if num1 > num2 { res1 } else { res2 };
-                             parce_data.stacks.push(num);
+                            parce_data.stacks.push(num);
                         }
 
                         _ => { // reserved
@@ -1586,7 +1841,7 @@ impl CFF {
 
                         command += &format!("{}\n", num);
                         let data = &subr.data.data[num as usize];
-                        self.parse(data,parce_data)?;
+                        self.parse(data, parce_data)?;
                     } else {
                         #[cfg(debug_assertions)]
                         {
@@ -1611,7 +1866,7 @@ impl CFF {
                         command += &format!("{}\n", num);
                         parce_data.commands.as_mut().commands.push(command);
                         let data = &subr.data.data[num as usize];
-                        self.parse(data,parce_data)?;
+                        self.parse(data, parce_data)?;
                     } else {
                         #[cfg(debug_assertions)]
                         {
@@ -1628,18 +1883,18 @@ impl CFF {
                 }
                 32..=246 => {
                     let value = b0 as i32 - 139;
-                     parce_data.stacks.push(value as f64);
+                    parce_data.stacks.push(value as f64);
                 }
                 247..=250 => {
                     let b1 = data[i];
                     let value = (b0 as i32 - 247) * 256 + b1 as i32 + 108;
-                     parce_data.stacks.push(value as f64);
+                    parce_data.stacks.push(value as f64);
                     i += 1;
                 }
                 251..=254 => {
                     let b1 = data[i];
                     let value = -(b0 as i32 - 251) * 256 - b1 as i32 - 108;
-                     parce_data.stacks.push(value as f64);
+                    parce_data.stacks.push(value as f64);
                     i += 1;
                 }
                 255 => {
@@ -1651,7 +1906,7 @@ impl CFF {
                         let value = i16::from_be_bytes([b1, b2]) as f64;
                         let frac = u16::from_be_bytes([b3, b4]) as f64;
                         let value = value + frac / 65536.0;
-                         parce_data.stacks.push(value);
+                        parce_data.stacks.push(value);
                         i += 4;
                     }
                 }
@@ -1664,13 +1919,7 @@ impl CFF {
         Some(())
     }
 
-
-    fn parse_data(
-        &self,
-        data: &[u8],
-        width: f64,
-        is_svg: bool,
-    ) -> String {
+    fn parse_data(&self, gid: usize, data: &[u8], width: f64, is_svg: bool) -> String {
         let commands = Box::new(Commands::new());
         let stacks = Box::new(Vec::with_capacity(48));
         let mut parce_data = ParcePack {
@@ -1687,8 +1936,20 @@ impl CFF {
         let commands = &parce_data.commands;
         if is_svg {
             let height = self.bbox[3] - self.bbox[1];
-            let mut svg = "<svg xmlns=\"http://www.w3.org/2000/svg\"".to_string();
-            svg += &format!(" width=\"24pt\" height=\"24pt\" viewbox=\"0  0 {} {}\">\n", width + parce_data.width, height);
+            let mut svg = "<svg xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" stroke-width=\"10pt\" stroke=\"black\" ".to_string();
+            svg += &format!(
+                " width=\"24pt\" height=\"24pt\" viewbox=\"{}  0 {} {}\">\n",
+                self.bbox[0] - 12.0,
+                width + parce_data.width,
+                height
+            );
+            #[cfg(debug_assertions)]
+            {
+                svg += &format!("<!-- gid {} width {} height {} -->\n", gid, width, height);
+                for command in commands.commands.iter() {
+                    svg += &format!("<!-- {} -->\n", command);
+                }
+            }
             svg += "<path d=\"";
             for operation in commands.operations.iter() {
                 match operation {
@@ -1699,7 +1960,15 @@ impl CFF {
                         svg += &format!("L {} {}\n", x, self.bbox[3] - y);
                     }
                     Operation::C(xa, ya, xb, yb, xc, yc) => {
-                        svg += &format!("C {} {} {} {} {} {}\n", xa, self.bbox[3] - ya, xb, self.bbox[3] - yb, xc, self.bbox[3] - yc);
+                        svg += &format!(
+                            "C {} {} {} {} {} {}\n",
+                            xa,
+                            self.bbox[3] - ya,
+                            xb,
+                            self.bbox[3] - yb,
+                            xc,
+                            self.bbox[3] - yc
+                        );
                     }
                     Operation::Z => {
                         svg += "Z\n";
@@ -1714,20 +1983,22 @@ impl CFF {
                 string += &format!("{}\n", command);
             }
             string
-    
         }
-
     }
 }
 
-
 #[derive(Debug, Clone)]
 pub(crate) struct FDSelect {
-    fsds: Vec<u8>
+    fsds: Vec<u8>,
 }
 
 impl FDSelect {
-    pub(crate) fn new<R: BinaryReader>(reader: &mut R,offset: u32, n_glyphs: usize) -> Result<Self,Box<dyn Error>>{      reader.seek(SeekFrom::Start(offset as u64))?;
+    pub(crate) fn new<R: BinaryReader>(
+        reader: &mut R,
+        offset: u32,
+        n_glyphs: usize,
+    ) -> Result<Self, Box<dyn Error>> {
+        reader.seek(SeekFrom::Start(offset as u64))?;
         reader.seek(SeekFrom::Start(offset as u64))?;
         let format = reader.read_u8()?;
         let mut fsds = Vec::new();
@@ -1751,14 +2022,11 @@ impl FDSelect {
                     last_gid = is_first_gid;
                 }
             }
-            _ => {return Err("Illegal format".into()) }
+            _ => return Err("Illegal format".into()),
         }
-        Ok(Self {
-            fsds
-        })
+        Ok(Self { fsds })
     }
 }
-
 
 #[derive(Debug, Clone)]
 pub(crate) struct Charsets {

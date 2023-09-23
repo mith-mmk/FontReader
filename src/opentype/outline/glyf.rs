@@ -148,7 +148,6 @@ impl Glyph {
                 on_curves.push(on_curve);
             }
 
-            i = 0;
             for flag in flags.iter() {
                 let mut x = 0;
                 if flag & 0x2 != 0 {
@@ -227,6 +226,7 @@ impl Glyph {
         let rsb = (layout.advance_width - parsed.x_max as isize) as i16;
         let x_min = parsed.x_min - layout.lsb as i16;
         let x_max = parsed.x_max + rsb;
+        //        let y_max = layout.accender - layout.descender + layout.line_gap;
         let y_max = layout.accender - layout.descender + layout.line_gap;
         let y_min = if y_max > (parsed.y_max - parsed.y_min) as isize {
             0
@@ -265,12 +265,14 @@ impl Glyph {
 
     pub(crate) fn get_svg_path(&self, layout: &crate::fontreader::HorizontalLayout) -> String {
         let parsed = self.parse();
-        Self::get_svg_path_parsed(&parsed, layout)
+        Self::get_svg_path_parsed(&parsed, layout, 0.0, 0.0)
     }
 
     pub(crate) fn get_svg_path_parsed(
         parsed: &ParsedGlyph,
         layout: &crate::fontreader::HorizontalLayout,
+        sx: f64,
+        sy: f64,
     ) -> String {
         let y_max = layout.accender as i16 + layout.line_gap as i16;
         let mut svg = String::new();
@@ -291,10 +293,10 @@ impl Glyph {
         let mut pos = 0;
         let mut befor_on_curve = false;
         let mut path_start = true;
-        let mut x = 0;
-        let mut y = 0;
-        let mut start_x = 0;
-        let mut start_y = 0;
+        let mut x = sx as i16;
+        let mut y = sy as i16;
+        let mut start_x = sx as i16;
+        let mut start_y = sy as i16;
 
         for i in 0..parsed.flags.len() {
             x += parsed.xs[i];
@@ -377,12 +379,14 @@ impl Glyph {
         fonsize: f32,
         fontunit: &str,
         layout: &crate::fontreader::HorizontalLayout,
+        sx: f64,
+        sy: f64,
     ) -> String {
         let parsed = self.parse();
         let mut svg = Self::get_svg_header_from_parsed(&parsed, fonsize, fontunit, layout);
 
         // heightを後ろから読み出す
-        svg += &Self::get_svg_path_parsed(&parsed, layout);
+        svg += &Self::get_svg_path_parsed(&parsed, layout, sx, sy);
         svg += "\n</svg>";
         svg
     }
