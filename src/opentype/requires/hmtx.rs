@@ -60,7 +60,7 @@ impl HMTX {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub(crate) struct LongHorMetric {
     pub(crate) advance_width: u16,
     pub(crate) left_side_bearing: i16,

@@ -42,7 +42,10 @@ fn main() {
             });
             #[cfg(debug_assertions)]
             {
-                println!("{}", font.get_name_raw());
+                println!("{}", font.get_header_raw());
+                println!("{}", font.get_maxp_raw());
+                println!("{}", font.get_hhea_raw());
+                println!("{}", font.get_svg_raw());
             }
         }
     }

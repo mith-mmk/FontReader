@@ -92,9 +92,9 @@ impl SBIX {
         gid: u32,
         fonsize: f32,
         fontunit: &str,
-        layout: &crate::fontreader::HorizontalLayout,
-        sx: f64,
-        sy: f64,
+        _: &crate::fontreader::HorizontalLayout,
+        _: f64,
+        _: f64,
     ) -> Option<String> {
         let strike = &self.strikes[self.strikes.len() - 1];
         let glyph_data = &strike.glyph_data[gid as usize];
@@ -121,7 +121,10 @@ impl SBIX {
                 return None;
             }
         }
-        let string = format!("<img width=\"{}\" height=\"{}\" src=\"{}\" />\n", width, height, base64);
+        let string = format!(
+            "<img width=\"{}\" height=\"{}\" src=\"{}\" />\n",
+            width, height, base64
+        );
         Some(string)
     }
 }

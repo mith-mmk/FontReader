@@ -20,42 +20,44 @@ pub(crate) struct CPAL {
 }
 
 impl CPAL {
-    pub(crate) fn new<R: BinaryReader>(reader: &mut R, offset: u32, _: u32) -> Self {
-        reader.seek(SeekFrom::Start(offset as u64)).unwrap();
-        let version = reader.read_u16_be().unwrap();
-        let num_palette_entries = reader.read_u16_be().unwrap();
-        let num_palettes = reader.read_u16_be().unwrap();
-        let num_color_records = reader.read_u16_be().unwrap();
-        let color_records_array_offset = reader.read_u32_be().unwrap();
+    pub(crate) fn new<R: BinaryReader>(
+        reader: &mut R,
+        offset: u32,
+        _: u32,
+    ) -> Result<Self, std::io::Error> {
+        reader.seek(SeekFrom::Start(offset as u64))?;
+        let version = reader.read_u16_be()?;
+        let num_palette_entries = reader.read_u16_be()?;
+        let num_palettes = reader.read_u16_be()?;
+        let num_color_records = reader.read_u16_be()?;
+        let color_records_array_offset = reader.read_u32_be()?;
         let mut color_record_indices = Vec::new();
         for _ in 0..num_palette_entries {
-            color_record_indices.push(reader.read_u16_be().unwrap());
+            color_record_indices.push(reader.read_u16_be()?);
         }
-        reader
-            .seek(SeekFrom::Start(
-                (offset + color_records_array_offset) as u64,
-            ))
-            .unwrap();
+        reader.seek(SeekFrom::Start(
+            (offset + color_records_array_offset) as u64,
+        ))?;
         let mut color_records = Vec::new();
         for _ in 0..num_color_records {
             let color_record = ColorRecord {
-                blue: reader.read_u8().unwrap(),
-                green: reader.read_u8().unwrap(),
-                red: reader.read_u8().unwrap(),
-                alpha: reader.read_u8().unwrap(),
+                blue: reader.read_u8()?,
+                green: reader.read_u8()?,
+                red: reader.read_u8()?,
+                alpha: reader.read_u8()?,
             };
 
             color_records.push(color_record);
         }
 
-        Self {
+        Ok(Self {
             version,
             num_palette_entries,
             num_palettes,
             num_color_records,
             color_records,
             color_record_indices,
-        }
+        })
     }
 
     pub(crate) fn to_string(&self) -> String {

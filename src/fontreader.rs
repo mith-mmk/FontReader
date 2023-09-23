@@ -6,6 +6,7 @@ use std::{fs::File, path::PathBuf};
 
 use crate::fontheader;
 use crate::opentype::color::sbix;
+use crate::opentype::color::svg;
 use crate::opentype::color::{colr, cpal};
 #[cfg(feature = "layout")]
 use crate::opentype::extentions::gsub;
@@ -80,6 +81,7 @@ pub struct Font {
     pub(crate) cpal: Option<cpal::CPAL>,
     #[cfg(feature = "layout")]
     pub(crate) gsub: Option<gsub::GSUB>,
+    pub(crate) svg: Option<svg::SVG>,
     pub(crate) sbix: Option<sbix::SBIX>,
     hmtx_pos: Option<Pointer>,
     loca_pos: Option<Pointer>, // OpenType font, CFF/CFF2 none
@@ -111,6 +113,7 @@ impl Font {
             #[cfg(feature = "layout")]
             gsub: None,
             sbix: None,
+            svg: None,
             hmtx_pos: None,
             loca_pos: None,
             glyf_pos: None,
@@ -322,6 +325,25 @@ impl Font {
                     string += &svg;
                     return Ok(string);
                 }
+            } else if let Some(svg) = self.svg.as_ref() {
+                let result = svg.get_svg(pos as u32, fontsize, fontunit, &layout, 0.0, 0.0);
+                if let Some(svg) = result {
+                    let mut string = "".to_string();
+                    #[cfg(debug_assertions)]
+                    {
+                        string += &format!("<!-- {} glyf id: {} -->", ch, pos);
+                        string += &format!(
+                            "<!-- layout {} {} {} {} {} -->\n",
+                            layout.lsb,
+                            layout.advance_width,
+                            layout.accender,
+                            layout.descender,
+                            layout.line_gap
+                        );
+                    }
+                    string += &svg;
+                    return Ok(string);
+                }
             }
             let glyf = if self.current_font == 0 {
                 self.glyf.as_ref().unwrap()
@@ -436,6 +458,19 @@ impl Font {
     }
 
     #[cfg(debug_assertions)]
+    pub fn get_maxp_raw(&self) -> String {
+        let maxp = if self.current_font == 0 {
+            self.maxp.as_ref().unwrap()
+        } else {
+            self.more_fonts[self.current_font - 1]
+                .maxp
+                .as_ref()
+                .unwrap()
+        };
+        maxp.to_string()
+    }
+
+    #[cfg(debug_assertions)]
     pub fn get_header_raw(&self) -> String {
         let head = if self.current_font == 0 {
             self.head.as_ref().unwrap()
@@ -456,6 +491,19 @@ impl Font {
             self.more_fonts[self.current_font - 1].os2.as_ref().unwrap()
         };
         os2.to_string()
+    }
+
+    #[cfg(debug_assertions)]
+    pub fn get_hhea_raw(&self) -> String {
+        let hhea = if self.current_font == 0 {
+            self.hhea.as_ref().unwrap()
+        } else {
+            self.more_fonts[self.current_font - 1]
+                .hhea
+                .as_ref()
+                .unwrap()
+        };
+        hhea.to_string()
     }
 
     #[cfg(debug_assertions)]
@@ -493,13 +541,45 @@ impl Font {
             }
         } else {
             let sbix = self.more_fonts[self.current_font - 1].sbix.as_ref();
-            if let Some(sbix) = &self.sbix {
+            if let Some(sbix) = sbix {
                 sbix
             } else {
                 return "sbix is none".to_string();
             }
         };
         sbix.to_string()
+    }
+
+    #[cfg(debug_assertions)]
+    pub fn get_svg_raw(&self) -> String {
+        let svg = if self.current_font == 0 {
+            if let Some(svg) = &self.svg {
+                svg
+            } else {
+                return "svg is none".to_string();
+            }
+        } else {
+            let svg = self.more_fonts[self.current_font - 1].svg.as_ref();
+            if let Some(svg) = svg {
+                svg
+            } else {
+                return "svg is none".to_string();
+            }
+        };
+        svg.to_string()
+    }
+
+    #[cfg(debug_assertions)]
+    pub fn get_post_raw(&self) -> String {
+        let post = if self.current_font == 0 {
+            self.post.as_ref().unwrap()
+        } else {
+            self.more_fonts[self.current_font - 1]
+                .post
+                .as_ref()
+                .unwrap()
+        };
+        post.to_string()
     }
 
     pub fn get_html(&self, string: &str) -> Result<String, Error> {
@@ -813,16 +893,21 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Result<Font, Error> {
                     }
                     b"COLR" => {
                         let mut reader = BytesReader::new(&table.data);
-                        let colr = colr::COLR::new(&mut reader, 0, table.data.len() as u32);
+                        let colr = colr::COLR::new(&mut reader, 0, table.data.len() as u32)?;
                         font.colr = Some(colr);
                     }
                     b"CPAL" => {
                         let mut reader = BytesReader::new(&table.data);
-                        let cpal = cpal::CPAL::new(&mut reader, 0, table.data.len() as u32);
+                        let cpal = cpal::CPAL::new(&mut reader, 0, table.data.len() as u32)?;
                         font.cpal = Some(cpal);
                     }
                     b"sbix" => {
                         sbix_table = Some(table);
+                    }
+                    b"SVG " => {
+                        let mut reader = BytesReader::new(&table.data);
+                        let svg = svg::SVG::new(&mut reader, 0, table.data.len() as u32)?;
+                        font.svg = Some(svg);
                     }
                     #[cfg(feature = "cff")]
                     b"CFF " => {
@@ -964,11 +1049,11 @@ fn from_opentype<R: BinaryReader>(file: &mut R, header: &OTFHeader) -> Result<Fo
                 font.glyf_pos = Some(glyf_pos);
             }
             b"COLR" => {
-                let colr = colr::COLR::new(file, record.offset, record.length);
+                let colr = colr::COLR::new(file, record.offset, record.length)?;
                 font.colr = Some(colr);
             }
             b"CPAL" => {
-                let cpal = cpal::CPAL::new(file, record.offset, record.length);
+                let cpal = cpal::CPAL::new(file, record.offset, record.length)?;
                 font.cpal = Some(cpal);
             }
             b"sbix" => {
@@ -977,6 +1062,10 @@ fn from_opentype<R: BinaryReader>(file: &mut R, header: &OTFHeader) -> Result<Fo
                     length: record.length,
                 };
                 font.sbix_pos = Some(sbix_pos);
+            }
+            b"SVG " => {
+                let svg = svg::SVG::new(file, record.offset, record.length)?;
+                font.svg = Some(svg);
             }
             #[cfg(feature = "cff")]
             b"CFF " => {

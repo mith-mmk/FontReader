@@ -40,7 +40,6 @@ fn main() {
                     println!("{:?}: {:?}", name_id, name.unwrap());
                 }
             });
-            println!("{}", font.get_sbix_raw());
             #[cfg(debug_assertions)]
             {
                 println!("{}", font.get_sbix_raw());

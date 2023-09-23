@@ -47,6 +47,9 @@ impl MAXP {
         string += &version;
         let num_glyphs = format!("Number of Glyphs {}\n", self.num_glyphs);
         string += &num_glyphs;
+        if self.version == 0x00005000 {
+            return string;
+        }
         let max_points = format!("Max Points {}\n", self.max_points);
         string += &max_points;
         let max_contours = format!("Max Contours {}\n", self.max_contours);

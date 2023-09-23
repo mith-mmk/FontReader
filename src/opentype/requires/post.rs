@@ -58,6 +58,15 @@ impl POST {
         string += &min_mem_type1;
         let max_mem_type1 = format!("Max Mem Type1 {}\n", self.max_mem_type1);
         string += &max_mem_type1;
+        if mager_version >= 2 {
+            let number_of_glyphs = format!("Number of Glyphs {}\n", self.number_of_glyphs);
+            string += &number_of_glyphs;
+            for i in 0..self.number_of_glyphs {
+                let name = &self.names[self.glyph_name_index[i as usize] as usize];
+                let name = format!("{} {}\n", i, name);
+                string += &name;
+            }
+        }
         string
     }
 }

@@ -1,4 +1,4 @@
-use std::io::SeekFrom;
+use std::{io::Error, io::SeekFrom};
 
 use bin_rs::reader::BinaryReader;
 
@@ -19,7 +19,7 @@ pub(crate) struct COLR {
 }
 
 impl COLR {
-    pub(crate) fn new<R: BinaryReader>(reader: &mut R, offset: u32, _: u32) -> Self {
+    pub(crate) fn new<R: BinaryReader>(reader: &mut R, offset: u32, _: u32) -> Result<Self, Error> {
         reader.seek(SeekFrom::Start(offset as u64)).unwrap();
         let version = reader.read_u16_be().unwrap();
         let num_base_glyphs = reader.read_u16_be().unwrap();
@@ -32,9 +32,9 @@ impl COLR {
         let mut base_glyph_records = Vec::new();
         for _ in 0..num_base_glyphs {
             let base_glyph_record = BaseGlyphRecord {
-                base_glyph: reader.read_u16_be().unwrap(),
-                first_layer_index: reader.read_u16_be().unwrap(),
-                num_layers: reader.read_u16_be().unwrap(),
+                base_glyph: reader.read_u16_be()?,
+                first_layer_index: reader.read_u16_be()?,
+                num_layers: reader.read_u16_be()?,
             };
             base_glyph_records.push(base_glyph_record);
         }
@@ -44,18 +44,18 @@ impl COLR {
         let mut layer_records = Vec::new();
         for _ in 0..num_layers {
             let layer_record = LayerRecord {
-                glyph_id: reader.read_u16_be().unwrap(),
-                palette_index: reader.read_u16_be().unwrap(),
+                glyph_id: reader.read_u16_be()?,
+                palette_index: reader.read_u16_be()?,
             };
             layer_records.push(layer_record);
         }
-        Self {
+        Ok(Self {
             version,
             num_base_glyphs,
             base_glyph_records,
             layer_records,
             num_layers,
-        }
+        })
     }
 
     pub(crate) fn to_string(&self) -> String {

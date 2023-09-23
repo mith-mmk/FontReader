@@ -38,6 +38,9 @@ fn main() {
             {
                 println!("{}", font.get_header_raw());
                 println!("{}", font.get_os2_raw());
+                println!("{}", font.get_name_raw());
+                println!("{}", font.get_maxp_raw());
+                println!("{}", font.get_post_raw());
             }
         }
     }
