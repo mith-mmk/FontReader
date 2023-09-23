@@ -1693,13 +1693,13 @@ impl CFF {
             for operation in commands.operations.iter() {
                 match operation {
                     Operation::M(x, y) => {
-                        svg += &format!("M {} {}\n", x, y);
+                        svg += &format!("M {} {}\n", x, self.bbox[3] - y);
                     }
                     Operation::L(x, y) => {
-                        svg += &format!("L {} {}\n", x, y);
+                        svg += &format!("L {} {}\n", x, self.bbox[3] - y);
                     }
                     Operation::C(xa, ya, xb, yb, xc, yc) => {
-                        svg += &format!("C {} {} {} {} {} {}\n", xa, ya, xb, yb, xc, yc);
+                        svg += &format!("C {} {} {} {} {} {}\n", xa, self.bbox[3] - ya, xb, self.bbox[3] - yb, xc, self.bbox[3] - yc);
                     }
                     Operation::Z => {
                         svg += "Z\n";
