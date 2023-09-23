@@ -11,9 +11,7 @@ readme = "README.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-full = ["encoding",
-        "layout",
-        "cff"]
+full = ["encoding", "layout", "cff"]
 encoding = ["iconv"]
 layout = []
 cff = []
@@ -27,4 +25,5 @@ num-derive = "0.4"
 miniz_oxide = {version = "0.7.1"}
 # for name table and PlatformID is 1 
 iconv = {version = "0.1", optional = true}
+base64 = "0.21.4"
 

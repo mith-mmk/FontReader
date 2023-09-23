@@ -15,6 +15,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 
 [[package]]
+name = "base64"
+version = "0.21.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9ba43ea6f343b788c8764558649e08df62f86c6ef251fdaeb1ffd010a9ae50a2"
+
+[[package]]
 name = "bin-rs"
 version = "0.0.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -30,6 +36,7 @@ checksum = "74c57ab96715773d9cb9789b38eb7cbf04b3c6f5624a9d98f51761603376767c"
 name = "fontloader"
 version = "0.0.1"
 dependencies = [
+ "base64",
  "bin-rs",
  "iconv",
  "miniz_oxide",

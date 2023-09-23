@@ -5,6 +5,7 @@ use std::io::Error;
 use std::{fs::File, path::PathBuf};
 
 use crate::fontheader;
+use crate::opentype::color::sbix;
 use crate::opentype::color::{colr, cpal};
 #[cfg(feature = "layout")]
 use crate::opentype::extentions::gsub;
@@ -79,9 +80,11 @@ pub struct Font {
     pub(crate) cpal: Option<cpal::CPAL>,
     #[cfg(feature = "layout")]
     pub(crate) gsub: Option<gsub::GSUB>,
+    pub(crate) sbix: Option<sbix::SBIX>,
     hmtx_pos: Option<Pointer>,
     loca_pos: Option<Pointer>, // OpenType font, CFF/CFF2 none
     glyf_pos: Option<Pointer>, // OpenType font, CFF/CFF2 none
+    sbix_pos: Option<Pointer>,
     pub(crate) more_fonts: Box<Vec<Font>>,
     current_font: usize,
 }
@@ -107,9 +110,11 @@ impl Font {
             cpal: None,
             #[cfg(feature = "layout")]
             gsub: None,
+            sbix: None,
             hmtx_pos: None,
             loca_pos: None,
             glyf_pos: None,
+            sbix_pos: None,
             more_fonts: Box::<Vec<Font>>::default(),
             current_font: 0,
         }
@@ -299,6 +304,25 @@ impl Font {
         let pos = glyf_data.glyph_id;
 
         if let FontData::Glyph(glyph) = &glyf_data.open_type_glyf.as_ref().unwrap().glyph {
+            let fontsize = 24.0;
+            let fontunit = "pt";
+            let layout = &glyf_data.open_type_glyf.as_ref().unwrap().layout;
+            let layout = match layout {
+                FontLayout::Horizontal(layout) => layout,
+                _ => panic!("not support vertical layout"),
+            };
+            if let Some(sbix) = self.sbix.as_ref() {
+                let result = sbix.get_svg(pos as u32, fontsize, fontunit, &layout, 0.0, 0.0);
+                if let Some(svg) = result {
+                    let mut string = "".to_string();
+                    #[cfg(debug_assertions)]
+                    {
+                        string += &format!("<!-- {} glyf id: {} -->", ch, pos);
+                    }
+                    string += &svg;
+                    return Ok(string);
+                }
+            }
             let glyf = if self.current_font == 0 {
                 self.glyf.as_ref().unwrap()
             } else {
@@ -307,13 +331,6 @@ impl Font {
                     .as_ref()
                     .unwrap()
             };
-            let layout = &glyf_data.open_type_glyf.as_ref().unwrap().layout;
-            let layout = match layout {
-                FontLayout::Horizontal(layout) => layout,
-                _ => panic!("not support vertical layout"),
-            };
-            let fontsize = 24.0;
-            let fontunit = "pt";
 
             let (cpal, colr) = if self.current_font == 0 {
                 (self.cpal.as_ref(), self.colr.as_ref())
@@ -366,7 +383,7 @@ impl Font {
                     return Ok(format!("<!-- {} glyf id: {} -->{}", ch, pos, string));
                 }
                 #[cfg(not(debug_assertions))]
-                Ok(glyph.to_svg(fontsize, fontunit, &layout))
+                Ok(glyph.to_svg(fontsize, fontunit, &layout, 0.0, 0.0))
             }
         } else {
             return Err(Error::new(
@@ -464,6 +481,25 @@ impl Font {
             );
         }
         string
+    }
+
+    #[cfg(debug_assertions)]
+    pub fn get_sbix_raw(&self) -> String {
+        let sbix = if self.current_font == 0 {
+            if let Some(sbix) = &self.sbix {
+                sbix
+            } else {
+                return "sbix is none".to_string();
+            }
+        } else {
+            let sbix = self.more_fonts[self.current_font - 1].sbix.as_ref();
+            if let Some(sbix) = &self.sbix {
+                sbix
+            } else {
+                return "sbix is none".to_string();
+            }
+        };
+        sbix.to_string()
     }
 
     pub fn get_html(&self, string: &str) -> Result<String, Error> {
@@ -715,6 +751,7 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Result<Font, Error> {
             let mut hmtx_table = None;
             let mut loca_table = None;
             let mut glyf_table = None;
+            let mut sbix_table = None;
             for table in woff.tables {
                 let tag: [u8; 4] = [
                     (table.tag >> 24) as u8,
@@ -784,6 +821,9 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Result<Font, Error> {
                         let cpal = cpal::CPAL::new(&mut reader, 0, table.data.len() as u32);
                         font.cpal = Some(cpal);
                     }
+                    b"sbix" => {
+                        sbix_table = Some(table);
+                    }
                     #[cfg(feature = "cff")]
                     b"CFF " => {
                         let mut reader = BytesReader::new(&table.data);
@@ -795,6 +835,9 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Result<Font, Error> {
                         let mut reader = BytesReader::new(&table.data);
                         let gsub = gsub::GSUB::new(&mut reader, 0, table.data.len() as u32);
                         font.gsub = Some(gsub);
+                    }
+                    b"sbix" => {
+                        sbix_table = Some(table);
                     }
                     _ => {
                         debug_assert!(true, "Unknown table tag")
@@ -827,6 +870,13 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Result<Font, Error> {
                 font.loca.as_ref().unwrap(),
             );
             font.glyf = Some(glyf);
+
+            if let Some(sbix_table) = sbix_table {
+                let mut reader = BytesReader::new(&sbix_table.data);
+                let num_glyphs = font.maxp.as_ref().unwrap().num_glyphs as u32;
+                let sbix = sbix::SBIX::new(&mut reader, 0, num_glyphs)?;
+                font.sbix = Some(sbix);
+            }
             #[cfg(debug_assertions)]
             {
                 font_debug(&font);
@@ -921,6 +971,13 @@ fn from_opentype<R: BinaryReader>(file: &mut R, header: &OTFHeader) -> Result<Fo
                 let cpal = cpal::CPAL::new(file, record.offset, record.length);
                 font.cpal = Some(cpal);
             }
+            b"sbix" => {
+                let sbix_pos = Pointer {
+                    offset: record.offset,
+                    length: record.length,
+                };
+                font.sbix_pos = Some(sbix_pos);
+            }
             #[cfg(feature = "cff")]
             b"CFF " => {
                 let cff = cff::CFF::new(file, record.offset, record.length);
@@ -958,6 +1015,10 @@ fn from_opentype<R: BinaryReader>(file: &mut R, header: &OTFHeader) -> Result<Fo
         let loca = font.loca.as_ref().unwrap();
         let glyf = glyf::GLYF::new(file, offset, length, loca);
         font.glyf = Some(glyf);
+    }
+    if let Some(offset) = font.sbix_pos.as_ref() {
+        let sbix = sbix::SBIX::new(file, offset.offset, num_glyphs as u32)?;
+        font.sbix = Some(sbix);
     }
 
     if font.cmap.is_none() {
