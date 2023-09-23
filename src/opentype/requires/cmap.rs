@@ -782,9 +782,10 @@ impl DefaultUVS {
         };
         for i in 0..length {
             string += &format!(
-                "{} {:06x} {}\n",
+                "{} {:06x} {} {}\n",
                 i,
                 self.unicode_value_ranges[i].start_unicode_value,
+                char::from_u32(self.unicode_value_ranges[i].start_unicode_value).unwrap_or(' '),
                 self.unicode_value_ranges[i].additional_count
             );
         }
@@ -831,8 +832,8 @@ pub(crate) struct UVSMapping {
 impl UVSMapping {
     fn to_string(&self) -> String {
         format!(
-            "\nunicode_value: {:04X}, glyph_id: {}",
-            self.unicode_value, self.glyph_id
+            "\nunicode_value: {:04X} {}, glyph_id: {}",
+            self.unicode_value, char::from_u32(self.unicode_value as u32).unwrap_or(' '), self.glyph_id
         )
     }
 }

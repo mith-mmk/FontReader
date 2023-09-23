@@ -1,9 +1,8 @@
 // CFF is Adobe Type 1 font format, which is a compact binary format.
-
-use std::{collections::HashMap, error::Error, io::SeekFrom};
+use bin_rs::reader::BinaryReader;
+use std::{collections::HashMap, error::Error, io::SeekFrom, rc::{Rc, self}, cell::RefCell};
 
 // Compare this snippet from src/outline/cff.rs:
-use bin_rs::reader::BinaryReader;
 
 //
 // // CFF is Adobe Type 1 font format, which is a compact binary format.
@@ -36,6 +35,40 @@ pub(crate) struct CFF {
     pub(crate) private_dict: Option<PrivateDict>,
     pub(crate) gsubr: Option<CharString>,
     pub(crate) subr: Option<CharString>,
+}
+
+
+struct ParcePack {
+    x: f64,
+    y: f64,
+    width: f64,
+    stacks: Box<Vec<f64>>,
+    is_first: bool,
+    hints: usize,
+    commands: Box<Commands>,
+}
+
+
+enum Operation {
+    M(f64, f64),
+    C(f64, f64, f64, f64, f64, f64),
+    L(f64, f64),
+    Z,
+}
+
+struct Commands {
+    operations: Vec<Operation>,
+    commands: Vec<String>,
+}
+
+impl Commands {
+    fn new() -> Self {
+        Self {
+            operations: Vec::new(),
+            commands: Vec::new()
+        }
+
+    }
 }
 
 impl CFF {
@@ -202,374 +235,364 @@ impl CFF {
         } else {
             width as f64
         };
-        self.parse_data(data, width, &mut Vec::new(), false)
+        self.parse_data(data, width, true)
     }
 
-    fn parse_data(
-        &self,
-        data: &[u8],
-        width: f64,
-        stacks: &mut Vec<f64>,
-        is_svg: bool,
-    ) -> String {
 
-        let mut width = width;
-        //        let cid = self.charsets.sid[gid as usize];
-        /*
-           0..=11 =>  operators
-           12 => escape get next byte
-           13..=18 => operators
-           19 => hintmask
-           20 => cntrmask
-           21..=27 => operators
-           28 => number get next 2 bytes
-           29..=31 => operators
-           32..=246 => number - 139
-           247..=250 => number (b0 - 247) * 256 + b1 + 108
-           251..=254 => number -(b0 - 251) * 256 - b1 - 108
-           255 => real number get next 4bytes 16dot16
-        */
-        let mut x = 0.0;
-        let mut y = 0.0;
-        let accender = self.bbox[3];
-        let mut string = String::new();
-        let mut svg = String::new();
-        // let mut stacks: Vec<f64> = Vec::new();
-        let mut first = if width == 0.0 { false } else { true };
-        let mut hints = 0;
+    fn parse(&self,data: &[u8], parce_data :&mut ParcePack) -> Option<()> {
         let mut i = 0;
         // println!("data.len() = {}, {}", data.len(), i);
         while i < data.len() {
             let b0 = data[i];
             i += 1;
+            println!("b0 = {}", b0);
             match b0 {
                 1 => {
                     // hstem |- y dy {dya dyb}* hstem (1) |
                     let mut command = "hstem".to_string();
                     let mut args = Vec::new();
-                    args.push(stacks.pop().unwrap());
-                    args.push(stacks.pop().unwrap());
+                    args.push(parce_data.stacks.pop()?);
+                    args.push(parce_data.stacks.pop()?);
 
-                    while 2 <= stacks.len() {
-                        let d1 = stacks.pop().unwrap();
-                        let d2 = stacks.pop().unwrap();
+                    while 2 <= parce_data.stacks.len() {
+                        let d1 = parce_data.stacks.pop()?;
+                        let d2 = parce_data.stacks.pop()?;
                         args.push(d1);
                         args.push(d2);
                     }
 
-                    y = args.pop().unwrap();
-                    command += &format!(" {}", y);
+                    parce_data.y = args.pop()?;
+                    command += &format!(" {}", parce_data.y);
                     if 1 <= args.len() {
-                        let dy = args.pop().unwrap();
-                        y += dy;
-                        command += &format!(" {}", y);
+                        let dy = args.pop()?;
+                        parce_data.y += dy;
+                        command += &format!(" {}", parce_data.y);
                     }
                     while 2 <= args.len() {
-                        let dya = args.pop().unwrap();
-                        y += dya;
-                        command += &format!(" {}", y);
-                        let dyb = args.pop().unwrap();
-                        y += dyb;
-                        command += &format!(" {}", y);
+                        let dya = args.pop()?;
+                        parce_data.y += dya;
+                        command += &format!(" {}", parce_data.y);
+                        let dyb = args.pop()?;
+                        parce_data.y += dyb;
+                        command += &format!(" {}", parce_data.y);
                     }
-                    command += "\n";
-                    string += &command;
+                    parce_data.commands.as_mut().commands.push(command);
                 }
                 3 => {
                     // vstem |- v dx {dxa dxb}* vstem (3) |
 
                     let mut args = Vec::new();
-                    args.push(stacks.pop().unwrap());
-                    args.push(stacks.pop().unwrap());
-                    while 2 <= stacks.len() {
-                        let d1 = stacks.pop().unwrap();
-                        let d2 = stacks.pop().unwrap();
+                    args.push(parce_data.stacks.pop()?);
+                    args.push(parce_data.stacks.pop()?);
+                    while 2 <= parce_data.stacks.len() {
+                        let d1 = parce_data.stacks.pop()?;
+                        let d2 = parce_data.stacks.pop()?;
                         args.push(d1);
                         args.push(d2);
                     }
-                    hints += args.len();
+                    parce_data.hints += args.len();
 
                     let mut command = "vstem".to_string();
-                    let mut x = args.pop().unwrap();
-                    command += &format!(" {}", x);
+                    parce_data.x = args.pop()?;
+                    command += &format!(" {}", parce_data.x);
                     if 1 <= args.len() {
-                        let dx = args.pop().unwrap();
-                        x += dx;
-                        command += &format!(" {}", x);
+                        let dx = args.pop()?;
+                        parce_data.x += dx;
+                        command += &format!(" {}", parce_data.x);
                     }
                     while 2 <= args.len() {
-                        let dxa = args.pop().unwrap();
-                        x += dxa;
-                        command += &format!(" {}", x);
-                        let dxb = args.pop().unwrap();
-                        x += dxb;
-                        command += &format!(" {}", x);
+                        let dxa = args.pop()?;
+                        parce_data.x += dxa;
+                        command += &format!(" {}", parce_data.x);
+                        let dxb = args.pop()?;
+                        parce_data.x += dxb;
+                        command += &format!(" {}", parce_data.x);
                     }
-                    command += "\n";
-                    string += &command;
+                    parce_data.commands.as_mut().commands.push(command);
                 }
                 18 => {
                     // hstemhm |- y dy {dya dyb}* hstemhm (18) |-
                     let mut args = Vec::new();
-                    args.push(stacks.pop().unwrap());
-                    args.push(stacks.pop().unwrap());
-                    while 2 <= stacks.len() {
-                        let d1 = stacks.pop().unwrap();
-                        let d2 = stacks.pop().unwrap();
+                    args.push(parce_data.stacks.pop()?);
+                    args.push(parce_data.stacks.pop()?);
+                    while 2 <= parce_data.stacks.len() {
+                        let d1 = parce_data.stacks.pop()?;
+                        let d2 = parce_data.stacks.pop()?;
                         args.push(d1);
                         args.push(d2);
                     }
-                    hints += args.len();
+                    parce_data.hints += args.len();
 
                     let mut command = "hstemhm".to_string();
-                    let mut y = args.pop().unwrap();
-                    command += &format!(" {}", y);
-                    let dy = args.pop().unwrap();
-                    y += dy;
-                    command += &format!(" {}", y);
+                    let mut y = args.pop()?;
+                    command += &format!(" {}", parce_data.y);
+                    let dy = args.pop()?;
+                    parce_data.y += dy;
+                    command += &format!(" {}", parce_data.y);
                     while 2 <= args.len() {
-                        let dya = args.pop().unwrap();
-                        y += dya;
-                        command += &format!(" {}", y);
-                        let dyb = args.pop().unwrap();
-                        y += dyb;
-                        command += &format!(" {}", y);
+                        let dya = args.pop()?;
+                        parce_data.y += dya;
+                        command += &format!(" {}", parce_data.y);
+                        let dyb = args.pop()?;
+                        parce_data.y += dyb;
+                        command += &format!(" {}", parce_data.y);
                     }
-                    command += "\n";
-                    string += &command;
+                    parce_data.commands.as_mut().commands.push(command);
                 }
                 23 => {
-                    // vstemhm |- x dx {dxa dxb}* vstemhm (23) |-
+                    // vstemhm |- parce_data.x dx {dxa dxb}* vstemhm (23) |-
                     let mut args = Vec::new();
-                    args.push(stacks.pop().unwrap());
-                    args.push(stacks.pop().unwrap());
-                    while 2 <= stacks.len() {
-                        let d1 = stacks.pop().unwrap();
-                        let d2 = stacks.pop().unwrap();
+                    args.push(parce_data.stacks.pop()?);
+                    args.push(parce_data.stacks.pop()?);
+                    while 2 <= parce_data.stacks.len() {
+                        let d1 = parce_data.stacks.pop()?;
+                        let d2 = parce_data.stacks.pop()?;
                         args.push(d1);
                         args.push(d2);
                     }
-                    hints += args.len();
+                    parce_data.hints += args.len();
                     let mut command = "vstemhm".to_string();
-                    let mut x = args.pop().unwrap();
-                    command += &format!(" {}", x);
-                    let dx = args.pop().unwrap();
-                    x += dx;
-                    command += &format!(" {}", x);
+                    parce_data.x = args.pop()?;
+                    command += &format!(" {}", parce_data.x);
+                    let dx = args.pop()?;
+                    parce_data.x += dx;
+                    command += &format!(" {}", parce_data.x);
                     while 2 <= args.len() {
-                        let dxa = args.pop().unwrap();
-                        x += dxa;
-                        command += &format!(" {}", x);
-                        let dxb = args.pop().unwrap();
-                        x += dxb;
-                        command += &format!(" {}", x);
-                        hints += 2;
+                        let dxa = args.pop()?;
+                        parce_data.x += dxa;
+                        command += &format!(" {}", parce_data.x);
+                        let dxb = args.pop()?;
+                        parce_data.x += dxb;
+                        command += &format!(" {}", parce_data.x);
+                        parce_data.hints += 2;
                     }
                     command += "\n";
-                    string += &command;
-                    stacks.truncate(stacks.len() - i);
+                    parce_data.commands.as_mut().commands.push(command);
                 }
                 19 => {
                     // hintmask |- hintmask (19 + mask) |
-                    let len = (hints + 7) / 8;
+                    let len = (parce_data.hints + 7) / 8;
                     let mut command = "hintmask".to_string();
                     for j in 0..len {
                         let mask = data[i + j];
                         command += &format!(" {:08b}", mask);
                     }
                     i += len;
-                    command += "\n";
-                    string += &command;
+                    parce_data.commands.as_mut().commands.push(command);
                 }
                 20 => {
                     // cntrmask |- cntrmask (20 + mask) |-
-                    let len = (hints + 7) / 8;
+                    let len = (parce_data.hints + 7) / 8;
                     let mut command = "cntrmask".to_string();
                     for j in 0..len {
                         let mask = data[i + j];
                         command += &format!(" {:08b}", mask);
                     }
                     i += len;
-                    command += "\n";
-                    string += &command;
+                    parce_data.commands.as_mut().commands.push(command);
                 }
 
                 21 => {
                     // rmoveto |- dy1 dy1 rmoveto (21) |-
-                    if !first {
-                        svg += "Z\n";
-                    }
-                    let dy = stacks.pop().unwrap();
-                    let dx = stacks.pop().unwrap();
-                    x += dx;
-                    y += dy;
-                    string += &format!("rmoveto {} {}\n", dx, dy);
-                    svg += &format!("M {} {}\n", x, accender - y);
+                    let dy = parce_data.stacks.pop()?;
+                    let dx = parce_data.stacks.pop()?;
+                    parce_data.x += dx;
+                    parce_data.y += dy;
+                    let command = format!("rmoveto {} {}\n", dx, dy);
+                    parce_data.commands.as_mut().commands.push(command);
+                    let xx = parce_data.x;
+                    let yy = parce_data.y;
+                    parce_data.commands.as_mut().operations.push(Operation::M(xx, yy));
 
-                    if 1 <= stacks.len() && first == true {
-                        width += stacks.pop().unwrap();
-                        first = false;
-                        string += &format!("width {}\n", width);
+                    if 1 <= parce_data.stacks.len() && parce_data.is_first == true {
+                        parce_data.width = parce_data.stacks.pop()?;
+                        parce_data.is_first = false;
+                        let width = parce_data.width;
+                        parce_data.commands.as_mut().commands.push(format!("width {}", width));
                     }
                 }
                 22 => {
                     // hmoveto |- dy1 hmoveto (22) |-
-                    if !first {
-                        svg += "Z\n";
+                    if !parce_data.is_first {
+                        parce_data.commands.as_mut().operations.push(Operation::Z);
                     }
-                    let dx = stacks.pop().unwrap();
-                    x += dx;
-                    string += &format!("hmoveto {}\n", dx);
-                    svg += &format!("M {} {}\n", x, accender - y);
-                    if 1 <= stacks.len() && first == true {
-                        width += stacks.pop().unwrap();
-                        first = false;
-                        string += &format!("width {}\n", width);
+                    let dx = parce_data.stacks.pop()?;
+                    parce_data.x += dx;
+                    let command = format!("hmoveto {}", dx);
+                    parce_data.commands.as_mut().commands.push(command);
+                    let xx = parce_data.x;
+                    let yy = parce_data.y;
+                    parce_data.commands.as_mut().operations.push(Operation::M(xx, yy));
+                    if 1 <= parce_data.stacks.len() && parce_data.is_first == true {
+                        parce_data.width = parce_data.stacks.pop()?;
+                        parce_data.is_first = false;
+                        let width = parce_data.width;
+                        parce_data.commands.as_mut().commands.push(format!("width {}", width));
                     }
-                    string += &format!("hmoveto {}\n", dx);
                 }
                 4 => {
                     // vmoveto |- dy1 vmoveto (4) |-
-                    if !first {
-                        svg += "Z\n";
+                    if !parce_data.is_first {
+                        parce_data.commands.as_mut().operations.push(Operation::Z);
                     }
-                    let dy = stacks.pop().unwrap();
-                    y += dy;
-                    string += &format!("vmoveto {}\n", dy);
-                    svg += &format!("M {} {}\n", x, accender - y);
+                    let dy = parce_data.stacks.pop()?;
+                    parce_data.y += dy;
+                    let command = format!("vmoveto {}\n", dy);
+                    parce_data.commands.as_mut().commands.push(command);
+                    let xx = parce_data.x;
+                    let yy = parce_data.y;
+                    parce_data.commands.as_mut().operations.push(Operation::M(xx, yy));
 
-                    if 1 <= stacks.len() && first == true {
-                        width += stacks.pop().unwrap();
-                        first = false;
-                        string += &format!("width {}\n", width);
+                    if 1 <= parce_data.stacks.len() && parce_data.is_first == true {
+                        parce_data.width = parce_data.stacks.pop()?;
+                        parce_data.is_first = false;
+                        let width = parce_data.width;
+                        parce_data.commands.as_mut().commands.push(format!("width {}", width));
                     }
                 }
                 5 => {
                     // rlineto |- {dxa dya}+ rlineto (5) |-
                     let mut args = Vec::new();
-                    while 2 <= stacks.len() {
-                        let d1 = stacks.pop().unwrap();
-                        let d2 = stacks.pop().unwrap();
+                    while 2 <= parce_data.stacks.len() {
+                        let d1 = parce_data.stacks.pop()?;
+                        let d2 = parce_data.stacks.pop()?;
                         args.push(d1);
                         args.push(d2);
                     }
 
                     let mut command = "rlineto".to_string();
                     while 2 <= args.len() {
-                        let dxa = args.pop().unwrap();
-                        x += dxa;
+                        let dxa = args.pop()?;
+                        let dya = args.pop()?;
+                        parce_data.x += dxa;
+                        parce_data.y += dya;
+                        let xx = parce_data.x;
+                        let yy = parce_data.y;
                         command += &format!(" {}", dxa);
-                        let dya = args.pop().unwrap();
-                        y += dya;
                         command += &format!(" {}", dya);
-                        svg += &format!("L {} {}\n", x, accender - y);
+                        parce_data.commands.as_mut().operations.push(Operation::L(xx, yy));
                     }
-                    command += "\n";
-                    string += &command;
+                    parce_data.commands.as_mut().commands.push(command);
                 }
                 6 => {
                     //  |- dy1 {dya dxb}* hlineto (6) |- odd
                     // |- {dxa dyb}+ hlineto (6) |-      even
                     let mut args = Vec::new();
-                    while 2 <= stacks.len() {
-                        let d1 = stacks.pop().unwrap();
-                        let d2 = stacks.pop().unwrap();
+                    while 2 <= parce_data.stacks.len() {
+                        let d1 = parce_data.stacks.pop()?;
+                        let d2 = parce_data.stacks.pop()?;
                         args.push(d1);
                         args.push(d2);
                     }
-                    if 1 <= stacks.len() {
-                        args.push(stacks.pop().unwrap());
+                    if 1 <= parce_data.stacks.len() {
+                        args.push(parce_data.stacks.pop()?);
                     }
 
                     let mut command = "hlineto".to_string();
                     if args.len() % 2 == 1 {
-                        let dy1 = args.pop().unwrap();
-                        x += dy1;
+                        let dy1 = args.pop()?;
+                        parce_data.x += dy1;
                         command += &format!(" dy1 {}", dy1);
-                        svg += &format!("L {} {}\n", x, accender - y);
+                        let xx = parce_data.x;
+                        let yy = parce_data.y;                       
+                        parce_data.commands.as_mut().operations.push(Operation::L(xx, yy));
                         while 2 <= args.len() {
-                            let dya = args.pop().unwrap();
-                            y += dya;
+                            let dya = args.pop()?;
+                            parce_data.y += dya;
+                            let xx = parce_data.x;
+                            let yy = parce_data.y;
                             command += &format!(" {}", dya);
-                            svg += &format!("L {} {}\n", x, accender - y);
-                            let dxb = args.pop().unwrap();
-                            x += dxb;
+                            parce_data.commands.as_mut().operations.push(Operation::L(xx, yy));
+                            let dxb = args.pop()?;
+                            parce_data.x += dxb;
+                            let xx = parce_data.x;
+                            let yy = parce_data.y;
                             command += &format!(" {}", dxb);
-                            svg += &format!("L {} {}\n", x, accender - y);
+                            parce_data.commands.as_mut().operations.push(Operation::L(xx, yy));
                         }
                     } else {
                         while 2 <= args.len() {
-                            let dxa = args.pop().unwrap();
-                            x += dxa;
+                            let dxa = args.pop()?;
+                            parce_data.x += dxa;
                             command += &format!(" {}", dxa);
-                            svg += &format!("L {} {}\n", x, accender - y);
-                            let dyb = args.pop().unwrap();
-                            y += dyb;
+                            let xx = parce_data.x;
+                            let yy = parce_data.y;
+                            parce_data.commands.as_mut().operations.push(Operation::L(xx, yy));
+                            let dyb = args.pop()?;
+                            parce_data.y += dyb;
+                            let xx = parce_data.x;
+                            let yy = parce_data.y;
                             command += &format!(" {}", dyb);
-                            svg += &format!("L {} {}\n", x, accender - y);
+                            parce_data.commands.as_mut().operations.push(Operation::L(xx, yy));
                         }
                     }
-
-                    command += "\n";
-                    string += &command;
+                    parce_data.commands.as_mut().commands.push(command);
                 }
                 7 => {
                     // vlineto - dy1 {dxa dyb}* vlineto (7) |- odd
                     // |- {dya dxb}+ vlineto (7) |-  even
                     let mut args = Vec::new();
-                    while 2 <= stacks.len() {
-                        let d1 = stacks.pop().unwrap();
-                        let d2 = stacks.pop().unwrap();
+                    while 2 <= parce_data.stacks.len() {
+                        let d1 = parce_data.stacks.pop()?;
+                        let d2 = parce_data.stacks.pop()?;
                         args.push(d1);
                         args.push(d2);
                     }
-                    if 1 <= stacks.len() {
-                        args.push(stacks.pop().unwrap());
+                    if 1 <= parce_data.stacks.len() {
+                        args.push(parce_data.stacks.pop()?);
                     }
 
                     let mut command = "vlineto".to_string();
 
                     if args.len() % 2 == 1 {
-                        let dy1 = args.pop().unwrap();
-                        y += dy1;
+                        let dy1 = args.pop()?;
+                        parce_data.y += dy1;
                         command += &format!(" dy1 {}", dy1);
-                        svg += &format!("L {} {}", x, accender - y);
+                        let xx = parce_data.x;
+                        let yy = parce_data.y;
+                        parce_data.commands.as_mut().operations.push(Operation::L(xx, yy));
                         while 2 <= args.len() {
-                            let dxa = args.pop().unwrap();
-                            x += dxa;
+                            let dxa = args.pop()?;
+                            parce_data.x += dxa;
+                            let xx = parce_data.x;
+                            let yy = parce_data.y;
                             command += &format!(" {}", dxa);
-                            svg += &format!("L {} {}\n", x, accender - y);
-                            let dyb = args.pop().unwrap();
-                            y += dyb;
+                            parce_data.commands.as_mut().operations.push(Operation::L(xx, yy));
+                            let dyb = args.pop()?;
+                            parce_data.y += dyb;
+                            let xx = parce_data.x;
+                            let yy = parce_data.y;
                             command += &format!(" {}", dyb);
-                            svg += &format!("L {} {}\n", x, accender - y);
+                            parce_data.commands.as_mut().operations.push(Operation::L(xx, yy));
                         }
                     } else {
                         while 2 <= args.len() {
-                            let dya = args.pop().unwrap();
-                            y += dya;
+                            let dya = args.pop()?;
+                            parce_data.y += dya;
+                            let xx = parce_data.x;
+                            let yy = parce_data.y;
                             command += &format!(" {}", dya);
-                            svg += &format!("L {} {}\n", x, accender - y);
-                            let dxb = args.pop().unwrap();
-                            x += dxb;
+                            parce_data.commands.as_mut().operations.push(Operation::L(xx, yy));
+                            let dxb = args.pop()?;
+                            parce_data.x += dxb;
+                            let xx = parce_data.x;
+                            let yy = parce_data.y;
                             command += &format!(" {}", dxb);
-                            svg += &format!("L {} {}\n", x, accender - y);
+                            parce_data.commands.as_mut().operations.push(Operation::L(xx, yy));
                         }
                     }
-
-                    command += "\n";
-                    string += &command;
+                    parce_data.commands.as_mut().commands.push(command);
                 }
                 8 => {
                     // rrcurveto |- {dxa dya dxb dyb dxc dyc}+ rrcurveto (8) |-
                     let mut args = Vec::new();
-                    while 6 <= stacks.len() {
-                        let d1 = stacks.pop().unwrap();
-                        let d2 = stacks.pop().unwrap();
-                        let d3 = stacks.pop().unwrap();
-                        let d4 = stacks.pop().unwrap();
-                        let d5 = stacks.pop().unwrap();
-                        let d6 = stacks.pop().unwrap();
+                    while 6 <= parce_data.stacks.len() {
+                        let d1 = parce_data.stacks.pop()?;
+                        let d2 = parce_data.stacks.pop()?;
+                        let d3 = parce_data.stacks.pop()?;
+                        let d4 = parce_data.stacks.pop()?;
+                        let d5 = parce_data.stacks.pop()?;
+                        let d6 = parce_data.stacks.pop()?;
                         args.push(d1);
                         args.push(d2);
                         args.push(d3);
@@ -580,78 +603,86 @@ impl CFF {
 
                     let mut command = "rrcurveto".to_string();
                     while 6 <= args.len() {
-                        let dxa = args.pop().unwrap();
-                        x += dxa;
+                        let dxa = args.pop()?;
+                        parce_data.x += dxa;
                         command += &format!(" {}", dxa);
-                        let dya = args.pop().unwrap();
-                        y += dya;
+                        let dya = args.pop()?;
+                        parce_data.y += dya;
                         command += &format!(" {}", dya);
-                        svg += &format!("C {} {}", x, accender - y); // P(a)
+                        let xa = parce_data.x;
+                        let ya = parce_data.x;
 
-                        let dxb = args.pop().unwrap();
-                        x += dxb;
+                        let dxb = args.pop()?;
+                        parce_data.x += dxb;
                         command += &format!(" {}", dxb);
-                        let dyb = args.pop().unwrap();
-                        y += dyb;
+                        let dyb = args.pop()?;
+                        parce_data.y += dyb;
                         command += &format!(" {}", dyb);
+                        let xb = parce_data.x;
+                        let yb = parce_data.y;
 
-                        svg += &format!(" {} {}", x, accender - y); // P(b)
-                        let dxc = args.pop().unwrap();
-                        x += dxc;
+                        let dxc = args.pop()?;
+                        parce_data.x += dxc;
                         command += &format!(" {}", dxc);
-                        let dyc = args.pop().unwrap();
-                        y += dyc;
+                        let dyc = args.pop()?;
+                        parce_data.y += dyc;
+                        let xc = parce_data.x;
+                        let yc = parce_data.y;
                         command += &format!(" {}", dyc);
-                        svg += &format!(" {} {}\n", x, accender - y); // P(c)
+                        parce_data.commands.as_mut().operations.push(Operation::C(xa, ya, xb, yb, xc, yc));
                     }
+                    parce_data.commands.as_mut().commands.push(command);
                 }
                 27 => {
                     //hhcurveto|- dy1? {dxa dxb dyb dxc}+ hhcurveto (27) |-
                     let mut args = Vec::new();
-                    while 4 <= stacks.len() {
-                        let d1 = stacks.pop().unwrap();
-                        let d2 = stacks.pop().unwrap();
-                        let d3 = stacks.pop().unwrap();
-                        let d4 = stacks.pop().unwrap();
+                    while 4 <= parce_data.stacks.len() {
+                        let d1 = parce_data.stacks.pop()?;
+                        let d2 = parce_data.stacks.pop()?;
+                        let d3 = parce_data.stacks.pop()?;
+                        let d4 = parce_data.stacks.pop()?;
                         args.push(d1);
                         args.push(d2);
                         args.push(d3);
                         args.push(d4);
                     }
-                    if 1 <= stacks.len() {
-                        args.push(stacks.pop().unwrap());
+                    if 1 <= parce_data.stacks.len() {
+                        args.push(parce_data.stacks.pop()?);
                     }
 
                     let mut command = "hhcurveto".to_string();
                     if args.len() % 4 == 1 {
-                        let dy1 = args.pop().unwrap();
+                        let dy1 = args.pop()?;
                         command += &format!(" dy1 {}", dy1);
-                        y += dy1;
-                        // svg += &format!("L {} {}", x, accender - y);
+                        parce_data.y += dy1;
+                        // svg += &format!("L {} {}", parce_data.x, accender - y);
                     }
                     while 4 <= args.len() {
-                        let dxa = args.pop().unwrap();
-                        x += dxa;
+                        let dxa = args.pop()?;
+                        parce_data.x += dxa;
+                        let xa = parce_data.x;
+                        let ya = parce_data.y;
 
                         command += &format!(" {}", dxa);
-                        svg += &format!("C {} {}", x, accender - y); // P(a)
 
-                        let dxb = args.pop().unwrap();
-                        x += dxb;
-                        command += &format!(" {}", dxb);
-                        let dyb = args.pop().unwrap();
-                        y += dyb;
-                        command += &format!(" {}", dyb);
-                        svg += &format!(" {} {}", x, accender - y); // P(b)
+                        let dxb = args.pop()?;
+                        parce_data.x += dxb;
+                        let dyb = args.pop()?;
+                        parce_data.y += dyb;
+                        let xb = parce_data.x;
+                        let yb = parce_data.y;
 
-                        let dxc = args.pop().unwrap();
-                        x += dxc;
+                        command += &format!(" {} {}", dxb, dyb);
+
+                        let dxc = args.pop()?;
+                        parce_data.x += dxc;
+                        let xc = parce_data.x;
+                        let yc = parce_data.y;
 
                         command += &format!(" {}", dxc);
-                        svg += &format!(" {} {}\n", x, accender - y); // P(c)
+                        parce_data.commands.as_mut().operations.push(Operation::C(xa,ya,xb,yb,xc,yc));
                     }
-                    command += "\n";
-                    string += &command;
+                    parce_data.commands.as_mut().commands.push(command);
                 }
                 31 => {
                     // hvcurveto |- dy1 dx2 dy2 dy3 {dya dxb dyb dxc dxd dxe dye dyf}* dxf?
@@ -659,15 +690,15 @@ impl CFF {
                     // |- {dxa dxb dyb dyc dyd dxe dye dxf}+ dyf? hvcurveto (31) |-
                     let mut args = Vec::new();
                     let mut tmp = String::new();
-                    while 8 <= stacks.len() {
-                        let d1 = stacks.pop().unwrap();
-                        let d2 = stacks.pop().unwrap();
-                        let d3 = stacks.pop().unwrap();
-                        let d4 = stacks.pop().unwrap();
-                        let d5 = stacks.pop().unwrap();
-                        let d6 = stacks.pop().unwrap();
-                        let d7 = stacks.pop().unwrap();
-                        let d8 = stacks.pop().unwrap();
+                    while 8 <= parce_data.stacks.len() {
+                        let d1 = parce_data.stacks.pop()?;
+                        let d2 = parce_data.stacks.pop()?;
+                        let d3 = parce_data.stacks.pop()?;
+                        let d4 = parce_data.stacks.pop()?;
+                        let d5 = parce_data.stacks.pop()?;
+                        let d6 = parce_data.stacks.pop()?;
+                        let d7 = parce_data.stacks.pop()?;
+                        let d8 = parce_data.stacks.pop()?;
                         args.push(d1);
                         args.push(d2);
                         args.push(d3);
@@ -677,145 +708,174 @@ impl CFF {
                         args.push(d7);
                         args.push(d8);
                     }
-                    if 4 <= stacks.len() {
-                        let d1 = stacks.pop().unwrap();
-                        let d2 = stacks.pop().unwrap();
-                        let d3 = stacks.pop().unwrap();
-                        let d4 = stacks.pop().unwrap();
+                    if 4 <= parce_data.stacks.len() {
+                        let d1 = parce_data.stacks.pop()?;
+                        let d2 = parce_data.stacks.pop()?;
+                        let d3 = parce_data.stacks.pop()?;
+                        let d4 = parce_data.stacks.pop()?;
                         args.push(d1);
                         args.push(d2);
                         args.push(d3);
                         args.push(d4);
                     }
-                    if 1 <= stacks.len() {
-                        args.push(stacks.pop().unwrap());
+                    if 1 <= parce_data.stacks.len() {
+                        args.push(parce_data.stacks.pop()?);
                     }
 
                     let mut command = "hvcurveto".to_string();
                     if args.len() % 8 >= 4 {
-                        let dy1 = args.pop().unwrap();
-                        x += dy1;
+                        let dy1 = args.pop()?;
+                        parce_data.y += dy1;
+                        let xa = parce_data.x;
+                        let ya = parce_data.y;
                         command += &format!(" dy1 {}", dy1);
-                        let dx2 = args.pop().unwrap();
-                        x += dx2;
-                        svg += &format!("C{} {}", x, accender - y); // P(a)
+                        let dx2 = args.pop()?;
+                        parce_data.x += dx2;
 
                         command += &format!(" dx2 {}", dx2);
-                        let dy2 = args.pop().unwrap();
-                        y += dy2;
+                        let dy2 = args.pop()?;
+                        parce_data.y += dy2;
                         command += &format!(" dy2 {}", dy2);
-                        svg += &format!(" {} {}", x, accender - y); // P(b)
+                        let xb = parce_data.x;
+                        let yb = parce_data.y;
 
-                        let dy3 = args.pop().unwrap();
-                        y += dy3;
+                        let dy3 = args.pop()?;
+                        parce_data.y += dy3;
+                        let xc = parce_data.x;
+                        let yc = parce_data.y;
                         command += &format!(" dy3 {}", dy3);
-                        svg += &format!(" {} {}\n", x, accender - y); // P(c)
+
+                        parce_data.commands.as_mut().operations.push(Operation::C(xa,ya,xb,yb,xc,yc));
                         let mut lp = false;
                         while 8 <= args.len() {
-                            svg += &format!("{}", tmp);
+                            // tmp //
                             lp = true;
-                            let dya = args.pop().unwrap();
-                            y += dya;
+                            let dya = args.pop()?;
+                            parce_data.y += dya;
                             command += &format!(" {}", dya);
-                            svg += &format!("C {} {}", x, accender - y); // P(a)
-                            let dxb = args.pop().unwrap();
-                            x += dxb;
+                            let xa = parce_data.x;
+                            let ya = parce_data.y;
+                            let dxb = args.pop()?;
+                            let dyb = args.pop()?;
+                            parce_data.x += dxb;
+                            parce_data.y += dyb;
+                            let xb = parce_data.x;
+                            let yb = parce_data.y;
                             command += &format!(" {}", dxb);
-                            let dyb = args.pop().unwrap();
-                            y += dyb;
                             command += &format!(" {}", dyb);
-                            svg += &format!(" {} {}", x, accender - y); // P(b)
-                            let dxc = args.pop().unwrap();
-                            x += dxc;
-                            command += &format!(" {}", dxc);
-                            svg += &format!(" {} {}\n", x, accender - y); // P(c)
-                            let dxd = args.pop().unwrap();
-                            x += dxd;
-                            command += &format!(" {}", dxd);
-                            svg += &format!("C {} {}", x, accender - y); // P(d)
-                            let dxe = args.pop().unwrap();
-                            x += dxe;
-                            command += &format!(" {}", dxe);
-                            let dye = args.pop().unwrap();
-                            y += dye;
-                            command += &format!(" {}", dye);
-                            svg += &format!(" {} {}", x, accender - y); // P(e)
 
-                            let dyf = args.pop().unwrap();
-                            y += dyf;
+                            let dxc = args.pop()?;
+                            parce_data.x += dxc;
+                            let xc = parce_data.x;
+                            let yc = parce_data.y;
+                            command += &format!(" {}", dxc);
+                            parce_data.commands.as_mut().operations.push(Operation::C(xa,ya,xb,yb,xc,yc));
+
+                            let dxd = args.pop()?;
+                            parce_data.x += dxd;
+
+                            let xd = parce_data.x;
+                            let yd = parce_data.y;
+                            command += &format!(" {}", dxd);
+                            let dxe = args.pop()?;
+                            let dye = args.pop()?;
+                            parce_data.x += dxe;
+                            parce_data.y += dye;
+                            let xe = parce_data.x;
+                            let ye = parce_data.y;
+                            command += &format!(" {}", dxe);
+                            command += &format!(" {}", dye);
+
+                            let dyf = args.pop()?;
+                            parce_data.y += dyf;
+                            let xf = parce_data.x;
+                            let yf = parce_data.y;
                             command += &format!(" {}", dyf);
-                            tmp = format!(" {} {}\n", x, accender - y); // P(f)
+                            parce_data.commands.as_mut().operations.push(Operation::C(xd, yd, xe, ye, xf, yf));                            
                         }
                         if lp {
                             if 1 <= args.len() {
-                                let dxf = args.pop().unwrap();
-                                x += dxf;
+                                let dxf = args.pop()?;
+                                parce_data.x += dxf;
+                                let xf = parce_data.x;
                                 command += &format!(" dxf {}", dxf);
-                                svg += &format!(" {} {}\n", x, accender - y); // P(f)
-                            } else {
-                                svg += &format!("{}", tmp);
+                                let op = parce_data.commands.as_mut().operations.pop()?;
+                                if let Operation::C(xd, yd, xe, ye, _, yf) = op {
+                                    parce_data.commands.as_mut().operations.push(Operation::C(xd, yd, xe, ye, xf, yf));                            
+                                } else {
+                                    parce_data.commands.as_mut().operations.push(op);
+                                }
                             }
                         }
                     } else {
                         while 8 <= args.len() {
-                            svg += &format!("{}", tmp);
-                            let dxa = args.pop().unwrap();
-                            x += dxa;
+                            let dxa = args.pop()?;
+                            parce_data.x += dxa;
+                            let xa = parce_data.x;
+                            let ya = parce_data.y;
                             command += &format!(" {}", dxa);
-                            svg += &format!("C {} {}", x, accender - y); // P(a)
-                            let dxb = args.pop().unwrap();
-                            x += dxb;
+                            let dxb = args.pop()?;
+                            let dyb = args.pop()?;
+                            parce_data.x += dxb;
+                            parce_data.y += dyb;
+                            let xb = parce_data.x;
+                            let yb = parce_data.y;
                             command += &format!(" {}", dxb);
-                            let dyb = args.pop().unwrap();
-                            y += dyb;
                             command += &format!(" {}", dyb);
-                            svg += &format!(" {} {}", x, accender - y); // P(b)
-                            let dyc = args.pop().unwrap();
-                            y += dyc;
+                            let dyc = args.pop()?;
+                            parce_data.y += dyc;
+                            let xc = parce_data.x;
+                            let yc = parce_data.y;
+                            parce_data.commands.as_mut().operations.push(Operation::C(xa,ya,xb,yb,xc,yc));
                             command += &format!(" {}", dyc);
-                            svg += &format!(" {} {}\n", x, accender - y); // P(c)
-                            let dyd = args.pop().unwrap();
-                            y += dyd;
+                            let dyd = args.pop()?;
+                            parce_data.y += dyd;
+                            let xd = parce_data.x;
+                            let yd = parce_data.y;
                             command += &format!(" {}", dyd);
-                            svg += &format!("C {} {}", x, accender - y); // P(d)
-                            let dxe = args.pop().unwrap();
-                            x += dxe;
+                            let dxe = args.pop()?;
+                            let dye = args.pop()?;
+                            parce_data.x += dxe;
+                            parce_data.y += dye;
+                            let xe = parce_data.x;
+                            let ye = parce_data.y;
                             command += &format!(" {}", dxe);
-                            let dye = args.pop().unwrap();
-                            y += dye;
                             command += &format!(" {}", dye);
-                            svg += &format!(" {} {}", x, accender - y); // P(e)
 
-                            let dxf = args.pop().unwrap();
-                            x += dxf;
+                            let dxf = args.pop()?;
+                            parce_data.x += dxf;
+                            let xf = parce_data.x;
+                            let yf = parce_data.x;
+                            parce_data.commands.as_mut().operations.push(Operation::C(xd, yd, xe, ye, xf, yf));
                             command += &format!(" {}", dxf);
-                            tmp = format!(" {} {}\n", x, accender - y); // P(f)
                         }
                         if 1 <= args.len() {
-                            let dyf = args.pop().unwrap();
-                            y += dyf;
+                            let dyf = args.pop()?;
+                            parce_data.y += dyf;
+                            let yf = parce_data.y;
                             command += &format!(" dyf {}", dyf);
-                            svg += &format!(" {} {}\n", x, accender - y); // P(f)
-                        } else {
-                            svg += &format!("{}", tmp);
+                            let op = parce_data.commands.as_mut().operations.pop()?;
+                            if let Operation::C(xd, yd, xe, ye, xf, _) = op {
+                                parce_data.commands.as_mut().operations.push(Operation::C(xd, yd, xe, ye, xf, yf));                            
+                            } else {
+                                parce_data.commands.as_mut().operations.push(op);
+                            }
                         }
                     }
-
-                    command += "\n";
-                    string += &command;
+                    parce_data.commands.as_mut().commands.push(command);
                 }
                 24 => {
                     // rcurveline rcurveline |- {dxa dya dxb dyb dxc dyc}+ dxd dyd rcurveline (24) |-
                     let mut args = Vec::new();
-                    args.push(stacks.pop().unwrap());
-                    args.push(stacks.pop().unwrap());
-                    while 6 <= stacks.len() {
-                        let d1 = stacks.pop().unwrap();
-                        let d2 = stacks.pop().unwrap();
-                        let d3 = stacks.pop().unwrap();
-                        let d4 = stacks.pop().unwrap();
-                        let d5 = stacks.pop().unwrap();
-                        let d6 = stacks.pop().unwrap();
+                    args.push(parce_data.stacks.pop()?);
+                    args.push(parce_data.stacks.pop()?);
+                    while 6 <= parce_data.stacks.len() {
+                        let d1 = parce_data.stacks.pop()?;
+                        let d2 = parce_data.stacks.pop()?;
+                        let d3 = parce_data.stacks.pop()?;
+                        let d4 = parce_data.stacks.pop()?;
+                        let d5 = parce_data.stacks.pop()?;
+                        let d6 = parce_data.stacks.pop()?;
                         args.push(d1);
                         args.push(d2);
                         args.push(d3);
@@ -825,51 +885,56 @@ impl CFF {
                     }
                     let mut command = "rcurveline".to_string();
                     while 8 <= args.len() {
-                        let dxa = args.pop().unwrap();
-                        x += dxa;
+                        let dxa = args.pop()?;
+                        let dya = args.pop()?;
+                        parce_data.x += dxa;
+                        parce_data.y += dya;
+                        let xa = parce_data.x;
+                        let ya = parce_data.y;
                         command += &format!(" {}", dxa);
-                        let dya = args.pop().unwrap();
-                        y += dya;
                         command += &format!(" {}", dya);
-                        svg += &format!("C {} {}", x, accender - y); // P(a)
-                        let dxb = args.pop().unwrap();
-                        x += dxb;
+                        let dxb = args.pop()?;
+                        let dyb = args.pop()?;
+                        parce_data.x += dxb;
+                        parce_data.y += dyb;
+                        let xb = parce_data.x;
+                        let yb = parce_data.y;
                         command += &format!(" {}", dxb);
-                        let dyb = args.pop().unwrap();
-                        y += dyb;
                         command += &format!(" {}", dyb);
-                        svg += &format!(" {} {}", x, accender - y); // P(b)
-                        let dxc = args.pop().unwrap();
-                        x += dxc;
+                        let dxc = args.pop()?;
+                        let dyc = args.pop()?;
+                        parce_data.x += dxc;
+                        parce_data.y += dyc;
+                        let xc = parce_data.x;
+                        let yc = parce_data.y;
                         command += &format!(" {}", dxc);
-                        let dyc = args.pop().unwrap();
-                        y += dyc;
                         command += &format!(" {}", dyc);
-                        svg += &format!(" {} {}\n", x, accender - y); // P(c)
+                        parce_data.commands.as_mut().operations.push(Operation::C(xa,ya,xb,yb,xc,yc));
                     }
-                    let dxd = args.pop().unwrap();
-                    x += dxd;
+                    let dxd = args.pop()?;
+                    let dyd = args.pop()?;
+                    parce_data.x += dxd;
+                    parce_data.y += dyd;
+                    let xx = parce_data.x;
+                    let yy = parce_data.y;
                     command += &format!(" dxd {}", dxd);
-                    let dyd = args.pop().unwrap();
-                    y += dyd;
                     command += &format!(" dyd {}", dyd);
-                    svg += &format!("L {} {}\n", x, accender - y); // add line
-                    command += "\n";
-                    string += &command;
+                    parce_data.commands.as_mut().operations.push(Operation::L(xx, yy));
+                    parce_data.commands.as_mut().commands.push(command);
                 }
                 25 => {
                     // rlinecurve rlinecurve |- {dxa dya}+ dxb dyb dxc dyc dxd dyd rlinecurve (25) |-
                     let mut args = Vec::new();
-                    while 8 <= stacks.len() {
-                        args.push(stacks.pop().unwrap());
-                        args.push(stacks.pop().unwrap());
+                    while 8 <= parce_data.stacks.len() {
+                        args.push(parce_data.stacks.pop()?);
+                        args.push(parce_data.stacks.pop()?);
                     }
-                    let d1 = stacks.pop().unwrap();
-                    let d2 = stacks.pop().unwrap();
-                    let d3 = stacks.pop().unwrap();
-                    let d4 = stacks.pop().unwrap();
-                    let d5 = stacks.pop().unwrap();
-                    let d6 = stacks.pop().unwrap();
+                    let d1 = parce_data.stacks.pop()?;
+                    let d2 = parce_data.stacks.pop()?;
+                    let d3 = parce_data.stacks.pop()?;
+                    let d4 = parce_data.stacks.pop()?;
+                    let d5 = parce_data.stacks.pop()?;
+                    let d6 = parce_data.stacks.pop()?;
                     args.push(d1);
                     args.push(d2);
                     args.push(d3);
@@ -878,55 +943,58 @@ impl CFF {
                     args.push(d6);
                     let mut command = "rlinecurve".to_string();
                     while 8 <= args.len() {
-                        let dxa = args.pop().unwrap();
-                        x += dxa;
-                        let dya = args.pop().unwrap();
-                        y += dya;
+                        let dxa = args.pop()?;
+                        let dya = args.pop()?;
+                        parce_data.x += dxa;
+                        parce_data.y += dya;
+                        let xx = parce_data.x;
+                        let yy = parce_data.y;
+                        parce_data.commands.as_mut().operations.push(Operation::L(xx, yy));
                         command += &format!("dxa {} dya {}", dxa, dya);
-                        svg += &format!("L {} {}\n", x, accender - y); // P(a)
                     }
-                    let dxb = args.pop().unwrap();
-                    x += dxb;
+                    let dxb = args.pop()?;
+                    let dyb = args.pop()?;
+                    parce_data.x += dxb;
+                    parce_data.y += dyb;
+                    let xa = parce_data.x;
+                    let ya = parce_data.y;
                     command += &format!(" {}", dxb);
-                    let dyb = args.pop().unwrap();
-                    y += dyb;
                     command += &format!(" {}", dyb);
-                    svg += &format!("C {} {}", x, accender - y); // P(b)
-                    let dxc = args.pop().unwrap();
-                    x += dxc;
+                    let dxc = args.pop()?;
+                    let dyc = args.pop()?;
+                    parce_data.x += dxc;
+                    parce_data.y += dyc;
+                    let xb = parce_data.x;
+                    let yb = parce_data.y;
                     command += &format!(" {}", dxc);
-                    let dyc = args.pop().unwrap();
-                    y += dyc;
                     command += &format!(" {}", dyc);
-                    svg += &format!(" {} {}", x, accender - y); // P(c)
 
-                    let dxd = args.pop().unwrap();
-                    x += dxd;
+                    let dxd = args.pop()?;
+                    let dyd = args.pop()?;
+                    parce_data.x += dxd;
+                    parce_data.y += dyd;
+                    let xc = parce_data.x;
+                    let yc = parce_data.y;
                     command += &format!(" {}", dxd);
-                    let dyd = args.pop().unwrap();
-                    y += dyd;
                     command += &format!(" {}", dyd);
-                    svg += &format!(" {} {}\n", x, accender - y); // P(d)
-
-                    command += "\n";
-                    string += &command;
+                    parce_data.commands.as_mut().operations.push(Operation::C(xa,ya,xb,yb,xc,yc));
+                    parce_data.commands.as_mut().commands.push(command);
                 }
                 30 => {
                     // vhcurveto |- dy1 dx2 dy2 dx3 {dxa dxb dyb dyc dyd dxe dye dxf}* dyf?
                     // vhcurveto (30) |-
                     // |- {dya dxb dyb dxc dxd dxe dye dyf}+ dxf? vhcurveto (30) |-
                     let mut args = Vec::new();
-                    let mut tmp = "".to_string();
 
-                    while 8 <= stacks.len() {
-                        let d1 = stacks.pop().unwrap();
-                        let d2 = stacks.pop().unwrap();
-                        let d3 = stacks.pop().unwrap();
-                        let d4 = stacks.pop().unwrap();
-                        let d5 = stacks.pop().unwrap();
-                        let d6 = stacks.pop().unwrap();
-                        let d7 = stacks.pop().unwrap();
-                        let d8 = stacks.pop().unwrap();
+                    while 8 <= parce_data.stacks.len() {
+                        let d1 = parce_data.stacks.pop()?;
+                        let d2 = parce_data.stacks.pop()?;
+                        let d3 = parce_data.stacks.pop()?;
+                        let d4 = parce_data.stacks.pop()?;
+                        let d5 = parce_data.stacks.pop()?;
+                        let d6 = parce_data.stacks.pop()?;
+                        let d7 = parce_data.stacks.pop()?;
+                        let d8 = parce_data.stacks.pop()?;
                         args.push(d1);
                         args.push(d2);
                         args.push(d3);
@@ -936,199 +1004,222 @@ impl CFF {
                         args.push(d7);
                         args.push(d8);
                     }
-                    if 4 <= stacks.len() {
-                        let d1 = stacks.pop().unwrap();
-                        let d2 = stacks.pop().unwrap();
-                        let d3 = stacks.pop().unwrap();
-                        let d4 = stacks.pop().unwrap();
+                    if 4 <= parce_data.stacks.len() {
+                        let d1 = parce_data.stacks.pop()?;
+                        let d2 = parce_data.stacks.pop()?;
+                        let d3 = parce_data.stacks.pop()?;
+                        let d4 = parce_data.stacks.pop()?;
                         args.push(d1);
                         args.push(d2);
                         args.push(d3);
                         args.push(d4);
                     }
-                    if 1 <= stacks.len() {
-                        args.push(stacks.pop().unwrap());
+                    if 1 <= parce_data.stacks.len() {
+                        args.push(parce_data.stacks.pop()?);
                     }
                     let mut command = "vhcurveto".to_string();
                     if args.len() % 8 >= 4 {
-                        let dy1 = args.pop().unwrap();
-                        y += dy1;
+                        let dy1 = args.pop()?;
+                        parce_data.y += dy1;
+                        let xa = parce_data.x;
+                        let ya = parce_data.y;
                         command += &format!(" dy1 {}", dy1);
-                        svg += &format!("C {} {}", x, accender - y); // P(a)
 
-                        let dx2 = args.pop().unwrap();
-                        x += dx2;
+                        let dx2 = args.pop()?;
+                        let dy2 = args.pop()?;
+                        parce_data.x += dx2;
+                        parce_data.y += dy2;
+                        let xb = parce_data.x;
+                        let yb = parce_data.y;
                         command += &format!(" dx2 {}", dx2);
-                        let dy2 = args.pop().unwrap();
-                        y += dy2;
                         command += &format!(" dy2 {}", dy2);
-                        svg += &format!(" {} {}", x, accender - y); // P(b)
 
-                        let dx3 = args.pop().unwrap();
-                        x += dx3;
+                        let dx3 = args.pop()?;
+                        parce_data.x += dx3;
+                        let xc = parce_data.x;
+                        let yc = parce_data.y;
                         command += &format!(" dx3 {}", dx3);
-                        svg += &format!(" {} {}\n", x, accender - y); // P(c)
+                        parce_data.commands.as_mut().operations.push(Operation::C(xa,ya,xb,yb,xc,yc));
                         let mut lp = false;
                         while 8 <= args.len() {
                             lp = true;
-                            svg += &tmp;
-                            let dxa = args.pop().unwrap();
-                            x += dxa;
+                            let dxa = args.pop()?;
+                            parce_data.x += dxa;
+                            let xa = parce_data.x;
+                            let ya = parce_data.y;
                             command += &format!(" {}", dxa);
-                            svg += &format!("C {} {}", x, accender - y); // P(a)
 
-                            let dxb = args.pop().unwrap();
-                            x += dxb;
+                            let dxb = args.pop()?;
+                            let dyb = args.pop()?;
+                            parce_data.x += dxb;
+                            parce_data.y += dyb;
+                            let xb = parce_data.x;
+                            let yb = parce_data.y;
                             command += &format!(" {}", dxb);
-                            let dyb = args.pop().unwrap();
-                            y += dyb;
                             command += &format!(" {}", dyb);
 
-                            svg += &format!(" {} {}", x, accender - y); // P(b)
 
-                            let dyc = args.pop().unwrap();
-                            y += dyc;
+                            let dyc = args.pop()?;
+                            parce_data.y += dyc;
+                            let xc = parce_data.x;
+                            let yc = parce_data.y;
                             command += &format!(" {}", dyc);
-                            svg += &format!(" {} {}\n", x, accender - y); // P(c)
+                            parce_data.commands.as_mut().operations.push(Operation::C(xa,ya,xb,yb,xc,yc));
 
-                            let dyd = args.pop().unwrap();
-                            y += dyd;
+                            let dyd = args.pop()?;
+                            parce_data.y += dyd;
+                            let xd = parce_data.x;
+                            let yd = parce_data.y;
                             command += &format!(" {}", dyd);
-                            svg += &format!("C {} {}", x, accender - y); // P(d)
 
-                            let dxe = args.pop().unwrap();
-                            x += dxe;
+                            let dxe = args.pop()?;
+                            let dye = args.pop()?;
+                            parce_data.x += dxe;
+                            parce_data.y += dye;
+                            let xe = parce_data.x;
+                            let ye = parce_data.y;
                             command += &format!(" {}", dxe);
-                            let dye = args.pop().unwrap();
-                            y += dye;
                             command += &format!(" {}", dye);
-                            svg += &format!(" {} {}", x, accender - y); // P(e)
 
-                            let dxf = args.pop().unwrap();
-                            x += dxf;
+                            let dxf = args.pop()?;
+                            parce_data.x += dxf;
+                            let xf = parce_data.x;
+                            let yf = parce_data.y;
                             command += &format!(" {}", dxf);
-                            tmp = format!(" {} {}\n", x, accender - y); // P(f)
+                            parce_data.commands.as_mut().operations.push(Operation::C(xd, yd, xe, ye, xf, yf));
                         }
                         if lp {
                             if 1 <= args.len() {
-                                let dyf = args.pop().unwrap();
-                                y += dyf;
+                                let dyf = args.pop()?;
+                                parce_data.y += dyf;
+                                let yf = parce_data.y;
                                 command += &format!(" dyf {}", dyf);
-                                svg += &format!(" {} {}\n", x, accender - y); // P(f)
-                            } else {
-                                svg += &format!("{}", tmp);
+                                let op = parce_data.commands.as_mut().operations.pop()?;
+                                if let Operation::C(xd, yd, xe, ye, xf, _) = op {
+                                    parce_data.commands.as_mut().operations.push(Operation::C(xd, yd, xe, ye, xf, yf));                            
+                                } else {
+                                    parce_data.commands.as_mut().operations.push(op);
+                                }
                             }
                         }
                     } else {
                         while 8 <= args.len() {
-                            svg += &tmp;
                             // {dya dxb dyb dxc dxd dxe dye dyf}+ dxf?
-                            let dya = args.pop().unwrap();
-                            y += dya;
+                            let dya = args.pop()?;
+                            parce_data.y += dya;
+                            let xa = parce_data.x;
+                            let ya = parce_data.y;
                             command += &format!(" {}", dya);
-                            svg += &format!("C {} {}", x, accender - y); // P(a)
 
-                            let dxb = args.pop().unwrap();
-                            x += dxb;
+                            let dxb = args.pop()?;
+                            let dyb = args.pop()?;
+                            parce_data.x += dxb;
+                            parce_data.y += dyb;
+                            let xb = parce_data.x;
+                            let yb = parce_data.y;
                             command += &format!(" {}", dxb);
-                            let dyb = args.pop().unwrap();
-                            y += dyb;
                             command += &format!(" {}", dyb);
 
-                            svg += &format!(" {} {}", x, accender - y); // P(b)
-
-                            let dxc = args.pop().unwrap();
-                            x += dxc;
+                            let dxc = args.pop()?;
+                            parce_data.x += dxc;
+                            let xc = parce_data.x;
+                            let yc = parce_data.y;
                             command += &format!(" {}", dxc);
-                            svg += &format!(" {} {}\n", x, accender - y); // P(c)
+                            parce_data.commands.as_mut().operations.push(Operation::C(xa,ya,xb,yb,xc,yc));
 
-                            let dxd = args.pop().unwrap();
-                            x += dxd;
+                            let dxd = args.pop()?;
+                            parce_data.x += dxd;
+                            let xd = parce_data.x;
+                            let yd = parce_data.y;
                             command += &format!(" {}", dxd);
 
-                            svg += &format!("C {} {}", x, accender - y); // P(d)
-                            let dxe = args.pop().unwrap();
-                            x += dxe;
-
+                            let dxe = args.pop()?;
+                            let dye = args.pop()?;
+                            parce_data.x += dxe;
+                            parce_data.y += dye;
+                            let xe = parce_data.x;
+                            let ye = parce_data.y;
                             command += &format!(" {}", dxe);
-                            let dye = args.pop().unwrap();
-                            y += dye;
                             command += &format!(" {}", dye);
 
-                            svg += &format!(" {} {}", x, accender - y); // P(e)
-                            let dyf = args.pop().unwrap();
-                            y += dyf;
+                            let dyf = args.pop()?;
+                            parce_data.y += dyf;
+                            let xf = parce_data.x;
+                            let yf = parce_data.y;
                             command += &format!(" {}", dyf);
-                            tmp = format!(" {} {}", x, accender - y); // P(f)
+                            parce_data.commands.as_mut().operations.push(Operation::C(xd, yd, xe, ye, xf, yf));
                         }
                         if 1 <= args.len() {
-                            let dxf = args.pop().unwrap();
-                            x += dxf;
+                            let dxf = args.pop()?;
+                            parce_data.x += dxf;
+                            let xf = parce_data.x;
                             command += &format!(" dxf {}", dxf);
-                            svg += &format!(" {} {}\n", x, accender - y); // P(f)
-                        } else {
-                            svg += &tmp;
+                            let op = parce_data.commands.as_mut().operations.pop()?;
+                            if let Operation::C(xd, yd, xe, ye, _, yf) = op {
+                                parce_data.commands.as_mut().operations.push(Operation::C(xd, yd, xe, ye, xf, yf));                            
+                            } else {
+                                parce_data.commands.as_mut().operations.push(op);
+                            }
                         }
                     }
-
-                    command += "\n";
-                    string += &command;
+                    parce_data.commands.as_mut().commands.push(command);
                 }
                 26 => {
                     // vvcurveto |- dx1? {dya dxb dyb dyc}+ vvcurveto (26) |-
                     let mut args = Vec::new();
-                    while 4 <= stacks.len() {
-                        let d1 = stacks.pop().unwrap();
-                        let d2 = stacks.pop().unwrap();
-                        let d3 = stacks.pop().unwrap();
-                        let d4 = stacks.pop().unwrap();
+                    while 4 <= parce_data.stacks.len() {
+                        let d1 = parce_data.stacks.pop()?;
+                        let d2 = parce_data.stacks.pop()?;
+                        let d3 = parce_data.stacks.pop()?;
+                        let d4 = parce_data.stacks.pop()?;
                         args.push(d1);
                         args.push(d2);
                         args.push(d3);
                         args.push(d4);
                     }
-                    if 1 <= stacks.len() {
-                        args.push(stacks.pop().unwrap());
+                    if 1 <= parce_data.stacks.len() {
+                        args.push(parce_data.stacks.pop()?);
                     }
                     let mut command = "vvcurveto".to_string();
                     if args.len() % 4 == 1 {
-                        let dx1 = args.pop().unwrap();
-                        x += dx1;
+                        let dx1 = args.pop()?;
+                        parce_data.x += dx1;
                         command += &format!(" dx1 {}", dx1);
-                        // svg += &format!("L {} {}", x, accender - y); // P1
                     }
                     while 4 <= args.len() {
-                        let dya = args.pop().unwrap();
-                        y += dya;
+                        let dya = args.pop()?;
+                        parce_data.y += dya;
+                        let xa = parce_data.x;
+                        let ya = parce_data.y;
                         command += &format!(" {}", dya);
-                        svg += &format!("C {} {}", x, accender - y); // P(a)
-                        let dxb = args.pop().unwrap();
-                        x += dxb;
+                        let dxb = args.pop()?;
+                        let dyb = args.pop()?;
+                        parce_data.y += dyb;
+                        parce_data.x += dxb;
+                        let xb = parce_data.x;
+                        let yb = parce_data.y;
                         command += &format!(" {}", dxb);
-                        let dyb = args.pop().unwrap();
-                        y += dyb;
                         command += &format!(" {}", dyb);
-                        svg += &format!(" {} {}", x, accender - y); // P(b)
 
-                        let dyc = args.pop().unwrap();
-                        y += dyc;
+                        let dyc = args.pop()?;
+                        parce_data.y += dyc;
+                        let xc = parce_data.x;
+                        let yc = parce_data.y;
                         command += &format!(" {}", dyc);
-                        svg += &format!(" {} {}\n", x, accender - y); // P(c)
-
+                        parce_data.commands.as_mut().operations.push(Operation::C(xa,ya,xb,yb,xc,yc));
                     }
-                    command += "\n";
-                    string += &command;
+                    parce_data.commands.as_mut().commands.push(command);
                 }
 
                 28 => {
                     let b1 = data[i];
                     let value = i16::from_be_bytes([b0, b1]) as i32;
-                    stacks.push(value as f64);
                     i += 1;
                 }
                 14 => {
-                    // endchar – endchar (14) |–
-                    break;
+                    parce_data.commands.as_mut().commands.push("endchar".to_string());
+                    parce_data.commands.as_mut().operations.push(Operation::Z);
+                    return Some(());
                 }
                 12 => {
                     let b1 = data[i];
@@ -1137,192 +1228,230 @@ impl CFF {
                         35 => {
                             // flex |- dy1 dy1 dx2 dy2 dx3 dy3 dx4 dy4 dx5 dy5 dx6 dy6 fd flex (12 35) |-
                             let mut command = "flex".to_string();
-                            let fd = stacks.pop().unwrap();
-                            let dy6 = stacks.pop().unwrap();
-                            let dx6 = stacks.pop().unwrap();
-                            let dy5 = stacks.pop().unwrap();
-                            let dx5 = stacks.pop().unwrap();
-                            let dy4 = stacks.pop().unwrap();
-                            let dx4 = stacks.pop().unwrap();
-                            let dy3 = stacks.pop().unwrap();
-                            let dx3 = stacks.pop().unwrap();
-                            let dy2 = stacks.pop().unwrap();
-                            let dx2 = stacks.pop().unwrap();
-                            let dy1 = stacks.pop().unwrap();
-                            let dy1 = stacks.pop().unwrap();
-                            let mut xx = x;
-                            let mut yy = y;
+                            let fd = parce_data.stacks.pop()?;
+                            let dy6 = parce_data.stacks.pop()?;
+                            let dx6 = parce_data.stacks.pop()?;
+                            let dy5 = parce_data.stacks.pop()?;
+                            let dx5 = parce_data.stacks.pop()?;
+                            let dy4 = parce_data.stacks.pop()?;
+                            let dx4 = parce_data.stacks.pop()?;
+                            let dy3 = parce_data.stacks.pop()?;
+                            let dx3 = parce_data.stacks.pop()?;
+                            let dy2 = parce_data.stacks.pop()?;
+                            let dx2 = parce_data.stacks.pop()?;
+                            let dy1 = parce_data.stacks.pop()?;
+                            let dy1 = parce_data.stacks.pop()?;
+                            let mut xx = parce_data.x;
+                            let mut yy = parce_data.y;
                             xx += dy1;
                             yy += dy1;
-                            svg += &format!("C {} {}", x, accender - y); // P(a)
+                            let xa = xx;
+                            let ya = yy;
                             xx += dx2;
                             yy += dy2;
-                            svg += &format!(" {} {}", xx, accender - yy); // P(b)
+                            let xb = xx;
+                            let yb = yy;
                             xx += dx3;
                             yy += dy3;
-                            svg += &format!(" {} {}", xx, accender - yy); // P(c)
+                            let xc = xx;
+                            let yc = yy;
+                            parce_data.commands.as_mut().operations.push(Operation::C(xa,ya,xb,yb,xc,yc));
                             xx += dx4;
                             yy += dy4;
-                            svg += &format!("C {} {}", xx, accender - yy); // P(d)
+                            let xd = xx;
+                            let yd = yy;
                             xx += dx5;
                             yy += dy5;
-                            svg += &format!(" {} {}", xx, accender - yy); // P(e)
+                            let xe = xx;
+                            let ye = yy;
                             xx += dx6;
                             yy += dy6;
-                            svg += &format!(" {} {}", xx, accender - yy); // P(f)
+                            let xf = xx;
+                            let yf = yy;
+                            parce_data.commands.as_mut().operations.push(Operation::C(xd, yd, xe, ye, xf, yf));
 
-                            x += dy1 + dx2 + dx3 + dx4 + dx5 + dx6;
-                            y += dy1 + dy2 + dy3 + dy4 + dy5 + dy6;
+                            parce_data.x += dy1 + dx2 + dx3 + dx4 + dx5 + dx6;
+                            parce_data.y += dy1 + dy2 + dy3 + dy4 + dy5 + dy6;
                             command += &format!(
                                 " {} {} {} {} {} {} {} {} {} {} {} {} fd {}\n",
                                 dy1, dy1, dx2, dy2, dx3, dy3, dx4, dy4, dx5, dy5, dx6, dy6, fd
                             );
-                            string += &command;
                         }
                         34 => {
                             // hflex |- dy1 dx2 dy2 dx3 dx4 dx5 dx6 hflex (12 34) |
                             let mut command = "hflex".to_string();
-                            let dx6 = stacks.pop().unwrap();
-                            let dx5 = stacks.pop().unwrap();
-                            let dx4 = stacks.pop().unwrap();
-                            let dx3 = stacks.pop().unwrap();
-                            let dx2 = stacks.pop().unwrap();
-                            let dy1 = stacks.pop().unwrap();
-                            let mut xx = x;
-                            let yy = y;
-                            xx += dy1;
-                            svg += &format!("C {} {}", xx, accender - yy); // P(a)
+                            let dx6 = parce_data.stacks.pop()?;
+                            let dx5 = parce_data.stacks.pop()?;
+                            let dx4 = parce_data.stacks.pop()?;
+                            let dx3 = parce_data.stacks.pop()?;
+                            let dy2 = parce_data.stacks.pop()?;
+                            let dx2 = parce_data.stacks.pop()?;
+                            let dy1 = parce_data.stacks.pop()?;
+                            let mut xx = parce_data.x;
+                            let mut yy = parce_data.y;
+                            yy += dy1;
+                            let xa = xx;
+                            let ya = yy;
                             xx += dx2;
-                            svg += &format!(" {} {}", xx, accender - yy); // P(b)
+                            yy += dy2;
+                            let xb = xx;
+                            let yb = yy;
                             xx += dx3;
-                            svg += &format!(" {} {}", xx, accender - yy); // P(c)
+                            let xc = xx;
+                            let yc = yy;
+                            parce_data.commands.as_mut().operations.push(Operation::C(xa,ya,xb,yb,xc,yc));
                             xx += dx4;
-                            svg += &format!("C {} {}", xx, accender - yy); // P(d)
+                            let xd = xx;
+                            let yd = yy;
                             xx += dx5;
-                            svg += &format!(" {} {}", xx, accender - yy); // P(e)
+                            let xe = xx;
+                            let ye = yy;
                             xx += dx6;
-                            svg += &format!(" {} {}", xx, accender - yy); // P(f)
+                            let xf = xx;
+                            let yf = yy;
+                            parce_data.commands.as_mut().operations.push(Operation::C(xd, yd, xe, ye, xf, yf));
 
-                            x += dy1 + dx2 + dx3 + dx4 + dx5 + dx6;
+                            parce_data.x = xx;
+                            parce_data.y = yy;
+
                             command +=
-                                &format!(" {} {} {} {} {} {}\n", dy1, dx2, dx3, dx4, dx5, dx6);
-                            string += &command;
+                                &format!(" {} {} {} {} {} {} {}\n", dy1, dx2, dy2, dx3, dx4, dx5, dx6);
+                            parce_data.commands.as_mut().commands.push(command);
                         }
                         36 => {
-                            // hflex1 |- dy1 dy1 dx2 dy2 dx3 dx4 dx5 dy5 dx6 hflex1 (12 36) |
+                            // hflex1 |- dx1 dy1 dx2 dy2 dx3 dx4 dx5 dy5 dx6 hflex1 (12 36) |
                             let mut command = "hflex1".to_string();
-                            let dx6 = stacks.pop().unwrap();
-                            let dy5 = stacks.pop().unwrap();
-                            let dx5 = stacks.pop().unwrap();
-                            let dx4 = stacks.pop().unwrap();
-                            let dx3 = stacks.pop().unwrap();
-                            let dy2 = stacks.pop().unwrap();
-                            let dx2 = stacks.pop().unwrap();
-                            let dy1 = stacks.pop().unwrap();
-                            let dy1 = stacks.pop().unwrap();
-                            let mut xx = x;
-                            let mut yy = y;
-                            xx += dy1;
+                            let dx6 = parce_data.stacks.pop()?;
+                            let dy5 = parce_data.stacks.pop()?;
+                            let dx5 = parce_data.stacks.pop()?;
+                            let dx4 = parce_data.stacks.pop()?;
+                            let dx3 = parce_data.stacks.pop()?;
+                            let dy2 = parce_data.stacks.pop()?;
+                            let dx2 = parce_data.stacks.pop()?;
+                            let dy1 = parce_data.stacks.pop()?;
+                            let dx1 = parce_data.stacks.pop()?;
+                            let mut xx = parce_data.x;
+                            let mut yy = parce_data.y;
+                            xx += dx1;
                             yy += dy1;
-                            svg += &format!("C {} {}", xx, accender - yy); // P(a)
+                            let xa = xx;
+                            let ya = yy;
                             xx += dx2;
                             yy += dy2;
-                            svg += &format!(" {} {}", xx, accender - yy); // P(b)
+                            let xb = xx;
+                            let yb = yy;
                             xx += dx3;
-                            svg += &format!(" {} {}", xx, accender - yy); // P(c)
+                            let xc = xx;
+                            let yc = yy;
+                            parce_data.commands.as_mut().operations.push(Operation::C(xa,ya,xb,yb,xc,yc));
                             xx += dx4;
-                            svg += &format!("C {} {}", xx, accender - yy); // P(d)
+                            let xd = xx;
+                            let yd = yy;
                             xx += dx5;
                             yy += dy5;
-                            svg += &format!(" {} {}", xx, accender - yy); // P(e)
+                            let xe = xx;
+                            let ye = yy;
                             xx += dx6;
-                            svg += &format!(" {} {}", xx, accender - yy); // P(f)
+                            let xf = xx;
+                            let yf = yy;
+                            parce_data.commands.as_mut().operations.push(Operation::C(xd, yd, xe, ye, xf, yf));
 
-                            x += dy1 + dx2 + dx3 + dx4 + dx5 + dx6;
-                            y += dy1 + dy2 + dy5;
+                            parce_data.x = xx;
+                            parce_data.y = yy;
                             command += &format!(
                                 " {} {} {} {} {} {} {} {} {}\n",
-                                dy1, dy1, dx2, dy2, dx3, dx4, dx5, dy5, dx6
+                                dx1, dy1, dx2, dy2, dx3, dx4, dx5, dy5, dx6
                             );
-                            string += &command;
+                            parce_data.commands.as_mut().commands.push(command);
                         }
                         37 => {
-                            // flex1 |- dy1 dy1 dx2 dy2 dx3 dy3 dx4 dy4 dx5 dy5 d6 flex1 (12 37) |-
+                            // flex1 |- dx1 dy1 dx2 dy2 dx3 dy3 dx4 dy4 dx5 dy5 d6 flex1 (12 37) |-
                             let mut command = "flex1".to_string();
-                            let dy6 = stacks.pop().unwrap();
-                            let dx6 = stacks.pop().unwrap();
-                            let dy5 = stacks.pop().unwrap();
-                            let dx5 = stacks.pop().unwrap();
-                            let dy4 = stacks.pop().unwrap();
-                            let dx4 = stacks.pop().unwrap();
-                            let dy3 = stacks.pop().unwrap();
-                            let dx3 = stacks.pop().unwrap();
-                            let dy2 = stacks.pop().unwrap();
-                            let dx2 = stacks.pop().unwrap();
-                            let dy1 = stacks.pop().unwrap();
-                            let dy1 = stacks.pop().unwrap();
-                            let mut xx = x;
-                            let mut yy = y;
-                            xx += dy1;
+                            let d6 = parce_data.stacks.pop()?;
+                            let dy5 = parce_data.stacks.pop()?;
+                            let dx5 = parce_data.stacks.pop()?;
+                            let dy4 = parce_data.stacks.pop()?;
+                            let dx4 = parce_data.stacks.pop()?;
+                            let dy3 = parce_data.stacks.pop()?;
+                            let dx3 = parce_data.stacks.pop()?;
+                            let dy2 = parce_data.stacks.pop()?;
+                            let dx2 = parce_data.stacks.pop()?;
+                            let dy1 = parce_data.stacks.pop()?;
+                            let dx1 = parce_data.stacks.pop()?;
+                            let mut xx = parce_data.x;
+                            let mut yy = parce_data.y;
+                            xx += dx1;
                             yy += dy1;
-                            svg += &format!("C {} {}", xx, accender - yy); // P(a)
+                            let xa = xx;
+                            let ya = yy;
                             xx += dx2;
                             yy += dy2;
-                            svg += &format!(" {} {}", xx, accender - yy); // P(b)
+                            let xb = xx;
+                            let yb = yy;
                             xx += dx3;
                             yy += dy3;
-                            svg += &format!(" {} {}", xx, accender - yy); // P(c)
+                            let xc = xx;
+                            let yc = yy;
+                            parce_data.commands.as_mut().operations.push(Operation::C(xa,ya,xb,yb,xc,yc));
                             xx += dx4;
                             yy += dy4;
-                            svg += &format!("C {} {}", xx, accender - yy); // P(d)
+                            let xd = xx;
+                            let yd = yy;
                             xx += dx5;
                             yy += dy5;
-                            svg += &format!(" {} {}", xx, accender - yy); // P(e)
-                            xx += dx6;
-                            yy += dy6;
-                            svg += &format!(" {} {}", xx, accender - yy); // P(f)
+                            let xe = xx;
+                            let ye = yy;
+                            let _x = dx1 + dx2 + dx3 + dx4 + dx5;
+                            let _y = dy1 + dy2 + dy3 + dy4 + dy5;
+                            if _x < _y {
+                                xx += d6;
+                            } else {
+                                yy += d6;
+                            }
+                            let xf = xx;
+                            let yf = yy;
 
-                            x += dy1 + dx2 + dx3 + dx4 + dx5 + dx6;
-                            y += dy1 + dy2 + dy3 + dy4 + dy5 + dy6;
+                            parce_data.x = xx;
+                            parce_data.y = yy;
                             command += &format!(
-                                " {} {} {} {} {} {} {} {} {} {} {} {}\n",
-                                dy1, dy1, dx2, dy2, dx3, dy3, dx4, dy4, dx5, dy5, dx6, dy6
+                                " {} {} {} {} {} {} {} {} {} {} {}\n",
+                                dx1, dy1, dx2, dy2, dx3, dy3, dx4, dy4, dx5, dy5, d6
                             );
-                            string += &command;
+                            parce_data.commands.as_mut().operations.push(Operation::C(xd, yd, xe, ye, xf, yf));
                         }
 
                         19 => {
                             // abs
-                            let number = stacks.pop().unwrap();
-                            string += &format!("abs {}\n", number);
-                            stacks.push(number.abs());
+                            let number = parce_data.stacks.pop()?;
+                           parce_data.commands.as_mut().commands.push(format!("abs {}", number));
+                             parce_data.stacks.push(number.abs());
                         }
                         10 => {
                             // add
-                            let num2 = stacks.pop().unwrap();
-                            let num1 = stacks.pop().unwrap();
-                            string += &format!("add {} {}\n", num1, num2);
-                            stacks.push(num1 + num2);
+                            let num2 = parce_data.stacks.pop()?;
+                            let num1 = parce_data.stacks.pop()?;
+                           parce_data.commands.as_mut().commands.push(format!("add {} {}", num1, num2));
+                             parce_data.stacks.push(num1 + num2);
                         }
                         11 => {
                             // sub
-                            let num2 = stacks.pop().unwrap();
-                            let num1 = stacks.pop().unwrap();
-                            string += &format!("sub {} {}\n", num1, num2);
-                            stacks.push(num1 - num2);
+                            let num2 = parce_data.stacks.pop()?;
+                            let num1 = parce_data.stacks.pop()?;
+                           parce_data.commands.as_mut().commands.push(format!("sub {} {}", num1, num2));
+                             parce_data.stacks.push(num1 - num2);
                         }
                         12 => {
                             // div
-                            let num2 = stacks.pop().unwrap();
-                            let num1 = stacks.pop().unwrap();
-                            string += &format!("div {} {}\n", num1, num2);
-                            stacks.push(num1 / num2);
+                            let num2 = parce_data.stacks.pop()?;
+                            let num1 = parce_data.stacks.pop()?;
+                           parce_data.commands.as_mut().commands.push(format!("div {} {}", num1, num2));
+                             parce_data.stacks.push(num1 / num2);
                         }
                         14 => {
                             // neg
-                            let num = stacks.pop().unwrap();
-                            string += &format!("neg {}\n", num);
-                            stacks.push(-num);
+                            let num = parce_data.stacks.pop()?;
+                           parce_data.commands.as_mut().commands.push(format!("neg {}", num));
+                             parce_data.stacks.push(-num);
                         }
                         23 => {
                             // random
@@ -1330,111 +1459,111 @@ impl CFF {
                             // need rand crate
                             // let num = rand::random::<f64>();
                             let num = 0.5;
-                            string += &format!("random\n");
-                            stacks.push(num);
+                           parce_data.commands.as_mut().commands.push(format!("random {}", num));
+                             parce_data.stacks.push(num);
                         }
                         24 => {
                             // mul
-                            let num2 = stacks.pop().unwrap();
-                            let num1 = stacks.pop().unwrap();
-                            string += &format!("mul {} {}\n", num1, num2);
-                            stacks.push(num1 * num2);
+                            let num2 = parce_data.stacks.pop()?;
+                            let num1 = parce_data.stacks.pop()?;
+                           parce_data.commands.as_mut().commands.push(format!("mul {} {}", num1, num2));
+                             parce_data.stacks.push(num1 * num2);
                         }
                         26 => {
                             // sqrt
-                            let num = stacks.pop().unwrap();
-                            string += &format!("sqrt {}\n", num);
-                            stacks.push(num.sqrt());
+                            let num = parce_data.stacks.pop()?;
+                           parce_data.commands.as_mut().commands.push(format!("sqrt {}", num));
+                             parce_data.stacks.push(num.sqrt());
                         }
                         18 => {
                             // drop
-                            stacks.pop();
-                            string += &format!("drop\n");
+                            parce_data.stacks.pop();
+                           parce_data.commands.as_mut().commands.push("drop".to_string());
                         }
                         29 => {
                             // index
-                            let index = stacks.pop().unwrap();
-                            let num = stacks[stacks.len() - index as usize];
-                            string += &format!("index {}\n", index);
-                            stacks.push(num);
+                            let index = parce_data.stacks.pop()?;
+                            let num = parce_data.stacks[parce_data.stacks.len() - index as usize];
+                           parce_data.commands.as_mut().commands.push(format!("index {} {}", index, num));
+                             parce_data.stacks.push(num);
                         }
                         30 => {
                             // roll
-                            let index = stacks.pop().unwrap();
-                            let count = stacks.pop().unwrap();
+                            let index = parce_data.stacks.pop()?;
+                            let count = parce_data.stacks.pop()?;
                             let mut new_stacks = Vec::new();
                             for _ in 0..count as usize {
-                                let num = stacks.pop().unwrap();
-                                new_stacks.push(num);
+                                let num = parce_data.stacks.pop()?;
+                                parce_data.stacks.push(num);
                             }
                             for _ in 0..count as usize {
-                                let num = new_stacks.pop().unwrap();
-                                stacks.push(num);
+                                let num = new_stacks.pop()?;
+                                 parce_data.stacks.push(num);
                             }
-                            string += &format!("roll {} {}\n", index, count);
+                           parce_data.commands.as_mut().commands.push(format!("roll {} {}", index, count));
                         }
                         27 => {
                             // dup
-                            let num = stacks.pop().unwrap();
-                            string += &format!("dup {}\n", num);
-                            stacks.push(num);
-                            stacks.push(num);
+                            let num = parce_data.stacks.pop()?;
+                           parce_data.commands.as_mut().commands.push(format!("dup {}", num));
+                             parce_data.stacks.push(num);
+                             parce_data.stacks.push(num);
                         }
 
                         20 => {
                             // put
-                            let index = stacks.pop().unwrap();
-                            let num = stacks.pop().unwrap();
-                            string += &format!("put {} {}\n", index, num);
-                            stacks[index as usize] = num;
+                            let index = parce_data.stacks.pop()?;
+                            let num = parce_data.stacks.pop()?;
+                           parce_data.commands.as_mut().commands.push(format!("put {} {}", index, num));
+                           parce_data.stacks[index as usize] = num;
                         }
                         21 => {
                             // get
-                            let index = stacks.pop().unwrap();
-                            let num = stacks[index as usize];
-                            string += &format!("get {} {}\n", index, num);
-                            stacks.push(num);
+                            let index = parce_data.stacks.pop()?;
+                            let num = parce_data.stacks[index as usize];
+                           parce_data.commands.as_mut().commands.push(format!("get {} {}", index, num));
+                             parce_data.stacks.push(num);
                         }
                         3 => {
                             // and
-                            let num2 = stacks.pop().unwrap();
-                            let num1 = stacks.pop().unwrap();
-                            string += &format!("and {} {}\n", num1, num2);
+                            let num2 = parce_data.stacks.pop()?;
+                            let num1 = parce_data.stacks.pop()?;
+                           parce_data.commands.as_mut().commands.push(format!("and {} {}", num1, num2));
                             let num = if num1 == 0.0 || num2 == 0.0 { 0 } else { 1 };
-                            stacks.push(num as f64);
+                             parce_data.stacks.push(num as f64);
                         }
                         4 => {
                             // or
-                            let num2 = stacks.pop().unwrap();
-                            let num1 = stacks.pop().unwrap();
-                            string += &format!("or {} {}\n", num1, num2);
+                            let num2 = parce_data.stacks.pop()?;
+                            let num1 = parce_data.stacks.pop()?;
+                           parce_data.commands.as_mut().commands.push(format!("or {} {}", num1, num2));
                             let num = if num1 == 0.0 && num2 == 0.0 { 0 } else { 1 };
-                            stacks.push(num as f64);
+                             parce_data.stacks.push(num as f64);
                         }
                         5 => {
                             // not
-                            let num = stacks.pop().unwrap();
-                            string += &format!("not {}\n", num);
+                            let num = parce_data.stacks.pop()?;
+                           parce_data.commands.as_mut().commands.push(format!("not {}", num));
                             let num = if num == 0.0 { 1 } else { 0 };
-                            stacks.push(num as f64);
+                             parce_data.stacks.push(num as f64);
                         }
                         15 => {
                             // eq
-                            let num2 = stacks.pop().unwrap();
-                            let num1 = stacks.pop().unwrap();
-                            string += &format!("eq {} {}\n", num1, num2);
+                            let num2 = parce_data.stacks.pop()?;
+                            let num1 = parce_data.stacks.pop()?;
+                           parce_data.commands.as_mut().commands.push(format!("eq {} {}", num1, num2));
                             let num = if num1 == num2 { 1 } else { 0 };
-                            stacks.push(num as f64);
+                             parce_data.stacks.push(num as f64);
                         }
                         22 => {
                             // if else
-                            let num2 = stacks.pop().unwrap();
-                            let num1 = stacks.pop().unwrap();
-                            let res2 = stacks.pop().unwrap();
-                            let res1 = stacks.pop().unwrap();
-                            string += &format!("ifelse {} {} {} {}\n", num1, num2, res1, res2);
+                            let num2 = parce_data.stacks.pop()?;
+                            let num1 = parce_data.stacks.pop()?;
+                            let res2 = parce_data.stacks.pop()?;
+                            let res1 = parce_data.stacks.pop()?;
+                           parce_data.commands.as_mut().commands.push(format!("ifelse {} {} {} {}", num1, num2, res1, res2));
                             let num = if num1 > num2 { res1 } else { res2 };
-                            stacks.push(num);
+                             parce_data.stacks.push(num);
                         }
 
                         _ => { // reserved
@@ -1444,7 +1573,7 @@ impl CFF {
                 10 => {
                     // call callsubr
                     let mut command = "callsubr\n".to_string();
-                    let mut num = stacks.pop().unwrap() as isize;
+                    let mut num = parce_data.stacks.pop()? as isize;
                     if let Some(subr) = self.subr.as_ref() {
                         let len = subr.data.data.len();
                         if len <= 1238 {
@@ -1456,10 +1585,8 @@ impl CFF {
                         }
 
                         command += &format!("{}\n", num);
-                        string += &command;
                         let data = &subr.data.data[num as usize];
-                        let subroutine = self.parse_data(&data, width, stacks, is_svg);
-                        string += &subroutine;
+                        self.parse(data,parce_data)?;
                     } else {
                         #[cfg(debug_assertions)]
                         {
@@ -1471,7 +1598,7 @@ impl CFF {
                 29 => {
                     // callgsubr
                     let mut command = "callgsubr\n".to_string();
-                    let mut num = stacks.pop().unwrap() as isize;
+                    let mut num = parce_data.stacks.pop()? as isize;
                     if let Some(subr) = self.gsubr.as_ref() {
                         let len = subr.data.data.len();
                         if len <= 1238 {
@@ -1482,10 +1609,9 @@ impl CFF {
                             num += 32768
                         }
                         command += &format!("{}\n", num);
-                        string += &command;
+                        parce_data.commands.as_mut().commands.push(command);
                         let data = &subr.data.data[num as usize];
-                        let subroutine = self.parse_data(&data, width,  stacks, is_svg);
-                        string += &subroutine;
+                        self.parse(data,parce_data)?;
                     } else {
                         #[cfg(debug_assertions)]
                         {
@@ -1497,23 +1623,23 @@ impl CFF {
                 11 => {
                     // return
                     let command = "return\n".to_string();
-                    string += &command;
-                    return string;
+                    parce_data.commands.as_mut().commands.push(command);
+                    return Some(());
                 }
                 32..=246 => {
                     let value = b0 as i32 - 139;
-                    stacks.push(value as f64);
+                     parce_data.stacks.push(value as f64);
                 }
                 247..=250 => {
                     let b1 = data[i];
                     let value = (b0 as i32 - 247) * 256 + b1 as i32 + 108;
-                    stacks.push(value as f64);
+                     parce_data.stacks.push(value as f64);
                     i += 1;
                 }
                 251..=254 => {
                     let b1 = data[i];
                     let value = -(b0 as i32 - 251) * 256 - b1 as i32 - 108;
-                    stacks.push(value as f64);
+                     parce_data.stacks.push(value as f64);
                     i += 1;
                 }
                 255 => {
@@ -1525,7 +1651,7 @@ impl CFF {
                         let value = i16::from_be_bytes([b1, b2]) as f64;
                         let frac = u16::from_be_bytes([b3, b4]) as f64;
                         let value = value + frac / 65536.0;
-                        stacks.push(value);
+                         parce_data.stacks.push(value);
                         i += 4;
                     }
                 }
@@ -1534,20 +1660,63 @@ impl CFF {
                 }
             }
         }
-        svg += "Z";
-        let x_min = self.bbox[0];
-        let height = self.bbox[3] - self.bbox[1];
+        parce_data.commands.as_mut().operations.push(Operation::Z);
+        Some(())
+    }
 
-        let viewbox = format!("viewBox=\"{} {} {} {}\"", x_min, 0, width - x_min, height);
 
-        let mut svg2 = format!("<svg width=\"270.9375pt\" height=\"240pt\" {} xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" stroke=\"black\" stroke-width=\"10pt\">\n", viewbox);
-        svg2 += "<path d=\"";
-        svg2 += &svg;
-        svg2 += "\" />\n</svg>";
-        svg = svg2;
+    fn parse_data(
+        &self,
+        data: &[u8],
+        width: f64,
+        is_svg: bool,
+    ) -> String {
+        let commands = Box::new(Commands::new());
+        let stacks = Box::new(Vec::with_capacity(48));
+        let mut parce_data = ParcePack {
+            x: 0.0,
+            y: 0.0,
+            hints: 0,
+            width: 0.0,
+            commands,
+            stacks,
+            is_first: true,
+        };
 
-        let string = format!("\nx {} y {} width {}\n {}\n{}\n", x, y, width, string, svg);
-        string
+        self.parse(data, &mut parce_data);
+        let commands = &parce_data.commands;
+        if is_svg {
+            let height = self.bbox[3] - self.bbox[1];
+            let mut svg = "<svg xmlns=\"http://www.w3.org/2000/svg\"".to_string();
+            svg += &format!(" width=\"24pt\" height=\"24pt\" viewbox=\"0  0 {} {}\">\n", width + parce_data.width, height);
+            svg += "<path d=\"";
+            for operation in commands.operations.iter() {
+                match operation {
+                    Operation::M(x, y) => {
+                        svg += &format!("M {} {}\n", x, y);
+                    }
+                    Operation::L(x, y) => {
+                        svg += &format!("L {} {}\n", x, y);
+                    }
+                    Operation::C(xa, ya, xb, yb, xc, yc) => {
+                        svg += &format!("C {} {} {} {} {} {}\n", xa, ya, xb, yb, xc, yc);
+                    }
+                    Operation::Z => {
+                        svg += "Z\n";
+                    }
+                }
+            }
+            svg += "\"/></svg>";
+            svg
+        } else {
+            let mut string = format!("standard width {}\n", width + parce_data.width);
+            for command in commands.commands.iter() {
+                string += &format!("{}\n", command);
+            }
+            string
+    
+        }
+
     }
 }
 
@@ -1572,14 +1741,14 @@ impl FDSelect {
             3 => {
                 let n_ranges = reader.read_u16_be()?;
                 let mut last_gid = 0;
-                let first_gid = reader.read_u16_be()?;
+                let is_first_gid = reader.read_u16_be()?;
                 for _ in 0..n_ranges {
                     let fd = reader.read_u8()?;
                     let sentinel_gid = reader.read_u16_be()?;
                     for _ in last_gid..sentinel_gid {
                         fsds.push(fd);
                     }
-                    last_gid = first_gid;
+                    last_gid = is_first_gid;
                 }
             }
             _ => {return Err("Illegal format".into()) }
