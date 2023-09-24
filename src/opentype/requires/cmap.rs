@@ -296,7 +296,7 @@ impl CmapEncodings {
                 let gid = if id_range_offset == 0 {
                     ((code_number as i32 + format4.id_delta[i] as i32) & 0xffff) as u32
                 } else {
-                    let mut offset = format4.id_range_offset[i] as u32 / 2 + i as u32
+                    let mut offset = id_range_offset / 2 + i as u32
                         - format4.seg_count_x2 as u32 / 2;
                     // reverce calculation
                     offset += code_number as u32 - format4.codes[i].0 as u32;
@@ -1032,7 +1032,6 @@ pub(crate) fn get_subtable(encoding_record: &EncodingRecord, buffer: &[u8]) -> C
         }
         4 => {
             // SegmentMappingToDelta
-            // Todo!
             let length = u16::from_be_bytes([buffer[2], buffer[3]]);
             let language = u16::from_be_bytes([buffer[4], buffer[5]]);
             let seg_count_x2 = u16::from_be_bytes([buffer[6], buffer[7]]);

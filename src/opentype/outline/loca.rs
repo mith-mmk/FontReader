@@ -19,7 +19,7 @@ impl LOCA {
         offest: u32,
         length: u32,
         num_glyphs: u16,
-    ) -> Self {
+    ) -> Result<Self, std::io::Error> {
         get_loca(file, offest, length, num_glyphs)
     }
 
@@ -28,7 +28,7 @@ impl LOCA {
         offest: u32,
         length: u32,
         index_to_loc_format: usize,
-    ) -> Self {
+    ) -> Result<Self, std::io::Error> {
         get_loca_by_size(file, offest, length, index_to_loc_format)
     }
 
@@ -56,45 +56,36 @@ fn get_loca_by_size<R: BinaryReader>(
     offest: u32,
     length: u32,
     index_to_loc_format: usize,
-) -> LOCA {
-    file.seek(SeekFrom::Start(offest as u64)).unwrap();
+) -> Result<LOCA, std::io::Error> {
+    file.seek(SeekFrom::Start(offest as u64))?;
 
     let mut offsets = Vec::new();
     let mut i = 0;
     while i < length {
         let offset: u32 = if index_to_loc_format == 0 {
             i += 2;
-            file.read_u16_be().unwrap() as u32 * 2
+            file.read_u16_be()? as u32 * 2
         } else {
             i += 4;
-            file.read_u32_be().unwrap()
+            file.read_u32_be()?
         };
         offsets.push(offset);
     }
 
-    LOCA {
+    Ok(LOCA {
         offsets: Box::new(offsets),
-    }
+    })
 }
 
-fn get_loca<R: BinaryReader>(file: &mut R, offest: u32, length: u32, num_glyphs: u16) -> LOCA {
+fn get_loca<R: BinaryReader>(file: &mut R, offest: u32, length: u32, num_glyphs: u16) -> Result<LOCA, std::io::Error> {
     let size = length / num_glyphs as u32;
-    file.seek(SeekFrom::Start(offest as u64)).unwrap();
-    if size != 4 && size != 2 {
+    file.seek(SeekFrom::Start(offest as u64))?;
+    let index_to_loc_format = if size != 4 && size != 2 {
         panic!("Invalid size of loca table");
-    }
-
-    let mut offsets = Vec::new();
-    for _ in 0..num_glyphs + 1 {
-        let offset: u32 = if size == 2 {
-            file.read_u16_be().unwrap() as u32 * 2
-        } else {
-            file.read_u32_be().unwrap()
-        };
-        offsets.push(offset);
-    }
-
-    LOCA {
-        offsets: Box::new(offsets),
-    }
+    } else if size == 4 {
+        1
+    } else {
+        0
+    };
+    get_loca_by_size(file, offest, length, index_to_loc_format)
 }

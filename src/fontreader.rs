@@ -582,6 +582,33 @@ impl Font {
         post.to_string()
     }
 
+    #[cfg(debug_assertions)]
+    pub fn get_cpal_raw(&self) -> String {
+        let cpal = if self.current_font == 0 {
+            self.cpal.as_ref().unwrap()
+        } else {
+            self.more_fonts[self.current_font - 1]
+                .cpal
+                .as_ref()
+                .unwrap()
+        };
+        cpal.to_string()
+    }
+
+    #[cfg(debug_assertions)]
+    pub fn get_colr_raw(&self) -> String {
+        let colr = if self.current_font == 0 {
+            self.colr.as_ref().unwrap()
+        } else {
+            self.more_fonts[self.current_font - 1]
+                .colr
+                .as_ref()
+                .unwrap()
+        };
+        colr.to_string()
+    }
+
+
     pub fn get_html(&self, string: &str) -> Result<String, Error> {
         let mut html = String::new();
         html += "<html>\n";
@@ -945,7 +972,7 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Result<Font, Error> {
                 0,
                 loca_table.as_ref().unwrap().data.len() as u32,
                 index_to_loc_format,
-            );
+            )?;
             font.loca = Some(loca);
             let mut reader = BytesReader::new(&glyf_table.as_ref().unwrap().data);
             let glyf = glyf::GLYF::new(
@@ -1097,7 +1124,8 @@ fn from_opentype<R: BinaryReader>(file: &mut R, header: &OTFHeader) -> Result<Fo
 
     if let Some(offset) = font.loca_pos.as_ref() {
         let length = font.loca_pos.as_ref().unwrap().length;
-        let loca = loca::LOCA::new(file, offset.offset, length, num_glyphs);
+        let index_to_loc_format = font.head.as_ref().unwrap().index_to_loc_format as usize;
+        let loca = loca::LOCA::new_by_size(file, offset.offset, length, index_to_loc_format)?;
         font.loca = Some(loca);
         let offset = font.glyf_pos.as_ref().unwrap().offset;
         let length = font.glyf_pos.as_ref().unwrap().length;

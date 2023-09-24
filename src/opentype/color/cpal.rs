@@ -32,7 +32,12 @@ impl CPAL {
         let num_color_records = reader.read_u16_be()?;
         let color_records_array_offset = reader.read_u32_be()?;
         let mut color_record_indices = Vec::new();
-        for _ in 0..num_palette_entries {
+        let mut max_color_record_index = 0;
+        for _ in 0..num_palettes {
+            let color_record_index = reader.read_u16_be()?;
+            if max_color_record_index < color_record_index {
+                max_color_record_index = color_record_index;
+            }
             color_record_indices.push(reader.read_u16_be()?);
         }
         reader.seek(SeekFrom::Start(
@@ -69,8 +74,8 @@ impl CPAL {
         ));
         string.push_str(&format!("num_palettes: {}\n", self.num_palettes));
         string.push_str(&format!("num_color_records: {}\n", self.num_color_records));
-        let max_length = 10;
-        let len = if 10 < self.color_records.len() {
+        let max_length =  10;
+        let len = if max_length < self.num_palette_entries as usize {
             max_length
         } else {
             self.color_records.len()
@@ -83,6 +88,18 @@ impl CPAL {
                 self.color_records[i].green,
                 self.color_records[i].blue,
                 self.color_records[i].alpha
+            ));
+        }
+
+        let len = if 10 < self.color_record_indices.len() {
+            max_length
+        } else {
+            self.color_record_indices.len()
+        };
+        for i in 0..len {
+            string.push_str(&format!(
+                "color_record_indices[{}]: {}\n",
+                i, self.color_record_indices[i]
             ));
         }
         string
