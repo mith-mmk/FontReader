@@ -1308,41 +1308,43 @@ impl CFF {
                     // vvcurveto |- dx1? {dya dxb dyb dyc}+ vvcurveto (26) |-
                     let mut args = Vec::new();
                     while 4 <= parce_data.stacks.len() {
-                        let d1 = parce_data.stacks.pop()?;
-                        let d2 = parce_data.stacks.pop()?;
-                        let d3 = parce_data.stacks.pop()?;
-                        let d4 = parce_data.stacks.pop()?;
-                        args.push(d1);
-                        args.push(d2);
-                        args.push(d3);
-                        args.push(d4);
+                        args.push(parce_data.stacks.pop()?);
+                        args.push(parce_data.stacks.pop()?);
+                        args.push(parce_data.stacks.pop()?);
+                        args.push(parce_data.stacks.pop()?);
                     }
                     if 1 <= parce_data.stacks.len() {
                         args.push(parce_data.stacks.pop()?);
                     }
                     let mut command = "vvcurveto".to_string();
-                    if args.len() % 4 == 1 {
+                    let dx1 = if args.len() % 4 == 1 {
                         let dx1 = args.pop()?;
                         parce_data.x += dx1;
                         command += &format!(" dx1 {}", dx1);
-                    }
+                        dx1
+                    } else {
+                        0.0
+                    };
                     while 4 <= args.len() {
                         let dya = args.pop()?;
+                        let dxb = args.pop()?;
+                        let dyb = args.pop()?;
+                        let dyc = args.pop()?;
+
+                        parce_data.x += dx1;
                         parce_data.y += dya;
                         let xa = parce_data.x;
                         let ya = parce_data.y;
                         command += &format!(" {}", dya);
-                        let dxb = args.pop()?;
-                        let dyb = args.pop()?;
-                        parce_data.y += dyb;
+                        parce_data.y += dyb + dx1;
                         parce_data.x += dxb;
                         let xb = parce_data.x;
                         let yb = parce_data.y;
                         command += &format!(" {}", dxb);
                         command += &format!(" {}", dyb);
 
-                        let dyc = args.pop()?;
-                        parce_data.y += dyc;
+                        parce_data.x += dx1;
+                        parce_data.y += dyc;                     
                         let xc = parce_data.x;
                         let yc = parce_data.y;
                         command += &format!(" {}", dyc);
