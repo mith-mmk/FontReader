@@ -44,7 +44,7 @@ struct ParcePack {
     y: f64,
     width: f64,
     stacks: Box<Vec<f64>>,
-    is_first: bool,
+    is_first: usize,
     hints: usize,
     commands: Box<Commands>,
 }
@@ -390,7 +390,7 @@ impl CFF {
 
                 21 => {
                     // rmoveto |- dx1 dy1 rmoveto (21) |-
-                    if !parce_data.is_first {
+                    if parce_data.is_first > 0 {
                         parce_data.commands.as_mut().operations.push(Operation::Z);
                     }
 
@@ -408,9 +408,8 @@ impl CFF {
                         .operations
                         .push(Operation::M(xx, yy));
 
-                    if 1 <= parce_data.stacks.len() && parce_data.is_first == true {
+                    if 1 <= parce_data.stacks.len() && parce_data.is_first == 0 {
                         parce_data.width = parce_data.stacks.pop()?;
-                        parce_data.is_first = false;
                         let width = parce_data.width;
                         parce_data
                             .commands
@@ -418,10 +417,11 @@ impl CFF {
                             .commands
                             .push(format!("width {}", width));
                     }
+                    parce_data.is_first += 1;
                 }
                 22 => {
                     // hmoveto |- dy1 hmoveto (22) |-
-                    if !parce_data.is_first {
+                    if parce_data.is_first > 0 {
                         parce_data.commands.as_mut().operations.push(Operation::Z);
                     }
                     let dx = parce_data.stacks.pop()?;
@@ -435,9 +435,8 @@ impl CFF {
                         .as_mut()
                         .operations
                         .push(Operation::M(xx, yy));
-                    if 1 <= parce_data.stacks.len() && parce_data.is_first == true {
+                    if 1 <= parce_data.stacks.len() && parce_data.is_first == 1 {
                         parce_data.width = parce_data.stacks.pop()?;
-                        parce_data.is_first = false;
                         let width = parce_data.width;
                         parce_data
                             .commands
@@ -445,10 +444,11 @@ impl CFF {
                             .commands
                             .push(format!("width {}", width));
                     }
+                    parce_data.is_first += 1;
                 }
                 4 => {
                     // vmoveto |- dy1 vmoveto (4) |-
-                    if !parce_data.is_first {
+                    if parce_data.is_first > 0 {
                         parce_data.commands.as_mut().operations.push(Operation::Z);
                     }
                     let dy = parce_data.stacks.pop()?;
@@ -463,9 +463,8 @@ impl CFF {
                         .operations
                         .push(Operation::M(xx, yy));
 
-                    if 1 <= parce_data.stacks.len() && parce_data.is_first == true {
+                    if 1 <= parce_data.stacks.len() && parce_data.is_first == 0 {
                         parce_data.width = parce_data.stacks.pop()?;
-                        parce_data.is_first = false;
                         let width = parce_data.width;
                         parce_data
                             .commands
@@ -473,6 +472,7 @@ impl CFF {
                             .commands
                             .push(format!("width {}", width));
                     }
+                    parce_data.is_first += 1;
                 }
                 5 => {
                     // rlineto |- {dxa dya}+ rlineto (5) |-
@@ -1368,6 +1368,15 @@ impl CFF {
                     i += 1;
                 }
                 14 => {
+                    if 1 <= parce_data.stacks.len() && parce_data.is_first == 0 {
+                        parce_data.width = parce_data.stacks.pop()?;
+                        let width = parce_data.width;
+                        parce_data
+                            .commands
+                            .as_mut()
+                            .commands
+                            .push(format!("width {}", width));
+                    }
                     parce_data
                         .commands
                         .as_mut()
@@ -1944,7 +1953,7 @@ impl CFF {
             width: 0.0,
             commands,
             stacks,
-            is_first: true,
+            is_first: 0,
         };
 
         self.parse(data, &mut parce_data);
