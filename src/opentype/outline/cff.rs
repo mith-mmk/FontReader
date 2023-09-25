@@ -39,6 +39,7 @@ pub(crate) struct CFF {
     pub(crate) private_dict: Option<PrivateDict>,
     pub(crate) gsubr: Option<CharString>,
     pub(crate) subr: Option<CharString>,
+    pub(crate) width: f64,
 }
 
 struct ParcePack {
@@ -81,6 +82,7 @@ impl CFF {
         let offset = offset as u64;
         reader.seek(SeekFrom::Start(offset))?;
         let mut bbox = [0.0, 0.0, 1000.0, 1000.0];
+        let mut width = 0.0;
 
         let header = Header::parse(reader)?;
         let name_index = Index::parse(reader)?;
@@ -115,6 +117,7 @@ impl CFF {
         let fd_array_offset = top_dict.get_i32(12, 36);
         let fd_select_offset = top_dict.get_i32(12, 37);
         let opt_bbox = top_dict.get_f64_array(0, 5);
+        width = top_dict.get_f64(12, 8).unwrap_or(0.0);
         if let Some(some_bbox) = opt_bbox {
             bbox = [some_bbox[0], some_bbox[1], some_bbox[2], some_bbox[3]];
         }
@@ -159,9 +162,12 @@ impl CFF {
             reader.seek(SeekFrom::Start(private_dict_offset as u64))?;
             let buffer = reader.read_bytes_as_vec(private[0] as usize)?;
             let private_dict = Dict::parse(&buffer)?;
+            width = private_dict.get_f64(0, 21).unwrap_or(width);
             #[cfg(debug_assertions)]
             {
                 println!("private_dict: {}", private_dict.to_string());
+                println!("defaultWidthX: {:?}", private_dict.get_f64(0, 20));
+                println!("nominalWidthX: {:?}", private_dict.get_f64(0, 21));
             }
             if let Some(sub_offset) = private_dict.get_i32(0, 19) {
                 let subr_offset = sub_offset as u64 + private_dict_offset;
@@ -195,7 +201,12 @@ impl CFF {
                 #[cfg(debug_assertions)]
                 {
                     println!("private_dict: {}", private_dict.to_string());
-                }
+                    println!("defaultWidthX: {:?}", private_dict.get_f64(0, 20));
+                    println!("nominalWidthX: {:?}", private_dict.get_f64(0, 21));
+                    }
+                width = private_dict.get_f64(0, 21).unwrap_or(width);
+
+
                 let subr_offset = private_dict.get_i32(0, 19);
                 if let Some(subr_offset) = subr_offset {
                     let subr_offset = subr_offset as u64 + private_dict_offset;
@@ -220,6 +231,7 @@ impl CFF {
             private_dict,
             gsubr,
             subr,
+            width,
         })
     }
 
@@ -1904,30 +1916,22 @@ impl CFF {
                     let value = i16::from_be_bytes([b0, b1]) as i32;
                     parce_data.stacks.push(value as f64);
                     i += 2;
-                    let command = format!("28 {} {} {}", b0, b1, value);
-                    parce_data.commands.as_mut().commands.push(command);
                 } 
                 32..=246 => {
                     let value = b0 as i32 - 139;
                     parce_data.stacks.push(value as f64);
-                    let command = format!("{} {}", b0, value);
-                    parce_data.commands.as_mut().commands.push(command);
                 }
                 247..=250 => {
                     let b1 = data[i];
                     let value = (b0 as i32 - 247) * 256 + b1 as i32 + 108;
                     parce_data.stacks.push(value as f64);
                     i += 1;
-                    let command = format!("{} {} {}", b0, b1, value);
-                    parce_data.commands.as_mut().commands.push(command);
                 }
                 251..=254 => {
                     let b1 = data[i];
                     let value = -(b0 as i32 - 251) * 256 - b1 as i32 - 108;
                     parce_data.stacks.push(value as f64);
                     i += 1;
-                    let command = format!("{} {} {}", b0, b1, value);
-                    parce_data.commands.as_mut().commands.push(command);
                 }
                 255 => {
                     if data.len() - i >= 4 {
@@ -1940,8 +1944,6 @@ impl CFF {
                         let value = value + frac / 65536.0;
                         parce_data.stacks.push(value);
                         i += 4;
-                        let command = format!("{} {}", b0, value);
-                        parce_data.commands.as_mut().commands.push(command);
                     }
                 }
                 _ => {
@@ -1961,10 +1963,6 @@ impl CFF {
         layout: &HorizontalLayout,
         is_svg: bool,
     ) -> String {
-        let width = layout.advance_width as f64;
-        let accender = layout.accender as f64;
-        let descender = layout.descender as f64;
-        let line_gap = layout.line_gap as f64;
         let commands = Box::new(Commands::new());
         let stacks = Box::new(Vec::with_capacity(48));
         let mut parce_data = ParcePack {
@@ -1980,19 +1978,31 @@ impl CFF {
         self.parse(data, &mut parce_data);
         let commands = &parce_data.commands;
         if is_svg {
-            let height = accender - descender + line_gap;
-            let y_pos = self.bbox[3];
-            let mut svg = "<svg xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" stroke-width=\"10pt\" stroke=\"black\" ".to_string();
+            let descender = layout.descender;
+            let accender = layout.accender;
+            let line_gap = layout.line_gap;
+            let advance_width = layout.advance_width as f64;
+            let fontsize = 24.0;
+            let fontunit = "pt";
+            // let width = self.width + parce_data.width;
+            let height = (accender - descender) as f64;
+            let width = advance_width / height * fontsize;
+            let h = format!("{}{}", fontsize,fontunit);
+            let w = format!("{}{}", width,fontunit);
+
+            let y_pos = self.bbox[3] + self.bbox[1];
+            let mut svg = "<svg xmlns=\"http://www.w3.org/2000/svg\" ".to_string();
             svg += &format!(
-                " width=\"24pt\" height=\"24pt\" viewbox=\"{} {} {} {}\">\n",
+                " width=\"{}\" height=\"{}\" viewbox=\"{} {} {} {}\">\n",
+                w, "16pt",
                 self.bbox[0] - 12.0,
                 self.bbox[1] - 12.0,
-                self.bbox[2] - self.bbox[0] + 24.0,
+                self.width + parce_data.width,
                 self.bbox[3] - self.bbox[1] + 24.0
             );
             #[cfg(debug_assertions)]
             {
-                svg += &format!("<!-- gid {} width {} height {} -->\n", gid, width, height);
+                svg += &format!("<!-- gid {} width {} {} height {} -->\n", gid, self.width, parce_data.width, height);
                 svg += &format!("<!-- bbox {:?} -->\n", self.bbox);
                 svg += &format!(
                     "<!-- advance_width {} accender {} descender {} line_gap {} -->\n",
