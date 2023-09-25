@@ -519,7 +519,7 @@ impl CFF {
                     let mut command = "hlineto".to_string();
                     if args.len() % 2 == 1 {
                         let dy1 = args.pop()?;
-                        parce_data.x += dy1;
+                        parce_data.y += dy1;
                         command += &format!(" dy1 {}", dy1);
                         let xx = parce_data.x;
                         let yy = parce_data.y;
