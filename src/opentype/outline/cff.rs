@@ -239,7 +239,12 @@ impl CFF {
         while i < data.len() {
             let b0 = data[i];
             i += 1;
-            println!("b0 = {}", b0);
+            #[cfg(debug_assertions)]
+            {
+                let command = format!("{} {:?}",b0, parce_data.stacks);
+                parce_data.commands.as_mut().commands.push(command);
+            }
+
             match b0 {
                 1 => {
                     // hstem |- y dy {dya dyb}* hstem (1) |
@@ -249,10 +254,8 @@ impl CFF {
                     args.push(parce_data.stacks.pop()?);
 
                     while 2 <= parce_data.stacks.len() {
-                        let d1 = parce_data.stacks.pop()?;
-                        let d2 = parce_data.stacks.pop()?;
-                        args.push(d1);
-                        args.push(d2);
+                        args.push(parce_data.stacks.pop()?);
+                        args.push(parce_data.stacks.pop()?);
                     }
 
                     parce_data.hints += args.len();
@@ -281,28 +284,23 @@ impl CFF {
                     args.push(parce_data.stacks.pop()?);
                     args.push(parce_data.stacks.pop()?);
                     while 2 <= parce_data.stacks.len() {
-                        let d1 = parce_data.stacks.pop()?;
-                        let d2 = parce_data.stacks.pop()?;
-                        args.push(d1);
-                        args.push(d2);
-                    }
+                        args.push(parce_data.stacks.pop()?);
+                        args.push(parce_data.stacks.pop()?);
+                        }
                     parce_data.hints += args.len();
 
                     let mut command = "vstem".to_string();
-                    parce_data.x = args.pop()?;
-                    command += &format!(" {}", parce_data.x);
-                    if 1 <= args.len() {
-                        let dx = args.pop()?;
-                        parce_data.x += dx;
-                        command += &format!(" {}", parce_data.x);
-                    }
+                    let mut x = args.pop()?;
+                    command += &format!(" {}", x);
+                    let dx = args.pop()?;
+                    command += &format!(" {}", dx);
                     while 2 <= args.len() {
                         let dxa = args.pop()?;
-                        parce_data.x += dxa;
-                        command += &format!(" {}", parce_data.x);
+                        x += dxa;
+                        command += &format!(" {}", x);
                         let dxb = args.pop()?;
-                        parce_data.x += dxb;
-                        command += &format!(" {}", parce_data.x);
+                        x += dxb;
+                        command += &format!(" {}", x);
                     }
                     parce_data.commands.as_mut().commands.push(command);
                 }
@@ -312,11 +310,9 @@ impl CFF {
                     args.push(parce_data.stacks.pop()?);
                     args.push(parce_data.stacks.pop()?);
                     while 2 <= parce_data.stacks.len() {
-                        let d1 = parce_data.stacks.pop()?;
-                        let d2 = parce_data.stacks.pop()?;
-                        args.push(d1);
-                        args.push(d2);
-                    }
+                        args.push(parce_data.stacks.pop()?);
+                        args.push(parce_data.stacks.pop()?);
+                        }
                     parce_data.hints += args.len();
 
                     let mut command = "hstemhm".to_string();
@@ -341,11 +337,9 @@ impl CFF {
                     args.push(parce_data.stacks.pop()?);
                     args.push(parce_data.stacks.pop()?);
                     while 2 <= parce_data.stacks.len() {
-                        let d1 = parce_data.stacks.pop()?;
-                        let d2 = parce_data.stacks.pop()?;
-                        args.push(d1);
-                        args.push(d2);
-                    }
+                        args.push(parce_data.stacks.pop()?);
+                        args.push(parce_data.stacks.pop()?);
+                        }
                     parce_data.hints += args.len();
                     let mut command = "vstemhm".to_string();
                     let mut x = args.pop()?;
@@ -577,14 +571,12 @@ impl CFF {
                     parce_data.commands.as_mut().commands.push(command);
                 }
                 7 => {
-                    // vlineto - dy1 {dxa dyb}* vlineto (7) |- odd
-                    // |- {dya dxb}+ vlineto (7) |-  even
+                    // |- dy1 {dxa dyb}* vlineto (7) |-
+                    // |- {dya dxb}+ vlineto (7) |-
                     let mut args = Vec::new();
                     while 2 <= parce_data.stacks.len() {
-                        let d1 = parce_data.stacks.pop()?;
-                        let d2 = parce_data.stacks.pop()?;
-                        args.push(d1);
-                        args.push(d2);
+                        args.push(parce_data.stacks.pop()?);
+                        args.push(parce_data.stacks.pop()?);
                     }
                     if 1 <= parce_data.stacks.len() {
                         args.push(parce_data.stacks.pop()?);
@@ -603,6 +595,7 @@ impl CFF {
                             .push(Operation::L(parce_data.x, parce_data.y));
                         while 2 <= args.len() {
                             let dxa = args.pop()?;
+                            let dyb = args.pop()?;
                             parce_data.x += dxa;
                             command += &format!(" dxa {}", dxa);
                             parce_data
@@ -610,7 +603,7 @@ impl CFF {
                                 .as_mut()
                                 .operations
                                 .push(Operation::L(parce_data.x, parce_data.y));
-                            let dyb = args.pop()?;
+
                             parce_data.y += dyb;
                             command += &format!(" dyb {}", dyb);
                             parce_data
@@ -622,15 +615,16 @@ impl CFF {
                     } else {
                         while 2 <= args.len() {
                             let dya = args.pop()?;
-                            parce_data.y += dya;
+                            let dxb = args.pop()?;
 
+                            parce_data.y += dya;
                             command += &format!(" {}", dya);
                             parce_data
                                 .commands
                                 .as_mut()
                                 .operations
                                 .push(Operation::L(parce_data.x, parce_data.y));
-                            let dxb = args.pop()?;
+
                             parce_data.x += dxb;
                             command += &format!(" {}", dxb);
                             parce_data
@@ -646,24 +640,24 @@ impl CFF {
                     // |- {dxa dya dxb dyb dxc dyc}+ rrcurveto (8) |-
                     let mut args = Vec::new();
                     while 6 <= parce_data.stacks.len() {
-                        let d1 = parce_data.stacks.pop()?;
-                        let d2 = parce_data.stacks.pop()?;
-                        let d3 = parce_data.stacks.pop()?;
-                        let d4 = parce_data.stacks.pop()?;
-                        let d5 = parce_data.stacks.pop()?;
-                        let d6 = parce_data.stacks.pop()?;
-                        args.push(d1);
-                        args.push(d2);
-                        args.push(d3);
-                        args.push(d4);
-                        args.push(d5);
-                        args.push(d6);
+                        args.push(parce_data.stacks.pop()?);
+                        args.push(parce_data.stacks.pop()?);
+                        args.push(parce_data.stacks.pop()?);
+
+                        args.push(parce_data.stacks.pop()?);
+                        args.push(parce_data.stacks.pop()?);
+                        args.push(parce_data.stacks.pop()?);
                     }
 
                     let mut command = "rrcurveto".to_string();
                     while 6 <= args.len() {
                         let dxa = args.pop()?;
                         let dya = args.pop()?;
+                        let dxb = args.pop()?;
+                        let dyb = args.pop()?;
+                        let dxc = args.pop()?;
+                        let dyc = args.pop()?;
+
                         parce_data.x += dxa;
                         parce_data.y += dya;
                         command += &format!(" {}", dxa);
@@ -671,8 +665,6 @@ impl CFF {
                         let xa = parce_data.x;
                         let ya = parce_data.y;
 
-                        let dxb = args.pop()?;
-                        let dyb = args.pop()?;
                         parce_data.x += dxb;
                         parce_data.y += dyb;
                         command += &format!(" {}", dxb);
@@ -680,8 +672,6 @@ impl CFF {
                         let xb = parce_data.x;
                         let yb = parce_data.y;
 
-                        let dxc = args.pop()?;
-                        let dyc = args.pop()?;
                         parce_data.x += dxc;
                         parce_data.y += dyc;
                         let xc = parce_data.x;
@@ -710,14 +700,11 @@ impl CFF {
                     }
 
                     let mut command = "hhcurveto".to_string();
-                    let dy1 = if args.len() % 4 == 1 {
+                    if args.len() % 4 == 1 {
                         let dy1 = args.pop()?;
                         command += &format!(" dy1 {}", dy1);
                         // parce_data.y += dy1;
-                        dy1
-                    } else {
-                        0.0
-                    };
+                    }
                     while 4 <= args.len() {
                         let dxa = args.pop()?;
                         let dxb = args.pop()?;
@@ -725,7 +712,6 @@ impl CFF {
                         let dxc = args.pop()?;
 
                         parce_data.x += dxa;
-                        parce_data.y += dy1;
                         let xa = parce_data.x;
                         let ya = parce_data.y;
 
@@ -739,7 +725,7 @@ impl CFF {
                         command += &format!(" dxb {} dyb {}", dxb, dyb);
 
                         parce_data.x += dxc;
-                        parce_data.y += dy1;
+                        // parce_data.y += dy1;
                         let xc = parce_data.x;
                         let yc = parce_data.y;
 
@@ -755,11 +741,6 @@ impl CFF {
                 31 => {
                     // |- dx1 dx2 dy2 dy3 {dya dxb dyb dxc dxd dxe dye dyf}* dxf? hvcurveto (31) |-
                     // |- {dxa dxb dyb dyc dyd dxe dye dxf}+ dyf? hvcurveto (31) |-
-                    #[cfg(debug_assertions)]
-                    {
-                        let command = format!("{:?}", parce_data.stacks);
-                        parce_data.commands.as_mut().commands.push(command);
-                        }
 
                     let mut args = Vec::new();
                     while 8 <= parce_data.stacks.len() {
@@ -1059,7 +1040,7 @@ impl CFF {
                             .as_mut()
                             .operations
                             .push(Operation::L(xx, yy));
-                        command += &format!("dxa {} dya {}", dxa, dya);
+                        command += &format!(" dxa {} dya {}", dxa, dya);
                     }
                     let dxb = args.pop()?;
                     let dyb = args.pop()?;
@@ -1099,32 +1080,21 @@ impl CFF {
                     let mut args = Vec::new();
 
                     while 8 <= parce_data.stacks.len() {
-                        let d1 = parce_data.stacks.pop()?;
-                        let d2 = parce_data.stacks.pop()?;
-                        let d3 = parce_data.stacks.pop()?;
-                        let d4 = parce_data.stacks.pop()?;
-                        let d5 = parce_data.stacks.pop()?;
-                        let d6 = parce_data.stacks.pop()?;
-                        let d7 = parce_data.stacks.pop()?;
-                        let d8 = parce_data.stacks.pop()?;
-                        args.push(d1);
-                        args.push(d2);
-                        args.push(d3);
-                        args.push(d4);
-                        args.push(d5);
-                        args.push(d6);
-                        args.push(d7);
-                        args.push(d8);
+                        args.push(parce_data.stacks.pop()?);
+                        args.push(parce_data.stacks.pop()?);
+                        args.push(parce_data.stacks.pop()?);
+                        args.push(parce_data.stacks.pop()?); 
+
+                        args.push(parce_data.stacks.pop()?);
+                        args.push(parce_data.stacks.pop()?);
+                        args.push(parce_data.stacks.pop()?);
+                        args.push(parce_data.stacks.pop()?);
                     }
                     if 4 <= parce_data.stacks.len() {
-                        let d1 = parce_data.stacks.pop()?;
-                        let d2 = parce_data.stacks.pop()?;
-                        let d3 = parce_data.stacks.pop()?;
-                        let d4 = parce_data.stacks.pop()?;
-                        args.push(d1);
-                        args.push(d2);
-                        args.push(d3);
-                        args.push(d4);
+                        args.push(parce_data.stacks.pop()?);
+                        args.push(parce_data.stacks.pop()?);
+                        args.push(parce_data.stacks.pop()?);
+                        args.push(parce_data.stacks.pop()?);                    
                     }
                     if 1 <= parce_data.stacks.len() {
                         args.push(parce_data.stacks.pop()?);
@@ -1317,33 +1287,29 @@ impl CFF {
                         args.push(parce_data.stacks.pop()?);
                     }
                     let mut command = "vvcurveto".to_string();
-                    let dx1 = if args.len() % 4 == 1 {
+                    if args.len() % 4 == 1 {
                         let dx1 = args.pop()?;
                         parce_data.x += dx1;
                         command += &format!(" dx1 {}", dx1);
-                        dx1
-                    } else {
-                        0.0
-                    };
+                    }
                     while 4 <= args.len() {
                         let dya = args.pop()?;
                         let dxb = args.pop()?;
                         let dyb = args.pop()?;
                         let dyc = args.pop()?;
 
-                        parce_data.x += dx1;
                         parce_data.y += dya;
                         let xa = parce_data.x;
                         let ya = parce_data.y;
                         command += &format!(" {}", dya);
-                        parce_data.y += dyb + dx1;
+                        parce_data.y += dyb;
                         parce_data.x += dxb;
                         let xb = parce_data.x;
                         let yb = parce_data.y;
                         command += &format!(" {}", dxb);
                         command += &format!(" {}", dyb);
 
-                        parce_data.x += dx1;
+                        // parce_data.x += dx1;
                         parce_data.y += dyc;                     
                         let xc = parce_data.x;
                         let yc = parce_data.y;
