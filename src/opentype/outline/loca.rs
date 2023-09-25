@@ -14,14 +14,7 @@ impl fmt::Display for LOCA {
 }
 
 impl LOCA {
-    pub(crate) fn new<R: BinaryReader>(
-        file: &mut R,
-        offest: u32,
-        length: u32,
-        num_glyphs: u16,
-    ) -> Result<Self, std::io::Error> {
-        get_loca(file, offest, length, num_glyphs)
-    }
+
 
     pub(crate) fn new_by_size<R: BinaryReader>(
         file: &mut R,
@@ -77,15 +70,3 @@ fn get_loca_by_size<R: BinaryReader>(
     })
 }
 
-fn get_loca<R: BinaryReader>(file: &mut R, offest: u32, length: u32, num_glyphs: u16) -> Result<LOCA, std::io::Error> {
-    let size = length / num_glyphs as u32;
-    file.seek(SeekFrom::Start(offest as u64))?;
-    let index_to_loc_format = if size != 4 && size != 2 {
-        panic!("Invalid size of loca table");
-    } else if size == 4 {
-        1
-    } else {
-        0
-    };
-    get_loca_by_size(file, offest, length, index_to_loc_format)
-}

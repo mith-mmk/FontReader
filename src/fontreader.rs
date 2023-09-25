@@ -231,11 +231,12 @@ impl Font {
                 let glyph_id = cmap.get_glyph_position_from_uvs(code, vs) as usize;
                 let hhead = self.hhea.as_ref().unwrap();
                 let width = hhead.advance_width_max as f64;
-                let string = cff.to_code(glyph_id, width);
+                let layout = self.get_horizontal_layout(glyph_id as usize);
+
+                let string = cff.to_code(glyph_id, &layout);
                 // println!("cff string: {}", string);
-                let hlayout = self.get_horizontal_layout(glyph_id as usize);
                 let open_type_glyf = Some(OpenTypeGlyph {
-                    layout: FontLayout::Horizontal(hlayout),
+                    layout: FontLayout::Horizontal(layout),
                     glyph: FontData::CFF(string.as_bytes().to_vec()),
                 });
 
@@ -290,8 +291,8 @@ impl Font {
         if let Some(cff) = self.cff.as_ref() {
             let gid = self.cmap.as_ref().unwrap().get_glyph_position(ch as u32) as usize;
             let hhea = self.hhea.as_ref().unwrap();
-            let width = hhea.advance_width_max as f64;
-            let string = cff.to_code(gid, width);
+            let layout = self.get_horizontal_layout(gid as usize);
+            let string = cff.to_code(gid, &layout);
             return Ok(string);
         }
 
