@@ -643,7 +643,7 @@ impl CFF {
                     parce_data.commands.as_mut().commands.push(command);
                 }
                 8 => {
-                    // rrcurveto |- {dxa dya dxb dyb dxc dyc}+ rrcurveto (8) |-
+                    // |- {dxa dya dxb dyb dxc dyc}+ rrcurveto (8) |-
                     let mut args = Vec::new();
                     while 6 <= parce_data.stacks.len() {
                         let d1 = parce_data.stacks.pop()?;
@@ -663,30 +663,30 @@ impl CFF {
                     let mut command = "rrcurveto".to_string();
                     while 6 <= args.len() {
                         let dxa = args.pop()?;
-                        parce_data.x += dxa;
-                        command += &format!(" {}", dxa);
                         let dya = args.pop()?;
+                        parce_data.x += dxa;
                         parce_data.y += dya;
+                        command += &format!(" {}", dxa);
                         command += &format!(" {}", dya);
                         let xa = parce_data.x;
-                        let ya = parce_data.x;
+                        let ya = parce_data.y;
 
                         let dxb = args.pop()?;
-                        parce_data.x += dxb;
-                        command += &format!(" {}", dxb);
                         let dyb = args.pop()?;
+                        parce_data.x += dxb;
                         parce_data.y += dyb;
+                        command += &format!(" {}", dxb);
                         command += &format!(" {}", dyb);
                         let xb = parce_data.x;
                         let yb = parce_data.y;
 
                         let dxc = args.pop()?;
-                        parce_data.x += dxc;
-                        command += &format!(" {}", dxc);
                         let dyc = args.pop()?;
+                        parce_data.x += dxc;
                         parce_data.y += dyc;
                         let xc = parce_data.x;
                         let yc = parce_data.y;
+                        command += &format!(" {}", dxc);
                         command += &format!(" {}", dyc);
                         parce_data
                             .commands
