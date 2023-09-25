@@ -242,8 +242,8 @@ impl CFF {
             i += 1;
             #[cfg(debug_assertions)]
             {
-                let command = format!("{} {:?}",b0, parce_data.stacks);
-                parce_data.commands.as_mut().commands.push(command);
+                //let command = format!("{} {:?}",b0, parce_data.stacks);
+                //parce_data.commands.as_mut().commands.push(command);
             }
 
             match b0 {
@@ -259,7 +259,7 @@ impl CFF {
                         args.push(parce_data.stacks.pop()?);
                     }
 
-                    // parce_data.hints += args.len();
+                    parce_data.hints += args.len();
 
                     let mut y = args.pop()?;
                     command += &format!(" {}", y);
@@ -288,7 +288,7 @@ impl CFF {
                         args.push(parce_data.stacks.pop()?);
                         args.push(parce_data.stacks.pop()?);
                     }
-                    // parce_data.hints += args.len();
+                    parce_data.hints += args.len();
 
                     let mut command = "vstem".to_string();
                     let mut x = args.pop()?;
@@ -391,9 +391,9 @@ impl CFF {
                         parce_data.commands.as_mut().commands.push(command);
                     }
 
-                    let len = (parce_data.hints + 7) / 8;
+                    let len = (parce_data.hints / 2 + 7) / 8;
                     let mut command = "hintmask".to_string();
-                    command += &format!(" {}", parce_data.hints);
+                    command += &format!(" {}", parce_data.hints/ 2);
                     for j in 0..len {
                         let mask = data[i + j];
                         command += &format!(" {:08b} {}", mask, mask);
@@ -432,8 +432,8 @@ impl CFF {
                     }
 
 
-                    let len = (parce_data.hints + 7) / 8;
-                    let mut command = format! {"cntrmask {} {}",parce_data.hints, len};
+                    let len = (parce_data.hints / 2 + 7) / 8;
+                    let mut command = format! {"cntrmask {} {}",parce_data.hints / 2, len};
                     for j in 0..len {
                         let mask = data[i + j];
                         command += &format!(" {:08b}", mask);
@@ -748,6 +748,7 @@ impl CFF {
                         command += &format!(" dy1 {}", dy1);
                         parce_data.y += dy1;
                     }
+
                     while 4 <= args.len() {
                         // dxa dxb dyb dxc
                         let dxa = args.pop()?;
@@ -1140,6 +1141,7 @@ impl CFF {
                         args.push(parce_data.stacks.pop()?);
                     }
                     let mut command = "vhcurveto".to_string();
+                    // <!-- vhcurveto dy1 -77 dx2 -6 dy2 -39 dx3 -14 dyf -19 -->
                     if args.len() % 8 >= 4 {
                         // - dy1 dx2 dy2 dx3 |-
                         let dy1 = args.pop()?;
@@ -1362,12 +1364,6 @@ impl CFF {
                     parce_data.commands.as_mut().commands.push(command);
                 }
 
-                28 => {
-                    let b1 = data[i];
-                    let value = i16::from_be_bytes([b0, b1]) as i32;
-                    parce_data.stacks.push(value as f64);
-                    i += 1;
-                }
                 14 => {
                     if 1 <= parce_data.stacks.len() && parce_data.is_first == 0 {
                         parce_data.width = parce_data.stacks.pop()?;
@@ -1902,21 +1898,36 @@ impl CFF {
                     parce_data.commands.as_mut().commands.push(command);
                     return Some(());
                 }
+                28 => {
+                    let b0 = data[i];
+                    let b1= data[i+1];
+                    let value = i16::from_be_bytes([b0, b1]) as i32;
+                    parce_data.stacks.push(value as f64);
+                    i += 2;
+                    let command = format!("28 {} {} {}", b0, b1, value);
+                    parce_data.commands.as_mut().commands.push(command);
+                } 
                 32..=246 => {
                     let value = b0 as i32 - 139;
                     parce_data.stacks.push(value as f64);
+                    let command = format!("{} {}", b0, value);
+                    parce_data.commands.as_mut().commands.push(command);
                 }
                 247..=250 => {
                     let b1 = data[i];
                     let value = (b0 as i32 - 247) * 256 + b1 as i32 + 108;
                     parce_data.stacks.push(value as f64);
                     i += 1;
+                    let command = format!("{} {} {}", b0, b1, value);
+                    parce_data.commands.as_mut().commands.push(command);
                 }
                 251..=254 => {
                     let b1 = data[i];
                     let value = -(b0 as i32 - 251) * 256 - b1 as i32 - 108;
                     parce_data.stacks.push(value as f64);
                     i += 1;
+                    let command = format!("{} {} {}", b0, b1, value);
+                    parce_data.commands.as_mut().commands.push(command);
                 }
                 255 => {
                     if data.len() - i >= 4 {
@@ -1929,10 +1940,13 @@ impl CFF {
                         let value = value + frac / 65536.0;
                         parce_data.stacks.push(value);
                         i += 4;
+                        let command = format!("{} {}", b0, value);
+                        parce_data.commands.as_mut().commands.push(command);
                     }
                 }
                 _ => {
-                    // 0,2,9,13,15,16,17 reserved
+                    let command = format!("unknown {}", b0);
+                    parce_data.commands.as_mut().commands.push(command);
                 }
             }
         }
