@@ -74,7 +74,7 @@ impl CPAL {
         ));
         string.push_str(&format!("num_palettes: {}\n", self.num_palettes));
         string.push_str(&format!("num_color_records: {}\n", self.num_color_records));
-        let max_length =  10;
+        let max_length = 10;
         let len = if max_length < self.num_palette_entries as usize {
             max_length
         } else {

@@ -14,8 +14,6 @@ impl fmt::Display for LOCA {
 }
 
 impl LOCA {
-
-
     pub(crate) fn new_by_size<R: BinaryReader>(
         file: &mut R,
         offest: u32,
@@ -69,4 +67,3 @@ fn get_loca_by_size<R: BinaryReader>(
         offsets: Box::new(offsets),
     })
 }
-

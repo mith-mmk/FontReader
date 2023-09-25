@@ -609,7 +609,6 @@ impl Font {
         colr.to_string()
     }
 
-
     pub fn get_html(&self, string: &str) -> Result<String, Error> {
         let mut html = String::new();
         html += "<html>\n";

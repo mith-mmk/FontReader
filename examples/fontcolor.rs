@@ -46,7 +46,7 @@ fn main() {
                 println!("{}", font.get_maxp_raw());
                 println!("{}", font.get_hhea_raw());
                 println!("{}", font.get_colr_raw());
-                println!("{}", font.get_cpal_raw()); 
+                println!("{}", font.get_cpal_raw());
             }
         }
     }
