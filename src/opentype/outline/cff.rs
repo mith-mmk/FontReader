@@ -74,7 +74,8 @@ impl CFF {
         offset: u32,
         _length: u32,
     ) -> Result<Self, Box<dyn Error>> {
-        reader.seek(SeekFrom::Start(offset as u64))?;
+        let offset = offset as u64;
+        reader.seek(SeekFrom::Start(offset))?;
         let mut bbox = [0.0, 0.0, 1000.0, 1000.0];
 
         let header = Header::parse(reader)?;
@@ -140,17 +141,17 @@ impl CFF {
         }
 
         // must CID = GID
-        let charsets_offset = charsets_offset as u32 + offset;
+        let charsets_offset = charsets_offset as u64 + offset;
 
         let charsets = Charsets::new(reader, charsets_offset, n_glyphs as u32)?;
-        let char_strings_offset = char_strings_offset as u32 + offset;
-        let char_string = CharString::new(reader, char_strings_offset as u32)?;
+        let char_strings_offset = char_strings_offset as u64 + offset;
+        let char_string = CharString::new(reader, char_strings_offset)?;
 
         let private = top_dict.get_i32_array(0, 18);
         let mut subr = None;
         let private_dict = if let Some(private) = private {
             let _ = private[0] as u32; //
-            let private_dict_offset = private[1] as u32 + offset;
+            let private_dict_offset = private[1] as u64 + offset;
             reader.seek(SeekFrom::Start(private_dict_offset as u64))?;
             let buffer = reader.read_bytes_as_vec(private[0] as usize)?;
             let private_dict = Dict::parse(&buffer)?;
@@ -159,7 +160,7 @@ impl CFF {
                 println!("private_dict: {}", private_dict.to_string());
             }
             if let Some(sub_offset) = private_dict.get_i32(0, 19) {
-                let subr_offset = sub_offset as u32 + private_dict_offset;
+                let subr_offset = sub_offset as u64 + private_dict_offset;
                 let subrtn = CharString::new(reader, subr_offset)?;
                 subr = Some(subrtn)
             }
@@ -169,9 +170,13 @@ impl CFF {
             None
         };
         if ros.is_some() {
-            let fd_array_offset = (fd_array_offset.unwrap() as u32 + offset) as u64;
+            let fd_array_offset = (fd_array_offset.unwrap() as u64 + offset) as u64;
             reader.seek(SeekFrom::Start(fd_array_offset))?;
             let fd_arrays = Index::parse(reader)?;
+            #[cfg(debug_assertions)]
+            {
+                println!("fd_arrays: {:?}", fd_arrays);
+            }
             let font_dict = Dict::parse(&fd_arrays.data[0])?;
             #[cfg(debug_assertions)]
             {
@@ -179,8 +184,8 @@ impl CFF {
             }
 
             if let Some(private) = font_dict.get_i32_array(0, 18) {
-                let private_dict_offset = private[1] as u32 + offset as u32;
-                reader.seek(SeekFrom::Start(private_dict_offset as u64))?;
+                let private_dict_offset = private[1] as u64 + offset;
+                reader.seek(SeekFrom::Start(private_dict_offset))?;
                 let buffer = reader.read_bytes_as_vec(private[0] as usize);
                 let private_dict = Dict::parse(&buffer?)?;
                 #[cfg(debug_assertions)]
@@ -189,7 +194,7 @@ impl CFF {
                 }
                 let subr_offset = private_dict.get_i32(0, 19);
                 if let Some(subr_offset) = subr_offset {
-                    let subr_offset = subr_offset as u32 + private_dict_offset as u32;
+                    let subr_offset = subr_offset as u64 + private_dict_offset;
                     let subrtn = CharString::new(reader, subr_offset)?;
                     subr = Some(subrtn);
                 }
@@ -215,8 +220,11 @@ impl CFF {
     }
 
     pub fn to_code(&self, gid: usize, width: f64) -> String {
-        let cid = self.charsets.sid[gid as usize];
-        println!("gid {} cid {}", gid, cid);
+        #[cfg(debug_assertions)]
+        {
+            let cid = self.charsets.sid[gid as usize];
+            println!("gid {} cid {}", gid, cid);
+        }
         let data = &self.char_string.data.data[gid as usize];
         let width = if width == 0.0 {
             self.top_dict.get_f64(0, 15).unwrap() // nomarl width
@@ -752,7 +760,7 @@ impl CFF {
                     parce_data.commands.as_mut().commands.push(command);
                 }
                 31 => {
-                    // hvcurveto |- dy1 dx2 dy2 dy3 {dya dxb dyb dxc dxd dxe dye dyf}* dxf?
+                    // hvcurveto |- dx1 dx2 dy2 dy3 {dya dxb dyb dxc dxd dxe dye dyf}* dxf?
                     //                hvcurveto (31) |-
                     // |- {dxa dxb dyb dyc dyd dxe dye dxf}+ dyf? hvcurveto (31) |-
                     let mut args = Vec::new();
@@ -790,11 +798,11 @@ impl CFF {
 
                     let mut command = "hvcurveto".to_string();
                     if args.len() % 8 >= 4 {
-                        let dy1 = args.pop()?;
-                        parce_data.y += dy1;
+                        let dx1 = args.pop()?;
+                        parce_data.x += dx1;
                         let xa = parce_data.x;
                         let ya = parce_data.y;
-                        command += &format!(" dy1 {}", dy1);
+                        command += &format!(" dx1 {}", dx1);
                         let dx2 = args.pop()?;
                         parce_data.x += dx2;
 
@@ -1355,6 +1363,7 @@ impl CFF {
                 28 => {
                     let b1 = data[i];
                     let value = i16::from_be_bytes([b0, b1]) as i32;
+                    parce_data.stacks.push(value as f64);
                     i += 1;
                 }
                 14 => {
@@ -1371,7 +1380,7 @@ impl CFF {
                     i += 1;
                     match b1 {
                         35 => {
-                            // flex |- dy1 dy1 dx2 dy2 dx3 dy3 dx4 dy4 dx5 dy5 dx6 dy6 fd flex (12 35) |-
+                            // flex |- dx1 dy1 dx2 dy2 dx3 dy3 dx4 dy4 dx5 dy5 dx6 dy6 fd flex (12 35) |-
                             let mut command = "flex".to_string();
                             let fd = parce_data.stacks.pop()?;
                             let dy6 = parce_data.stacks.pop()?;
@@ -1385,7 +1394,7 @@ impl CFF {
                             let dy2 = parce_data.stacks.pop()?;
                             let dx2 = parce_data.stacks.pop()?;
                             let dy1 = parce_data.stacks.pop()?;
-                            let dy1 = parce_data.stacks.pop()?;
+                            let dx1 = parce_data.stacks.pop()?;
                             let mut xx = parce_data.x;
                             let mut yy = parce_data.y;
                             xx += dy1;
@@ -1827,7 +1836,7 @@ impl CFF {
                 }
                 10 => {
                     // call callsubr
-                    let mut command = "callsubr\n".to_string();
+                    let mut command = "callsubr".to_string();
                     let mut num = parce_data.stacks.pop()? as isize;
                     if let Some(subr) = self.subr.as_ref() {
                         let len = subr.data.data.len();
@@ -1839,7 +1848,8 @@ impl CFF {
                             num += 32768
                         }
 
-                        command += &format!("{}\n", num);
+                        command += &format!(" {}\n", num);
+                        parce_data.commands.as_mut().commands.push(command);
                         let data = &subr.data.data[num as usize];
                         self.parse(data, parce_data)?;
                     } else {
@@ -1936,16 +1946,19 @@ impl CFF {
         let commands = &parce_data.commands;
         if is_svg {
             let height = self.bbox[3] - self.bbox[1];
+            let y_pos = self.bbox[3];
             let mut svg = "<svg xmlns=\"http://www.w3.org/2000/svg\" fill=\"none\" stroke-width=\"10pt\" stroke=\"black\" ".to_string();
             svg += &format!(
-                " width=\"24pt\" height=\"24pt\" viewbox=\"{}  0 {} {}\">\n",
+                " width=\"24pt\" height=\"24pt\" viewbox=\"{} {} {} {}\">\n",
                 self.bbox[0] - 12.0,
+                0.0,
                 width + parce_data.width,
                 height
             );
             #[cfg(debug_assertions)]
             {
                 svg += &format!("<!-- gid {} width {} height {} -->\n", gid, width, height);
+                svg += &format!("<!-- bbox {:?} -->\n", self.bbox);
                 for command in commands.commands.iter() {
                     svg += &format!("<!-- {} -->\n", command);
                 }
@@ -1954,20 +1967,20 @@ impl CFF {
             for operation in commands.operations.iter() {
                 match operation {
                     Operation::M(x, y) => {
-                        svg += &format!("M {} {}\n", x, self.bbox[3] - y);
+                        svg += &format!("M {} {}\n", x, y_pos - y);
                     }
                     Operation::L(x, y) => {
-                        svg += &format!("L {} {}\n", x, self.bbox[3] - y);
+                        svg += &format!("L {} {}\n", x, y_pos - y);
                     }
                     Operation::C(xa, ya, xb, yb, xc, yc) => {
                         svg += &format!(
                             "C {} {} {} {} {} {}\n",
                             xa,
-                            self.bbox[3] - ya,
+                            y_pos - ya,
                             xb,
-                            self.bbox[3] - yb,
+                            y_pos - yb,
                             xc,
-                            self.bbox[3] - yc
+                            y_pos - yc
                         );
                     }
                     Operation::Z => {
@@ -2037,10 +2050,10 @@ pub(crate) struct Charsets {
 impl Charsets {
     fn new<R: BinaryReader>(
         reader: &mut R,
-        offset: u32,
+        offset: u64,
         n_glyphs: u32,
     ) -> Result<Self, Box<dyn Error>> {
-        reader.seek(SeekFrom::Start(offset as u64)).unwrap();
+        reader.seek(SeekFrom::Start(offset)).unwrap();
         let format = reader.read_u8().unwrap();
         let mut charsets = Self {
             format,
@@ -2369,10 +2382,10 @@ pub(crate) struct CharString {
 impl CharString {
     pub(crate) fn new<R: BinaryReader>(
         reader: &mut R,
-        offset: u32,
+        offset: u64,
     ) -> Result<Self, Box<dyn Error>> {
         if offset > 0 {
-            reader.seek(SeekFrom::Start(offset as u64))?;
+            reader.seek(SeekFrom::Start(offset))?;
         }
         let index = Index::parse(reader)?;
         Ok(Self { data: index })
