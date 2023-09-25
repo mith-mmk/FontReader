@@ -242,8 +242,8 @@ impl CFF {
             i += 1;
             #[cfg(debug_assertions)]
             {
-                //let command = format!("{} {:?}",b0, parce_data.stacks);
-                //parce_data.commands.as_mut().commands.push(command);
+                let command = format!("{} {:?}",b0, parce_data.stacks);
+                parce_data.commands.as_mut().commands.push(command);
             }
 
             match b0 {
@@ -259,7 +259,7 @@ impl CFF {
                         args.push(parce_data.stacks.pop()?);
                     }
 
-                    parce_data.hints += args.len();
+                    // parce_data.hints += args.len();
 
                     let mut y = args.pop()?;
                     command += &format!(" {}", y);
@@ -288,7 +288,7 @@ impl CFF {
                         args.push(parce_data.stacks.pop()?);
                         args.push(parce_data.stacks.pop()?);
                     }
-                    parce_data.hints += args.len();
+                    // parce_data.hints += args.len();
 
                     let mut command = "vstem".to_string();
                     let mut x = args.pop()?;
@@ -362,17 +362,76 @@ impl CFF {
                 }
                 19 => {
                     // hintmask |- hintmask (19 + mask) |
+                    /* pop vstemhm */
+                    if parce_data.is_first == 0 && parce_data.stacks.len() >=  2{
+                        let mut args = Vec::new();
+                        args.push(parce_data.stacks.pop()?);
+                        args.push(parce_data.stacks.pop()?);
+                        while 2 <= parce_data.stacks.len() {
+                            args.push(parce_data.stacks.pop()?);
+                            args.push(parce_data.stacks.pop()?);
+                        }
+                        parce_data.hints += args.len();
+
+                        let mut command = "vstemhm".to_string();
+                        let mut x = args.pop()?;
+                        command += &format!(" {}", x);
+                        let dx = args.pop()?;
+                        x += dx;
+                        command += &format!(" {}", x);
+                        while 2 <= args.len() {
+                            let dxa = args.pop()?;
+                            x += dxa;
+                            command += &format!(" {}", x);
+                            let dxb = args.pop()?;
+                            x += dxb;
+                            command += &format!(" {}", x);
+                        }
+                        command += "\n";
+                        parce_data.commands.as_mut().commands.push(command);
+                    }
+
                     let len = (parce_data.hints + 7) / 8;
                     let mut command = "hintmask".to_string();
+                    command += &format!(" {}", parce_data.hints);
                     for j in 0..len {
                         let mask = data[i + j];
-                        command += &format!(" {:08b}", mask);
+                        command += &format!(" {:08b} {}", mask, mask);
                     }
                     i += len;
                     parce_data.commands.as_mut().commands.push(command);
                 }
                 20 => {
                     // cntrmask |- cntrmask (20 + mask) |-
+                    /* pop vstemhm */
+                    if parce_data.is_first == 0 && parce_data.stacks.len() >=  2{
+                        let mut args = Vec::new();
+                        args.push(parce_data.stacks.pop()?);
+                        args.push(parce_data.stacks.pop()?);
+                        while 2 <= parce_data.stacks.len() {
+                            args.push(parce_data.stacks.pop()?);
+                            args.push(parce_data.stacks.pop()?);
+                        }
+                        parce_data.hints += args.len();
+                        let mut command = "vstemhm".to_string();
+                        let mut x = args.pop()?;
+                        command += &format!(" {}", x);
+                        let dx = args.pop()?;
+                        x += dx;
+                        command += &format!(" {}", x);
+                        while 2 <= args.len() {
+                            let dxa = args.pop()?;
+                            x += dxa;
+                            command += &format!(" {}", x);
+                            let dxb = args.pop()?;
+                            x += dxb;
+                            command += &format!(" {}", x);
+                        }
+                        command += "\n";
+                        parce_data.commands.as_mut().commands.push(command);
+                    }
+
+
                     let len = (parce_data.hints + 7) / 8;
                     let mut command = format! {"cntrmask {} {}",parce_data.hints, len};
                     for j in 0..len {
