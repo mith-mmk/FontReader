@@ -503,7 +503,7 @@ impl CFF {
                     parce_data.commands.as_mut().commands.push(command);
                 }
                 6 => {
-                    //  |- dy1 {dya dxb}* hlineto (6) |- odd
+                    //  - dx1 {dya dxb}* hlineto (6) |
                     // |- {dxa dyb}+ hlineto (6) |-      even
                     let mut args = Vec::new();
                     while 2 <= parce_data.stacks.len() {
@@ -518,9 +518,9 @@ impl CFF {
 
                     let mut command = "hlineto".to_string();
                     if args.len() % 2 == 1 {
-                        let dy1 = args.pop()?;
-                        parce_data.y += dy1;
-                        command += &format!(" dy1 {}", dy1);
+                        let dx1 = args.pop()?;
+                        parce_data.x += dx1;
+                        command += &format!(" dx1 {}", dx1);
                         let xx = parce_data.x;
                         let yy = parce_data.y;
                         parce_data
