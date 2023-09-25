@@ -278,7 +278,7 @@ impl CFF {
                     parce_data.commands.as_mut().commands.push(command);
                 }
                 3 => {
-                    // vstem |- v dx {dxa dxb}* vstem (3) |
+                    // vstem |- x dx {dxa dxb}* vstem (3) |
 
                     let mut args = Vec::new();
                     args.push(parce_data.stacks.pop()?);
@@ -332,7 +332,7 @@ impl CFF {
                     parce_data.commands.as_mut().commands.push(command);
                 }
                 23 => {
-                    // vstemhm |- parce_data.x dx {dxa dxb}* vstemhm (23) |-
+                    // vstemhm |- x dx {dxa dxb}* vstemhm (23) |-
                     let mut args = Vec::new();
                     args.push(parce_data.stacks.pop()?);
                     args.push(parce_data.stacks.pop()?);
@@ -394,13 +394,11 @@ impl CFF {
                     parce_data.y += dy;
                     let command = format!("rmoveto {} {}", dx, dy);
                     parce_data.commands.as_mut().commands.push(command);
-                    let xx = parce_data.x;
-                    let yy = parce_data.y;
                     parce_data
                         .commands
                         .as_mut()
                         .operations
-                        .push(Operation::M(xx, yy));
+                        .push(Operation::M(parce_data.x, parce_data.y));
 
                     if 1 <= parce_data.stacks.len() && parce_data.is_first == 0 {
                         parce_data.width = parce_data.stacks.pop()?;
@@ -414,7 +412,7 @@ impl CFF {
                     parce_data.is_first += 1;
                 }
                 22 => {
-                    // hmoveto |- dy1 hmoveto (22) |-
+                    // |- dx1 hmoveto (22) |-
                     if parce_data.is_first > 0 {
                         parce_data.commands.as_mut().operations.push(Operation::Z);
                     }
@@ -422,13 +420,11 @@ impl CFF {
                     parce_data.x += dx;
                     let command = format!("hmoveto {}", dx);
                     parce_data.commands.as_mut().commands.push(command);
-                    let xx = parce_data.x;
-                    let yy = parce_data.y;
                     parce_data
                         .commands
                         .as_mut()
                         .operations
-                        .push(Operation::M(xx, yy));
+                        .push(Operation::M(parce_data.x, parce_data.y));
                     if 1 <= parce_data.stacks.len() && parce_data.is_first == 1 {
                         parce_data.width = parce_data.stacks.pop()?;
                         let width = parce_data.width;
@@ -441,7 +437,7 @@ impl CFF {
                     parce_data.is_first += 1;
                 }
                 4 => {
-                    // vmoveto |- dy1 vmoveto (4) |-
+                    // |- dy1 vmoveto (4) |-
                     if parce_data.is_first > 0 {
                         parce_data.commands.as_mut().operations.push(Operation::Z);
                     }
@@ -449,13 +445,11 @@ impl CFF {
                     parce_data.y += dy;
                     let command = format!("vmoveto {}\n", dy);
                     parce_data.commands.as_mut().commands.push(command);
-                    let xx = parce_data.x;
-                    let yy = parce_data.y;
                     parce_data
                         .commands
                         .as_mut()
                         .operations
-                        .push(Operation::M(xx, yy));
+                        .push(Operation::M(parce_data.x, parce_data.y));
 
                     if 1 <= parce_data.stacks.len() && parce_data.is_first == 0 {
                         parce_data.width = parce_data.stacks.pop()?;
@@ -472,10 +466,8 @@ impl CFF {
                     // rlineto |- {dxa dya}+ rlineto (5) |-
                     let mut args = Vec::new();
                     while 2 <= parce_data.stacks.len() {
-                        let d1 = parce_data.stacks.pop()?;
-                        let d2 = parce_data.stacks.pop()?;
-                        args.push(d1);
-                        args.push(d2);
+                        args.push(parce_data.stacks.pop()?);
+                        args.push(parce_data.stacks.pop()?);
                     }
 
                     let mut command = "rlineto".to_string();
@@ -484,15 +476,13 @@ impl CFF {
                         let dya = args.pop()?;
                         parce_data.x += dxa;
                         parce_data.y += dya;
-                        let xx = parce_data.x;
-                        let yy = parce_data.y;
                         command += &format!(" {}", dxa);
                         command += &format!(" {}", dya);
                         parce_data
                             .commands
                             .as_mut()
                             .operations
-                            .push(Operation::L(xx, yy));
+                            .push(Operation::L(parce_data.x, parce_data.y));
                     }
                     parce_data.commands.as_mut().commands.push(command);
                 }
@@ -501,10 +491,8 @@ impl CFF {
                     // |- {dxa dyb}+ hlineto (6) |-      even
                     let mut args = Vec::new();
                     while 2 <= parce_data.stacks.len() {
-                        let d1 = parce_data.stacks.pop()?;
-                        let d2 = parce_data.stacks.pop()?;
-                        args.push(d1);
-                        args.push(d2);
+                        args.push(parce_data.stacks.pop()?);
+                        args.push(parce_data.stacks.pop()?);
                     }
                     if 1 <= parce_data.stacks.len() {
                         args.push(parce_data.stacks.pop()?);
@@ -515,57 +503,51 @@ impl CFF {
                         let dx1 = args.pop()?;
                         parce_data.x += dx1;
                         command += &format!(" dx1 {}", dx1);
-                        let xx = parce_data.x;
-                        let yy = parce_data.y;
                         parce_data
                             .commands
                             .as_mut()
                             .operations
-                            .push(Operation::L(xx, yy));
+                            .push(Operation::L(parce_data.x, parce_data.y));
                         while 2 <= args.len() {
                             let dya = args.pop()?;
+                            let dxb = args.pop()?;
+
                             parce_data.y += dya;
-                            let xx = parce_data.x;
-                            let yy = parce_data.y;
                             command += &format!(" {}", dya);
                             parce_data
                                 .commands
                                 .as_mut()
                                 .operations
-                                .push(Operation::L(xx, yy));
-                            let dxb = args.pop()?;
-                            parce_data.x += dxb;
-                            let xx = parce_data.x;
-                            let yy = parce_data.y;
+                                .push(Operation::L(parce_data.x, parce_data.y));
+
+                                parce_data.x += dxb;
                             command += &format!(" {}", dxb);
                             parce_data
                                 .commands
                                 .as_mut()
                                 .operations
-                                .push(Operation::L(xx, yy));
+                                .push(Operation::L(parce_data.x, parce_data.y));
                         }
                     } else {
                         while 2 <= args.len() {
                             let dxa = args.pop()?;
+                            let dyb = args.pop()?;
+
                             parce_data.x += dxa;
                             command += &format!(" {}", dxa);
-                            let xx = parce_data.x;
-                            let yy = parce_data.y;
                             parce_data
                                 .commands
                                 .as_mut()
                                 .operations
-                                .push(Operation::L(xx, yy));
-                            let dyb = args.pop()?;
+                                .push(Operation::L(parce_data.x, parce_data.y));
+
                             parce_data.y += dyb;
-                            let xx = parce_data.x;
-                            let yy = parce_data.y;
                             command += &format!(" {}", dyb);
                             parce_data
                                 .commands
                                 .as_mut()
                                 .operations
-                                .push(Operation::L(xx, yy));
+                                .push(Operation::L(parce_data.x, parce_data.y));
                         }
                     }
                     parce_data.commands.as_mut().commands.push(command);
