@@ -281,14 +281,12 @@ impl Font {
         self.get_glyph_with_uvs(ch, '\u{0}')
     }
 
-    pub fn get_svg_with_uvs(&self, ch: char, vs: char) -> Result<String, Error> {
+    pub fn get_svg_with_uvs(&self, ch: char, vs: char,fontsize: f64,fontunit: &str) -> Result<String, Error> {
         // svg ?
         // sbix ?
         // cff ?
         #[cfg(feature = "cff")]
         if let Some(cff) = self.cff.as_ref() {
-            let fontsize = 24.0;
-            let fontunit = "pt";
             let gid = self.cmap.as_ref().unwrap().get_glyph_position(ch as u32) as usize;
             let layout = self.get_horizontal_layout(gid as usize);
             let string = cff.to_svg(gid,fontsize, fontunit, &layout, 0.0, 0.0);
@@ -307,8 +305,6 @@ impl Font {
         let pos = glyf_data.glyph_id;
 
         if let FontData::Glyph(glyph) = &glyf_data.open_type_glyf.as_ref().unwrap().glyph {
-            let fontsize = 24.0;
-            let fontunit = "pt";
             let layout = &glyf_data.open_type_glyf.as_ref().unwrap().layout;
             let layout = match layout {
                 FontLayout::Horizontal(layout) => layout,
@@ -415,8 +411,8 @@ impl Font {
         }
     }
 
-    pub fn get_svg(&self, ch: char) -> Result<String, Error> {
-        self.get_svg_with_uvs(ch, '\u{0}')
+    pub fn get_svg(&self, ch: char, fontsize: f64, fontunit: &str) -> Result<String, Error> {
+        self.get_svg_with_uvs(ch, '\u{0}', fontsize, fontunit)
     }
 
     pub fn get_name(&self, name_id: NameID, locale: &String) -> Result<String, Error> {
@@ -608,7 +604,9 @@ impl Font {
         colr.to_string()
     }
 
-    pub fn get_html(&self, string: &str) -> Result<String, Error> {
+
+
+    pub fn get_html(&self, string: &str, fontsize: f64, fontunit: &str) -> Result<String, Error> {
         let mut html = String::new();
         html += "<html>\n";
         html += "<head>\n";
@@ -638,11 +636,11 @@ impl Font {
                 || ch as u32 >= 0xE0100 && ch as u32 <= 0xE01EF
             {
                 let ch0 = string.chars().nth(i - 1).unwrap();
-                let svg = self.get_svg_with_uvs(ch0, ch)?;
+                let svg = self.get_svg_with_uvs(ch0, ch, fontsize, fontunit)?;
                 svgs.pop();
                 svgs.push(svg);
             } else {
-                let svg = self.get_svg(ch)?;
+                let svg = self.get_svg(ch, fontsize, fontunit)?;
                 svgs.push(svg);
             }
         }

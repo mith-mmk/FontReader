@@ -90,7 +90,7 @@ impl SBIX {
     pub(crate) fn get_svg(
         &self,
         gid: u32,
-        fonsize: f32,
+        fonsize: f64,
         fontunit: &str,
         _: &crate::fontreader::HorizontalLayout,
         _: f64,

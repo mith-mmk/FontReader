@@ -40,7 +40,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("{}", string);
     let text_file = "./test/read.txt";
     let string = std::fs::read_to_string(text_file)?;
-    let html = font.get_html(&string)?;
+    let html = font.get_html(&string, 64.0, "px")?;
     std::fs::write(output_file, html)?;
     Ok(())
 }

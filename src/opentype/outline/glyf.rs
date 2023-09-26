@@ -209,7 +209,7 @@ impl Glyph {
 
     pub(crate) fn get_svg_heder(
         &self,
-        fonsize: f32,
+        fonsize: f64,
         fontunit: &str,
         layout: &crate::fontreader::HorizontalLayout,
     ) -> String {
@@ -219,7 +219,7 @@ impl Glyph {
 
     pub(crate) fn get_svg_header_from_parsed(
         parsed: &ParsedGlyph,
-        fontsize: f32,
+        fontsize: f64,
         fontunit: &str,
         layout: &crate::fontreader::HorizontalLayout,
     ) -> String {
@@ -234,8 +234,8 @@ impl Glyph {
             y_max - (parsed.y_max - parsed.y_min) as isize
         };
         let height = fontsize;
-        let width = x_min as f32 + x_max as f32;
-        let width = width * height / y_max as f32;
+        let width = x_min as f64 + x_max as f64;
+        let width = width * height / y_max as f64;
 
         let height_str = format!("{}{}", height, fontunit);
         let width_str = format!("{}{}", width, fontunit);
@@ -376,7 +376,7 @@ impl Glyph {
 
     pub fn to_svg(
         &self,
-        fonsize: f32,
+        fonsize: f64,
         fontunit: &str,
         layout: &crate::fontreader::HorizontalLayout,
         sx: f64,
