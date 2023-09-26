@@ -113,7 +113,7 @@ pub(crate) struct FeatureVariations {
     pub(crate) feature_table_substitutions: Box<Vec<FeatureTableSubstitution>>,
 }
 impl FeatureVariations {
-    pub(crate) fn new<R: BinaryReader>(reader: &mut R, offset: u64, length: u32) -> Self {
+    pub(crate) fn new<R: BinaryReader>(reader: &mut R, offset: u64, _length: u32) -> Self {
         reader.seek(SeekFrom::Start(offset as u64)).unwrap();
         let major_version = reader.read_u16_be().unwrap();
         let minor_version = reader.read_u16_be().unwrap();
@@ -174,7 +174,7 @@ pub(crate) struct FeatureVariationList {
     pub(crate) feature_variations: Vec<FeatureVariation>,
 }
 impl FeatureVariationList {
-    pub(crate) fn new<R: BinaryReader>(reader: &mut R, offset: u64, length: u32) -> Self {
+    pub(crate) fn new<R: BinaryReader>(reader: &mut R, offset: u64, _length: u32) -> Self {
         reader.seek(SeekFrom::Start(offset as u64)).unwrap();
         let feature_variation_count = reader.read_u16_be().unwrap();
         let mut feature_variations = Vec::new();

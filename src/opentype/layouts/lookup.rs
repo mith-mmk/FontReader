@@ -73,7 +73,7 @@ impl LookupList {
     pub(crate) fn new<R: BinaryReader>(reader: &mut R, offset: u64, _: u32) -> Self {
         reader.seek(SeekFrom::Start(offset as u64)).unwrap();
         let lookup_count = reader.read_u16_be().unwrap();
-        let mut lookup_offsets = (0..lookup_count)
+        let lookup_offsets = (0..lookup_count)
             .map(|_| reader.read_u16_be().unwrap())
             .collect::<Vec<u16>>();
 
@@ -734,7 +734,7 @@ impl LookupSubstitution {
                     LookupResult::None
                 }
             }
-            Self::ChainingContextSubstitution3(chaining3) => {
+            Self::ChainingContextSubstitution3(_chaining3) => {
                 todo!() // これ実装したやつ頭おかしいだろ
             }
             Self::ExtensionSubstitution(_) => {

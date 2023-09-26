@@ -21,15 +21,15 @@ impl GDEF {
         let major_versionn = reader.read_u16_be().unwrap();
         let minor_version = reader.read_u16_be().unwrap();
         let glyph_class_def_offset = reader.read_u16_be().unwrap();
-        let attach_list_offset = reader.read_u16_be().unwrap();
-        let lig_caret_list_offset = reader.read_u16_be().unwrap();
-        let mark_attach_class_def_offset = reader.read_u16_be().unwrap();
-        let mark_glyph_sets_def_offset = if minor_version >= 2 {
+        let _attach_list_offset = reader.read_u16_be().unwrap();
+        let _lig_caret_list_offset = reader.read_u16_be().unwrap();
+        let _mark_attach_class_def_offset = reader.read_u16_be().unwrap();
+        let _mark_glyph_sets_def_offset = if minor_version >= 2 {
             reader.read_u16_be().unwrap()
         } else {
             0
         };
-        let item_var_store_offset = if minor_version >= 3 {
+        let _item_var_store_offset = if minor_version >= 3 {
             reader.read_u16_be().unwrap()
         } else {
             0

@@ -18,12 +18,12 @@ impl ParsedScript {
     pub(crate) fn parse<R: BinaryReader>(reader: &mut R, script: &Script) -> Self {
         let offset = script.script_offset;
         reader.seek(SeekFrom::Start(offset as u64)).unwrap();
-        let default_language_system_offset = reader.read_u16_be().unwrap();
+        let _default_language_system_offset = reader.read_u16_be().unwrap();
         let language_system_count = reader.read_u16_be().unwrap();
         let mut language_systems = Vec::new();
         for _ in 0..language_system_count {
             let language_system_tag = reader.read_u32_be().unwrap();
-            let language_system_offset = reader.read_u16_be().unwrap(); // todo!
+            let _language_system_offset = reader.read_u16_be().unwrap(); // todo!
             let lookup_order_offset = reader.read_u16_be().unwrap();
             let required_feature_index = reader.read_u16_be().unwrap();
             let feature_index_count = reader.read_u16_be().unwrap();
@@ -72,7 +72,7 @@ impl ScriptList {
     pub(crate) fn new<R: BinaryReader>(
         reader: &mut R,
         script_list_offset: u64,
-        length: u32,
+        _length: u32,
     ) -> ScriptList {
         reader
             .seek(SeekFrom::Start(script_list_offset as u64))

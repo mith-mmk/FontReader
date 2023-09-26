@@ -1,7 +1,7 @@
 use std::io::SeekFrom;
 
 use base64::{
-    engine::{self, general_purpose},
+    engine::{general_purpose},
     Engine as _,
 };
 use bin_rs::reader::BinaryReader;
