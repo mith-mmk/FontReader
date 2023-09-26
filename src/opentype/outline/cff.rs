@@ -1,6 +1,6 @@
 // CFF is Adobe Type 1 font format, which is a compact binary format.
 use bin_rs::reader::BinaryReader;
-use std::{collections::HashMap, error::Error, f32::consts::E, io::SeekFrom};
+use std::{collections::HashMap, error::Error, f32::consts::E, io::SeekFrom, default};
 
 use crate::{
     fontreader::{FontLayout, HorizontalLayout},
@@ -39,13 +39,15 @@ pub(crate) struct CFF {
     pub(crate) private_dict: Option<PrivateDict>,
     pub(crate) gsubr: Option<CharString>,
     pub(crate) subr: Option<CharString>,
+    pub(crate) default_width: f64,
     pub(crate) width: f64,
 }
 
 struct ParcePack {
     x: f64,
     y: f64,
-    width: f64,
+    min_x: f64,
+    width: Option<f64>,
     stacks: Box<Vec<f64>>,
     is_first: usize,
     hints: usize,
@@ -83,6 +85,7 @@ impl CFF {
         reader.seek(SeekFrom::Start(offset))?;
         let mut bbox = [0.0, 0.0, 1000.0, 1000.0];
         let mut width;
+        let mut default_width = 0.0;
 
         let header = Header::parse(reader)?;
         let name_index = Index::parse(reader)?;
@@ -118,6 +121,7 @@ impl CFF {
         let fd_select_offset = top_dict.get_i32(12, 37);
         let opt_bbox = top_dict.get_f64_array(0, 5);
         width = top_dict.get_f64(12, 8).unwrap_or(0.0);
+        default_width = width;
         if let Some(some_bbox) = opt_bbox {
             bbox = [some_bbox[0], some_bbox[1], some_bbox[2], some_bbox[3]];
         }
@@ -162,6 +166,7 @@ impl CFF {
             reader.seek(SeekFrom::Start(private_dict_offset as u64))?;
             let buffer = reader.read_bytes_as_vec(private[0] as usize)?;
             let private_dict = Dict::parse(&buffer)?;
+            default_width = private_dict.get_f64(0, 20).unwrap_or(0.0);
             width = private_dict.get_f64(0, 21).unwrap_or(width);
             #[cfg(debug_assertions)]
             {
@@ -204,6 +209,7 @@ impl CFF {
                     println!("defaultWidthX: {:?}", private_dict.get_f64(0, 20));
                     println!("nominalWidthX: {:?}", private_dict.get_f64(0, 21));
                     }
+                default_width = private_dict.get_f64(0, 20).unwrap_or(default_width);
                 width = private_dict.get_f64(0, 21).unwrap_or(width);
 
 
@@ -232,6 +238,7 @@ impl CFF {
             gsubr,
             subr,
             width,
+            default_width
         })
     }
 
@@ -242,28 +249,19 @@ impl CFF {
             println!("gid {} cid {}", gid, cid);
         }
         let data = &self.char_string.data.data[gid as usize];
-        self.parse_data(gid, data, layout, true)
+        self.parse_data(gid, data,24.0, "pt", layout,0.0, 0.0, false)
     }
 
     fn parse(&self, data: &[u8], parce_data: &mut ParcePack) -> Option<()> {
         let mut i = 0;
-        #[cfg(debug_assertions)]
-        {
-            let mut command = String::new();
-            for b in data {
-                command += &format!("{} ", b);
-            }
-            parce_data.commands.as_mut().commands.push(command);
-        }
         // w? {hs* vs* cm* hm* mt subpath}? {mt subpath}* endchar
         while i < data.len() {
             let b0 = data[i];
             i += 1;
             #[cfg(debug_assertions)]
             {
-                print!("{} {:?}",b0, parce_data.stacks);
-                let command = format!("{} {:?}",b0, parce_data.stacks);
-                parce_data.commands.as_mut().commands.push(command);
+                // let command = format!("{} {:?}",b0, parce_data.stacks);
+                // parce_data.commands.as_mut().commands.push(command);
             }
 
             match b0 {
@@ -472,6 +470,7 @@ impl CFF {
                     let dx = parce_data.stacks.pop()?;
                     parce_data.x += dx;
                     parce_data.y += dy;
+                    parce_data.min_x = parce_data.min_x.min(parce_data.x);
                     let command = format!("rmoveto {} {}", dx, dy);
                     parce_data.commands.as_mut().commands.push(command);
                     parce_data
@@ -481,13 +480,13 @@ impl CFF {
                         .push(Operation::M(parce_data.x, parce_data.y));
 
                     if 1 <= parce_data.stacks.len() && parce_data.is_first == 0 {
-                        parce_data.width = parce_data.stacks.pop()?;
+                        parce_data.width = parce_data.stacks.pop();
                         let width = parce_data.width;
                         parce_data
                             .commands
                             .as_mut()
                             .commands
-                            .push(format!("width {}", width));
+                            .push(format!("width {:?}", width));
                     }
                     parce_data.is_first += 1;
                 }
@@ -498,6 +497,7 @@ impl CFF {
                     }
                     let dx = parce_data.stacks.pop()?;
                     parce_data.x += dx;
+                    parce_data.min_x = parce_data.min_x.min(parce_data.x);
                     let command = format!("hmoveto {}", dx);
                     parce_data.commands.as_mut().commands.push(command);
                     parce_data
@@ -506,13 +506,13 @@ impl CFF {
                         .operations
                         .push(Operation::M(parce_data.x, parce_data.y));
                     if 1 <= parce_data.stacks.len() && parce_data.is_first == 0 {
-                        parce_data.width = parce_data.stacks.pop()?;
+                        parce_data.width = parce_data.stacks.pop();
                         let width = parce_data.width;
                         parce_data
                             .commands
                             .as_mut()
                             .commands
-                            .push(format!("width {}", width));
+                            .push(format!("width {:?}", width));
                     }
                     parce_data.is_first += 1;
                 }
@@ -532,13 +532,13 @@ impl CFF {
                         .push(Operation::M(parce_data.x, parce_data.y));
 
                     if 1 <= parce_data.stacks.len() && parce_data.is_first == 0 {
-                        parce_data.width = parce_data.stacks.pop()?;
+                        parce_data.width = parce_data.stacks.pop();
                         let width = parce_data.width;
                         parce_data
                             .commands
                             .as_mut()
                             .commands
-                            .push(format!("width {}", width));
+                            .push(format!("width {:?}", width));
                     }
                     parce_data.is_first += 1;
                 }
@@ -555,6 +555,7 @@ impl CFF {
                         let dxa = args.pop()?;
                         let dya = args.pop()?;
                         parce_data.x += dxa;
+                        parce_data.min_x = parce_data.min_x.min(parce_data.x);
                         parce_data.y += dya;
                         command += &format!(" {}", dxa);
                         command += &format!(" {}", dya);
@@ -582,6 +583,7 @@ impl CFF {
                     if args.len() % 2 == 1 {
                         let dx1 = args.pop()?;
                         parce_data.x += dx1;
+                        parce_data.min_x = parce_data.min_x.min(parce_data.x);
                         command += &format!(" dx1 {}", dx1);
                         parce_data
                             .commands
@@ -601,6 +603,7 @@ impl CFF {
                                 .push(Operation::L(parce_data.x, parce_data.y));
 
                             parce_data.x += dxb;
+                            parce_data.min_x = parce_data.min_x.min(parce_data.x);
                             command += &format!(" {}", dxb);
                             parce_data
                                 .commands
@@ -614,6 +617,7 @@ impl CFF {
                             let dyb = args.pop()?;
 
                             parce_data.x += dxa;
+                            parce_data.min_x = parce_data.min_x.min(parce_data.x);
                             command += &format!(" {}", dxa);
                             parce_data
                                 .commands
@@ -659,6 +663,7 @@ impl CFF {
                             let dxa = args.pop()?;
                             let dyb = args.pop()?;
                             parce_data.x += dxa;
+                            parce_data.min_x = parce_data.min_x.min(parce_data.x);
                             command += &format!(" dxa {}", dxa);
                             parce_data
                                 .commands
@@ -688,6 +693,7 @@ impl CFF {
                                 .push(Operation::L(parce_data.x, parce_data.y));
 
                             parce_data.x += dxb;
+                            parce_data.min_x = parce_data.min_x.min(parce_data.x);
                             command += &format!(" {}", dxb);
                             parce_data
                                 .commands
@@ -790,6 +796,7 @@ impl CFF {
                         command += &format!(" dxb {} dyb {}", dxb, dyb);
 
                         parce_data.x += dxc;
+                        parce_data.min_x = parce_data.min_x.min(parce_data.x);
                         // parce_data.y += dy1;
                         let xc = parce_data.x;
                         let yc = parce_data.y;
@@ -884,6 +891,7 @@ impl CFF {
                             command += &format!(" dxb {}", dyb);
 
                             parce_data.x += dxc;
+                            parce_data.min_x = parce_data.min_x.min(parce_data.x);
                             let xc = parce_data.x;
                             let yc = parce_data.y;
                             command += &format!(" dxc {}", dxc);
@@ -918,6 +926,7 @@ impl CFF {
                         if 1 <= args.len() {
                             let dxf = args.pop()?;
                             parce_data.x += dxf;
+                            parce_data.min_x = parce_data.min_x.min(parce_data.x);
                             let xf = parce_data.x;
                             command += &format!(" dxf {}", dxf);
                             let op = parce_data.commands.as_mut().operations.pop()?;
@@ -975,6 +984,7 @@ impl CFF {
                             command += &format!(" dxe {}", dxe);
                             command += &format!(" dye {}", dye);
                             parce_data.x += dxf;
+                            parce_data.min_x = parce_data.min_x.min(parce_data.x);
                             let xf = parce_data.x;
                             let yf = parce_data.y;
                             parce_data
@@ -1009,18 +1019,12 @@ impl CFF {
                     args.push(parce_data.stacks.pop()?);
                     args.push(parce_data.stacks.pop()?);
                     while 6 <= parce_data.stacks.len() {
-                        let d1 = parce_data.stacks.pop()?;
-                        let d2 = parce_data.stacks.pop()?;
-                        let d3 = parce_data.stacks.pop()?;
-                        let d4 = parce_data.stacks.pop()?;
-                        let d5 = parce_data.stacks.pop()?;
-                        let d6 = parce_data.stacks.pop()?;
-                        args.push(d1);
-                        args.push(d2);
-                        args.push(d3);
-                        args.push(d4);
-                        args.push(d5);
-                        args.push(d6);
+                        args.push(parce_data.stacks.pop()?);
+                        args.push(parce_data.stacks.pop()?);
+                        args.push(parce_data.stacks.pop()?);
+                        args.push(parce_data.stacks.pop()?);
+                        args.push(parce_data.stacks.pop()?);
+                        args.push(parce_data.stacks.pop()?);
                     }
                     let mut command = "rcurveline".to_string();
                     while 8 <= args.len() {
@@ -1043,6 +1047,7 @@ impl CFF {
                         let dxc = args.pop()?;
                         let dyc = args.pop()?;
                         parce_data.x += dxc;
+                        parce_data.min_x = parce_data.min_x.min(parce_data.x);
                         parce_data.y += dyc;
                         let xc = parce_data.x;
                         let yc = parce_data.y;
@@ -1059,6 +1064,7 @@ impl CFF {
                     parce_data.x += dxd;
                     parce_data.y += dyd;
                     let xx = parce_data.x;
+                    parce_data.min_x = parce_data.min_x.min(parce_data.x);
                     let yy = parce_data.y;
                     command += &format!(" dxd {}", dxd);
                     command += &format!(" dyd {}", dyd);
@@ -1093,26 +1099,28 @@ impl CFF {
                         let dxa = args.pop()?;
                         let dya = args.pop()?;
                         parce_data.x += dxa;
+                        parce_data.min_x = parce_data.min_x.min(parce_data.x);
                         parce_data.y += dya;
-                        let xx = parce_data.x;
-                        let yy = parce_data.y;
                         parce_data
                             .commands
                             .as_mut()
                             .operations
-                            .push(Operation::L(xx, yy));
+                            .push(Operation::L(parce_data.x, parce_data.y));
                         command += &format!(" dxa {} dya {}", dxa, dya);
                     }
                     let dxb = args.pop()?;
                     let dyb = args.pop()?;
+                    let dxc = args.pop()?;
+                    let dyc = args.pop()?;
+                    let dxd = args.pop()?;
+                    let dyd = args.pop()?;
+
                     parce_data.x += dxb;
                     parce_data.y += dyb;
                     let xa = parce_data.x;
                     let ya = parce_data.y;
                     command += &format!(" {}", dxb);
                     command += &format!(" {}", dyb);
-                    let dxc = args.pop()?;
-                    let dyc = args.pop()?;
                     parce_data.x += dxc;
                     parce_data.y += dyc;
                     let xb = parce_data.x;
@@ -1120,9 +1128,8 @@ impl CFF {
                     command += &format!(" {}", dxc);
                     command += &format!(" {}", dyc);
 
-                    let dxd = args.pop()?;
-                    let dyd = args.pop()?;
                     parce_data.x += dxd;
+                    parce_data.min_x = parce_data.min_x.min(parce_data.x);
                     parce_data.y += dyd;
                     let xc = parce_data.x;
                     let yc = parce_data.y;
@@ -1191,13 +1198,15 @@ impl CFF {
                             .push(Operation::C(xa, ya, xb, yb, xc, yc));
                         while 8 <= args.len() {
                             let dxa = args.pop()?;
+                            let dxb = args.pop()?;
+                            let dyb = args.pop()?;
+                            let dyc = args.pop()?;
+
                             parce_data.x += dxa;
                             let xa = parce_data.x;
                             let ya = parce_data.y;
                             command += &format!(" {}", dxa);
 
-                            let dxb = args.pop()?;
-                            let dyb = args.pop()?;
                             parce_data.x += dxb;
                             parce_data.y += dyb;
                             let xb = parce_data.x;
@@ -1205,7 +1214,6 @@ impl CFF {
                             command += &format!(" {}", dxb);
                             command += &format!(" {}", dyb);
 
-                            let dyc = args.pop()?;
                             parce_data.y += dyc;
                             let xc = parce_data.x;
                             let yc = parce_data.y;
@@ -1233,6 +1241,7 @@ impl CFF {
 
                             let dxf = args.pop()?;
                             parce_data.x += dxf;
+                            parce_data.min_x = parce_data.min_x.min(parce_data.x);
                             let xf = parce_data.x;
                             let yf = parce_data.y;
                             command += &format!(" {}", dxf);
@@ -1262,13 +1271,15 @@ impl CFF {
                         while 8 <= args.len() {
                             // {dya dxb dyb dxc dxd dxe dye dyf}+ dxf?
                             let dya = args.pop()?;
+                            let dxb = args.pop()?;
+                            let dyb = args.pop()?;
+                            let dxc = args.pop()?;
+
                             parce_data.y += dya;
                             let xa = parce_data.x;
                             let ya = parce_data.y;
                             command += &format!(" {}", dya);
 
-                            let dxb = args.pop()?;
-                            let dyb = args.pop()?;
                             parce_data.x += dxb;
                             parce_data.y += dyb;
                             let xb = parce_data.x;
@@ -1276,8 +1287,8 @@ impl CFF {
                             command += &format!(" {}", dxb);
                             command += &format!(" {}", dyb);
 
-                            let dxc = args.pop()?;
                             parce_data.x += dxc;
+                            parce_data.min_x = parce_data.min_x.min(parce_data.x);
                             let xc = parce_data.x;
                             let yc = parce_data.y;
                             command += &format!(" {}", dxc);
@@ -1316,6 +1327,7 @@ impl CFF {
                         if 1 <= args.len() {
                             let dxf = args.pop()?;
                             parce_data.x += dxf;
+                            parce_data.min_x = parce_data.min_x.min(parce_data.x);
                             let xf = parce_data.x;
                             command += &format!(" dxf {}", dxf);
                             let op = parce_data.commands.as_mut().operations.pop()?;
@@ -1386,13 +1398,13 @@ impl CFF {
 
                 14 => {
                     if 1 <= parce_data.stacks.len() && parce_data.is_first == 0 {
-                        parce_data.width = parce_data.stacks.pop()?;
+                        parce_data.width = parce_data.stacks.pop();
                         let width = parce_data.width;
                         parce_data
                             .commands
                             .as_mut()
                             .commands
-                            .push(format!("width {}", width));
+                            .push(format!("width {:?}", width));
                     }
                     parce_data
                         .commands
@@ -1433,6 +1445,7 @@ impl CFF {
                             let xb = xx;
                             let yb = yy;
                             xx += dx3;
+                            parce_data.min_x = parce_data.min_x.min(parce_data.x);
                             yy += dy3;
                             let xc = xx;
                             let yc = yy;
@@ -1450,6 +1463,7 @@ impl CFF {
                             let xe = xx;
                             let ye = yy;
                             xx += dx6;
+                            parce_data.min_x = parce_data.min_x.min(parce_data.x);
                             yy += dy6;
                             let xf = xx;
                             let yf = yy;
@@ -1509,6 +1523,7 @@ impl CFF {
                                 .push(Operation::C(xd, yd, xe, ye, xf, yf));
 
                             parce_data.x = xx;
+                            parce_data.min_x = parce_data.min_x.min(parce_data.x);
                             parce_data.y = yy;
 
                             command += &format!(
@@ -1564,6 +1579,7 @@ impl CFF {
                                 .push(Operation::C(xd, yd, xe, ye, xf, yf));
 
                             parce_data.x = xx;
+                            parce_data.min_x = parce_data.min_x.min(parce_data.x);
                             parce_data.y = yy;
                             command += &format!(
                                 " {} {} {} {} {} {} {} {} {}\n",
@@ -1623,6 +1639,7 @@ impl CFF {
                             let yf = yy;
 
                             parce_data.x = xx;
+                            parce_data.min_x = parce_data.min_x.min(parce_data.x);
                             parce_data.y = yy;
                             command += &format!(
                                 " {} {} {} {} {} {} {} {} {} {} {}\n",
@@ -1873,7 +1890,6 @@ impl CFF {
                         } else {
                             num + 32768
                         };
-                        println!("sbrtn {} {}", no, num);
                         command += &format!(" {} {}\n", no, num);
                         parce_data.commands.as_mut().commands.push(command);
                         let data = &subr.data.data[no as usize];
@@ -1899,7 +1915,6 @@ impl CFF {
                             num + 32768
                         };
                         command += &format!(" {} {}\n",no, num);
-                        println!("sbrtn {} {}", no, num);
                         parce_data.commands.as_mut().commands.push(command);
                         let data = &subr.data.data[no as usize];
                         self.parse(data, parce_data)?;
@@ -1921,7 +1936,6 @@ impl CFF {
                     let b0 = data[i];
                     let b1= data[i+1];
                     let value = i16::from_be_bytes([b0, b1]) as i32;
-                    println!("b0 {} b1 {} value {}", b0, b1, value);
                     parce_data.stacks.push(value as f64);
                     i += 2;
                 } 
@@ -1964,20 +1978,38 @@ impl CFF {
         Some(())
     }
 
+    pub(crate) fn to_svg(
+        &self,
+        gid: usize,
+        fontsize: f64,
+        fontunit: &str, 
+        layout: &HorizontalLayout,
+        sx: f64,
+        sy: f64,
+    ) -> String {
+       let data = &self.char_string.data.data[gid as usize];
+       self.parse_data(gid, &data, fontsize, fontunit, layout,sx, sy, true) 
+    }
+
     fn parse_data(
         &self,
         gid: usize,
         data: &[u8],
+        fontsize: f64,
+        fontunit: &str,
         layout: &HorizontalLayout,
+        sx: f64,
+        sy: f64,
         is_svg: bool,
     ) -> String {
         let commands = Box::new(Commands::new());
-        let stacks = Box::new(Vec::with_capacity(48));
+        let stacks = Box::new(Vec::with_capacity(48)); // CFF1 max stack depth 48
         let mut parce_data = ParcePack {
             x: 0.0,
             y: 0.0,
             hints: 0,
-            width: 0.0,
+            min_x: 0.0,
+            width: None,
             commands,
             stacks,
             is_first: 0,
@@ -1986,35 +2018,40 @@ impl CFF {
         self.parse(data, &mut parce_data);
         let commands = &parce_data.commands;
         if is_svg {
+            let lsb = layout.lsb as f64;
             let descender = layout.descender;
             let accender = layout.accender;
             let line_gap = layout.line_gap;
             let advance_width = layout.advance_width as f64;
-            let fontsize = 24.0;
-            let fontunit = "pt";
             // let width = self.width + parce_data.width;
-            let height = (accender - descender) as f64;
-            let width = advance_width / height * fontsize;
+            let height = self.bbox[3] - self.bbox[1] as f64;
+            let y_scale = (height + line_gap as f64) / height;
+            let width = advance_width / height * fontsize; 
             let h = format!("{}{}", fontsize,fontunit);
-            let w = format!("{}{}", width,fontunit);
+            let w = format!("{}{}", width / y_scale ,fontunit);
+            let self_width = if let Some(width) = parce_data.width {
+                self.width + width
+            } else {
+                self.default_width
+            };
 
             let y_pos = self.bbox[3] + self.bbox[1];
             let mut svg = "<svg xmlns=\"http://www.w3.org/2000/svg\" ".to_string();
             svg += &format!(
                 " width=\"{}\" height=\"{}\" viewbox=\"{} {} {} {}\">\n",
-                w, "16pt",
-                self.bbox[0] - 12.0,
-                self.bbox[1] - 12.0,
-                self.width + parce_data.width,
-                self.bbox[3] - self.bbox[1] + 24.0
+                w, h,
+                0, // parce_data.min_x,
+                self.bbox[1],
+                self_width,
+                (self.bbox[3] - self.bbox[1]) * y_scale
             );
             #[cfg(debug_assertions)]
             {
-                svg += &format!("<!-- gid {} width {} {} height {} -->\n", gid, self.width, parce_data.width, height);
+                svg += &format!("<!-- gid {} width {} {} {} height {} -->\n", gid, self.width, self_width, parce_data.min_x, height);
                 svg += &format!("<!-- bbox {:?} -->\n", self.bbox);
                 svg += &format!(
-                    "<!-- advance_width {} accender {} descender {} line_gap {} -->\n",
-                    layout.advance_width, accender, descender, line_gap
+                    "<!-- advance_width {} accender {} descender {} line_gap {} {} -->\n",
+                    layout.advance_width, accender, descender, line_gap, y_scale
                 );
                 for command in commands.commands.iter() {
                     svg += &format!("<!-- {} -->\n", command);
@@ -2024,20 +2061,20 @@ impl CFF {
             for operation in commands.operations.iter() {
                 match operation {
                     Operation::M(x, y) => {
-                        svg += &format!("M {} {}\n", x, y_pos - y);
+                        svg += &format!("M {} {}\n", x + sx, y_pos - y + sy);
                     }
                     Operation::L(x, y) => {
-                        svg += &format!("L {} {}\n", x, y_pos - y);
+                        svg += &format!("L {} {}\n", x + sx, y_pos - y + sy);
                     }
                     Operation::C(xa, ya, xb, yb, xc, yc) => {
                         svg += &format!(
                             "C {} {} {} {} {} {}\n",
-                            xa,
-                            y_pos - ya,
-                            xb,
-                            y_pos - yb,
-                            xc,
-                            y_pos - yc
+                            xa + sx ,
+                            y_pos - ya + sy,
+                            xb + sx ,
+                            y_pos - yb + sy,
+                            xc + sx ,
+                            y_pos - yc + sy
                         );
                     }
                     Operation::Z => {

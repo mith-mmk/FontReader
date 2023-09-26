@@ -229,8 +229,6 @@ impl Font {
                     )
                 };
                 let glyph_id = cmap.get_glyph_position_from_uvs(code, vs) as usize;
-                let hhead = self.hhea.as_ref().unwrap();
-                let width = hhead.advance_width_max as f64;
                 let layout = self.get_horizontal_layout(glyph_id as usize);
 
                 let string = cff.to_code(glyph_id, &layout);
@@ -289,10 +287,11 @@ impl Font {
         // cff ?
         #[cfg(feature = "cff")]
         if let Some(cff) = self.cff.as_ref() {
+            let fontsize = 24.0;
+            let fontunit = "pt";
             let gid = self.cmap.as_ref().unwrap().get_glyph_position(ch as u32) as usize;
-            let hhea = self.hhea.as_ref().unwrap();
             let layout = self.get_horizontal_layout(gid as usize);
-            let string = cff.to_code(gid, &layout);
+            let string = cff.to_svg(gid,fontsize, fontunit, &layout, 0.0, 0.0);
             return Ok(string);
         }
 
