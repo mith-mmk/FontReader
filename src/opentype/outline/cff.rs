@@ -82,7 +82,7 @@ impl CFF {
         let offset = offset as u64;
         reader.seek(SeekFrom::Start(offset))?;
         let mut bbox = [0.0, 0.0, 1000.0, 1000.0];
-        let mut width = 0.0;
+        let mut width;
 
         let header = Header::parse(reader)?;
         let name_index = Index::parse(reader)?;
@@ -167,7 +167,7 @@ impl CFF {
             {
                 println!("private_dict: {}", private_dict.to_string());
                 println!("defaultWidthX: {:?}", private_dict.get_f64(0, 20));
-                println!("nominalWidthX: {:?}", private_dict.get_f64(0, 21));
+                println!("normalWidthX: {:?}", private_dict.get_f64(0, 21));
             }
             if let Some(sub_offset) = private_dict.get_i32(0, 19) {
                 let subr_offset = sub_offset as u64 + private_dict_offset;
@@ -247,15 +247,23 @@ impl CFF {
 
     fn parse(&self, data: &[u8], parce_data: &mut ParcePack) -> Option<()> {
         let mut i = 0;
-        // println!("data.len() = {}, {}", data.len(), i);
+        #[cfg(debug_assertions)]
+        {
+            let mut command = String::new();
+            for b in data {
+                command += &format!("{} ", b);
+            }
+            parce_data.commands.as_mut().commands.push(command);
+        }
         // w? {hs* vs* cm* hm* mt subpath}? {mt subpath}* endchar
         while i < data.len() {
             let b0 = data[i];
             i += 1;
             #[cfg(debug_assertions)]
             {
-                //let command = format!("{} {:?}",b0, parce_data.stacks);
-                //parce_data.commands.as_mut().commands.push(command);
+                print!("{} {:?}",b0, parce_data.stacks);
+                let command = format!("{} {:?}",b0, parce_data.stacks);
+                parce_data.commands.as_mut().commands.push(command);
             }
 
             match b0 {
@@ -497,7 +505,7 @@ impl CFF {
                         .as_mut()
                         .operations
                         .push(Operation::M(parce_data.x, parce_data.y));
-                    if 1 <= parce_data.stacks.len() && parce_data.is_first == 1 {
+                    if 1 <= parce_data.stacks.len() && parce_data.is_first == 0 {
                         parce_data.width = parce_data.stacks.pop()?;
                         let width = parce_data.width;
                         parce_data
@@ -1856,20 +1864,19 @@ impl CFF {
                 10 => {
                     // call callsubr
                     let mut command = "callsubr".to_string();
-                    let mut num = parce_data.stacks.pop()? as isize;
+                    let  num = parce_data.stacks.pop()? as isize;
                     if let Some(subr) = self.subr.as_ref() {
-                        let len = subr.data.data.len();
-                        if len <= 1238 {
-                            num += 107
-                        } else if len <= 33899 {
-                            num += 1131
+                        let no = if subr.data.data.len() <= 1238 {
+                            num + 107
+                        } else if subr.data.data.len() <= 33899 {
+                            num + 1131
                         } else {
-                            num += 32768
-                        }
-
-                        command += &format!(" {}\n", num);
+                            num + 32768
+                        };
+                        println!("sbrtn {} {}", no, num);
+                        command += &format!(" {} {}\n", no, num);
                         parce_data.commands.as_mut().commands.push(command);
-                        let data = &subr.data.data[num as usize];
+                        let data = &subr.data.data[no as usize];
                         self.parse(data, parce_data)?;
                     } else {
                         #[cfg(debug_assertions)]
@@ -1882,19 +1889,19 @@ impl CFF {
                 29 => {
                     // callgsubr
                     let mut command = "callgsubr\n".to_string();
-                    let mut num = parce_data.stacks.pop()? as isize;
+                    let num = parce_data.stacks.pop()? as isize;
                     if let Some(subr) = self.gsubr.as_ref() {
-                        let len = subr.data.data.len();
-                        if len <= 1238 {
-                            num += 107
-                        } else if len <= 33899 {
-                            num += 1131
+                        let no = if subr.data.data.len() <= 1238 {
+                            num + 107
+                        } else if subr.data.data.len() <= 33899 {
+                            num + 1131
                         } else {
-                            num += 32768
-                        }
-                        command += &format!("{}\n", num);
+                            num + 32768
+                        };
+                        command += &format!(" {} {}\n",no, num);
+                        println!("sbrtn {} {}", no, num);
                         parce_data.commands.as_mut().commands.push(command);
-                        let data = &subr.data.data[num as usize];
+                        let data = &subr.data.data[no as usize];
                         self.parse(data, parce_data)?;
                     } else {
                         #[cfg(debug_assertions)]
@@ -1914,6 +1921,7 @@ impl CFF {
                     let b0 = data[i];
                     let b1= data[i+1];
                     let value = i16::from_be_bytes([b0, b1]) as i32;
+                    println!("b0 {} b1 {} value {}", b0, b1, value);
                     parce_data.stacks.push(value as f64);
                     i += 2;
                 } 
