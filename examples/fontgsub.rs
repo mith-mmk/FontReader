@@ -1,9 +1,7 @@
-use fontloader::{opentype::NameID, Font};
+use fontloader::Font;
 #[cfg(target_os = "windows")]
 use std::env;
 use std::path::PathBuf;
-
-/* sbixはjpegかpng リサイズルーチンだけ居るかも */
 
 fn main() {
     // agrs[1] is the folder name
@@ -36,15 +34,13 @@ fn main() {
         for i in 0..font_number {
             font.set_font(i).unwrap();
             println!("\nfont number: {} ", i);
-            NameID::iter().into_iter().for_each(|name_id| {
-                let name = font.get_name(name_id, &"ja".to_string());
-                if !name.is_err() {
-                    println!("{:?}: {:?}", name_id, name.unwrap());
-                }
-            });
-            #[cfg(debug_assertions)]
+            #[cfg(feature="layout")]
             {
-                println!("{}", font.get_sbix_raw());
+                #[cfg(debug_assertions)]
+                {
+                    let gsub = font.get_gsub_raw();
+                    println!("layout: {}", gsub);
+                }
             }
         }
     }

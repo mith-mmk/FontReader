@@ -20,13 +20,26 @@ impl Feature {
         let mut string = format!("FeatureTag: {}\n", tag);
         string += &format!("FeatureParams: {:?}\n", self.feature_params);
         string += &format!("LookupListIndices: {:?}\n", self.lookup_list_indices);
+        if let Some(feature_params) = &self.feature_params {
+            string += &format!("FeatureParams: {}\n", feature_params.to_string());
+        }
         string
     }
 }
 
 #[derive(Debug, Clone)]
 pub(crate) struct FeatureParams {
-    pub(crate) feature_params: u16,
+    pub(crate) feature_params: Vec<u8>,
+}
+
+impl FeatureParams {
+    pub(crate) fn to_string(&self) -> String {
+        let mut string = String::new();
+        for param in self.feature_params.iter() {
+            string += &format!("{:02X} ", param);
+        }
+        string
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -36,7 +49,7 @@ pub(crate) struct FeatureList {
 }
 
 impl FeatureList {
-    pub(crate) fn new<R: BinaryReader>(reader: &mut R, offset: u64, _: u32) -> FeatureList {
+    pub(crate) fn new<R: BinaryReader>(reader: &mut R, offset: u64, length: u32) -> FeatureList {
         reader.seek(SeekFrom::Start(offset as u64)).unwrap();
         let feature_count = reader.read_u16_be().unwrap();
         let mut features = Vec::new();
@@ -61,14 +74,20 @@ impl FeatureList {
                     .push(reader.read_u16_be().unwrap());
             }
             if feature_params_offset > 0 {
-                todo!("FeatureParams")
+                let offset = offset + feature_params_offset as u64;
+                reader.seek(SeekFrom::Start(offset as u64)).unwrap();
+                let length = length as usize - feature_params_offset as usize;
+                let feature_params = reader.read_bytes_as_vec(length).unwrap();
+                feature.feature_params = Some(FeatureParams {
+                    feature_params: feature_params.to_vec(),
+                });
             }
         }
 
         Self {
             feature_count,
             features: Box::new(features),
-        }
+            }
     }
 
     pub(crate) fn get_features(&self, tag: &[u8; 4]) -> Vec<Feature> {

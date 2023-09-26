@@ -79,7 +79,7 @@ impl GSUB {
         string
     }
 
-    // ccmp
+    // ccmp Glyph Composition / Decomposition
     pub fn lookup_ccmp(&self, griph_ids: usize) -> Option<usize> {
         let features = self.features.get_features(b"ccmp");
         for feature in features.iter() {

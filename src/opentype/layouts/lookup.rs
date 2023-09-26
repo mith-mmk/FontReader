@@ -193,8 +193,16 @@ impl LookupList {
         let subst_format = reader.read_u16_be().unwrap();
         let coverage_offset = reader.read_u16_be().unwrap();
         let alternate_set_count = reader.read_u16_be().unwrap();
+        let mut alternet_set_offset = Vec::new();
+        for _ in 0..alternate_set_count {
+            alternet_set_offset.push(reader.read_u16_be().unwrap());
+        }
+
+
         let mut alternate_set = Vec::new();
         for _ in 0..alternate_set_count {
+            let offset = alternet_set_offset.pop().unwrap() as u64 + offset;
+            reader.seek(SeekFrom::Start(offset as u64)).unwrap();
             let glyph_count = reader.read_u16_be().unwrap();
             let mut alternate_glyph_ids = Vec::new();
             for _ in 0..glyph_count {
@@ -268,41 +276,98 @@ impl LookupList {
     fn get_context<R: BinaryReader>(reader: &mut R, offset: u64) -> LookupSubstitution {
         reader.seek(SeekFrom::Start(offset as u64)).unwrap();
         let subst_format = reader.read_u16_be().unwrap();
+        if subst_format == 1 {
+            return Self::get_context_format1(reader, offset);
+        } else if subst_format == 2 {
+            todo!();
+            // return self::get_context_format2(reader, offset);
+        } else if subst_format == 3 {
+            todo!();
+            // return self::get_context_format3(reader, offset);
+        } else {
+            panic!("Unknown context format: {}", subst_format)
+        }
+    }
+
+    fn get_context_format1<R: BinaryReader>(reader: &mut R, offset: u64) -> LookupSubstitution {
         let coverage_offset = reader.read_u16_be().unwrap();
         let rule_set_count = reader.read_u16_be().unwrap();
-        let mut rule_set = Vec::new();
+        let mut rule_set_offsets = Vec::new();
         for _ in 0..rule_set_count {
+            rule_set_offsets.push(reader.read_u16_be().unwrap());
+        }
+        let mut rule_set = Vec::new();
+        for rule_set_offset in rule_set_offsets.iter() {
+            if *rule_set_offset == 0 {
+                rule_set.push(SequenceRuleSet {
+                    rule_count: 0,
+                    rule: Vec::new(),
+                });
+                continue;
+            }
+
+            let offset = *rule_set_offset as u64 + offset;
+            reader.seek(SeekFrom::Start(offset as u64)).unwrap();
             let rule_count = reader.read_u16_be().unwrap();
-            let mut rule = Vec::new();
+            let mut rule_offsets = Vec::new();
             for _ in 0..rule_count {
+                rule_offsets.push(reader.read_u16_be().unwrap());
+            }
+            let mut rule = Vec::new();
+            for rule_offset in rule_offsets.iter() {
+                let offset = *rule_offset as u64 + offset;
+                reader.seek(SeekFrom::Start(offset as u64)).unwrap();
                 let glyph_count = reader.read_u16_be().unwrap();
-                let mut input_glyph_ids = Vec::new();
-                for _ in 0..glyph_count {
-                    input_glyph_ids.push(reader.read_u16_be().unwrap());
-                }
                 let lookup_count = reader.read_u16_be().unwrap();
+                let mut input_sequence = Vec::new();
+                for _ in 0..glyph_count - 1 {
+                    input_sequence.push(reader.read_u16_be().unwrap());
+                }
                 let mut lookup_indexes = Vec::new();
                 for _ in 0..lookup_count {
                     lookup_indexes.push(reader.read_u16_be().unwrap());
                 }
-                rule.push(Rule {
+                rule.push(SequenceRule {
                     glyph_count,
-                    input_glyph_ids,
+                    input_sequence,
                     lookup_count,
                     lookup_indexes,
                 });
             }
-            rule_set.push(RuleSet { rule_count, rule });
+            rule_set.push(SequenceRuleSet { rule_count, rule });
         }
         let offset = offset + coverage_offset as u64;
         let coverage = Self::get_coverage(reader, offset);
         LookupSubstitution::ContextSubstitution(ContextSubstitutionFormat1 {
-            subst_format,
+            subst_format: 1 as u16,
             coverage,
             rule_set_count,
             rule_set,
         })
     }
+
+    fn get_context_format2<R: BinaryReader>(reader: &mut R, offset: u64) -> LookupSubstitution {
+        let coverage_offset = reader.read_u16_be().unwrap();
+        let backtrace_class_def_offset = reader.read_u16_be().unwrap();
+        let input_class_def_offset = reader.read_u16_be().unwrap();
+        let lookup_class_def_offset = reader.read_u16_be().unwrap();
+        let chained_class_seq_rule_set_count = reader.read_u16_be().unwrap();
+        let mut chained_class_seq_rule_set_offsets = Vec::new();
+        for _ in 0..chained_class_seq_rule_set_count {
+            chained_class_seq_rule_set_offsets.push(reader.read_u16_be().unwrap());
+        }
+        todo!();
+        
+
+
+    }
+    
+    fn get_context_format3<R: BinaryReader>(reader: &mut R, offset: u64) -> LookupSubstitution {
+        todo!();
+    }
+
+
+    
 
     fn get_chaining_context<R: BinaryReader>(reader: &mut R, offset: u64) -> LookupSubstitution {
         reader.seek(SeekFrom::Start(offset as u64)).unwrap();
@@ -587,7 +652,9 @@ pub(crate) enum LookupSubstitution {
     // 5.1
     ContextSubstitution(ContextSubstitutionFormat1),
     // 5.2
+    ContextSubstitution2(ContextSubstitutionFormat2),
     // 5.3
+    ContextSubstitution3(ContextSubstitutionFormat3),
     // Lookup Type 6: Chaining Contextual Substitution Subtable
     ChainingContextSubstitution(ChainingContextSubstitutionFormat1),
     ChainingContextSubstitution2(ChainingContextSubstitutionFormat2),
@@ -603,7 +670,7 @@ pub(crate) enum LookupResult {
     Single(u16),
     Multiple(Vec<u16>),
     Ligature(Vec<LigatureTable>),
-    Context(Vec<Rule>),
+    Context(Vec<SequenceRule>),
     Chaining(Vec<ChainSubRule>),
     Chaing63(Vec<ChainSubRule>),
     None,
@@ -820,21 +887,83 @@ pub(crate) struct ContextSubstitutionFormat1 {
     pub(crate) subst_format: u16,
     pub(crate) coverage: Coverage,
     pub(crate) rule_set_count: u16,
-    pub(crate) rule_set: Vec<RuleSet>,
+    pub(crate) rule_set: Vec<SequenceRuleSet>,
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct RuleSet {
+pub(crate) struct SequenceRuleSet {
     pub(crate) rule_count: u16,
-    pub(crate) rule: Vec<Rule>,
+    pub(crate) rule: Vec<SequenceRule>,
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct Rule {
+pub(crate) struct SequenceRule {
     pub(crate) glyph_count: u16,
-    pub(crate) input_glyph_ids: Vec<u16>,
+    pub(crate) input_sequence: Vec<u16>,
     pub(crate) lookup_count: u16,
     pub(crate) lookup_indexes: Vec<u16>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct ContextSubstitutionFormat2 {
+    pub(crate) subst_format: u16,
+    pub(crate) coverage: Coverage,
+    pub(crate) backtrack_class_def: ClassDef,
+    pub(crate) input_class_def: ClassDef,
+    pub(crate) lookahead_class_def: ClassDef,
+    pub(crate) chained_class_seq_rule_set_count: u16,
+    pub(crate) chained_class_seq_rule_sets: Vec<ChaineClassSeqRuleSet>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum ClassDef {
+    Format1(ClassDefFormat1),
+    Format2(ClassDefFormat2),
+}
+
+
+#[derive(Debug, Clone)]
+pub(crate) struct ClassDefFormat1 {
+    pub(crate) class_format: u16,
+    pub(crate) start_glyph_id: u16,
+    pub(crate) glyph_count: u16,
+    pub(crate) class_value_array: Vec<u16>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct ClassDefFormat2 {
+    pub(crate) class_format: u16,
+    pub(crate) range_count: u16,
+    pub(crate) range_record: Vec<ClassRangeRecord>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct ChaineClassSeqRuleSet {
+    pub(crate) chain_sub_class_set_count: u16,
+    pub(crate) chained_class_seq_rules: Vec<ChaineClassSeqRule>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct ChaineClassSeqRule {
+    pub(crate) backtrack_glyph_count: u16,
+    pub(crate) backtrack_sequences: Vec<u16>,
+    pub(crate) input_glyph_count: u16,
+    pub(crate) input_sequences: Vec<u16>,
+    pub(crate) lookahead_glyph_count: u16,
+    pub(crate) lookahead_class_ids: Vec<u16>,
+    pub(crate) lookup_count: u16,
+    pub(crate) lookup_indexes: Vec<u16>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct ContextSubstitutionFormat3 {
+    pub(crate) subst_format: u16,
+    pub(crate) coverage: Coverage,
+    pub(crate) backtrack_coverages: Vec<Coverage>,
+    pub(crate) input_coverages: Vec<Coverage>,
+    pub(crate) lookahead_coverages: Vec<Coverage>,
+    pub(crate) seq_lookup_count: u16,
+    pub(crate) seq_lookup_records: SequenceLookupRecords,
 }
 
 // Lookup Type 6: Chaining Contextual Substitution Subtable Format 1

@@ -2,6 +2,11 @@ use fontloader::{opentype::NameID, Font};
 #[cfg(target_os = "windows")]
 use std::env;
 use std::path::PathBuf;
+/*
+    一つのSVGファイルに複数のSVGが含まれている。
+
+    その場合、#glyph[gid]で引く htmlにすると巨大なbase64が必須になる。
+*/
 
 fn main() {
     // agrs[1] is the folder name

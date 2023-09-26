@@ -604,6 +604,19 @@ impl Font {
         colr.to_string()
     }
 
+    #[cfg(debug_assertions)]
+    #[cfg(feature = "layout")]
+    pub fn get_gsub_raw(&self) -> String {
+        let gsub = if self.current_font == 0 {
+            self.gsub.as_ref().unwrap()
+        } else {
+            self.more_fonts[self.current_font - 1]
+                .gsub
+                .as_ref()
+                .unwrap()
+        };
+        gsub.to_string()
+    }
 
 
     pub fn get_html(&self, string: &str, fontsize: f64, fontunit: &str) -> Result<String, Error> {
