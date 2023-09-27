@@ -21,9 +21,20 @@ impl ParsedScript {
         let _default_language_system_offset = reader.read_u16_be().unwrap();
         let language_system_count = reader.read_u16_be().unwrap();
         let mut language_systems = Vec::new();
+        let mut language_system_tags = Vec::new();
+        let mut language_system_offsets = Vec::new();
         for _ in 0..language_system_count {
-            let language_system_tag = reader.read_u32_be().unwrap();
-            let _language_system_offset = reader.read_u16_be().unwrap(); // todo!
+            language_system_tags.push(reader.read_u32_be().unwrap());
+            language_system_offsets.push(reader.read_u16_be().unwrap());
+        }
+
+        for (i, language_system_tag) in language_system_tags.iter().enumerate() {
+            let language_system_tag = *language_system_tag;
+            let language_system_offset = language_system_offsets[i];
+            reader
+                .seek(SeekFrom::Start(offset + language_system_offset as u64))
+                .unwrap();
+
             let lookup_order_offset = reader.read_u16_be().unwrap();
             let required_feature_index = reader.read_u16_be().unwrap();
             let feature_index_count = reader.read_u16_be().unwrap();

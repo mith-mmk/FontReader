@@ -1,18 +1,17 @@
 #[derive(Debug, Clone)]
 pub(crate) struct LanguageSystem {
-    pub(crate) lookup_order_offset: u16,
+    pub(crate) lookup_order_offset: u16, // 0
     pub(crate) required_feature_index: u16,
     pub(crate) feature_index_count: u16,
     pub(crate) feature_indexes: Vec<u16>,
 }
 impl LanguageSystem {
     pub(crate) fn to_string(&self) -> String {
-        let mut string = format!("LanguageSystem: {}\n", self.lookup_order_offset);
-        string += &format!("{}\n", self.required_feature_index);
-        string += &format!("{}\n", self.feature_index_count);
-        for feature_index in self.feature_indexes.iter() {
-            string += &format!("{}\n", feature_index);
-        }
+        let mut string = format!("lookup_order_offset {}\n", self.lookup_order_offset);
+        string += &format!("required_feature_index {}\n", self.required_feature_index);
+        string += &format!("feature_index_count {}\n", self.feature_index_count);
+        string += &format!("feature_indexes {:?}\n", self.feature_indexes);
+
         string
     }
 }
@@ -25,8 +24,11 @@ pub(crate) struct LanguageSystemRecord {
 
 impl LanguageSystemRecord {
     pub(crate) fn to_string(&self) -> String {
-        let mut string = format!("LanguageSystem: {}\n", self.language_system_tag);
+        let bytes = self.language_system_tag.to_be_bytes();
+        let tag = String::from_utf8_lossy(&bytes);
+        let mut string = format!("LanguageSystem Tag: {} {:04x}\n", tag, self.language_system_tag);
         string += &format!("{}\n", self.language_system.to_string());
+
         string
     }
 }

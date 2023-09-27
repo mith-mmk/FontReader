@@ -2,9 +2,9 @@
 
 // only check lookup Format1.1 , 4, 6.1, 7
 
-use std::io::SeekFrom;
+use std::{io::SeekFrom, collections::HashMap};
 
-use crate::opentype::layouts::*;
+use crate::opentype::layouts::{*, lookup::Lookup, script::Script, feature::Feature};
 use bin_rs::reader::BinaryReader;
 
 #[derive(Debug, Clone)]
@@ -16,6 +16,12 @@ pub(crate) struct GSUB {
     pub(crate) lookups: Box<LookupList>,
     // version 1.1
     pub(crate) feature_variations: Option<Box<FeatureVariationList>>,
+}
+
+pub(crate) struct ParsedGsub {
+    scripts: HashMap<String, Vec<Script>>,
+    features: HashMap<String, Vec<Feature>>,
+    lookups: HashMap<String, Vec<Lookup>>,
 }
 
 impl GSUB {
