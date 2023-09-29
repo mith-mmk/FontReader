@@ -2,9 +2,9 @@
 
 // only check lookup Format1.1 , 4, 6.1, 7
 
-use std::{io::SeekFrom, collections::HashMap};
+use std::{collections::HashMap, io::SeekFrom};
 
-use crate::opentype::layouts::{*, lookup::Lookup, script::Script, feature::Feature};
+use crate::opentype::layouts::{feature::Feature, lookup::Lookup, script::Script, *};
 use bin_rs::reader::BinaryReader;
 
 #[derive(Debug, Clone)]
@@ -25,17 +25,21 @@ pub(crate) struct ParsedGsub {
 }
 
 impl GSUB {
-    pub(crate) fn new<R: BinaryReader>(reader: &mut R, offset: u32, length: u32) -> Self {
+    pub(crate) fn new<R: BinaryReader>(
+        reader: &mut R,
+        offset: u32,
+        length: u32,
+    ) -> Result<Self, std::io::Error> {
         let offset = offset as u64;
 
-        reader.seek(SeekFrom::Start(offset as u64)).unwrap();
-        let major_version = reader.read_u16_be().unwrap();
-        let minor_version = reader.read_u16_be().unwrap();
-        let script_list_offset = reader.read_u16_be().unwrap();
-        let feature_list_offset = reader.read_u16_be().unwrap();
-        let lookup_list_offset = reader.read_u16_be().unwrap();
+        reader.seek(SeekFrom::Start(offset as u64))?;
+        let major_version = reader.read_u16_be()?;
+        let minor_version = reader.read_u16_be()?;
+        let script_list_offset = reader.read_u16_be()?;
+        let feature_list_offset = reader.read_u16_be()?;
+        let lookup_list_offset = reader.read_u16_be()?;
         let feature_variations_offset = if major_version == 1 && minor_version == 1 {
-            reader.read_u16_be().unwrap()
+            reader.read_u16_be()?
         } else {
             0
         };
@@ -54,7 +58,7 @@ impl GSUB {
             reader,
             offset + lookup_list_offset as u64,
             length,
-        ));
+        )?);
         let feature_variations = if feature_variations_offset > 0 {
             Some(Box::new(FeatureVariationList::new(
                 reader,
@@ -64,14 +68,14 @@ impl GSUB {
         } else {
             None
         };
-        Self {
+        Ok(Self {
             major_version,
             minor_version,
             scripts,
             features,
             lookups,
             feature_variations,
-        }
+        })
     }
 
     pub(crate) fn to_string(&self) -> String {

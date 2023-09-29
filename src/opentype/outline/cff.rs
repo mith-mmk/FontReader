@@ -1,6 +1,6 @@
 // CFF is Adobe Type 1 font format, which is a compact binary format.
 use bin_rs::reader::BinaryReader;
-use std::{collections::HashMap, error::Error, f32::consts::E, io::SeekFrom, default};
+use std::{collections::HashMap, default, error::Error, f32::consts::E, io::SeekFrom};
 
 use crate::{
     fontreader::{FontLayout, HorizontalLayout},
@@ -208,10 +208,9 @@ impl CFF {
                     println!("private_dict: {}", private_dict.to_string());
                     println!("defaultWidthX: {:?}", private_dict.get_f64(0, 20));
                     println!("nominalWidthX: {:?}", private_dict.get_f64(0, 21));
-                    }
+                }
                 default_width = private_dict.get_f64(0, 20).unwrap_or(default_width);
                 width = private_dict.get_f64(0, 21).unwrap_or(width);
-
 
                 let subr_offset = private_dict.get_i32(0, 19);
                 if let Some(subr_offset) = subr_offset {
@@ -238,7 +237,7 @@ impl CFF {
             gsubr,
             subr,
             width,
-            default_width
+            default_width,
         })
     }
 
@@ -249,7 +248,7 @@ impl CFF {
             println!("gid {} cid {}", gid, cid);
         }
         let data = &self.char_string.data.data[gid as usize];
-        self.parse_data(gid, data,24.0, "pt", layout,0.0, 0.0, false)
+        self.parse_data(gid, data, 24.0, "pt", layout, 0.0, 0.0, false)
     }
 
     fn parse(&self, data: &[u8], parce_data: &mut ParcePack) -> Option<()> {
@@ -381,7 +380,7 @@ impl CFF {
                 19 => {
                     // hintmask |- hintmask (19 + mask) |
                     /* pop vstemhm */
-                    if parce_data.is_first == 0 && parce_data.stacks.len() >=  2{
+                    if parce_data.is_first == 0 && parce_data.stacks.len() >= 2 {
                         let mut args = Vec::new();
                         args.push(parce_data.stacks.pop()?);
                         args.push(parce_data.stacks.pop()?);
@@ -411,7 +410,7 @@ impl CFF {
 
                     let len = (parce_data.hints / 2 + 7) / 8;
                     let mut command = "hintmask".to_string();
-                    command += &format!(" {}", parce_data.hints/ 2);
+                    command += &format!(" {}", parce_data.hints / 2);
                     for j in 0..len {
                         let mask = data[i + j];
                         command += &format!(" {:08b} {}", mask, mask);
@@ -422,7 +421,7 @@ impl CFF {
                 20 => {
                     // cntrmask |- cntrmask (20 + mask) |-
                     /* pop vstemhm */
-                    if parce_data.is_first == 0 && parce_data.stacks.len() >=  2{
+                    if parce_data.is_first == 0 && parce_data.stacks.len() >= 2 {
                         let mut args = Vec::new();
                         args.push(parce_data.stacks.pop()?);
                         args.push(parce_data.stacks.pop()?);
@@ -448,7 +447,6 @@ impl CFF {
                         command += "\n";
                         parce_data.commands.as_mut().commands.push(command);
                     }
-
 
                     let len = (parce_data.hints / 2 + 7) / 8;
                     let mut command = format! {"cntrmask {} {}",parce_data.hints / 2, len};
@@ -1881,7 +1879,7 @@ impl CFF {
                 10 => {
                     // call callsubr
                     let mut command = "callsubr".to_string();
-                    let  num = parce_data.stacks.pop()? as isize;
+                    let num = parce_data.stacks.pop()? as isize;
                     if let Some(subr) = self.subr.as_ref() {
                         let no = if subr.data.data.len() <= 1238 {
                             num + 107
@@ -1914,7 +1912,7 @@ impl CFF {
                         } else {
                             num + 32768
                         };
-                        command += &format!(" {} {}\n",no, num);
+                        command += &format!(" {} {}\n", no, num);
                         parce_data.commands.as_mut().commands.push(command);
                         let data = &subr.data.data[no as usize];
                         self.parse(data, parce_data)?;
@@ -1934,11 +1932,11 @@ impl CFF {
                 }
                 28 => {
                     let b0 = data[i];
-                    let b1= data[i+1];
+                    let b1 = data[i + 1];
                     let value = i16::from_be_bytes([b0, b1]) as i32;
                     parce_data.stacks.push(value as f64);
                     i += 2;
-                } 
+                }
                 32..=246 => {
                     let value = b0 as i32 - 139;
                     parce_data.stacks.push(value as f64);
@@ -1982,13 +1980,13 @@ impl CFF {
         &self,
         gid: usize,
         fontsize: f64,
-        fontunit: &str, 
+        fontunit: &str,
         layout: &HorizontalLayout,
         sx: f64,
         sy: f64,
     ) -> String {
-       let data = &self.char_string.data.data[gid as usize];
-       self.parse_data(gid, &data, fontsize, fontunit, layout,sx, sy, true) 
+        let data = &self.char_string.data.data[gid as usize];
+        self.parse_data(gid, &data, fontsize, fontunit, layout, sx, sy, true)
     }
 
     fn parse_data(
@@ -2026,9 +2024,9 @@ impl CFF {
             // let width = self.width + parce_data.width;
             let height = self.bbox[3] - self.bbox[1] as f64;
             let y_scale = (height + line_gap as f64) / height;
-            let width = advance_width / height * fontsize; 
-            let h = format!("{}{}", fontsize,fontunit);
-            let w = format!("{}{}", width / y_scale ,fontunit);
+            let width = advance_width / height * fontsize;
+            let h = format!("{}{}", fontsize, fontunit);
+            let w = format!("{}{}", width / y_scale, fontunit);
             let self_width = if let Some(width) = parce_data.width {
                 self.width + width
             } else {
@@ -2039,7 +2037,8 @@ impl CFF {
             let mut svg = "<svg xmlns=\"http://www.w3.org/2000/svg\" ".to_string();
             svg += &format!(
                 " width=\"{}\" height=\"{}\" viewbox=\"{} {} {} {}\">\n",
-                w, h,
+                w,
+                h,
                 0, // parce_data.min_x,
                 self.bbox[1],
                 self_width,
@@ -2047,7 +2046,10 @@ impl CFF {
             );
             #[cfg(debug_assertions)]
             {
-                svg += &format!("<!-- gid {} width {} {} {} height {} -->\n", gid, self.width, self_width, parce_data.min_x, height);
+                svg += &format!(
+                    "<!-- gid {} width {} {} {} height {} -->\n",
+                    gid, self.width, self_width, parce_data.min_x, height
+                );
                 svg += &format!("<!-- bbox {:?} -->\n", self.bbox);
                 svg += &format!(
                     "<!-- advance_width {} accender {} descender {} line_gap {} {} -->\n",
@@ -2069,11 +2071,11 @@ impl CFF {
                     Operation::C(xa, ya, xb, yb, xc, yc) => {
                         svg += &format!(
                             "C {} {} {} {} {} {}\n",
-                            xa + sx ,
+                            xa + sx,
                             y_pos - ya + sy,
-                            xb + sx ,
+                            xb + sx,
                             y_pos - yb + sy,
-                            xc + sx ,
+                            xc + sx,
                             y_pos - yc + sy
                         );
                     }

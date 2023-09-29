@@ -1,9 +1,6 @@
 use std::io::SeekFrom;
 
-use base64::{
-    engine::{general_purpose},
-    Engine as _,
-};
+use base64::{engine::general_purpose, Engine as _};
 use bin_rs::reader::BinaryReader;
 
 #[derive(Debug, Clone)]

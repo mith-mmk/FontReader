@@ -87,7 +87,7 @@ impl FeatureList {
         Self {
             feature_count,
             features: Box::new(features),
-            }
+        }
     }
 
     pub(crate) fn get_features(&self, tag: &[u8; 4]) -> Vec<Feature> {

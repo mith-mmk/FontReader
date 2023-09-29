@@ -1,8 +1,7 @@
-use super::*;
+use super::{classdef::ClassDef, *};
 use bin_rs::reader::BinaryReader;
 use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits;
-use core::num;
 use std::io::SeekFrom;
 
 #[derive(Debug, Clone)]
@@ -39,14 +38,17 @@ impl Lookup {
         string
     }
 
-
-    pub(crate) fn new<R: BinaryReader>(reader: &mut R, lookup: &LookupRaw) -> Self {
+    pub(crate) fn new<R: BinaryReader>(
+        reader: &mut R,
+        lookup: &LookupRaw,
+    ) -> Result<Self, std::io::Error> {
         let mut subtables = Vec::new();
         let offset = lookup.offset;
         for subtable_offset in lookup.subtable_offsets.iter() {
             let offset = offset + *subtable_offset as u64;
 
-            let lookup_type = num_traits::FromPrimitive::from_u16(lookup.lookup_type).unwrap();
+            let lookup_type = num_traits::FromPrimitive::from_u16(lookup.lookup_type)
+                .unwrap_or(LookupType::Unknown);
             let subtable = match lookup_type {
                 LookupType::SingleSubstitution => LookupList::get_single(reader, offset),
                 LookupType::MultipleSubstitution => LookupList::get_multiple(reader, offset),
@@ -61,16 +63,19 @@ impl Lookup {
                     LookupList::get_reverse_chaining_context(reader, offset)
                 }
                 _ => {
-                    panic!("Unknown lookup type: {}", lookup.lookup_type);
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        format!("Unknown lookup type"),
+                    ))
                 }
             };
-            subtables.push(subtable);
+            subtables.push(subtable?);
         }
-        Self {
+        Ok(Self {
             lookup_type: lookup.lookup_type,
             lookup_flag: lookup.lookup_flag,
             subtables: subtables,
-        }
+        })
     }
 }
 
@@ -83,25 +88,23 @@ pub(crate) struct LookupRaw {
 }
 
 impl LookupRaw {
-    fn new<R: BinaryReader>(reader: &mut R, offset: u64) -> Self {
-        reader.seek(SeekFrom::Start(offset as u64)).unwrap();
-        let lookup_type = reader.read_u16_be().unwrap();
-        let lookup_flag = reader.read_u16_be().unwrap();
-        let subtable_count = reader.read_u16_be().unwrap();
+    fn new<R: BinaryReader>(reader: &mut R, offset: u64) -> Result<Self, std::io::Error> {
+        reader.seek(SeekFrom::Start(offset as u64))?;
+        let lookup_type = reader.read_u16_be()?;
+        let lookup_flag = reader.read_u16_be()?;
+        let subtable_count = reader.read_u16_be()?;
 
         let mut subtable_offsets = Vec::new();
         for _ in 0..subtable_count {
-            subtable_offsets.push(reader.read_u16_be().unwrap());
+            subtable_offsets.push(reader.read_u16_be()?);
         }
-        Self {
+        Ok(Self {
             offset,
             lookup_type,
             lookup_flag,
             subtable_offsets,
-        }
+        })
     }
-
-
 }
 
 #[derive(FromPrimitive, ToPrimitive, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
@@ -115,6 +118,7 @@ pub enum LookupType {
     ChainingContextSubstitution = 6,
     ExtensionSubstitution = 7,
     ReverseChainingContextualSingleSubstitution = 8,
+    Unknown = 0xFFFF,
 }
 
 #[derive(Debug, Clone)]
@@ -127,170 +131,194 @@ pub enum LookupFlag {
 }
 
 impl LookupList {
-     
-    pub(crate) fn get<R: BinaryReader>(number: usize,reader: &mut R, offset: u64, _: u32) -> Lookup {
-        reader.seek(SeekFrom::Start(offset as u64)).unwrap();
-        let lookup_count = reader.read_u16_be().unwrap();
-        let lookup_offsets = (0..lookup_count)
-            .map(|_| reader.read_u16_be().unwrap())
-            .collect::<Vec<u16>>();
+    pub(crate) fn get<R: BinaryReader>(
+        number: usize,
+        reader: &mut R,
+        offset: u64,
+        _: u32,
+    ) -> Result<Lookup, std::io::Error> {
+        reader.seek(SeekFrom::Start(offset as u64))?;
+        let lookup_count = reader.read_u16_be()?;
+        let mut lookup_offsets = Vec::with_capacity(lookup_count as usize);
+        for i in 0..lookup_count {
+            lookup_offsets.push(reader.read_u16_be()?);
+        }
 
         let mut lookups = Vec::new();
         for lookup_offset in lookup_offsets.iter() {
             let offset = offset + *lookup_offset as u64;
-            let lookup_raw = LookupRaw::new(reader, offset);
+            let lookup_raw = LookupRaw::new(reader, offset)?;
             lookups.push(lookup_raw);
         }
         let lookup_raw = lookups.get(number).unwrap();
         Lookup::new(reader, lookup_raw)
     }
 
-    pub(crate) fn new<R: BinaryReader>(reader: &mut R, offset: u64, _: u32) -> Self {
-        reader.seek(SeekFrom::Start(offset as u64)).unwrap();
-        let lookup_count = reader.read_u16_be().unwrap();
-        let lookup_offsets = (0..lookup_count)
-            .map(|_| reader.read_u16_be().unwrap())
-            .collect::<Vec<u16>>();
+    pub(crate) fn new<R: BinaryReader>(
+        reader: &mut R,
+        offset: u64,
+        _: u32,
+    ) -> Result<Self, std::io::Error> {
+        reader.seek(SeekFrom::Start(offset as u64))?;
+        let lookup_count = reader.read_u16_be()?;
+        let mut lookup_offsets = Vec::with_capacity(lookup_count as usize);
+        for i in 0..lookup_count {
+            lookup_offsets.push(reader.read_u16_be()?);
+        }
 
         let mut lookups = Vec::new();
         for lookup_offset in lookup_offsets.iter() {
             let offset = offset + *lookup_offset as u64;
-            let lookup_raw = LookupRaw::new(reader, offset);
+            let lookup_raw = LookupRaw::new(reader, offset)?;
 
             lookups.push(lookup_raw);
         }
         let mut lookups_parsed = Vec::new();
         for lookup_raw in lookups.iter_mut() {
-            let lookup = Lookup::new(reader, lookup_raw);
+            let lookup = Lookup::new(reader, lookup_raw)?;
             lookups_parsed.push(lookup);
         }
 
-        Self {
+        Ok(Self {
             lookups: Box::new(lookups_parsed),
-        }
+        })
     }
-    fn get_single<R: BinaryReader>(reader: &mut R, offset: u64) -> LookupSubstitution {
-        reader.seek(SeekFrom::Start(offset as u64)).unwrap();
-        let subst_format = reader.read_u16_be().unwrap();
-        let coverage_offset = reader.read_u16_be().unwrap();
+
+    fn get_single<R: BinaryReader>(
+        reader: &mut R,
+        offset: u64,
+    ) -> Result<LookupSubstitution, std::io::Error> {
+        reader.seek(SeekFrom::Start(offset as u64))?;
+        let subst_format = reader.read_u16_be()?;
+        let coverage_offset = reader.read_u16_be()?;
         if subst_format != 2 {
-            let delta_glyph_id = reader.read_i16_be().unwrap();
-            let coverage = Self::get_coverage(reader, offset + coverage_offset as u64);
-            return LookupSubstitution::Single(SingleSubstitutionFormat1 {
+            let delta_glyph_id = reader.read_i16_be()?;
+            let coverage = Self::get_coverage(reader, offset + coverage_offset as u64)?;
+            return Ok(LookupSubstitution::Single(SingleSubstitutionFormat1 {
                 subst_format,
                 coverage,
                 delta_glyph_id,
-            });
+            }));
         }
-        let glyph_count = reader.read_u16_be().unwrap();
+        let glyph_count = reader.read_u16_be()?;
         let mut substitute_glyph_ids = Vec::new();
         for _ in 0..glyph_count {
-            substitute_glyph_ids.push(reader.read_u16_be().unwrap());
+            substitute_glyph_ids.push(reader.read_u16_be()?);
         }
-        let coverage = Self::get_coverage(reader, offset + coverage_offset as u64);
-        LookupSubstitution::Single2(SingleSubstitutionFormat2 {
+        let coverage = Self::get_coverage(reader, offset + coverage_offset as u64)?;
+        Ok(LookupSubstitution::Single2(SingleSubstitutionFormat2 {
             subst_format,
             coverage,
             glyph_count,
             substitute_glyph_ids: substitute_glyph_ids,
-        })
+        }))
     }
 
-    fn get_multiple<R: BinaryReader>(reader: &mut R, offset: u64) -> LookupSubstitution {
-        reader.seek(SeekFrom::Start(offset as u64)).unwrap();
-        let subst_format = reader.read_u16_be().unwrap();
-        let coverage_offset = reader.read_u16_be().unwrap();
-        let sequence_count = reader.read_u16_be().unwrap();
+    fn get_multiple<R: BinaryReader>(
+        reader: &mut R,
+        offset: u64,
+    ) -> Result<LookupSubstitution, std::io::Error> {
+        reader.seek(SeekFrom::Start(offset as u64))?;
+        let subst_format = reader.read_u16_be()?;
+        let coverage_offset = reader.read_u16_be()?;
+        let sequence_count = reader.read_u16_be()?;
         let mut sequence_offsets = Vec::new();
         for _ in 0..sequence_count {
-            sequence_offsets.push(reader.read_u16_be().unwrap());
+            sequence_offsets.push(reader.read_u16_be()?);
         }
         let mut sequence_tables = Vec::new();
-        for _ in 0..sequence_count {
-            let sequence_offset = sequence_offsets.pop().unwrap() as u64 + offset;
-            reader.seek(SeekFrom::Start(sequence_offset as u64)).unwrap();
-            let glyph_count = reader.read_u16_be().unwrap();
+        for sequence_offset in sequence_offsets.iter() {
+            let sequence_offset = *sequence_offset as u64 + offset;
+            reader.seek(SeekFrom::Start(sequence_offset as u64))?;
+            let glyph_count = reader.read_u16_be()?;
             let mut substitute_glyph_ids = Vec::new();
             for _ in 0..glyph_count {
-                substitute_glyph_ids.push(reader.read_u16_be().unwrap());
+                substitute_glyph_ids.push(reader.read_u16_be()?);
             }
             sequence_tables.push(SequenceTable {
                 glyph_count,
                 substitute_glyph_ids,
             });
         }
-        let coverage = Self::get_coverage(reader, offset + coverage_offset as u64);
-        LookupSubstitution::Multiple(MultipleSubstitutionFormat1 {
+        let coverage = Self::get_coverage(reader, offset + coverage_offset as u64)?;
+        Ok(LookupSubstitution::Multiple(MultipleSubstitutionFormat1 {
             subst_format,
             coverage,
             sequence_count,
             sequence_tables,
-        })
+        }))
     }
 
-    fn get_alternate<R: BinaryReader>(reader: &mut R, offset: u64) -> LookupSubstitution {
-        reader.seek(SeekFrom::Start(offset as u64)).unwrap();
-        let subst_format = reader.read_u16_be().unwrap();
-        let coverage_offset = reader.read_u16_be().unwrap();
-        let alternate_set_count = reader.read_u16_be().unwrap();
+    fn get_alternate<R: BinaryReader>(
+        reader: &mut R,
+        offset: u64,
+    ) -> Result<LookupSubstitution, std::io::Error> {
+        reader.seek(SeekFrom::Start(offset as u64))?;
+        let subst_format = reader.read_u16_be()?;
+        let coverage_offset = reader.read_u16_be()?;
+        let alternate_set_count = reader.read_u16_be()?;
         let mut alternet_set_offset = Vec::new();
         for _ in 0..alternate_set_count {
-            alternet_set_offset.push(reader.read_u16_be().unwrap());
+            alternet_set_offset.push(reader.read_u16_be()?);
         }
 
-
         let mut alternate_set = Vec::new();
-        for _ in 0..alternate_set_count {
-            let offset = alternet_set_offset.pop().unwrap() as u64 + offset;
-            reader.seek(SeekFrom::Start(offset as u64)).unwrap();
-            let glyph_count = reader.read_u16_be().unwrap();
+        for alternet_set_offset in alternet_set_offset.iter() {
+            let offset = *alternet_set_offset as u64 + offset;
+            reader.seek(SeekFrom::Start(offset as u64))?;
+            let glyph_count = reader.read_u16_be()?;
             let mut alternate_glyph_ids = Vec::new();
             for _ in 0..glyph_count {
-                alternate_glyph_ids.push(reader.read_u16_be().unwrap());
+                alternate_glyph_ids.push(reader.read_u16_be()?);
             }
             alternate_set.push(AlternateSet {
                 glyph_count,
                 alternate_glyph_ids,
             });
         }
-        let coverage = Self::get_coverage(reader, offset + coverage_offset as u64);
-        LookupSubstitution::Alternate(AlternateSubstitutionFormat1 {
-            subst_format,
-            coverage,
-            alternate_set_count,
-            alternate_set,
-        })
+        let coverage = Self::get_coverage(reader, offset + coverage_offset as u64)?;
+        Ok(LookupSubstitution::Alternate(
+            AlternateSubstitutionFormat1 {
+                subst_format,
+                coverage,
+                alternate_set_count,
+                alternate_set,
+            },
+        ))
     }
 
-    fn get_ligature<R: BinaryReader>(reader: &mut R, offset: u64) -> LookupSubstitution {
-        reader.seek(SeekFrom::Start(offset as u64)).unwrap();
-        let subst_format = reader.read_u16_be().unwrap();
-        let coverage_offset = reader.read_u16_be().unwrap();
-        let ligature_set_count = reader.read_u16_be().unwrap();
+    fn get_ligature<R: BinaryReader>(
+        reader: &mut R,
+        offset: u64,
+    ) -> Result<LookupSubstitution, std::io::Error> {
+        reader.seek(SeekFrom::Start(offset as u64))?;
+        let subst_format = reader.read_u16_be()?;
+        let coverage_offset = reader.read_u16_be()?;
+        let ligature_set_count = reader.read_u16_be()?;
         let mut ligature_offset = Vec::new();
         for _ in 0..ligature_set_count {
-            ligature_offset.push(reader.read_u16_be().unwrap());
+            ligature_offset.push(reader.read_u16_be()?);
         }
 
         let mut ligature_set = Vec::new();
         for ligature_offset in ligature_offset.iter() {
             let offset = *ligature_offset as u64 + offset;
-            reader.seek(SeekFrom::Start(offset as u64)).unwrap();
-            let ligature_count = reader.read_u16_be().unwrap();
+            reader.seek(SeekFrom::Start(offset as u64))?;
+            let ligature_count = reader.read_u16_be()?;
             let mut lingature_offset = Vec::new();
             for _ in 0..ligature_count {
-                lingature_offset.push(reader.read_u16_be().unwrap());
+                lingature_offset.push(reader.read_u16_be()?);
             }
 
             let mut ligature_table = Vec::new();
             for lingature_offset in lingature_offset.iter() {
                 let offset = *lingature_offset as u64 + offset;
-                reader.seek(SeekFrom::Start(offset as u64)).unwrap();
-                let ligature_glyph = reader.read_u16_be().unwrap();
-                let component_count = reader.read_u16_be().unwrap();
+                reader.seek(SeekFrom::Start(offset as u64))?;
+                let ligature_glyph = reader.read_u16_be()?;
+                let component_count = reader.read_u16_be()?;
                 let mut component_glyph_ids = Vec::new();
                 for _ in 0..component_count {
-                    component_glyph_ids.push(reader.read_u16_be().unwrap());
+                    component_glyph_ids.push(reader.read_u16_be()?);
                 }
                 ligature_table.push(LigatureTable {
                     ligature_glyph,
@@ -304,18 +332,21 @@ impl LookupList {
             });
         }
         let offset = offset + coverage_offset as u64;
-        let coverage = Self::get_coverage(reader, offset);
-        LookupSubstitution::Ligature(LigatureSubstitutionFormat1 {
+        let coverage = Self::get_coverage(reader, offset)?;
+        Ok(LookupSubstitution::Ligature(LigatureSubstitutionFormat1 {
             subst_format,
             coverage,
             ligature_set_count,
             ligature_set,
-        })
+        }))
     }
 
-    fn get_context<R: BinaryReader>(reader: &mut R, offset: u64) -> LookupSubstitution {
-        reader.seek(SeekFrom::Start(offset as u64)).unwrap();
-        let subst_format = reader.read_u16_be().unwrap();
+    fn get_context<R: BinaryReader>(
+        reader: &mut R,
+        offset: u64,
+    ) -> Result<LookupSubstitution, std::io::Error> {
+        reader.seek(SeekFrom::Start(offset as u64))?;
+        let subst_format = reader.read_u16_be()?;
         if subst_format == 1 {
             return Self::get_context_format1(reader, offset);
         } else if subst_format == 2 {
@@ -323,144 +354,127 @@ impl LookupList {
         } else if subst_format == 3 {
             return Self::get_context_format3(reader, offset);
         } else {
-            panic!("Unknown context format: {}", subst_format)
+            Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                format!("Unknown context format"),
+            ))
         }
     }
 
-    fn get_context_format1<R: BinaryReader>(reader: &mut R, offset: u64) -> LookupSubstitution {
-        let coverage_offset = reader.read_u16_be().unwrap();
-        let rule_set_count = reader.read_u16_be().unwrap();
+    fn get_context_format1<R: BinaryReader>(
+        reader: &mut R,
+        offset: u64,
+    ) -> Result<LookupSubstitution, std::io::Error> {
+        let coverage_offset = reader.read_u16_be()?;
+        let rule_set_count = reader.read_u16_be()?;
         let mut rule_set_offsets = Vec::new();
         for _ in 0..rule_set_count {
-            rule_set_offsets.push(reader.read_u16_be().unwrap());
+            rule_set_offsets.push(reader.read_u16_be()?);
         }
         let mut rule_sets = Vec::new();
         for rule_set_offset in rule_set_offsets.iter() {
-            let rule_set = Self::get_seq_rule_set(reader, offset + *rule_set_offset as u64); 
+            let rule_set = Self::get_seq_rule_set(reader, offset + *rule_set_offset as u64)?;
             rule_sets.push(rule_set);
         }
         let offset = offset + coverage_offset as u64;
-        let coverage = Self::get_coverage(reader, offset);
-        LookupSubstitution::ContextSubstitution(ContextSubstitutionFormat1 {
-            subst_format: 1 as u16,
-            coverage,
-            rule_set_count,
-            rule_sets,
-        })
+        let coverage = Self::get_coverage(reader, offset)?;
+        Ok(LookupSubstitution::ContextSubstitution(
+            ContextSubstitutionFormat1 {
+                subst_format: 1 as u16,
+                coverage,
+                rule_set_count,
+                rule_sets,
+            },
+        ))
     }
 
-    fn get_class_def<R: BinaryReader>(reader: &mut R, offset: u64) -> ClassDef {
-        reader.seek(SeekFrom::Start(offset as u64)).unwrap();
-        let class_format = reader.read_u16_be().unwrap();
-        if class_format == 1 {
-            let start_glyph_id = reader.read_u16_be().unwrap();
-            let glyph_count = reader.read_u16_be().unwrap();
-            let mut class_value_array = Vec::new();
-            for _ in 0..glyph_count {
-                class_value_array.push(reader.read_u16_be().unwrap());
-            }
-
-            ClassDef::Format1(ClassDefFormat1 {
-                class_format,
-                start_glyph_id,
-                glyph_count,
-                class_value_array,
-            })
-        } else if class_format == 2 {
-            let range_count = reader.read_u16_be().unwrap();
-            let mut range_records = Vec::new();
-            for _ in 0..range_count {
-                let start_glyph_id = reader.read_u16_be().unwrap();
-                let end_glyph_id = reader.read_u16_be().unwrap();
-                let class = reader.read_u16_be().unwrap();
-                range_records.push(ClassRangeRecord {
-                    start_glyph_id,
-                    end_glyph_id,
-                    class,
-                });
-            }
-            ClassDef::Format2(ClassDefFormat2 {
-                class_format,
-                range_count,
-                range_records,
-            })
-        } else {
-            panic!("Unknown class format: {}", class_format)
-        }
+    fn get_class_def<R: BinaryReader>(
+        reader: &mut R,
+        offset: u64,
+    ) -> Result<ClassDef, std::io::Error> {
+        ClassDef::new(reader, offset)
     }
 
-    fn get_context_format2<R: BinaryReader>(reader: &mut R, offset: u64) -> LookupSubstitution {
-        let coverage_offset = reader.read_u16_be().unwrap();
-        let class_def_offset = reader.read_u16_be().unwrap();
-        let class_seq_rule_set_count = reader.read_u16_be().unwrap();
+    fn get_context_format2<R: BinaryReader>(
+        reader: &mut R,
+        offset: u64,
+    ) -> Result<LookupSubstitution, std::io::Error> {
+        let coverage_offset = reader.read_u16_be()?;
+        let class_def_offset = reader.read_u16_be()?;
+        let class_seq_rule_set_count = reader.read_u16_be()?;
         let mut class_seq_rule_set_offsets = Vec::new();
         for _ in 0..class_seq_rule_set_count {
-            class_seq_rule_set_offsets.push(reader.read_u16_be().unwrap());
+            class_seq_rule_set_offsets.push(reader.read_u16_be()?);
         }
         let mut class_seq_rule_sets = Vec::new();
         for class_seq_rule_set_offset in class_seq_rule_set_offsets.iter() {
             let offset = *class_seq_rule_set_offset as u64 + offset;
-            let class_seq_rule_set = Self::get_class_seq_rule_set(reader, offset);
-            class_seq_rule_sets.push(class_seq_rule_set);            
+            let class_seq_rule_set = Self::get_class_seq_rule_set(reader, offset)?;
+            class_seq_rule_sets.push(class_seq_rule_set);
         }
-        let coverage = Self::get_coverage(reader, offset + coverage_offset as u64);
-        let class_def = Self::get_class_def(reader, offset + class_def_offset as u64);
+        let coverage = Self::get_coverage(reader, offset + coverage_offset as u64)?;
+        let class_def = Self::get_class_def(reader, offset + class_def_offset as u64)?;
 
-        LookupSubstitution::ContextSubstitution2(ContextSubstitutionFormat2 {
-            subst_format: 2 as u16,
-            coverage,
-            class_def,
-            class_seq_rule_set_count,
-            class_seq_rule_sets,
-        })
-
+        Ok(LookupSubstitution::ContextSubstitution2(
+            ContextSubstitutionFormat2 {
+                subst_format: 2 as u16,
+                coverage,
+                class_def,
+                class_seq_rule_set_count,
+                class_seq_rule_sets,
+            },
+        ))
     }
 
-    fn get_class_seq_rule_set<R: BinaryReader>(reader: &mut R, offset: u64) -> ClassSequenceRuleSet {
-        reader.seek(SeekFrom::Start(offset as u64)).unwrap();
-        let class_seq_rule_count = reader.read_u16_be().unwrap();
+    fn get_class_seq_rule_set<R: BinaryReader>(
+        reader: &mut R,
+        offset: u64,
+    ) -> Result<ClassSequenceRuleSet, std::io::Error> {
+        reader.seek(SeekFrom::Start(offset as u64))?;
+        let class_seq_rule_count = reader.read_u16_be()?;
         let mut class_seq_rule_offsets = Vec::new();
         for _ in 0..class_seq_rule_count {
-            class_seq_rule_offsets.push(reader.read_u16_be().unwrap());
+            class_seq_rule_offsets.push(reader.read_u16_be()?);
         }
         let mut class_seq_rules = Vec::new();
         for class_seq_rule_offset in class_seq_rule_offsets.iter() {
             if *class_seq_rule_offset == 0 {
-                class_seq_rules.push(
-                    ClassSequenceRule {
-                        glyph_count: 0,
-                        input_sequences: Vec::new(),
-                        seq_lookup_count: 0,
-                        seq_lookup_records: SequenceLookupRecords {
-                            lookup_records: Vec::new(),
-                        },
-                    }
-                );
+                class_seq_rules.push(ClassSequenceRule {
+                    glyph_count: 0,
+                    input_sequences: Vec::new(),
+                    seq_lookup_count: 0,
+                    seq_lookup_records: SequenceLookupRecords {
+                        lookup_records: Vec::new(),
+                    },
+                });
                 continue;
             }
             let offset = *class_seq_rule_offset as u64 + offset;
-            let class_seq_rule = Self::get_class_seq_rule(reader, offset);
+            let class_seq_rule = Self::get_class_seq_rule(reader, offset)?;
             class_seq_rules.push(class_seq_rule);
         }
-        ClassSequenceRuleSet {
+        Ok(ClassSequenceRuleSet {
             class_seq_rule_count,
             class_seq_rules,
-        }
+        })
     }
 
-    fn get_class_seq_rule<R: BinaryReader>(reader: &mut R, offset: u64) -> ClassSequenceRule {
-        reader.seek(SeekFrom::Start(offset as u64)).unwrap();
-        let glyph_count = reader.read_u16_be().unwrap();
-        let seq_lookup_count = reader.read_u16_be().unwrap();
+    fn get_class_seq_rule<R: BinaryReader>(
+        reader: &mut R,
+        offset: u64,
+    ) -> Result<ClassSequenceRule, std::io::Error> {
+        reader.seek(SeekFrom::Start(offset as u64))?;
+        let glyph_count = reader.read_u16_be()?;
+        let seq_lookup_count = reader.read_u16_be()?;
         let mut input_sequences = Vec::new();
         for _ in 0..glyph_count as i32 - 1 {
-            let input_sequence = reader.read_u16_be().unwrap();
+            let input_sequence = reader.read_u16_be()?;
             input_sequences.push(input_sequence);
         }
         let mut lookup_records = Vec::new();
         for _ in 0..seq_lookup_count {
-            let sequence_index = reader.read_u16_be().unwrap();
-            let lookup_list_index = reader.read_u16_be().unwrap();
+            let sequence_index = reader.read_u16_be()?;
+            let lookup_list_index = reader.read_u16_be()?;
             lookup_records.push(LookupRecord {
                 sequence_index,
                 lookup_list_index,
@@ -468,71 +482,71 @@ impl LookupList {
         }
         let seq_lookup_records = SequenceLookupRecords { lookup_records };
 
-        ClassSequenceRule {
+        Ok(ClassSequenceRule {
             glyph_count,
             input_sequences,
             seq_lookup_count,
             seq_lookup_records,
-        }
-        
-
-
+        })
     }
 
-
-
-    fn get_seq_rule_set<R: BinaryReader>(reader: &mut R, offset: u64) -> SequenceRuleSet {
-        reader.seek(SeekFrom::Start(offset as u64)).unwrap();
-        let rule_count = reader.read_u16_be().unwrap();
+    fn get_seq_rule_set<R: BinaryReader>(
+        reader: &mut R,
+        offset: u64,
+    ) -> Result<SequenceRuleSet, std::io::Error> {
+        reader.seek(SeekFrom::Start(offset as u64))?;
+        let rule_count = reader.read_u16_be()?;
         let mut rule_offsets = Vec::new();
         for _ in 0..rule_count {
-            rule_offsets.push(reader.read_u16_be().unwrap());
+            rule_offsets.push(reader.read_u16_be()?);
         }
         let mut rules = Vec::new();
         for rule_offset in rule_offsets.iter() {
             let offset = *rule_offset as u64 + offset;
-            let rule = Self::get_seq_rule(reader, offset);
+            let rule = Self::get_seq_rule(reader, offset)?;
             rules.push(rule);
         }
-        SequenceRuleSet {
-            rule_count,
-            rules,
-        }
+        Ok(SequenceRuleSet { rule_count, rules })
     }
-    
-    fn get_seq_rule<R: BinaryReader>(reader: &mut R, offset: u64) -> SequenceRule {
-        reader.seek(SeekFrom::Start(offset as u64)).unwrap();
-        let glyph_count = reader.read_u16_be().unwrap();
-        let lookup_count = reader.read_u16_be().unwrap();
+
+    fn get_seq_rule<R: BinaryReader>(
+        reader: &mut R,
+        offset: u64,
+    ) -> Result<SequenceRule, std::io::Error> {
+        reader.seek(SeekFrom::Start(offset as u64))?;
+        let glyph_count = reader.read_u16_be()?;
+        let lookup_count = reader.read_u16_be()?;
         let mut input_sequence = Vec::new();
         for _ in 0..glyph_count - 1 {
-            input_sequence.push(reader.read_u16_be().unwrap());
+            input_sequence.push(reader.read_u16_be()?);
         }
         let mut lookup_indexes = Vec::new();
         for _ in 0..lookup_count {
-            lookup_indexes.push(reader.read_u16_be().unwrap());
+            lookup_indexes.push(reader.read_u16_be()?);
         }
-        SequenceRule {
+        Ok(SequenceRule {
             glyph_count,
             input_sequence,
             lookup_count,
             lookup_indexes,
-        }
+        })
     }
 
-    
-    fn get_context_format3<R: BinaryReader>(reader: &mut R, offset: u64) -> LookupSubstitution {
+    fn get_context_format3<R: BinaryReader>(
+        reader: &mut R,
+        offset: u64,
+    ) -> Result<LookupSubstitution, std::io::Error> {
         // ContextSubstitutionFormat3
-        let glyph_count = reader.read_u16_be().unwrap();
-        let seq_lookup_count = reader.read_u16_be().unwrap();
+        let glyph_count = reader.read_u16_be()?;
+        let seq_lookup_count = reader.read_u16_be()?;
         let mut coverage_offsets = Vec::new();
         for _ in 0..glyph_count {
-            coverage_offsets.push(reader.read_u16_be().unwrap());
+            coverage_offsets.push(reader.read_u16_be()?);
         }
         let mut lookup_records = Vec::new();
         for _ in 0..seq_lookup_count {
-            let sequence_index = reader.read_u16_be().unwrap();
-            let lookup_list_index = reader.read_u16_be().unwrap();
+            let sequence_index = reader.read_u16_be()?;
+            let lookup_list_index = reader.read_u16_be()?;
             lookup_records.push(LookupRecord {
                 sequence_index,
                 lookup_list_index,
@@ -541,62 +555,66 @@ impl LookupList {
         let seq_lookup_records = SequenceLookupRecords { lookup_records };
         let mut coverages = Vec::new();
         for coverage_offset in coverage_offsets.iter() {
-            let coverage = Self::get_coverage(reader, offset + *coverage_offset as u64);
+            let coverage = Self::get_coverage(reader, offset + *coverage_offset as u64)?;
             coverages.push(coverage);
         }
-        LookupSubstitution::ContextSubstitution3(ContextSubstitutionFormat3 {
-            subst_format: 3 as u16,
-            glyph_count,
-            coverages,
-            seq_lookup_count,
-            seq_lookup_records,
-        })
+        Ok(LookupSubstitution::ContextSubstitution3(
+            ContextSubstitutionFormat3 {
+                subst_format: 3 as u16,
+                glyph_count,
+                coverages,
+                seq_lookup_count,
+                seq_lookup_records,
+            },
+        ))
     }
-    
 
-    fn get_chaining_context<R: BinaryReader>(reader: &mut R, offset: u64) -> LookupSubstitution {
-        reader.seek(SeekFrom::Start(offset as u64)).unwrap();
-        let subst_format = reader.read_u16_be().unwrap();
+    fn get_chaining_context<R: BinaryReader>(
+        reader: &mut R,
+        offset: u64,
+    ) -> Result<LookupSubstitution, std::io::Error> {
+        reader.seek(SeekFrom::Start(offset as u64))?;
+        let subst_format = reader.read_u16_be()?;
         match subst_format {
             1 => {
-                let coverage_offset = reader.read_u16_be().unwrap();
-                let chain_sub_rule_set_count = reader.read_u16_be().unwrap();
+                let coverage_offset = reader.read_u16_be()?;
+                let chain_sub_rule_set_count = reader.read_u16_be()?;
                 let mut chain_sub_rule_set_offsets = Vec::new();
                 for _ in 0..chain_sub_rule_set_count {
-                    chain_sub_rule_set_offsets.push(reader.read_u16_be().unwrap());
+                    chain_sub_rule_set_offsets.push(reader.read_u16_be()?);
                 }
                 let mut chain_sub_rule_set = Vec::new();
                 for chain_sub_rule_set_offset in chain_sub_rule_set_offsets.iter() {
                     let offset = *chain_sub_rule_set_offset as u64 + offset;
-                    reader.seek(SeekFrom::Start(offset as u64)).unwrap();
-                    let chain_sub_rule_count = reader.read_u16_be().unwrap();
+                    reader.seek(SeekFrom::Start(offset as u64))?;
+                    let chain_sub_rule_count = reader.read_u16_be()?;
                     let mut chain_sub_rule_offsets = Vec::new();
                     for _ in 0..chain_sub_rule_count {
-                        chain_sub_rule_offsets.push(reader.read_u16_be().unwrap());
+                        chain_sub_rule_offsets.push(reader.read_u16_be()?);
                     }
                     let mut chain_sub_rule = Vec::new();
                     for chain_sub_rule_offset in chain_sub_rule_offsets.iter() {
                         let offset = *chain_sub_rule_offset as u64 + offset;
-                        reader.seek(SeekFrom::Start(offset as u64)).unwrap();
-                        let backtrack_glyph_count = reader.read_u16_be().unwrap();
+                        reader.seek(SeekFrom::Start(offset as u64))?;
+                        let backtrack_glyph_count = reader.read_u16_be()?;
                         let mut backtrack_glyph_ids = Vec::new();
                         for _ in 0..backtrack_glyph_count {
-                            backtrack_glyph_ids.push(reader.read_u16_be().unwrap());
+                            backtrack_glyph_ids.push(reader.read_u16_be()?);
                         }
-                        let input_glyph_count = reader.read_u16_be().unwrap();
+                        let input_glyph_count = reader.read_u16_be()?;
                         let mut input_glyph_ids = Vec::new();
                         for _ in 0..input_glyph_count {
-                            input_glyph_ids.push(reader.read_u16_be().unwrap());
+                            input_glyph_ids.push(reader.read_u16_be()?);
                         }
-                        let lookahead_glyph_count = reader.read_u16_be().unwrap();
+                        let lookahead_glyph_count = reader.read_u16_be()?;
                         let mut lookahead_glyph_ids = Vec::new();
                         for _ in 0..lookahead_glyph_count {
-                            lookahead_glyph_ids.push(reader.read_u16_be().unwrap());
+                            lookahead_glyph_ids.push(reader.read_u16_be()?);
                         }
-                        let lookup_count = reader.read_u16_be().unwrap();
+                        let lookup_count = reader.read_u16_be()?;
                         let mut lookup_indexes = Vec::new();
                         for _ in 0..lookup_count {
-                            lookup_indexes.push(reader.read_u16_be().unwrap());
+                            lookup_indexes.push(reader.read_u16_be()?);
                         }
                         chain_sub_rule.push(ChainSubRule {
                             backtrack_glyph_count,
@@ -615,65 +633,65 @@ impl LookupList {
                     });
                 }
                 let offset = offset + coverage_offset as u64;
-                let coverage = Self::get_coverage(reader, offset);
-                LookupSubstitution::ChainingContextSubstitution(
+                let coverage = Self::get_coverage(reader, offset)?;
+                Ok(LookupSubstitution::ChainingContextSubstitution(
                     ChainingContextSubstitutionFormat1 {
                         subst_format,
                         coverage,
                         chain_sub_rule_set_count,
                         chain_sub_rule_set,
                     },
-                )
+                ))
             }
             2 => {
-                let coverage_offset = reader.read_u16_be().unwrap();
-                let class_range_count = reader.read_u16_be().unwrap();
+                let coverage_offset = reader.read_u16_be()?;
+                let class_range_count = reader.read_u16_be()?;
                 let mut class_range_records = Vec::new();
                 for _ in 0..class_range_count {
-                    let start_glyph_id = reader.read_u16_be().unwrap();
-                    let end_glyph_id = reader.read_u16_be().unwrap();
-                    let class = reader.read_u16_be().unwrap();
+                    let start_glyph_id = reader.read_u16_be()?;
+                    let end_glyph_id = reader.read_u16_be()?;
+                    let class = reader.read_u16_be()?;
                     class_range_records.push(ClassRangeRecord {
                         start_glyph_id,
                         end_glyph_id,
                         class,
                     });
                 }
-                let coverage = Self::get_coverage(reader, offset + coverage_offset as u64);
+                let coverage = Self::get_coverage(reader, offset + coverage_offset as u64)?;
 
-                LookupSubstitution::ChainingContextSubstitution2(
+                Ok(LookupSubstitution::ChainingContextSubstitution2(
                     ChainingContextSubstitutionFormat2 {
                         subst_format,
                         class_range_count,
                         class_range_records,
                         coverage,
                     },
-                )
+                ))
             }
             3 => {
-                let backtrack_glyph_count = reader.read_u16_be().unwrap();
+                let backtrack_glyph_count = reader.read_u16_be()?;
                 let mut backtrack_coverage_offsets = Vec::new();
                 for _ in 0..backtrack_glyph_count {
-                    let coverage_offset = reader.read_u16_be().unwrap();
+                    let coverage_offset = reader.read_u16_be()?;
                     backtrack_coverage_offsets.push(coverage_offset);
                 }
-                let input_glyph_count = reader.read_u16_be().unwrap();
+                let input_glyph_count = reader.read_u16_be()?;
                 let mut input_coverage_offsets = Vec::new();
                 for _ in 0..input_glyph_count {
-                    let coverage_offset = reader.read_u16_be().unwrap();
+                    let coverage_offset = reader.read_u16_be()?;
                     input_coverage_offsets.push(coverage_offset);
                 }
-                let lookahead_glyph_count = reader.read_u16_be().unwrap();
+                let lookahead_glyph_count = reader.read_u16_be()?;
                 let mut lookahead_coverage_offsets = Vec::new();
                 for _ in 0..lookahead_glyph_count {
-                    let coverage_offset = reader.read_u16_be().unwrap();
+                    let coverage_offset = reader.read_u16_be()?;
                     lookahead_coverage_offsets.push(coverage_offset);
                 }
-                let seq_lookup_count = reader.read_u16_be().unwrap();
+                let seq_lookup_count = reader.read_u16_be()?;
                 let mut lookup_records = Vec::new();
                 for _ in 0..seq_lookup_count {
-                    let sequence_index = reader.read_u16_be().unwrap();
-                    let lookup_list_index = reader.read_u16_be().unwrap();
+                    let sequence_index = reader.read_u16_be()?;
+                    let lookup_list_index = reader.read_u16_be()?;
                     lookup_records.push(LookupRecord {
                         sequence_index,
                         lookup_list_index,
@@ -683,23 +701,23 @@ impl LookupList {
 
                 let mut backtrack_coverages = Vec::new();
                 for coverage_offset in backtrack_coverage_offsets.iter() {
-                    let coverage = Self::get_coverage(reader, offset + *coverage_offset as u64);
+                    let coverage = Self::get_coverage(reader, offset + *coverage_offset as u64)?;
                     backtrack_coverages.push(coverage);
                 }
 
                 let mut input_coverages = Vec::new();
                 for coverage_offset in input_coverage_offsets.iter() {
-                    let coverage = Self::get_coverage(reader, offset + *coverage_offset as u64);
+                    let coverage = Self::get_coverage(reader, offset + *coverage_offset as u64)?;
                     input_coverages.push(coverage);
                 }
 
                 let mut lookahead_coverages = Vec::new();
                 for coverage_offset in lookahead_coverage_offsets.iter() {
-                    let coverage = Self::get_coverage(reader, offset + *coverage_offset as u64);
+                    let coverage = Self::get_coverage(reader, offset + *coverage_offset as u64)?;
                     lookahead_coverages.push(coverage);
                 }
 
-                LookupSubstitution::ChainingContextSubstitution3(
+                Ok(LookupSubstitution::ChainingContextSubstitution3(
                     ChainingContextSubstitutionFormat3 {
                         format: subst_format,
                         backtrack_glyph_count,
@@ -711,61 +729,33 @@ impl LookupList {
                         seq_lookup_count,
                         seq_lookup_records,
                     },
-                )
+                ))
             }
-            _ => LookupSubstitution::Unknown,
+            _ => Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                format!("Unknown chaining context format"),
+            )),
         }
     }
 
-    fn get_coverage<R: BinaryReader>(reader: &mut R, offset: u64) -> Coverage {
-        reader.seek(SeekFrom::Start(offset as u64)).unwrap();
-        let coverage_format = reader.read_u16_be().unwrap();
-        match coverage_format {
-            1 => {
-                let glyph_count = reader.read_u16_be().unwrap();
-                let mut glyph_ids = Vec::new();
-                for _ in 0..glyph_count {
-                    glyph_ids.push(reader.read_u16_be().unwrap());
-                }
-                Coverage::Format1(CoverageFormat1 {
-                    coverage_format,
-                    glyph_count,
-                    glyph_ids,
-                })
-            }
-            2 => {
-                let range_count = reader.read_u16_be().unwrap();
-                let mut range_records = Vec::new();
-                for _ in 0..range_count {
-                    let start_glyph_id = reader.read_u16_be().unwrap();
-                    let end_glyph_id = reader.read_u16_be().unwrap();
-                    let start_coverage_index = reader.read_u16_be().unwrap();
-                    range_records.push(RangeRecord {
-                        start_glyph_id,
-                        end_glyph_id,
-                        start_coverage_index,
-                    });
-                }
-                Coverage::Format2(CoverageFormat2 {
-                    coverage_format,
-                    range_count,
-                    range_records,
-                })
-            }
-            _ => {
-                panic!("Unknown coverage format: {}", coverage_format);
-            }
-        }
+    fn get_coverage<R: BinaryReader>(
+        reader: &mut R,
+        offset: u64,
+    ) -> Result<Coverage, std::io::Error> {
+        Coverage::new(reader, offset)
     }
 
-    fn get_extension<R: BinaryReader>(reader: &mut R, offset: u64) -> LookupSubstitution {
-        reader.seek(SeekFrom::Start(offset as u64)).unwrap();
+    fn get_extension<R: BinaryReader>(
+        reader: &mut R,
+        offset: u64,
+    ) -> Result<LookupSubstitution, std::io::Error> {
+        reader.seek(SeekFrom::Start(offset as u64))?;
         let _ = reader.read_u16_be(); // 1
-        let extension_lookup_type = reader.read_u16_be().unwrap();
-        let extension_offset = reader.read_u32_be().unwrap();
+        let extension_lookup_type = reader.read_u16_be()?;
+        let extension_offset = reader.read_u32_be()?;
 
         let offset = offset + extension_offset as u64;
-        reader.seek(SeekFrom::Start(offset as u64)).unwrap();
+        reader.seek(SeekFrom::Start(offset as u64))?;
         let lookup_type = num_traits::FromPrimitive::from_u16(extension_lookup_type).unwrap();
         let subtable = match lookup_type {
             LookupType::SingleSubstitution => Self::get_single(reader, offset),
@@ -788,37 +778,39 @@ impl LookupList {
     fn get_reverse_chaining_context<R: BinaryReader>(
         reader: &mut R,
         offset: u64,
-    ) -> LookupSubstitution {
-        reader.seek(SeekFrom::Start(offset as u64)).unwrap();
-        let subst_format = reader.read_u16_be().unwrap();
-        let coverage_offset = reader.read_u16_be().unwrap();
-        let backtrack_glyph_count = reader.read_u16_be().unwrap();
+    ) -> Result<LookupSubstitution, std::io::Error> {
+        reader.seek(SeekFrom::Start(offset as u64))?;
+        let subst_format = reader.read_u16_be()?;
+        let coverage_offset = reader.read_u16_be()?;
+        let backtrack_glyph_count = reader.read_u16_be()?;
         let mut backtrack_glyph_ids = Vec::new();
         for _ in 0..backtrack_glyph_count {
-            backtrack_glyph_ids.push(reader.read_u16_be().unwrap());
+            backtrack_glyph_ids.push(reader.read_u16_be()?);
         }
-        let input_glyph_count = reader.read_u16_be().unwrap();
+        let input_glyph_count = reader.read_u16_be()?;
         let mut input_glyph_ids = Vec::new();
         for _ in 0..input_glyph_count {
-            input_glyph_ids.push(reader.read_u16_be().unwrap());
+            input_glyph_ids.push(reader.read_u16_be()?);
         }
-        let lookahead_glyph_count = reader.read_u16_be().unwrap();
+        let lookahead_glyph_count = reader.read_u16_be()?;
         let mut lookahead_glyph_ids = Vec::new();
         for _ in 0..lookahead_glyph_count {
-            lookahead_glyph_ids.push(reader.read_u16_be().unwrap());
+            lookahead_glyph_ids.push(reader.read_u16_be()?);
         }
-        let substitute_glyph_id = reader.read_u16_be().unwrap();
-        LookupSubstitution::ReverseChainSingle(ReverseChainSingleSubstitutionFormat1 {
-            subst_format,
-            coverage_offset,
-            backtrack_glyph_count,
-            backtrack_glyph_ids,
-            input_glyph_count,
-            input_glyph_ids,
-            lookahead_glyph_count,
-            lookahead_glyph_ids,
-            substitute_glyph_id,
-        })
+        let substitute_glyph_id = reader.read_u16_be()?;
+        Ok(LookupSubstitution::ReverseChainSingle(
+            ReverseChainSingleSubstitutionFormat1 {
+                subst_format,
+                coverage_offset,
+                backtrack_glyph_count,
+                backtrack_glyph_ids,
+                input_glyph_count,
+                input_glyph_ids,
+                lookahead_glyph_count,
+                lookahead_glyph_ids,
+                substitute_glyph_id,
+            },
+        ))
     }
 }
 
@@ -987,10 +979,10 @@ impl LookupSubstitution {
                 }
             }
             Self::ChainingContextSubstitution3(_chaining3) => {
-                todo!() // これ実装したやつ頭おかしいだろ
+                panic!("ChainingContextSubstitution3 is not implemented")
             }
             Self::ExtensionSubstitution(_) => {
-                panic!() // not 7
+                panic!("ExtensionSubstitution is not implemented")
             }
             Self::ReverseChainSingle(_) => {
                 panic!()
@@ -1099,40 +1091,17 @@ pub(crate) struct ContextSubstitutionFormat2 {
 }
 
 #[derive(Debug, Clone)]
-pub (crate) struct ClassSequenceRuleSet {
+pub(crate) struct ClassSequenceRuleSet {
     pub(crate) class_seq_rule_count: u16,
     pub(crate) class_seq_rules: Vec<ClassSequenceRule>,
 }
 
 #[derive(Debug, Clone)]
-pub (crate) struct ClassSequenceRule {
+pub(crate) struct ClassSequenceRule {
     pub(crate) glyph_count: u16,
     pub(crate) seq_lookup_count: u16,
     pub(crate) input_sequences: Vec<u16>,
     pub(crate) seq_lookup_records: SequenceLookupRecords,
-
-}
-
-#[derive(Debug, Clone)]
-pub(crate) enum ClassDef {
-    Format1(ClassDefFormat1),
-    Format2(ClassDefFormat2),
-}
-
-
-#[derive(Debug, Clone)]
-pub(crate) struct ClassDefFormat1 {
-    pub(crate) class_format: u16,
-    pub(crate) start_glyph_id: u16,
-    pub(crate) glyph_count: u16,
-    pub(crate) class_value_array: Vec<u16>,
-}
-
-#[derive(Debug, Clone)]
-pub(crate) struct ClassDefFormat2 {
-    pub(crate) class_format: u16,
-    pub(crate) range_count: u16,
-    pub(crate) range_records: Vec<ClassRangeRecord>,
 }
 
 #[derive(Debug, Clone)]

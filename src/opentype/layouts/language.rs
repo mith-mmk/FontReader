@@ -26,7 +26,10 @@ impl LanguageSystemRecord {
     pub(crate) fn to_string(&self) -> String {
         let bytes = self.language_system_tag.to_be_bytes();
         let tag = String::from_utf8_lossy(&bytes);
-        let mut string = format!("LanguageSystem Tag: {} {:04x}\n", tag, self.language_system_tag);
+        let mut string = format!(
+            "LanguageSystem Tag: {} {:04x}\n",
+            tag, self.language_system_tag
+        );
         string += &format!("{}\n", self.language_system.to_string());
 
         string

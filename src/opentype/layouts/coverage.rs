@@ -1,3 +1,7 @@
+use std::io::SeekFrom;
+
+use bin_rs::reader::BinaryReader;
+
 #[derive(Debug, Clone)]
 
 pub(crate) enum Coverage {
@@ -30,6 +34,70 @@ impl Coverage {
                 }
                 return None;
             }
+        }
+    }
+
+    pub(crate) fn to_string(&self) -> String {
+        match self {
+            Coverage::Format1(coverage) => {
+                let mut string = String::new();
+                string += &format!("CoverageFormat: {}\n", coverage.coverage_format);
+                string += &format!("GlyphCount: {}\n", coverage.glyph_count);
+                string += &format!("GlyphIds: {:?}\n", coverage.glyph_ids);
+                string
+            }
+            Coverage::Format2(coverage) => {
+                let mut string = String::new();
+                string += &format!("CoverageFormat: {}\n", coverage.coverage_format);
+                string += &format!("RangeCount: {}\n", coverage.range_count);
+                string += &format!("RangeRecords: {:?}\n", coverage.range_records);
+                string
+            }
+        }
+    }
+
+    pub(crate) fn new<R: BinaryReader>(
+        reader: &mut R,
+        offset: u64,
+    ) -> Result<Self, std::io::Error> {
+        reader.seek(SeekFrom::Start(offset as u64))?;
+        let coverage_format = reader.read_u16_be()?;
+        match coverage_format {
+            1 => {
+                let glyph_count = reader.read_u16_be()?;
+                let mut glyph_ids = Vec::new();
+                for _ in 0..glyph_count {
+                    glyph_ids.push(reader.read_u16_be()?);
+                }
+                Ok(Coverage::Format1(CoverageFormat1 {
+                    coverage_format,
+                    glyph_count,
+                    glyph_ids,
+                }))
+            }
+            2 => {
+                let range_count = reader.read_u16_be()?;
+                let mut range_records = Vec::new();
+                for _ in 0..range_count {
+                    let start_glyph_id = reader.read_u16_be()?;
+                    let end_glyph_id = reader.read_u16_be()?;
+                    let start_coverage_index = reader.read_u16_be()?;
+                    range_records.push(RangeRecord {
+                        start_glyph_id,
+                        end_glyph_id,
+                        start_coverage_index,
+                    });
+                }
+                Ok(Coverage::Format2(CoverageFormat2 {
+                    coverage_format,
+                    range_count,
+                    range_records,
+                }))
+            }
+            _ => Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Unknown coverage format",
+            )),
         }
     }
 }

@@ -34,12 +34,14 @@ fn main() {
         for i in 0..font_number {
             font.set_font(i).unwrap();
             println!("\nfont number: {} ", i);
-            #[cfg(feature="layout")]
+            #[cfg(feature = "layout")]
             {
                 #[cfg(debug_assertions)]
                 {
+                    let gdef = font.get_gdef_raw();
+                    println!("GDEF: {}", gdef);
                     let gsub = font.get_gsub_raw();
-                    println!("layout: {}", gsub);
+                    println!("GSUB: {}", gsub);
                 }
             }
         }

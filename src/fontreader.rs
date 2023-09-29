@@ -8,6 +8,7 @@ use crate::fontheader;
 use crate::opentype::color::sbix;
 use crate::opentype::color::svg;
 use crate::opentype::color::{colr, cpal};
+use crate::opentype::extentions::gdef;
 #[cfg(feature = "layout")]
 use crate::opentype::extentions::gsub;
 use crate::opentype::platforms::PlatformID;
@@ -80,6 +81,8 @@ pub struct Font {
     pub(crate) colr: Option<colr::COLR>,
     pub(crate) cpal: Option<cpal::CPAL>,
     #[cfg(feature = "layout")]
+    pub(crate) gdef: Option<gdef::GDEF>,
+    #[cfg(feature = "layout")]
     pub(crate) gsub: Option<gsub::GSUB>,
     pub(crate) svg: Option<svg::SVG>,
     pub(crate) sbix: Option<sbix::SBIX>,
@@ -110,6 +113,8 @@ impl Font {
             cff: None,
             colr: None,
             cpal: None,
+            #[cfg(feature = "layout")]
+            gdef: None,
             #[cfg(feature = "layout")]
             gsub: None,
             sbix: None,
@@ -281,7 +286,13 @@ impl Font {
         self.get_glyph_with_uvs(ch, '\u{0}')
     }
 
-    pub fn get_svg_with_uvs(&self, ch: char, vs: char,fontsize: f64,fontunit: &str) -> Result<String, Error> {
+    pub fn get_svg_with_uvs(
+        &self,
+        ch: char,
+        vs: char,
+        fontsize: f64,
+        fontunit: &str,
+    ) -> Result<String, Error> {
         // svg ?
         // sbix ?
         // cff ?
@@ -289,7 +300,7 @@ impl Font {
         if let Some(cff) = self.cff.as_ref() {
             let gid = self.cmap.as_ref().unwrap().get_glyph_position(ch as u32) as usize;
             let layout = self.get_horizontal_layout(gid as usize);
-            let string = cff.to_svg(gid,fontsize, fontunit, &layout, 0.0, 0.0);
+            let string = cff.to_svg(gid, fontsize, fontunit, &layout, 0.0, 0.0);
             return Ok(string);
         }
 
@@ -606,6 +617,20 @@ impl Font {
 
     #[cfg(debug_assertions)]
     #[cfg(feature = "layout")]
+    pub fn get_gdef_raw(&self) -> String {
+        let gdef = if self.current_font == 0 {
+            self.gdef.as_ref().unwrap()
+        } else {
+            self.more_fonts[self.current_font - 1]
+                .gdef
+                .as_ref()
+                .unwrap()
+        };
+        gdef.to_string()
+    }
+
+    #[cfg(debug_assertions)]
+    #[cfg(feature = "layout")]
     pub fn get_gsub_raw(&self) -> String {
         let gsub = if self.current_font == 0 {
             self.gsub.as_ref().unwrap()
@@ -617,7 +642,6 @@ impl Font {
         };
         gsub.to_string()
     }
-
 
     pub fn get_html(&self, string: &str, fontsize: f64, fontunit: &str) -> Result<String, Error> {
         let mut html = String::new();
@@ -955,11 +979,14 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Result<Font, Error> {
                     #[cfg(feature = "layout")]
                     b"GSUB" => {
                         let mut reader = BytesReader::new(&table.data);
-                        let gsub = gsub::GSUB::new(&mut reader, 0, table.data.len() as u32);
+                        let gsub = gsub::GSUB::new(&mut reader, 0, table.data.len() as u32)?;
                         font.gsub = Some(gsub);
                     }
-                    b"sbix" => {
-                        sbix_table = Some(table);
+                    #[cfg(feature = "layout")]
+                    b"GDEF" => {
+                        let mut reader = BytesReader::new(&table.data);
+                        let gdef = gdef::GDEF::new(&mut reader, 0, table.data.len() as usize)?;
+                        font.gdef = Some(gdef);
                     }
                     _ => {
                         debug_assert!(true, "Unknown table tag")
@@ -1111,11 +1138,19 @@ fn from_opentype<R: BinaryReader>(file: &mut R, header: &OTFHeader) -> Result<Fo
             }
             #[cfg(feature = "layout")]
             b"GSUB" => {
-                let gsub = gsub::GSUB::new(file, record.offset, record.length);
+                let gsub = gsub::GSUB::new(file, record.offset, record.length)?;
                 font.gsub = Some(gsub);
                 #[cfg(debug_assertions)]
                 {
                     println!("{}", &font.gsub.as_ref().unwrap().to_string());
+                }
+            }
+            b"GDEF" => {
+                let gdef = gdef::GDEF::new(file, record.offset as u64, record.length as usize)?;
+                font.gdef = Some(gdef);
+                #[cfg(debug_assertions)]
+                {
+                    println!("{}", &font.gdef.as_ref().unwrap().to_string());
                 }
             }
             _ => {
