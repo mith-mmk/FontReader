@@ -24,8 +24,13 @@ pub(crate) struct LanguageSystemRecord {
 
 impl LanguageSystemRecord {
     pub(crate) fn to_string(&self) -> String {
-        let bytes = self.language_system_tag.to_be_bytes();
-        let tag = String::from_utf8_lossy(&bytes);
+        let tag = 
+        if self.language_system_tag == 0 {
+            "Default".to_string()
+        } else {
+            let bytes = self.language_system_tag.to_be_bytes();
+            String::from_utf8_lossy(&bytes).to_string()
+        };
         let mut string = format!(
             "LanguageSystem Tag: {} {:04x}\n",
             tag, self.language_system_tag

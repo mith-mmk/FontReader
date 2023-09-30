@@ -16,6 +16,7 @@ use crate::opentype::requires::cmap::CmapEncodings;
 use crate::opentype::requires::hmtx::LongHorMetric;
 use crate::opentype::requires::name::NameID;
 use crate::opentype::requires::*;
+use crate::opentype::requires::vmtx::VerticalMetric;
 use crate::opentype::{outline::*, OTFHeader};
 
 #[cfg(debug_assertions)]
@@ -86,6 +87,8 @@ pub struct Font {
     pub(crate) gsub: Option<gsub::GSUB>,
     pub(crate) svg: Option<svg::SVG>,
     pub(crate) sbix: Option<sbix::SBIX>,
+    pub(crate) vhea: Option<vhea::VHEA>,
+    pub(crate) vmtx: Option<vmtx::VMTX>,
     hmtx_pos: Option<Pointer>,
     loca_pos: Option<Pointer>, // OpenType font, CFF/CFF2 none
     glyf_pos: Option<Pointer>, // OpenType font, CFF/CFF2 none
@@ -119,6 +122,8 @@ impl Font {
             gsub: None,
             sbix: None,
             svg: None,
+            vhea: None,
+            vmtx: None,
             hmtx_pos: None,
             loca_pos: None,
             glyf_pos: None,
@@ -160,6 +165,42 @@ impl Font {
                 .as_ref()
                 .unwrap()
                 .get_metrix(id)
+        }
+    }
+
+    pub(crate) fn get_v_metrix(&self, id: usize) -> VerticalMetric {
+        if self.current_font == 0 {
+            self.vmtx.as_ref().unwrap().get_metrix(id)
+        } else {
+            self.more_fonts[self.current_font - 1]
+                .vmtx
+                .as_ref()
+                .unwrap()
+                .get_metrix(id)
+        }
+    }
+
+
+    pub fn get_vertical_layout(&self, id: usize) -> Option<VerticalLayout> {
+        let vhea = if self.current_font == 0 {
+            self.vhea.as_ref()
+        } else {
+            self.more_fonts[self.current_font - 1]
+                .vhea
+                .as_ref()
+        };
+        
+        if let Some(vhea) = vhea {
+            let v_metrix = self.get_v_metrix(id);
+            return Some(VerticalLayout {
+                tsb: v_metrix.top_side_bearing as isize,
+                advance_height: v_metrix.advance_height as isize,
+                accender: vhea.get_accender() as isize,
+                descender: vhea.get_descender() as isize,
+                line_gap: vhea.get_line_gap() as isize,
+            });
+        } else {
+            return None
         }
     }
 
@@ -214,6 +255,8 @@ impl Font {
             open_type_glyf: Some(open_type_glyph),
         }
     }
+
+    // pub fn get_glyph_vartical_width_uvs(&self, ch: char, vs: char) -> Option<GriphData> {
 
     pub fn get_glyph_with_uvs(&self, ch: char, vs: char) -> GriphData {
         let code = ch as u32;
@@ -845,7 +888,7 @@ fn font_debug(_font: &Font) {
 }
 
 fn font_load<R: BinaryReader>(file: &mut R) -> Result<Font, Error> {
-    match fontheader::get_font_type(file) {
+    match fontheader::get_font_type(file)? {
         fontheader::FontHeaders::OTF(header) => {
             let font = from_opentype(file, &header);
             #[cfg(debug_assertions)]
@@ -887,7 +930,7 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Result<Font, Error> {
         fontheader::FontHeaders::WOFF(header) => {
             let mut font = Font::empty();
             font.font_type = fontheader::FontHeaders::WOFF(header.clone());
-            let woff = crate::woff::WOFF::from(file, header);
+            let woff = crate::woff::WOFF::from(file, header)?;
 
             let mut hmtx_table = None;
             let mut loca_table = None;

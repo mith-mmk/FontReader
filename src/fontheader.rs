@@ -253,14 +253,14 @@ pub struct WOFF2Header {
     pub(crate) priv_length: u32,
 }
 
-pub fn get_font_type_from_file(filename: &PathBuf) -> FontHeaders {
+pub fn get_font_type_from_file(filename: &PathBuf) -> Result<FontHeaders, std::io::Error> {
     let file = std::fs::File::open(filename).unwrap();
     let reader = std::io::BufReader::new(file);
     let mut file = StreamReader::new(reader);
     get_font_type(&mut file)
 }
 
-pub fn get_font_type<B: BinaryReader>(file: &mut B) -> FontHeaders {
+pub fn get_font_type<B: BinaryReader>(file: &mut B) -> Result<FontHeaders, std::io::Error> {
     file.set_endian(Endian::BigEndian);
     let buffer = file.read_bytes_no_move(4).unwrap();
     let buffer: [u8; 4] = buffer.try_into().unwrap();
@@ -269,33 +269,33 @@ pub fn get_font_type<B: BinaryReader>(file: &mut B) -> FontHeaders {
     match &buffer {
         b"ttcf" => {
             let fontheader = TTCHeader::new(file);
-            FontHeaders::TTC(fontheader)
+            Ok(FontHeaders::TTC(fontheader))
         }
         // if 0x00010000 -> OTF
         b"\x00\x01\x00\x00" | b"OTTO" => {
             let fontheader = OTFHeader::new(file);
-            FontHeaders::OTF(fontheader)
+            Ok(FontHeaders::OTF(fontheader))
         }
         // 0
         b"wOFF" => {
-            let header = WOFFHeader::new(file);
-            FontHeaders::WOFF(header)
+            let header = WOFFHeader::new(file)?;
+            Ok(FontHeaders::WOFF(header))
         }
         b"wOF2" => {
-            let signature = file.read_u32_be().unwrap();
-            let flavor = file.read_u32_be().unwrap();
-            let length = file.read_u32_be().unwrap();
-            let num_tables = file.read_u16_be().unwrap();
-            let reserved = file.read_u16_be().unwrap();
-            let total_sfnt_size = file.read_u32_be().unwrap();
-            let major_version = file.read_u16_be().unwrap();
-            let minor_version = file.read_u16_be().unwrap();
-            let meta_offset = file.read_u32_be().unwrap();
-            let meta_length = file.read_u32_be().unwrap();
-            let meta_orig_length = file.read_u32_be().unwrap();
-            let priv_offset = file.read_u32_be().unwrap();
-            let priv_length = file.read_u32_be().unwrap();
-            FontHeaders::WOFF2(WOFF2Header {
+            let signature = file.read_u32_be()?;
+            let flavor = file.read_u32_be()?;
+            let length = file.read_u32_be()?;
+            let num_tables = file.read_u16_be()?;
+            let reserved = file.read_u16_be()?;
+            let total_sfnt_size = file.read_u32_be()?;
+            let major_version = file.read_u16_be()?;
+            let minor_version = file.read_u16_be()?;
+            let meta_offset = file.read_u32_be()?;
+            let meta_length = file.read_u32_be()?;
+            let meta_orig_length = file.read_u32_be()?;
+            let priv_offset = file.read_u32_be()?;
+            let priv_length = file.read_u32_be()?;
+            Ok(FontHeaders::WOFF2(WOFF2Header {
                 sfnt_version,
                 signature,
                 flavor,
@@ -310,13 +310,13 @@ pub fn get_font_type<B: BinaryReader>(file: &mut B) -> FontHeaders {
                 meta_orig_length,
                 priv_offset,
                 priv_length,
-            })
+            }))
         }
-        _ => FontHeaders::Unknown,
+        _ => Ok(FontHeaders::Unknown),
     }
 }
 
-pub fn get_font_type_from_buffer(fontdata: &[u8]) -> FontHeaders {
+pub fn get_font_type_from_buffer(fontdata: &[u8]) -> Result<FontHeaders, std::io::Error> {
     let file = &mut BytesReader::new(fontdata);
     get_font_type(file)
 }

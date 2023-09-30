@@ -1,10 +1,10 @@
 // GSUB -- Glyph Substitution Table
 
-// only check lookup Format1.1 , 4, 6.1, 7
+// only check lookup Format1.1 , 4, 5, 6.1, 7
 
-use std::{collections::HashMap, io::SeekFrom};
+use std::io::SeekFrom;
 
-use crate::opentype::layouts::{feature::Feature, lookup::Lookup, script::Script, *};
+use crate::opentype::layouts::{feature::Feature, lookup::Lookup, script::ParsedScript, *};
 use bin_rs::reader::BinaryReader;
 
 #[derive(Debug, Clone)]
@@ -18,11 +18,6 @@ pub(crate) struct GSUB {
     pub(crate) feature_variations: Option<Box<FeatureVariationList>>,
 }
 
-pub(crate) struct ParsedGsub {
-    scripts: HashMap<String, Vec<Script>>,
-    features: HashMap<String, Vec<Feature>>,
-    lookups: HashMap<String, Vec<Lookup>>,
-}
 
 impl GSUB {
     pub(crate) fn new<R: BinaryReader>(
@@ -48,7 +43,7 @@ impl GSUB {
             reader,
             offset + script_list_offset as u64,
             length,
-        ));
+        )?);
         let features = Box::new(FeatureList::new(
             reader,
             offset + feature_list_offset as u64,
@@ -89,9 +84,33 @@ impl GSUB {
         string
     }
 
+    pub fn get_script(&self, tag: &[u8;4]) -> Option<&ParsedScript> {
+        self.scripts.get_script(tag)
+    }
+
+    pub fn get_features(&self,tag: &[u8;4], script: &ParsedScript) -> Vec<&Feature> {
+        let mut features = Vec::new();
+        let language_system = &script.language_systems[0];
+        for feature_index in language_system.language_system.feature_indexes.iter() {
+            if self.features.features[*feature_index as usize].feature_tag == u32::from_be_bytes(*tag) {
+                features.push(&self.features.features[*feature_index as usize]);
+            }
+        }
+        features
+    }
+
+    pub fn get_lookups(&self, feature: &Feature) -> Vec<&Lookup> {
+        let mut lookups = Vec::new();
+        for lookup_index in feature.lookup_list_indices.iter() {
+            lookups.push(&self.lookups.lookups[*lookup_index as usize]);
+        }
+        lookups
+    }
+
     // ccmp Glyph Composition / Decomposition
-    pub fn lookup_ccmp(&self, griph_ids: usize) -> Option<usize> {
-        let features = self.features.get_features(b"ccmp");
+    pub fn lookup_ccmp(&self, griph_ids: usize, script: &ParsedScript) -> Option<usize> {
+        let script = self.get_script(b"DFLT").unwrap();
+        let features = self.get_features(&b"ccmp", script, );
         for feature in features.iter() {
             for lookup_index in feature.lookup_list_indices.iter() {
                 let lookup = self.lookups.lookups[*lookup_index as usize].clone();

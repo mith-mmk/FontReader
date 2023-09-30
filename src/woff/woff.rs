@@ -20,7 +20,7 @@ pub struct WOFFHeader {
 }
 
 impl WOFFHeader {
-    pub(crate) fn new<R: BinaryReader>(reader: &mut R) -> Self {
+    pub(crate) fn new<R: BinaryReader>(reader: &mut R) -> Result<Self,std::io::Error> {
         let mut header = Self {
             sfnt_version: 0,
             signature: 0,
@@ -37,20 +37,20 @@ impl WOFFHeader {
             priv_offset: 0,
             priv_length: 0,
         };
-        header.signature = reader.read_u32().unwrap();
-        header.flavor = reader.read_u32().unwrap();
-        header.length = reader.read_u32().unwrap();
-        header.num_tables = reader.read_u16().unwrap();
-        header.reserved = reader.read_u16().unwrap();
-        header.total_sfnt_size = reader.read_u32().unwrap();
-        header.major_version = reader.read_u16().unwrap();
-        header.minor_version = reader.read_u16().unwrap();
-        header.meta_offset = reader.read_u32().unwrap();
-        header.meta_length = reader.read_u32().unwrap();
-        header.meta_orig_length = reader.read_u32().unwrap();
-        header.priv_offset = reader.read_u32().unwrap();
-        header.priv_length = reader.read_u32().unwrap();
-        header
+        header.signature = reader.read_u32()?;
+        header.flavor = reader.read_u32()?;
+        header.length = reader.read_u32()?;
+        header.num_tables = reader.read_u16()?;
+        header.reserved = reader.read_u16()?;
+        header.total_sfnt_size = reader.read_u32()?;
+        header.major_version = reader.read_u16()?;
+        header.minor_version = reader.read_u16()?;
+        header.meta_offset = reader.read_u32()?;
+        header.meta_length = reader.read_u32()?;
+        header.meta_orig_length = reader.read_u32()?;
+        header.priv_offset = reader.read_u32()?;
+        header.priv_length = reader.read_u32()?;
+        Ok(header)
     }
 }
 
@@ -99,15 +99,15 @@ pub(crate) struct WOFF {
 }
 
 impl WOFF {
-    pub(crate) fn from<B: BinaryReader>(reader: &mut B, header: WOFFHeader) -> Self {
+    pub(crate) fn from<B: BinaryReader>(reader: &mut B, header: WOFFHeader) -> Result<Self, std::io::Error> {
         let mut table_records = Vec::new();
         for _ in 0..header.num_tables {
             let mut table_record = WOFFTableRecord::new();
-            table_record.tag = reader.read_u32().unwrap();
-            table_record.offset = reader.read_u32().unwrap();
-            table_record.comp_length = reader.read_u32().unwrap();
-            table_record.orig_length = reader.read_u32().unwrap();
-            table_record.orig_checksum = reader.read_u32().unwrap();
+            table_record.tag = reader.read_u32()?;
+            table_record.offset = reader.read_u32()?;
+            table_record.comp_length = reader.read_u32()?;
+            table_record.orig_length = reader.read_u32()?;
+            table_record.orig_checksum = reader.read_u32()?;
             let tag_str = crate::util::u32_to_string(table_record.tag);
             #[cfg(debug_assertions)]
             {
@@ -123,12 +123,19 @@ impl WOFF {
         // read metadata
         reader
             .seek(std::io::SeekFrom::Start(header.meta_offset as u64))
-            .unwrap();
+            ?;
         let metadata = if header.meta_length > 0 {
             let compress_metadata = reader
                 .read_bytes_as_vec(header.meta_length as usize)
-                .unwrap();
-            let metadata_bytes = decompress_to_vec_zlib(&compress_metadata).unwrap();
+                ?;
+            let metadata_bytes = decompress_to_vec_zlib(&compress_metadata);
+            if metadata_bytes.is_err() {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "Failed to decompress metadata",
+                ));
+            }
+            let metadata_bytes = metadata_bytes.unwrap();
             String::from_utf8(metadata_bytes).unwrap()
         } else {
             "".to_string()
@@ -140,36 +147,43 @@ impl WOFF {
 
         reader
             .seek(std::io::SeekFrom::Start(header.priv_offset as u64))
-            .unwrap();
+            ?;
         let private_data = reader
             .read_bytes_as_vec(header.priv_length as usize)
-            .unwrap();
+            ?;
 
         // read table data
         let mut tables = Vec::new();
         for table_record in table_records.iter() {
             reader
                 .seek(std::io::SeekFrom::Start(table_record.offset as u64))
-                .unwrap();
+                ?;
             let mut table = WOFFTable::new();
             table.tag = table_record.tag;
             let mut table_data = reader
                 .read_bytes_as_vec(table_record.comp_length as usize)
-                .unwrap();
+                ?;
             if table_record.comp_length != table_record.orig_length {
-                table_data = decompress_to_vec_zlib(&table_data).unwrap();
+                let decompress = decompress_to_vec_zlib(&table_data);
+                if decompress.is_err() {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "Failed to decompress table data",
+                    ));
+                }
+                table_data = decompress.unwrap();
             }
             table.data = table_data;
             tables.push(table);
         }
 
-        WOFF {
+        Ok(WOFF {
             header,
             table_records,
             metadata: Box::new(metadata),
             private_data: Box::new(private_data),
             tables,
-        }
+        })
     }
 
     pub fn get_metadata(&self) -> &str {

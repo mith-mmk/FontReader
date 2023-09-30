@@ -5,7 +5,7 @@ use std::{fmt, io::SeekFrom};
 
 #[derive(Debug, Clone)]
 pub(crate) struct VMTX {
-    pub(crate) v_metrics: Box<Vec<LongHorMetric>>,
+    pub(crate) v_metrics: Box<Vec<VerticalMetric>>,
     pub(crate) top_side_bearings: Box<Vec<u16>>,
 }
 
@@ -26,11 +26,11 @@ impl VMTX {
         get_hdmx(file, offest, length, number_of_hmetrics, num_glyphs)
     }
 
-    pub(crate) fn get_metrix(&self, i: usize) -> LongHorMetric {
+    pub(crate) fn get_metrix(&self, i: usize) -> VerticalMetric {
         let v_metric = self.v_metrics.get(i);
         if v_metric.is_none() {
-            return LongHorMetric {
-                advance_width: 0,
+            return VerticalMetric {
+                advance_height: 0,
                 top_side_bearing: 0,
             };
         }
@@ -41,7 +41,7 @@ impl VMTX {
         let mut string = "hmtx\n".to_string();
         let max_len = 10;
         for (i, v_metric) in self.v_metrics.iter().enumerate() {
-            let advance_width = format!("{i} Advance Height {} ", v_metric.advance_width);
+            let advance_width = format!("{i} Advance Height {} ", v_metric.advance_height);
             string += &advance_width;
             let top_side_bearing = format!("Top Side Bearing {}\n", v_metric.top_side_bearing);
             string += &top_side_bearing;
@@ -61,8 +61,8 @@ impl VMTX {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct LongHorMetric {
-    pub(crate) advance_width: u16,
+pub(crate) struct VerticalMetric {
+    pub(crate) advance_height: u16,
     pub(crate) top_side_bearing: i16,
 }
 
@@ -77,10 +77,10 @@ fn get_hdmx<R: bin_rs::reader::BinaryReader>(
     file.seek(SeekFrom::Start(offest as u64))?;
     let mut v_metrics = Vec::new();
     for _ in 0..number_of_hmetrics {
-        let advance_width = file.read_u16_be()?;
+        let advance_height = file.read_u16_be()?;
         let top_side_bearing = file.read_i16_be()?;
-        v_metrics.push(LongHorMetric {
-            advance_width,
+        v_metrics.push(VerticalMetric {
+            advance_height,
             top_side_bearing,
         });
     }

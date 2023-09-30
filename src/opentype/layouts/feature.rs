@@ -90,17 +90,6 @@ impl FeatureList {
         }
     }
 
-    pub(crate) fn get_features(&self, tag: &[u8; 4]) -> Vec<Feature> {
-        let tag_id = u32::from_be_bytes(*tag);
-        let mut features = Vec::new();
-        for feature in self.features.iter() {
-            if feature.feature_tag == tag_id {
-                features.push(feature.clone());
-            }
-        }
-        features
-    }
-
     pub(crate) fn to_string(&self) -> String {
         let mut string = format!("FeatureCount: {}\n", self.feature_count);
         for feature in self.features.iter() {
