@@ -11,6 +11,7 @@ use crate::opentype::color::{colr, cpal};
 use crate::opentype::extentions::gdef;
 #[cfg(feature = "layout")]
 use crate::opentype::extentions::gsub;
+use crate::opentype::layouts;
 use crate::opentype::platforms::PlatformID;
 use crate::opentype::requires::cmap::CmapEncodings;
 use crate::opentype::requires::hmtx::LongHorMetric;
@@ -329,6 +330,127 @@ impl Font {
         self.get_glyph_with_uvs(ch, '\u{0}')
     }
 
+    pub fn get_svg_from_id(&self, glyph_id: usize, fontsize: f64, fontunit: &str)  -> Result<String, Error>{
+        let layout = self.get_horizontal_layout(glyph_id);
+        #[cfg(feature = "cff")]
+        if let Some(cff) = self.cff.as_ref() {
+            let string = cff.to_svg(glyph_id, fontsize, fontunit, &layout, 0.0, 0.0)?;
+            return Ok(string);
+        }
+
+        // utf-32
+        let pos = glyph_id as u32;
+        if let Some(glyf) = &self.glyf { 
+            let glyph = glyf.get_glyph(pos as usize);
+            if glyph.is_none() {
+                return Err(Error::new(
+                    std::io::ErrorKind::Other,
+                    "glyph is none".to_string(),
+                ));
+            }
+            let glyph = glyph.unwrap();
+            if let Some(sbix) = self.sbix.as_ref() {
+                let result = sbix.get_svg(pos as u32, fontsize, fontunit, &layout, 0.0, 0.0);
+                if let Some(svg) = result {
+                    let mut string = "".to_string();
+                    #[cfg(debug_assertions)]
+                    {
+                        string += &format!("<!-- glyf id: {} -->", pos);
+                    }
+                    string += &svg;
+                    return Ok(string);
+                }
+            } else if let Some(svg) = self.svg.as_ref() {
+                let result = svg.get_svg(pos as u32, fontsize, fontunit, &layout, 0.0, 0.0);
+                if let Some(svg) = result {
+                    let mut string = "".to_string();
+                    #[cfg(debug_assertions)]
+                    {
+                        string += &format!("<!-- glyf id: {} -->", pos);
+                        string += &format!(
+                            "<!-- layout {} {} {} {} {} -->\n",
+                            layout.lsb,
+                            layout.advance_width,
+                            layout.accender,
+                            layout.descender,
+                            layout.line_gap
+                        );
+                    }
+                    string += &svg;
+                    return Ok(string);
+                }
+            }
+            let glyf = if self.current_font == 0 {
+                self.glyf.as_ref().unwrap()
+            } else {
+                self.more_fonts[self.current_font - 1]
+                    .glyf
+                    .as_ref()
+                    .unwrap()
+            };
+
+            let (cpal, colr) = if self.current_font == 0 {
+                (self.cpal.as_ref(), self.colr.as_ref())
+            } else {
+                (
+                    self.more_fonts[self.current_font - 1].cpal.as_ref(),
+                    self.more_fonts[self.current_font - 1].colr.as_ref(),
+                )
+            };
+
+            if let Some(colr) = colr.as_ref() {
+                let layers = colr.get_layer_record(pos as u16);
+                if layers.is_empty() {
+                    return Ok(glyph.to_svg(fontsize, fontunit, &layout, 0.0, 0.0));
+                }
+                let mut string = glyph.get_svg_heder(fontsize, fontunit, &layout);
+                #[cfg(debug_assertions)]
+                {
+                    string += &format!("\n<!-- glyf id: {} -->", pos);
+                }
+
+                for layer in layers {
+                    let glyf_id = layer.glyph_id as u32;
+                    let glyf = glyf.get_glyph(glyf_id as usize).unwrap();
+                    let pallet = cpal
+                        .as_ref()
+                        .unwrap()
+                        .get_pallet(layer.palette_index as usize);
+                    #[cfg(debug_assertions)]
+                    {
+                        string += &format!("<!-- pallet index {} -->\n", layer.palette_index);
+                        string += &format!(
+                            "<!-- Red {} Green {} Blue {} Alpha {} -->\n",
+                            pallet.red, pallet.green, pallet.blue, pallet.alpha
+                        );
+                    }
+                    string += &format!(
+                        "<g fill=\"rgba({}, {}, {}, {})\">\n",
+                        pallet.red, pallet.green, pallet.blue, pallet.alpha
+                    );
+                    string += &glyf.get_svg_path(&layout);
+                    string += "</g>\n";
+                }
+                string += "</svg>";
+                Ok(string)
+            } else {
+                #[cfg(debug_assertions)]
+                {
+                    let string = glyph.to_svg(fontsize, fontunit, &layout, 0.0, 0.0);
+                    return Ok(format!("<!-- glyf id: {} -->{}", pos, string));
+                }
+                #[cfg(not(debug_assertions))]
+                Ok(glyph.to_svg(fontsize, fontunit, &layout, 0.0, 0.0))
+            }
+        } else {
+            return Err(Error::new(
+                std::io::ErrorKind::Other,
+                "glyf is none".to_string(),
+            ));
+        }
+    }
+
+
     pub fn get_svg_with_uvs(
         &self,
         ch: char,
@@ -344,7 +466,7 @@ impl Font {
             let gid = self.cmap.as_ref().unwrap().get_glyph_position(ch as u32) as usize;
             let layout = self.get_horizontal_layout(gid as usize);
             let string = cff.to_svg(gid, fontsize, fontunit, &layout, 0.0, 0.0);
-            return Ok(string);
+            return string;
         }
 
         if self.glyf.is_none() {
@@ -1188,6 +1310,7 @@ fn from_opentype<R: BinaryReader>(file: &mut R, header: &OTFHeader) -> Result<Fo
                     println!("{}", &font.gsub.as_ref().unwrap().to_string());
                 }
             }
+            #[cfg(feature = "layout")]
             b"GDEF" => {
                 let gdef = gdef::GDEF::new(file, record.offset as u64, record.length as usize)?;
                 font.gdef = Some(gdef);

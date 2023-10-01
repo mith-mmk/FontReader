@@ -1984,9 +1984,15 @@ impl CFF {
         layout: &HorizontalLayout,
         sx: f64,
         sy: f64,
-    ) -> String {
+    ) -> Result<String, std::io::Error> {
+        if gid >= self.char_string.data.data.len() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                format!("gid {} is not found", gid),
+            ));
+        }
         let data = &self.char_string.data.data[gid as usize];
-        self.parse_data(gid, &data, fontsize, fontunit, layout, sx, sy, true)
+        Ok(self.parse_data(gid, &data, fontsize, fontunit, layout, sx, sy, true))
     }
 
     fn parse_data(
