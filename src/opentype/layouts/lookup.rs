@@ -140,7 +140,7 @@ impl LookupList {
         reader.seek(SeekFrom::Start(offset as u64))?;
         let lookup_count = reader.read_u16_be()?;
         let mut lookup_offsets = Vec::with_capacity(lookup_count as usize);
-        for i in 0..lookup_count {
+        for _ in 0..lookup_count {
             lookup_offsets.push(reader.read_u16_be()?);
         }
 
@@ -162,7 +162,7 @@ impl LookupList {
         reader.seek(SeekFrom::Start(offset as u64))?;
         let lookup_count = reader.read_u16_be()?;
         let mut lookup_offsets = Vec::with_capacity(lookup_count as usize);
-        for i in 0..lookup_count {
+        for _ in 0..lookup_count {
             lookup_offsets.push(reader.read_u16_be()?);
         }
 
@@ -183,6 +183,8 @@ impl LookupList {
             lookups: Box::new(lookups_parsed),
         })
     }
+
+
 
     fn get_single<R: BinaryReader>(
         reader: &mut R,
@@ -887,6 +889,28 @@ impl LookupSubstitution {
             coverages = Some((coverages1, coverages2, coverages3));
         }
         (coverage, coverages)
+    }
+
+    pub(crate) fn get_single_glyph_id(&self, glyph_id: u16) -> Option<u16> {
+        let subtable = self;
+        match subtable {
+            LookupSubstitution::Single(single) => {
+                let (coverage, _) = subtable.get_coverage();
+                if let Some(_) = coverage.contains(glyph_id as usize) {
+                    return Some((glyph_id as isize + single.delta_glyph_id as isize) as u16);
+                }
+            }
+           LookupSubstitution::Single2(subtable) => {
+                let coverage= &subtable.coverage;
+                if let Some(id) = coverage.contains(glyph_id as usize) {
+                    return Some(subtable.substitute_glyph_ids[id as usize] as u16);
+                }
+            }
+            _ => {
+            }
+        }
+        None
+        
     }
 
     pub(crate) fn get_lookup(&self, gliph_id: usize) -> LookupResult {

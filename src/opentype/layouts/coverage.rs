@@ -2,6 +2,8 @@ use std::io::SeekFrom;
 
 use bin_rs::reader::BinaryReader;
 
+use crate::opentype::{outline::glyf, requires};
+
 #[derive(Debug, Clone)]
 
 pub(crate) enum Coverage {
@@ -13,26 +15,34 @@ impl Coverage {
     pub(crate) fn contains(&self, griph_id: usize) -> Option<usize> {
         match self {
             Coverage::Format1(coverage) => {
-                for (i, glyph_id) in coverage.glyph_ids.iter().enumerate() {
-                    if *glyph_id == griph_id as u16 {
-                        return Some(i);
-                    }
+                let glyph_ids = &coverage.glyph_ids;
+                let result = glyph_ids.binary_search(&(griph_id as u16));
+                match result {
+                    Ok(index) => Some(index),
+                    Err(_) => None,
                 }
-                return None;
             }
             Coverage::Format2(coverage) => {
-                for range_record in coverage.range_records.iter() {
-                    if range_record.start_glyph_id <= griph_id as u16
-                        && range_record.end_glyph_id >= griph_id as u16
-                    {
-                        return Some(
-                            (range_record.start_coverage_index
-                                + (griph_id as u16 - range_record.start_glyph_id))
-                                as usize,
-                        );
+                let range_records:& Vec<RangeRecord>  = &coverage.range_records;
+                let result = range_records.binary_search_by(|x| {
+                    if x.start_glyph_id >= (griph_id as u16) && x.end_glyph_id <= (griph_id as u16) {
+                        std::cmp::Ordering::Equal
+                    } else if x.end_glyph_id > (griph_id as u16) {
+                        std::cmp::Ordering::Greater
+                    } else {
+                        std::cmp::Ordering::Less
                     }
+                });
+                match result {
+                    Ok(index) => {
+                        let reage_record = &range_records[index];
+                        let index  = reage_record.start_coverage_index
+                            + (griph_id as u16 - reage_record.start_glyph_id);
+                        Some(index as usize)
+                    }
+                    Err(_) => None,
                 }
-                return None;
+                    
             }
         }
     }

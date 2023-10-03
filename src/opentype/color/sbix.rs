@@ -89,7 +89,7 @@ impl SBIX {
         gid: u32,
         fonsize: f64,
         fontunit: &str,
-        _: &crate::fontreader::HorizontalLayout,
+        _: &crate::fontreader::FontLayout,
         _: f64,
         _: f64,
     ) -> Option<String> {

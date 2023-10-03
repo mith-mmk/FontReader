@@ -257,9 +257,22 @@ impl Font {
         }
     }
 
-    // pub fn get_glyph_vartical_width_uvs(&self, ch: char, vs: char) -> Option<GriphData> {
+    pub fn get_layout(&self, glyph_id: usize, is_vart: bool) -> FontLayout {
+        let layout = if is_vart {
+            let result = self.get_vertical_layout(glyph_id as usize);
+            if result.is_some() {
+                FontLayout::Vertical(result.unwrap())
+            } else {
+                FontLayout::Horizontal(self.get_horizontal_layout(glyph_id as usize))
+            }
+        } else {
+            FontLayout::Horizontal(self.get_horizontal_layout(glyph_id as usize))
+        };
+        layout
+    }
 
-    pub fn get_glyph_with_uvs(&self, ch: char, vs: char) -> GriphData {
+
+    pub fn get_glyph_with_uvs_axis(&self, ch: char, vs: char, is_vart: bool) -> GriphData {
         let code = ch as u32;
         let vs = vs as u32;
 
@@ -278,12 +291,22 @@ impl Font {
                     )
                 };
                 let glyph_id = cmap.get_glyph_position_from_uvs(code, vs) as usize;
-                let layout = self.get_horizontal_layout(glyph_id as usize);
+                
+                let layout = if is_vart {
+                    let result = self.get_vertical_layout(glyph_id as usize);
+                    if result.is_some() {
+                        FontLayout::Vertical(result.unwrap())
+                    } else {
+                        FontLayout::Horizontal(self.get_horizontal_layout(glyph_id as usize))
+                    }
+                } else {
+                    FontLayout::Horizontal(self.get_horizontal_layout(glyph_id as usize))
+                };
 
                 let string = cff.to_code(glyph_id, &layout);
                 // println!("cff string: {}", string);
                 let open_type_glyf = Some(OpenTypeGlyph {
-                    layout: FontLayout::Horizontal(layout),
+                    layout,
                     glyph: FontData::CFF(string.as_bytes().to_vec()),
                 });
 
@@ -326,12 +349,16 @@ impl Font {
         }
     }
 
+    pub fn get_glyph_with_uvs(&self, ch: char, vs: char) -> GriphData {
+        self.get_glyph_with_uvs_axis(ch, vs, false)
+    }
+
     pub fn get_glyph(&self, ch: char) -> GriphData {
         self.get_glyph_with_uvs(ch, '\u{0}')
     }
 
     pub fn get_svg_from_id(&self, glyph_id: usize, fontsize: f64, fontunit: &str)  -> Result<String, Error>{
-        let layout = self.get_horizontal_layout(glyph_id);
+        let layout = self.get_layout(glyph_id, false);
         #[cfg(feature = "cff")]
         if let Some(cff) = self.cff.as_ref() {
             let string = cff.to_svg(glyph_id, fontsize, fontunit, &layout, 0.0, 0.0)?;
@@ -345,7 +372,7 @@ impl Font {
             if glyph.is_none() {
                 return Err(Error::new(
                     std::io::ErrorKind::Other,
-                    "glyph is none".to_string(),
+                    "glyph is none,also you need --features cff".to_string(),
                 ));
             }
             let glyph = glyph.unwrap();
@@ -367,14 +394,16 @@ impl Font {
                     #[cfg(debug_assertions)]
                     {
                         string += &format!("<!-- glyf id: {} -->", pos);
-                        string += &format!(
-                            "<!-- layout {} {} {} {} {} -->\n",
-                            layout.lsb,
-                            layout.advance_width,
-                            layout.accender,
-                            layout.descender,
-                            layout.line_gap
-                        );
+                        if let FontLayout::Horizontal(layout) = &layout {
+                            string += &format!(
+                                "<!-- layout {} {} {} {} {} -->\n",
+                                layout.lsb,
+                                layout.advance_width,
+                                layout.accender,
+                                layout.descender,
+                                layout.line_gap
+                            );
+                        }
                     }
                     string += &svg;
                     return Ok(string);
@@ -464,7 +493,7 @@ impl Font {
         #[cfg(feature = "cff")]
         if let Some(cff) = self.cff.as_ref() {
             let gid = self.cmap.as_ref().unwrap().get_glyph_position(ch as u32) as usize;
-            let layout = self.get_horizontal_layout(gid as usize);
+            let layout = self.get_layout(gid as usize, false);
             let string = cff.to_svg(gid, fontsize, fontunit, &layout, 0.0, 0.0);
             return string;
         }
@@ -482,10 +511,6 @@ impl Font {
 
         if let FontData::Glyph(glyph) = &glyf_data.open_type_glyf.as_ref().unwrap().glyph {
             let layout = &glyf_data.open_type_glyf.as_ref().unwrap().layout;
-            let layout = match layout {
-                FontLayout::Horizontal(layout) => layout,
-                _ => panic!("not support vertical layout"),
-            };
             if let Some(sbix) = self.sbix.as_ref() {
                 let result = sbix.get_svg(pos as u32, fontsize, fontunit, &layout, 0.0, 0.0);
                 if let Some(svg) = result {
@@ -504,14 +529,16 @@ impl Font {
                     #[cfg(debug_assertions)]
                     {
                         string += &format!("<!-- {} glyf id: {} -->", ch, pos);
-                        string += &format!(
-                            "<!-- layout {} {} {} {} {} -->\n",
-                            layout.lsb,
-                            layout.advance_width,
-                            layout.accender,
-                            layout.descender,
-                            layout.line_gap
-                        );
+                        if let FontLayout::Horizontal(layout) = layout {
+                            string += &format!(
+                                "<!-- layout {} {} {} {} {} -->\n",
+                                layout.lsb,
+                                layout.advance_width,
+                                layout.accender,
+                                layout.descender,
+                                layout.line_gap
+                            );    
+                        }
                     }
                     string += &svg;
                     return Ok(string);
@@ -896,11 +923,7 @@ impl Font {
     }
 }
 
-enum Layout {
-    Horizontal(HorizontalLayout),
-    Vertical(VerticalLayout),
-    Unknown,
-}
+
 
 #[derive(Debug, Clone)]
 pub struct HorizontalLayout {
@@ -981,7 +1004,7 @@ fn font_debug(_font: &Font) {
     for i in 0x0020..0x0ff {
         let pos = cmap_encodings.get_glyph_position(i);
         let glyph = glyf.get_glyph(pos as usize).unwrap();
-        let layout = _font.get_horizontal_layout(pos as usize);
+        let layout = _font.get_layout(pos as usize, false);
         let svg = glyph.to_svg(32.0, "pt", &layout, 0.0, 0.0);
         let ch = char::from_u32(i).unwrap();
         writeln!(&mut writer, "{}:{:04} ", ch, pos).unwrap();
@@ -996,7 +1019,7 @@ fn font_debug(_font: &Font) {
         }
         let pos = cmap_encodings.get_glyph_position(i as u32);
         let glyph = glyf.get_glyph(pos as usize).unwrap();
-        let layout = _font.get_horizontal_layout(pos as usize);
+        let layout = _font.get_layout(pos as usize, false);
         let svg = glyph.to_svg(100.0, "px", &layout, 0.0, 0.0);
         let ch = char::from_u32(i as u32).unwrap();
         write!(&mut writer, "{}:{:04} ", ch, pos).unwrap();

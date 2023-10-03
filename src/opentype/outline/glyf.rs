@@ -3,6 +3,8 @@ use std::{fmt, io::SeekFrom};
 
 use bin_rs::reader::BinaryReader;
 
+use crate::fontreader::FontLayout;
+
 use super::loca;
 /*
 int16	numberOfContours	If the number of contours is greater than or equal to zero, this is a simple glyph. If negative, this is a composite glyph — the value -1 should be used for composite glyphs.
@@ -211,7 +213,7 @@ impl Glyph {
         &self,
         fonsize: f64,
         fontunit: &str,
-        layout: &crate::fontreader::HorizontalLayout,
+        layout: &FontLayout,
     ) -> String {
         let parsed = self.parse();
         Self::get_svg_header_from_parsed(&parsed, fonsize, fontunit, layout)
@@ -221,60 +223,90 @@ impl Glyph {
         parsed: &ParsedGlyph,
         fontsize: f64,
         fontunit: &str,
-        layout: &crate::fontreader::HorizontalLayout,
+        layout: &FontLayout,
     ) -> String {
-        let rsb = (layout.advance_width - parsed.x_max as isize) as i16;
-        let x_min = parsed.x_min - layout.lsb as i16;
-        let x_max = parsed.x_max + rsb;
-        //        let y_max = layout.accender - layout.descender + layout.line_gap;
-        let y_max = layout.accender - layout.descender + layout.line_gap;
-        let y_min = if y_max > (parsed.y_max - parsed.y_min) as isize {
-            0
-        } else {
-            y_max - (parsed.y_max - parsed.y_min) as isize
-        };
-        let height = fontsize;
-        let width = x_min as f64 + x_max as f64;
-        let width = width * height / y_max as f64;
+        match layout {
+            FontLayout::Horizontal(layout) => {
+                let rsb = (layout.advance_width - parsed.x_max as isize) as i16;
+                let x_min = parsed.x_min - layout.lsb as i16;
+                let x_max = parsed.x_max + rsb;
+                //        let y_max = layout.accender - layout.descender + layout.line_gap;
+                let y_max = layout.accender - layout.descender + layout.line_gap;
+                let y_min = if y_max > (parsed.y_max - parsed.y_min) as isize {
+                    0
+                } else {
+                    y_max - (parsed.y_max - parsed.y_min) as isize
+                };
+                let height = fontsize;
+                let width = x_min as f64 + x_max as f64;
+                let width = width * height / y_max as f64;
+        
+                let height_str = format!("{}{}", height, fontunit);
+                let width_str = format!("{}{}", width, fontunit);
+                let mut svg = format!("<svg width=\"{}\" height=\"{}\" viewBox=\"{} {} {} {}\" xmlns=\"http://www.w3.org/2000/svg\">", width_str, height_str, x_min, y_min, x_max, y_max);
+                #[cfg(debug_assertions)]
+                {
+                    let rsb = (layout.advance_width - parsed.x_max as isize) as i16;
+                    svg += &format!(
+                        "<!-- lsb {} accender {} descender {} line_gap {} avance width {}-->",
+                        layout.lsb,
+                        layout.accender,
+                        layout.descender,
+                        layout.line_gap,
+                        layout.advance_width
+                    );
+                    svg += &format!(
+                        "<!-- x min {} y min {} x max {} y max {} -->",
+                        parsed.x_min, parsed.y_min, parsed.x_max, parsed.y_max
+                    );
+                    svg += &format!(
+                        "<!-- offset {} length {} lsb {} advanced width {} rsb {} -->",
+                        parsed.offset, parsed.length, layout.lsb, layout.advance_width, rsb
+                    );
+                }
+                svg        
+            }
+            FontLayout::Vertical(layout) => {
+                let bsb = (layout.advance_height - parsed.y_max as isize) as i16;
+                let x_min = 0;
+                let y_max = layout.advance_height;
+                //        let y_max = layout.accender - layout.descender + layout.line_gap;
+                let x_max = layout.accender - layout.descender + layout.line_gap;
+                let y_min = 0;
+                let height = fontsize;
+                let width = x_min as f64 + x_max as f64;
+                let width = width * height / y_max as f64;
+        
+                let height_str = format!("{}{}", height, fontunit);
+                let width_str = format!("{}{}", width, fontunit);
+                let mut svg = format!("<svg width=\"{}\" height=\"{}\" viewBox=\"{} {} {} {}\" xmlns=\"http://www.w3.org/2000/svg\">", width_str, height_str, x_min, y_min, x_max, y_max);
+                svg        
 
-        let height_str = format!("{}{}", height, fontunit);
-        let width_str = format!("{}{}", width, fontunit);
-        let mut svg = format!("<svg width=\"{}\" height=\"{}\" viewBox=\"{} {} {} {}\" xmlns=\"http://www.w3.org/2000/svg\">", width_str, height_str, x_min, y_min, x_max, y_max);
-        #[cfg(debug_assertions)]
-        {
-            let rsb = (layout.advance_width - parsed.x_max as isize) as i16;
-            svg += &format!(
-                "<!-- lsb {} accender {} descender {} line_gap {} avance width {}-->",
-                layout.lsb,
-                layout.accender,
-                layout.descender,
-                layout.line_gap,
-                layout.advance_width
-            );
-            svg += &format!(
-                "<!-- x min {} y min {} x max {} y max {} -->",
-                parsed.x_min, parsed.y_min, parsed.x_max, parsed.y_max
-            );
-            svg += &format!(
-                "<!-- offset {} length {} lsb {} advanced width {} rsb {} -->",
-                parsed.offset, parsed.length, layout.lsb, layout.advance_width, rsb
-            );
+            }
+            FontLayout::Unknown => {
+                "".to_string()
+            }
         }
-        svg
     }
 
-    pub(crate) fn get_svg_path(&self, layout: &crate::fontreader::HorizontalLayout) -> String {
+    pub(crate) fn get_svg_path(&self, layout: &FontLayout) -> String {
         let parsed = self.parse();
         Self::get_svg_path_parsed(&parsed, layout, 0.0, 0.0)
     }
 
     pub(crate) fn get_svg_path_parsed(
         parsed: &ParsedGlyph,
-        layout: &crate::fontreader::HorizontalLayout,
+        layout: &FontLayout,
         sx: f64,
         sy: f64,
     ) -> String {
-        let y_max = layout.accender as i16 + layout.line_gap as i16;
+        
+        let y_max = match layout {
+            FontLayout::Horizontal(layout) => layout.accender as i16 + layout.line_gap as i16,
+            FontLayout::Vertical(layout) => layout.advance_height as i16,
+            FontLayout::Unknown => 0,
+        };
+                    
         let mut svg = String::new();
         #[cfg(debug_assertions)]
         {
@@ -378,7 +410,7 @@ impl Glyph {
         &self,
         fonsize: f64,
         fontunit: &str,
-        layout: &crate::fontreader::HorizontalLayout,
+        layout: &FontLayout,
         sx: f64,
         sy: f64,
     ) -> String {

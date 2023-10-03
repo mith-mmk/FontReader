@@ -4,7 +4,7 @@ use std::{collections::HashMap, default, error::Error, f32::consts::E, io::SeekF
 
 use crate::{
     fontreader::{FontLayout, HorizontalLayout},
-    opentype::layouts,
+    opentype::{layouts, color::svg},
 };
 
 // Compare this snippet from src/outline/cff.rs:
@@ -241,7 +241,7 @@ impl CFF {
         })
     }
 
-    pub fn to_code(&self, gid: usize, layout: &HorizontalLayout) -> String {
+    pub fn to_code(&self, gid: usize, layout: &FontLayout) -> String {
         #[cfg(debug_assertions)]
         {
             let cid = self.charsets.sid[gid as usize];
@@ -1981,7 +1981,7 @@ impl CFF {
         gid: usize,
         fontsize: f64,
         fontunit: &str,
-        layout: &HorizontalLayout,
+        layout: &FontLayout,
         sx: f64,
         sy: f64,
     ) -> Result<String, std::io::Error> {
@@ -1995,34 +1995,17 @@ impl CFF {
         Ok(self.parse_data(gid, &data, fontsize, fontunit, layout, sx, sy, true))
     }
 
-    fn parse_data(
-        &self,
-        gid: usize,
-        data: &[u8],
-        fontsize: f64,
-        fontunit: &str,
-        layout: &HorizontalLayout,
-        sx: f64,
-        sy: f64,
-        is_svg: bool,
+    fn get_svg_header(
+            &self,
+            gid: usize,
+            parce_data: &ParcePack,
+            fontsize: f64,
+            fontunit: &str,
+            layout: &FontLayout,
     ) -> String {
-        let commands = Box::new(Commands::new());
-        let stacks = Box::new(Vec::with_capacity(48)); // CFF1 max stack depth 48
-        let mut parce_data = ParcePack {
-            x: 0.0,
-            y: 0.0,
-            hints: 0,
-            min_x: 0.0,
-            width: None,
-            commands,
-            stacks,
-            is_first: 0,
-        };
-
-        self.parse(data, &mut parce_data);
-        let commands = &parce_data.commands;
-        if is_svg {
-            let lsb = layout.lsb as f64;
+        match layout {
+            FontLayout::Horizontal(layout) => {
+                let lsb = layout.lsb as f64;
             let descender = layout.descender;
             let accender = layout.accender;
             let line_gap = layout.line_gap;
@@ -2038,8 +2021,8 @@ impl CFF {
             } else {
                 self.default_width
             };
-
-            let y_pos = self.bbox[3] + self.bbox[1];
+    
+            
             let mut svg = "<svg xmlns=\"http://www.w3.org/2000/svg\" ".to_string();
             svg += &format!(
                 " width=\"{}\" height=\"{}\" viewbox=\"{} {} {} {}\">\n",
@@ -2061,10 +2044,85 @@ impl CFF {
                     "<!-- advance_width {} accender {} descender {} line_gap {} {} -->\n",
                     layout.advance_width, accender, descender, line_gap, y_scale
                 );
-                for command in commands.commands.iter() {
-                    svg += &format!("<!-- {} -->\n", command);
-                }
             }
+            svg
+        }
+        FontLayout::Vertical(layout) => {
+            let descender = layout.descender;
+            let accender = layout.accender;
+            let line_gap = layout.line_gap;
+            let advance_height = layout.advance_height as f64;
+            // let width = self.width + parce_data.width;
+            let height = self.bbox[3] - self.bbox[1] as f64;
+            let width = (descender + accender) as f64 / advance_height * fontsize;
+            let h = format!("{}{}", fontsize, fontunit);
+            let w = format!("{}{}", width, fontunit);
+            let self_width = if let Some(width) = parce_data.width {
+                self.width + width
+            } else {
+                self.default_width
+            };
+    
+            
+            let mut svg = "<svg xmlns=\"http://www.w3.org/2000/svg\" ".to_string();
+            svg += &format!(
+                " width=\"{}\" height=\"{}\" viewbox=\"{} {} {} {}\">\n",
+                w,
+                h,
+                0, // parce_data.min_x,
+                self.bbox[1],
+                self_width,
+                (self.bbox[3] - self.bbox[1])
+            );
+            #[cfg(debug_assertions)]
+            {
+                svg += &format!(
+                    "<!-- gid {} width {} {} {} height {} -->\n",
+                    gid, self.width, self_width, parce_data.min_x, height
+                );
+                svg += &format!("<!-- bbox {:?} -->\n", self.bbox);
+                svg += &format!(
+                    "<!-- advance_height {} accender {} descender {} line_gap {}-->\n",
+                    layout.advance_height, accender, descender, line_gap
+                );
+            }
+            svg
+
+
+        }
+        FontLayout::Unknown => {"".to_string()}
+        }
+    }
+
+    fn parse_data(
+        &self,
+        gid: usize,
+        data: &[u8],
+        fontsize: f64,
+        fontunit: &str,
+        layout: &FontLayout,
+        sx: f64,
+        sy: f64,
+        is_svg: bool,
+    ) -> String {
+        let commands = Box::new(Commands::new());
+        let stacks = Box::new(Vec::with_capacity(48)); // CFF1 max stack depth 48
+        let mut parce_data = ParcePack {
+            x: 0.0,
+            y: 0.0,
+            hints: 0,
+            min_x: 0.0,
+            width: None,
+            commands,
+            stacks,
+            is_first: 0,
+        };
+
+        self.parse(data, &mut parce_data);
+        let commands = &parce_data.commands;
+        if is_svg {
+            let mut svg = self.get_svg_header(gid, &parce_data, fontsize, fontunit, layout);
+            let y_pos = self.bbox[3] + self.bbox[1];
             svg += "<path d=\"";
             for operation in commands.operations.iter() {
                 match operation {

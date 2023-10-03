@@ -4,7 +4,7 @@
 
 use std::io::SeekFrom;
 
-use crate::opentype::layouts::{feature::Feature, lookup::Lookup, script::ParsedScript, *};
+use crate::opentype::{layouts::{feature::Feature, lookup::{Lookup, LookupSubstitution}, script::ParsedScript, *}, Glyph};
 use bin_rs::reader::BinaryReader;
 
 #[derive(Debug, Clone)]
@@ -108,17 +108,14 @@ impl GSUB {
     }
 
     // ccmp Glyph Composition / Decomposition
-    pub fn lookup_ccmp(&self, griph_ids: usize, script: &ParsedScript) -> Option<usize> {
+    pub fn lookup_ccmp(&self, glyph_id: usize) -> Option<Vec<u16>> {
         let script = self.get_script(b"DFLT").unwrap();
         let features = self.get_features(&b"ccmp", script, );
         for feature in features.iter() {
             for lookup_index in feature.lookup_list_indices.iter() {
                 let lookup = self.lookups.lookups[*lookup_index as usize].clone();
                 for subtable in lookup.subtables.iter() {
-                    let (coverage, _) = subtable.get_coverage();
-                    if let Some(id) = coverage.contains(griph_ids) {
-                        return Some(id);
-                    }
+                    // get glyph_ids from subtable
                 }
             }
         }
@@ -126,8 +123,21 @@ impl GSUB {
     }
 
     // vert, vrt2, vrtr
-    pub fn lookup_vertical(&self, _griph_ids: usize) -> usize {
-        todo!("lookup_vertical")
+    pub fn lookup_vertical(&self, glyph_id: u16) -> Option<u16> {
+        let script = self.get_script(b"DFLT").unwrap();
+        let features = self.get_features(&b"vert", script, );
+        for feature in features.iter() {
+            for lookup_index in feature.lookup_list_indices.iter() {
+                let lookup = self.lookups.lookups[*lookup_index as usize].clone();
+                for subtable in lookup.subtables.iter() {
+                    let result = subtable.get_single_glyph_id(glyph_id);
+                    if result.is_some() {
+                        return result;
+                    }               
+                }
+            }
+        }
+        None
     }
 
     // locl

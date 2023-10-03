@@ -3,6 +3,8 @@ use std::io::SeekFrom;
 
 use bin_rs::reader::BinaryReader;
 
+use crate::fontreader::FontLayout;
+
 #[derive(Debug, Clone)]
 pub(crate) struct SVG {
     version: u16,
@@ -59,7 +61,7 @@ impl SVG {
         gid: u32,
         fonsize: f64,
         fontunit: &str,
-        layout: &crate::fontreader::HorizontalLayout,
+        layout: &FontLayout,
         _: f64,
         _: f64,
     ) -> Option<String> {
@@ -92,13 +94,28 @@ impl SVG {
             "<svg width=\"{}{}\" height=\"{}{}\" ",
             fonsize, fontunit, fonsize, fontunit
         );
-        string += &format!(
-            " viewbox=\"{} {} {} {}\"",
-            0,
-            -layout.accender,
-            layout.advance_width,
-            layout.accender - layout.descender + layout.line_gap
-        );
+        match layout {
+            FontLayout::Horizontal(layout) => {
+                string += &format!(
+                    " viewbox=\"{} {} {} {}\"",
+                    0,
+                    -layout.accender,
+                    layout.advance_width,
+                    layout.accender - layout.descender + layout.line_gap
+                );        
+            }
+            FontLayout::Vertical(layout) => {
+                string += &format!(
+                    " viewbox=\"{} {} {} {}\"",
+                    0,
+                    -layout.accender,
+                    layout.advance_height,
+                    layout.accender - layout.descender + layout.line_gap,
+                );
+
+            },
+            _ => {}
+        }
         for i in 1..svgs.len() {
             string += &svgs[i];
         }
