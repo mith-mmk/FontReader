@@ -184,8 +184,6 @@ impl LookupList {
         })
     }
 
-
-
     fn get_single<R: BinaryReader>(
         reader: &mut R,
         offset: u64,
@@ -900,17 +898,15 @@ impl LookupSubstitution {
                     return Some((glyph_id as isize + single.delta_glyph_id as isize) as u16);
                 }
             }
-           LookupSubstitution::Single2(subtable) => {
-                let coverage= &subtable.coverage;
+            LookupSubstitution::Single2(subtable) => {
+                let coverage = &subtable.coverage;
                 if let Some(id) = coverage.contains(glyph_id as usize) {
                     return Some(subtable.substitute_glyph_ids[id as usize] as u16);
                 }
             }
-            _ => {
-            }
+            _ => {}
         }
         None
-        
     }
 
     pub(crate) fn get_lookup(&self, gliph_id: usize) -> LookupResult {

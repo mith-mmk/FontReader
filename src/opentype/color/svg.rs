@@ -102,7 +102,7 @@ impl SVG {
                     -layout.accender,
                     layout.advance_width,
                     layout.accender - layout.descender + layout.line_gap
-                );        
+                );
             }
             FontLayout::Vertical(layout) => {
                 string += &format!(
@@ -112,8 +112,7 @@ impl SVG {
                     layout.advance_height,
                     layout.accender - layout.descender + layout.line_gap,
                 );
-
-            },
+            }
             _ => {}
         }
         for i in 1..svgs.len() {

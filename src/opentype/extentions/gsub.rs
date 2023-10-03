@@ -4,7 +4,15 @@
 
 use std::io::SeekFrom;
 
-use crate::opentype::{layouts::{feature::Feature, lookup::{Lookup, LookupSubstitution}, script::ParsedScript, *}, Glyph};
+use crate::opentype::{
+    layouts::{
+        feature::Feature,
+        lookup::{Lookup, LookupSubstitution},
+        script::ParsedScript,
+        *,
+    },
+    Glyph,
+};
 use bin_rs::reader::BinaryReader;
 
 #[derive(Debug, Clone)]
@@ -17,7 +25,6 @@ pub(crate) struct GSUB {
     // version 1.1
     pub(crate) feature_variations: Option<Box<FeatureVariationList>>,
 }
-
 
 impl GSUB {
     pub(crate) fn new<R: BinaryReader>(
@@ -84,15 +91,17 @@ impl GSUB {
         string
     }
 
-    pub fn get_script(&self, tag: &[u8;4]) -> Option<&ParsedScript> {
+    pub fn get_script(&self, tag: &[u8; 4]) -> Option<&ParsedScript> {
         self.scripts.get_script(tag)
     }
 
-    pub fn get_features(&self,tag: &[u8;4], script: &ParsedScript) -> Vec<&Feature> {
+    pub fn get_features(&self, tag: &[u8; 4], script: &ParsedScript) -> Vec<&Feature> {
         let mut features = Vec::new();
         let language_system = &script.language_systems[0];
         for feature_index in language_system.language_system.feature_indexes.iter() {
-            if self.features.features[*feature_index as usize].feature_tag == u32::from_be_bytes(*tag) {
+            if self.features.features[*feature_index as usize].feature_tag
+                == u32::from_be_bytes(*tag)
+            {
                 features.push(&self.features.features[*feature_index as usize]);
             }
         }
@@ -110,7 +119,7 @@ impl GSUB {
     // ccmp Glyph Composition / Decomposition
     pub fn lookup_ccmp(&self, glyph_id: usize) -> Option<Vec<u16>> {
         let script = self.get_script(b"DFLT").unwrap();
-        let features = self.get_features(&b"ccmp", script, );
+        let features = self.get_features(&b"ccmp", script);
         for feature in features.iter() {
             for lookup_index in feature.lookup_list_indices.iter() {
                 let lookup = self.lookups.lookups[*lookup_index as usize].clone();
@@ -125,7 +134,7 @@ impl GSUB {
     // vert, vrt2, vrtr
     pub fn lookup_vertical(&self, glyph_id: u16) -> Option<u16> {
         let script = self.get_script(b"DFLT").unwrap();
-        let features = self.get_features(&b"vert", script, );
+        let features = self.get_features(&b"vert", script);
         for feature in features.iter() {
             for lookup_index in feature.lookup_list_indices.iter() {
                 let lookup = self.lookups.lookups[*lookup_index as usize].clone();
@@ -133,7 +142,7 @@ impl GSUB {
                     let result = subtable.get_single_glyph_id(glyph_id);
                     if result.is_some() {
                         return result;
-                    }               
+                    }
                 }
             }
         }

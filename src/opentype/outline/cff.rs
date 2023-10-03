@@ -4,7 +4,7 @@ use std::{collections::HashMap, default, error::Error, f32::consts::E, io::SeekF
 
 use crate::{
     fontreader::{FontLayout, HorizontalLayout},
-    opentype::{layouts, color::svg},
+    opentype::{color::svg, layouts},
 };
 
 // Compare this snippet from src/outline/cff.rs:
@@ -1996,101 +1996,97 @@ impl CFF {
     }
 
     fn get_svg_header(
-            &self,
-            gid: usize,
-            parce_data: &ParcePack,
-            fontsize: f64,
-            fontunit: &str,
-            layout: &FontLayout,
+        &self,
+        gid: usize,
+        parce_data: &ParcePack,
+        fontsize: f64,
+        fontunit: &str,
+        layout: &FontLayout,
     ) -> String {
         match layout {
             FontLayout::Horizontal(layout) => {
                 let lsb = layout.lsb as f64;
-            let descender = layout.descender;
-            let accender = layout.accender;
-            let line_gap = layout.line_gap;
-            let advance_width = layout.advance_width as f64;
-            // let width = self.width + parce_data.width;
-            let height = self.bbox[3] - self.bbox[1] as f64;
-            let y_scale = (height + line_gap as f64) / height;
-            let width = advance_width / height * fontsize;
-            let h = format!("{}{}", fontsize, fontunit);
-            let w = format!("{}{}", width / y_scale, fontunit);
-            let self_width = if let Some(width) = parce_data.width {
-                self.width + width
-            } else {
-                self.default_width
-            };
-    
-            
-            let mut svg = "<svg xmlns=\"http://www.w3.org/2000/svg\" ".to_string();
-            svg += &format!(
-                " width=\"{}\" height=\"{}\" viewbox=\"{} {} {} {}\">\n",
-                w,
-                h,
-                0, // parce_data.min_x,
-                self.bbox[1],
-                self_width,
-                (self.bbox[3] - self.bbox[1]) * y_scale
-            );
-            #[cfg(debug_assertions)]
-            {
-                svg += &format!(
-                    "<!-- gid {} width {} {} {} height {} -->\n",
-                    gid, self.width, self_width, parce_data.min_x, height
-                );
-                svg += &format!("<!-- bbox {:?} -->\n", self.bbox);
-                svg += &format!(
-                    "<!-- advance_width {} accender {} descender {} line_gap {} {} -->\n",
-                    layout.advance_width, accender, descender, line_gap, y_scale
-                );
-            }
-            svg
-        }
-        FontLayout::Vertical(layout) => {
-            let descender = layout.descender;
-            let accender = layout.accender;
-            let line_gap = layout.line_gap;
-            let advance_height = layout.advance_height as f64;
-            // let width = self.width + parce_data.width;
-            let height = self.bbox[3] - self.bbox[1] as f64;
-            let width = (descender + accender) as f64 / advance_height * fontsize;
-            let h = format!("{}{}", fontsize, fontunit);
-            let w = format!("{}{}", width, fontunit);
-            let self_width = if let Some(width) = parce_data.width {
-                self.width + width
-            } else {
-                self.default_width
-            };
-    
-            
-            let mut svg = "<svg xmlns=\"http://www.w3.org/2000/svg\" ".to_string();
-            svg += &format!(
-                " width=\"{}\" height=\"{}\" viewbox=\"{} {} {} {}\">\n",
-                w,
-                h,
-                0, // parce_data.min_x,
-                self.bbox[1],
-                self_width,
-                (self.bbox[3] - self.bbox[1])
-            );
-            #[cfg(debug_assertions)]
-            {
-                svg += &format!(
-                    "<!-- gid {} width {} {} {} height {} -->\n",
-                    gid, self.width, self_width, parce_data.min_x, height
-                );
-                svg += &format!("<!-- bbox {:?} -->\n", self.bbox);
-                svg += &format!(
-                    "<!-- advance_height {} accender {} descender {} line_gap {}-->\n",
-                    layout.advance_height, accender, descender, line_gap
-                );
-            }
-            svg
+                let descender = layout.descender;
+                let accender = layout.accender;
+                let line_gap = layout.line_gap;
+                let advance_width = layout.advance_width as f64;
+                // let width = self.width + parce_data.width;
+                let height = self.bbox[3] - self.bbox[1] as f64;
+                let y_scale = (height + line_gap as f64) / height;
+                let width = advance_width / height * fontsize;
+                let h = format!("{}{}", fontsize, fontunit);
+                let w = format!("{}{}", width / y_scale, fontunit);
+                let self_width = if let Some(width) = parce_data.width {
+                    self.width + width
+                } else {
+                    self.default_width
+                };
 
+                let mut svg = "<svg xmlns=\"http://www.w3.org/2000/svg\" ".to_string();
+                svg += &format!(
+                    " width=\"{}\" height=\"{}\" viewbox=\"{} {} {} {}\">\n",
+                    w,
+                    h,
+                    0, // parce_data.min_x,
+                    self.bbox[1],
+                    self_width,
+                    (self.bbox[3] - self.bbox[1]) * y_scale
+                );
+                #[cfg(debug_assertions)]
+                {
+                    svg += &format!(
+                        "<!-- gid {} width {} {} {} height {} -->\n",
+                        gid, self.width, self_width, parce_data.min_x, height
+                    );
+                    svg += &format!("<!-- bbox {:?} -->\n", self.bbox);
+                    svg += &format!(
+                        "<!-- advance_width {} accender {} descender {} line_gap {} {} -->\n",
+                        layout.advance_width, accender, descender, line_gap, y_scale
+                    );
+                }
+                svg
+            }
+            FontLayout::Vertical(layout) => {
+                let descender = layout.descender;
+                let accender = layout.accender;
+                let line_gap = layout.line_gap;
+                let advance_height = layout.advance_height as f64;
+                // let width = self.width + parce_data.width;
+                let height = self.bbox[3] - self.bbox[1] as f64;
+                let width = (descender + accender) as f64 / advance_height * fontsize;
+                let h = format!("{}{}", fontsize, fontunit);
+                let w = format!("{}{}", width, fontunit);
+                let self_width = if let Some(width) = parce_data.width {
+                    self.width + width
+                } else {
+                    self.default_width
+                };
 
-        }
-        FontLayout::Unknown => {"".to_string()}
+                let mut svg = "<svg xmlns=\"http://www.w3.org/2000/svg\" ".to_string();
+                svg += &format!(
+                    " width=\"{}\" height=\"{}\" viewbox=\"{} {} {} {}\">\n",
+                    w,
+                    h,
+                    0, // parce_data.min_x,
+                    self.bbox[1],
+                    self_width,
+                    (self.bbox[3] - self.bbox[1])
+                );
+                #[cfg(debug_assertions)]
+                {
+                    svg += &format!(
+                        "<!-- gid {} width {} {} {} height {} -->\n",
+                        gid, self.width, self_width, parce_data.min_x, height
+                    );
+                    svg += &format!("<!-- bbox {:?} -->\n", self.bbox);
+                    svg += &format!(
+                        "<!-- advance_height {} accender {} descender {} line_gap {}-->\n",
+                        layout.advance_height, accender, descender, line_gap
+                    );
+                }
+                svg
+            }
+            FontLayout::Unknown => "".to_string(),
         }
     }
 

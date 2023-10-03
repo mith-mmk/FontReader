@@ -41,11 +41,14 @@ impl GDEF {
             0
         };
         let glyph_class_def = if glyph_class_def_offset != 0 {
-            Some(ClassDef::new(reader, offset + glyph_class_def_offset as u64)?)
+            Some(ClassDef::new(
+                reader,
+                offset + glyph_class_def_offset as u64,
+            )?)
         } else {
             None
         };
-        
+
         let attach_list = if _attach_list_offset != 0 {
             let attach_list = AttachPointList::new(reader, offset + _attach_list_offset as u64)?;
             Some(attach_list)
@@ -246,12 +249,14 @@ impl LigatureGlyph {
                 3 => {
                     let caret_value_point = reader.read_u16_be()?;
                     let device_table_offset = reader.read_u16_be()?;
-                    let device_table = 
-                        if device_table_offset == 0 {
-                            None
-                        } else {
-                            Some(DeviceTable::new(reader, offset + device_table_offset as u64)?)
-                        };
+                    let device_table = if device_table_offset == 0 {
+                        None
+                    } else {
+                        Some(DeviceTable::new(
+                            reader,
+                            offset + device_table_offset as u64,
+                        )?)
+                    };
                     caret_value.push(CaretValue::Format3(CaretValueFormat3 {
                         caret_value_point,
                         device_table,
@@ -291,8 +296,6 @@ pub(crate) struct CaretValueFormat3 {
     pub(crate) caret_value_point: u16,
     pub(crate) device_table: Option<DeviceTable>,
 }
-
-
 
 pub(crate) struct VariationStore {}
 

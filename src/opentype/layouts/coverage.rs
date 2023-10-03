@@ -23,9 +23,10 @@ impl Coverage {
                 }
             }
             Coverage::Format2(coverage) => {
-                let range_records:& Vec<RangeRecord>  = &coverage.range_records;
+                let range_records: &Vec<RangeRecord> = &coverage.range_records;
                 let result = range_records.binary_search_by(|x| {
-                    if x.start_glyph_id >= (griph_id as u16) && x.end_glyph_id <= (griph_id as u16) {
+                    if x.start_glyph_id >= (griph_id as u16) && x.end_glyph_id <= (griph_id as u16)
+                    {
                         std::cmp::Ordering::Equal
                     } else if x.end_glyph_id > (griph_id as u16) {
                         std::cmp::Ordering::Greater
@@ -36,13 +37,12 @@ impl Coverage {
                 match result {
                     Ok(index) => {
                         let reage_record = &range_records[index];
-                        let index  = reage_record.start_coverage_index
+                        let index = reage_record.start_coverage_index
                             + (griph_id as u16 - reage_record.start_glyph_id);
                         Some(index as usize)
                     }
                     Err(_) => None,
                 }
-                    
             }
         }
     }

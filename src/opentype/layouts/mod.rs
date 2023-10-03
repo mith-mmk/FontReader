@@ -1,11 +1,11 @@
 pub(crate) mod classdef;
 pub(crate) mod condition;
 pub(crate) mod coverage;
+pub(crate) mod device;
 pub(crate) mod feature;
 pub(crate) mod language;
 pub(crate) mod lookup;
 pub(crate) mod script;
-pub(crate) mod device;
 
 pub(crate) use feature::FeatureList;
 pub(crate) use feature::FeatureVariationList;

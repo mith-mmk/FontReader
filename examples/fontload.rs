@@ -37,7 +37,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     */
 
     let string = font.get_info()?;
-    println!("{}", string); 
+    println!("{}", string);
     let mut html = "<html><head><meta charset=\"utf-8\"></head><body>".to_string();
     for i in 0..65535 {
         let j = i;

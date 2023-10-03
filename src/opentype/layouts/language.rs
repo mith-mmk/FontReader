@@ -24,8 +24,7 @@ pub(crate) struct LanguageSystemRecord {
 
 impl LanguageSystemRecord {
     pub(crate) fn to_string(&self) -> String {
-        let tag = 
-        if self.language_system_tag == 0 {
+        let tag = if self.language_system_tag == 0 {
             "Default".to_string()
         } else {
             let bytes = self.language_system_tag.to_be_bytes();

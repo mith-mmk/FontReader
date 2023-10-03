@@ -35,8 +35,7 @@ fn main() {
             font.set_font(i).unwrap();
             println!("\nfont number: {} ", i);
             #[cfg(feature = "layout")]
-            {
-                           }
+            {}
         }
     }
 }

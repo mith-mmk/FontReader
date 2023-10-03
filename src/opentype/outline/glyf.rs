@@ -240,7 +240,7 @@ impl Glyph {
                 let height = fontsize;
                 let width = x_min as f64 + x_max as f64;
                 let width = width * height / y_max as f64;
-        
+
                 let height_str = format!("{}{}", height, fontunit);
                 let width_str = format!("{}{}", width, fontunit);
                 let mut svg = format!("<svg width=\"{}\" height=\"{}\" viewBox=\"{} {} {} {}\" xmlns=\"http://www.w3.org/2000/svg\">", width_str, height_str, x_min, y_min, x_max, y_max);
@@ -264,7 +264,7 @@ impl Glyph {
                         parsed.offset, parsed.length, layout.lsb, layout.advance_width, rsb
                     );
                 }
-                svg        
+                svg
             }
             FontLayout::Vertical(layout) => {
                 let bsb = (layout.advance_height - parsed.y_max as isize) as i16;
@@ -276,16 +276,13 @@ impl Glyph {
                 let height = fontsize;
                 let width = x_min as f64 + x_max as f64;
                 let width = width * height / y_max as f64;
-        
+
                 let height_str = format!("{}{}", height, fontunit);
                 let width_str = format!("{}{}", width, fontunit);
                 let mut svg = format!("<svg width=\"{}\" height=\"{}\" viewBox=\"{} {} {} {}\" xmlns=\"http://www.w3.org/2000/svg\">", width_str, height_str, x_min, y_min, x_max, y_max);
-                svg        
-
+                svg
             }
-            FontLayout::Unknown => {
-                "".to_string()
-            }
+            FontLayout::Unknown => "".to_string(),
         }
     }
 
@@ -300,13 +297,12 @@ impl Glyph {
         sx: f64,
         sy: f64,
     ) -> String {
-        
         let y_max = match layout {
             FontLayout::Horizontal(layout) => layout.accender as i16 + layout.line_gap as i16,
             FontLayout::Vertical(layout) => layout.advance_height as i16,
             FontLayout::Unknown => 0,
         };
-                    
+
         let mut svg = String::new();
         #[cfg(debug_assertions)]
         {

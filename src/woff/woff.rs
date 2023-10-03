@@ -20,7 +20,7 @@ pub struct WOFFHeader {
 }
 
 impl WOFFHeader {
-    pub(crate) fn new<R: BinaryReader>(reader: &mut R) -> Result<Self,std::io::Error> {
+    pub(crate) fn new<R: BinaryReader>(reader: &mut R) -> Result<Self, std::io::Error> {
         let mut header = Self {
             sfnt_version: 0,
             signature: 0,
@@ -99,7 +99,10 @@ pub(crate) struct WOFF {
 }
 
 impl WOFF {
-    pub(crate) fn from<B: BinaryReader>(reader: &mut B, header: WOFFHeader) -> Result<Self, std::io::Error> {
+    pub(crate) fn from<B: BinaryReader>(
+        reader: &mut B,
+        header: WOFFHeader,
+    ) -> Result<Self, std::io::Error> {
         let mut table_records = Vec::new();
         for _ in 0..header.num_tables {
             let mut table_record = WOFFTableRecord::new();
@@ -121,13 +124,9 @@ impl WOFF {
             table_records.push(table_record);
         }
         // read metadata
-        reader
-            .seek(std::io::SeekFrom::Start(header.meta_offset as u64))
-            ?;
+        reader.seek(std::io::SeekFrom::Start(header.meta_offset as u64))?;
         let metadata = if header.meta_length > 0 {
-            let compress_metadata = reader
-                .read_bytes_as_vec(header.meta_length as usize)
-                ?;
+            let compress_metadata = reader.read_bytes_as_vec(header.meta_length as usize)?;
             let metadata_bytes = decompress_to_vec_zlib(&compress_metadata);
             if metadata_bytes.is_err() {
                 return Err(std::io::Error::new(
@@ -145,24 +144,16 @@ impl WOFF {
 
         // read private data
 
-        reader
-            .seek(std::io::SeekFrom::Start(header.priv_offset as u64))
-            ?;
-        let private_data = reader
-            .read_bytes_as_vec(header.priv_length as usize)
-            ?;
+        reader.seek(std::io::SeekFrom::Start(header.priv_offset as u64))?;
+        let private_data = reader.read_bytes_as_vec(header.priv_length as usize)?;
 
         // read table data
         let mut tables = Vec::new();
         for table_record in table_records.iter() {
-            reader
-                .seek(std::io::SeekFrom::Start(table_record.offset as u64))
-                ?;
+            reader.seek(std::io::SeekFrom::Start(table_record.offset as u64))?;
             let mut table = WOFFTable::new();
             table.tag = table_record.tag;
-            let mut table_data = reader
-                .read_bytes_as_vec(table_record.comp_length as usize)
-                ?;
+            let mut table_data = reader.read_bytes_as_vec(table_record.comp_length as usize)?;
             if table_record.comp_length != table_record.orig_length {
                 let decompress = decompress_to_vec_zlib(&table_data);
                 if decompress.is_err() {
