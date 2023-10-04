@@ -488,12 +488,13 @@ impl Font {
         }
     }
 
-    pub fn get_svg_with_uvs(
+    pub fn get_svg_with_uvs_axis(
         &self,
         ch: char,
         vs: char,
         fontsize: f64,
         fontunit: &str,
+        is_vart: bool,
     ) -> Result<String, Error> {
         // svg ?
         // sbix ?
@@ -514,7 +515,7 @@ impl Font {
         }
 
         // utf-32
-        let glyf_data = self.get_glyph_with_uvs(ch, vs);
+        let glyf_data = self.get_glyph_with_uvs_axis(ch, vs, is_vart);
         let pos = glyf_data.glyph_id;
 
         if let FontData::Glyph(glyph) = &glyf_data.open_type_glyf.as_ref().unwrap().glyph {
@@ -542,6 +543,15 @@ impl Font {
                                 "<!-- layout {} {} {} {} {} -->\n",
                                 layout.lsb,
                                 layout.advance_width,
+                                layout.accender,
+                                layout.descender,
+                                layout.line_gap
+                            );
+                        } else if let FontLayout::Vertical(layout) = layout {
+                            string += &format!(
+                                "<!-- layout vert {} {} {} {} {} -->\n",
+                                layout.tsb,
+                                layout.advance_height,
                                 layout.accender,
                                 layout.descender,
                                 layout.line_gap
@@ -620,6 +630,17 @@ impl Font {
                 "glyf is none".to_string(),
             ));
         }
+
+    }
+
+    pub fn get_svg_with_uvs(
+        &self,
+        ch: char,
+        vs: char,
+        fontsize: f64,
+        fontunit: &str,
+    ) -> Result<String, Error> {
+        self.get_svg_with_uvs_axis(ch, vs, fontsize, fontunit, false)
     }
 
     pub fn get_svg(&self, ch: char, fontsize: f64, fontunit: &str) -> Result<String, Error> {
