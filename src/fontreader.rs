@@ -44,7 +44,6 @@ pub enum FontLayout {
 #[derive(Debug, Clone)]
 pub struct GriphData {
     glyph_id: usize,
-    format: GlyphFormat,
     pub(crate) open_type_glyf: Option<OpenTypeGlyph>,
 }
 
@@ -185,7 +184,7 @@ impl Font {
             self.vhea.as_ref()
         } else {
             self.more_fonts[self.current_font - 1].vhea.as_ref()
-        };
+        };       
 
         if let Some(vhea) = vhea {
             let v_metrix = self.get_v_metrix(id);
@@ -240,21 +239,20 @@ impl Font {
         };
 
         let glyph = glyf.get_glyph(glyph_id).unwrap();
-        let layout: HorizontalLayout = self.get_horizontal_layout(glyph_id);
+        let layout = self.get_layout(glyph_id, false);
         let open_type_glyph = OpenTypeGlyph {
-            layout: FontLayout::Horizontal(layout),
+            layout,
             glyph: FontData::Glyph(glyph.clone()),
         };
 
         GriphData {
             glyph_id,
-            format: GlyphFormat::OpenTypeGlyph,
             open_type_glyf: Some(open_type_glyph),
         }
     }
 
-    pub fn get_layout(&self, glyph_id: usize, is_vart: bool) -> FontLayout {
-        let layout = if is_vart {
+    pub fn get_layout(&self, glyph_id: usize, is_vert: bool) -> FontLayout {
+        let layout = if is_vert {
             let result = self.get_vertical_layout(glyph_id as usize);
             if result.is_some() {
                 FontLayout::Vertical(result.unwrap())
@@ -267,7 +265,7 @@ impl Font {
         layout
     }
 
-    pub fn get_glyph_with_uvs_axis(&self, ch: char, vs: char, is_vart: bool) -> GriphData {
+    pub fn get_glyph_with_uvs_axis(&self, ch: char, vs: char, is_vert: bool) -> GriphData {
         let code = ch as u32;
         let vs = vs as u32;
         let cmap = if self.current_font == 0 {
@@ -282,7 +280,7 @@ impl Font {
         let glyph_id = cmap.get_glyph_position_from_uvs(code, vs) as usize;
 
         #[cfg(feature = "layout")]
-        let glyph_id = if is_vart {
+        let glyph_id = if is_vert {
             if let Some(gsub) = self.gsub.as_ref() {
                 let result = gsub.lookup_vertical(glyph_id as u16);
                 if result.is_some() {
@@ -300,17 +298,7 @@ impl Font {
         #[cfg(feature = "cff")]
         {
             if self.cff.is_some() {
-                let layout = if is_vart {
-                    let result = self.get_vertical_layout(glyph_id as usize);
-                    if result.is_some() {
-                        FontLayout::Vertical(result.unwrap())
-                    } else {
-                        FontLayout::Horizontal(self.get_horizontal_layout(glyph_id as usize))
-                    }
-                } else {
-                    FontLayout::Horizontal(self.get_horizontal_layout(glyph_id as usize))
-                };
-
+                let layout = self.get_layout(glyph_id, is_vert);
                 let cff = self.cff.as_ref().unwrap();
 
                 let string = cff.to_code(glyph_id, &layout);
@@ -322,7 +310,6 @@ impl Font {
 
                 return GriphData {
                     glyph_id,
-                    format: GlyphFormat::CFF,
                     open_type_glyf: open_type_glyf,
                 };
             }
@@ -339,15 +326,14 @@ impl Font {
 
         //        let pos = cmap.get_glyph_position(code);
         let glyph = glyf.get_glyph(glyph_id as usize).unwrap();
-        let layout: HorizontalLayout = self.get_horizontal_layout(glyph_id as usize);
+        let layout = self.get_layout(glyph_id as usize, is_vert);
         let open_type_glyph = OpenTypeGlyph {
-            layout: FontLayout::Horizontal(layout),
+            layout,
             glyph: FontData::Glyph(glyph.clone()),
         };
 
         GriphData {
             glyph_id: glyph_id as usize,
-            format: GlyphFormat::OpenTypeGlyph,
             open_type_glyf: Some(open_type_glyph),
         }
     }
@@ -493,16 +479,16 @@ impl Font {
         vs: char,
         fontsize: f64,
         fontunit: &str,
-        is_vart: bool,
+        is_vert: bool,
     ) -> Result<String, Error> {
         // svg ?
         // sbix ?
         // cff ?
         #[cfg(feature = "cff")]
         if let Some(cff) = self.cff.as_ref() {
-            let gid = self.cmap.as_ref().unwrap().get_glyph_position(ch as u32) as usize;
-            let layout = self.get_layout(gid as usize, false);
-            let string = cff.to_svg(gid, fontsize, fontunit, &layout, 0.0, 0.0);
+            let glyph_id = self.cmap.as_ref().unwrap().get_glyph_position(ch as u32) as usize;
+            let layout = self.get_layout(glyph_id as usize, is_vert);
+            let string = cff.to_svg(glyph_id, fontsize, fontunit, &layout, 0.0, 0.0);
             return string;
         }
 
@@ -514,29 +500,29 @@ impl Font {
         }
 
         // utf-32
-        let glyf_data = self.get_glyph_with_uvs_axis(ch, vs, is_vart);
-        let pos = glyf_data.glyph_id;
+        let glyf_data = self.get_glyph_with_uvs_axis(ch, vs, is_vert);
+        let glyph_id = glyf_data.glyph_id;
 
         if let FontData::Glyph(glyph) = &glyf_data.open_type_glyf.as_ref().unwrap().glyph {
             let layout = &glyf_data.open_type_glyf.as_ref().unwrap().layout;
             if let Some(sbix) = self.sbix.as_ref() {
-                let result = sbix.get_svg(pos as u32, fontsize, fontunit, &layout, 0.0, 0.0);
+                let result = sbix.get_svg(glyph_id as u32, fontsize, fontunit, &layout, 0.0, 0.0);
                 if let Some(svg) = result {
                     let mut string = "".to_string();
                     #[cfg(debug_assertions)]
                     {
-                        string += &format!("<!-- {} glyf id: {} -->", ch, pos);
+                        string += &format!("<!-- {} glyf id: {} -->", ch, glyph_id);
                     }
                     string += &svg;
                     return Ok(string);
                 }
             } else if let Some(svg) = self.svg.as_ref() {
-                let result = svg.get_svg(pos as u32, fontsize, fontunit, &layout, 0.0, 0.0);
+                let result = svg.get_svg(glyph_id as u32, fontsize, fontunit, &layout, 0.0, 0.0);
                 if let Some(svg) = result {
                     let mut string = "".to_string();
                     #[cfg(debug_assertions)]
                     {
-                        string += &format!("<!-- {} glyf id: {} -->", ch, pos);
+                        string += &format!("<!-- {} glyf id: {} -->", ch, glyph_id);
                         if let FontLayout::Horizontal(layout) = layout {
                             string += &format!(
                                 "<!-- layout {} {} {} {} {} -->\n",
@@ -580,14 +566,14 @@ impl Font {
             };
 
             if let Some(colr) = colr.as_ref() {
-                let layers = colr.get_layer_record(pos as u16);
+                let layers = colr.get_layer_record(glyph_id as u16);
                 if layers.is_empty() {
                     return Ok(glyph.to_svg(fontsize, fontunit, &layout, 0.0, 0.0));
                 }
                 let mut string = glyph.get_svg_heder(fontsize, fontunit, &layout);
                 #[cfg(debug_assertions)]
                 {
-                    string += &format!("\n<!-- {} glyf id: {} -->", ch, pos);
+                    string += &format!("\n<!-- {} glyf id: {} -->", ch, glyph_id);
                 }
 
                 for layer in layers {
@@ -618,7 +604,7 @@ impl Font {
                 #[cfg(debug_assertions)]
                 {
                     let string = glyph.to_svg(fontsize, fontunit, &layout, 0.0, 0.0);
-                    return Ok(format!("<!-- {} glyf id: {} -->{}", ch, pos, string));
+                    return Ok(format!("<!-- {} glyf id: {} -->{}", ch, glyph_id, string));
                 }
                 #[cfg(not(debug_assertions))]
                 Ok(glyph.to_svg(fontsize, fontunit, &layout, 0.0, 0.0))
@@ -860,6 +846,35 @@ impl Font {
                 .unwrap()
         };
         gsub.to_string()
+    }
+
+    pub fn get_html_vert(&self, string: &str, fontsize: f64, fontunit: &str) -> Result<String, Error> {
+        let mut html = String::new();
+        html += "<html>\n";
+        html += "<head>\n";
+        html += "<meta charset=\"UTF-8\">\n";
+        html += "<title>fontreader</title>\n";
+        html += "<style>body {writing-mode: vertical-rl; }</style>\n";
+        html += "</head>\n";
+        html += "<body>\n";
+        let mut svgs = Vec::new();
+        for(ch, vs) in string.chars().zip(string.chars().skip(1)) {
+            if ch == '\n' {
+                svgs.push("<br>".to_string());
+                continue;
+            }
+            if ch == '\r' {
+                continue;
+            }
+            let svg = self.get_svg_with_uvs_axis(ch, vs, fontsize, fontunit, true)?;
+            svgs.push(svg);
+        }
+        for svg in svgs {
+            html += &svg;
+        }
+        html += "</body>\n";
+        html += "</html>\n";
+        Ok(html)
     }
 
     pub fn get_html(&self, string: &str, fontsize: f64, fontunit: &str) -> Result<String, Error> {

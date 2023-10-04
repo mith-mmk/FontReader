@@ -2,8 +2,6 @@ use std::io::SeekFrom;
 
 use bin_rs::reader::BinaryReader;
 
-use crate::opentype::{outline::glyf, requires};
-
 #[derive(Debug, Clone)]
 
 pub(crate) enum Coverage {
@@ -12,11 +10,12 @@ pub(crate) enum Coverage {
 }
 
 impl Coverage {
-    pub(crate) fn contains(&self, griph_id: usize) -> Option<usize> {
+    pub(crate) fn contains(&self, glyph_id: usize) -> Option<usize> {
+        let glyph_id = glyph_id as u16;
         match self {
             Coverage::Format1(coverage) => {
                 let glyph_ids = &coverage.glyph_ids;
-                let result = glyph_ids.binary_search(&(griph_id as u16));
+                let result = glyph_ids.binary_search(&glyph_id);
                 match result {
                     Ok(index) => Some(index),
                     Err(_) => None,
@@ -25,20 +24,20 @@ impl Coverage {
             Coverage::Format2(coverage) => {
                 let range_records: &Vec<RangeRecord> = &coverage.range_records;
                 let result = range_records.binary_search_by(|x| {
-                    if x.start_glyph_id >= (griph_id as u16) && x.end_glyph_id <= (griph_id as u16)
+                    if x.start_glyph_id <= glyph_id && glyph_id <= x.end_glyph_id
                     {
                         std::cmp::Ordering::Equal
-                    } else if x.end_glyph_id > (griph_id as u16) {
-                        std::cmp::Ordering::Greater
-                    } else {
+                    } else if x.end_glyph_id < glyph_id {
                         std::cmp::Ordering::Less
+                    } else {
+                        std::cmp::Ordering::Greater
                     }
                 });
                 match result {
                     Ok(index) => {
                         let reage_record = &range_records[index];
                         let index = reage_record.start_coverage_index
-                            + (griph_id as u16 - reage_record.start_glyph_id);
+                            + (glyph_id as u16 - reage_record.start_glyph_id);
                         Some(index as usize)
                     }
                     Err(_) => None,

@@ -110,7 +110,7 @@ impl GSUB {
 
     // ccmp Glyph Composition / Decomposition
     pub fn lookup_ccmp(&self, glyph_id: usize) -> Option<Vec<u16>> {
-        let script = self.get_script(b"DFLT").unwrap();
+        let script = self.get_script(b"DFLT")?;
         let features = self.get_features(&b"ccmp", script);
         for feature in features.iter() {
             for lookup_index in feature.lookup_list_indices.iter() {
@@ -125,7 +125,8 @@ impl GSUB {
 
     // vert, vrt2, vrtr
     pub fn lookup_vertical(&self, glyph_id: u16) -> Option<u16> {
-        let script = self.get_script(b"DFLT").unwrap();
+        let script = self.get_script(b"DFLT")?;
+                
         let features = self.get_features(&b"vert", script);
         for feature in features.iter() {
             for lookup_index in feature.lookup_list_indices.iter() {
