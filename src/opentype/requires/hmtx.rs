@@ -23,7 +23,7 @@ impl HMTX {
         number_of_hmetrics: u16,
         num_glyphs: u16,
     ) -> Result<Self, Error> {
-        get_hdmx(file, offest, length, number_of_hmetrics, num_glyphs)
+        get_hmtx(file, offest, length, number_of_hmetrics, num_glyphs)
     }
 
     pub(crate) fn get_metrix(&self, i: usize) -> LongHorMetric {
@@ -66,7 +66,7 @@ pub(crate) struct LongHorMetric {
     pub(crate) left_side_bearing: i16,
 }
 
-fn get_hdmx<R: bin_rs::reader::BinaryReader>(
+fn get_hmtx<R: bin_rs::reader::BinaryReader>(
     file: &mut R,
     offest: u32,
     _length: u32,

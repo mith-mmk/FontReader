@@ -89,6 +89,7 @@ pub struct Font {
     pub(crate) vhea: Option<vhea::VHEA>,
     pub(crate) vmtx: Option<vmtx::VMTX>,
     hmtx_pos: Option<Pointer>,
+    vmtx_pos: Option<Pointer>,
     loca_pos: Option<Pointer>, // OpenType font, CFF/CFF2 none
     glyf_pos: Option<Pointer>, // OpenType font, CFF/CFF2 none
     sbix_pos: Option<Pointer>,
@@ -124,6 +125,7 @@ impl Font {
             vhea: None,
             vmtx: None,
             hmtx_pos: None,
+            vmtx_pos: None,
             loca_pos: None,
             glyf_pos: None,
             sbix_pos: None,
@@ -858,7 +860,7 @@ impl Font {
         html += "</head>\n";
         html += "<body>\n";
         let mut svgs = Vec::new();
-        for(ch, vs) in string.chars().zip(string.chars().skip(1)) {
+        for (i, ch) in string.chars().enumerate() {
             if ch == '\n' {
                 svgs.push("<br>".to_string());
                 continue;
@@ -866,9 +868,28 @@ impl Font {
             if ch == '\r' {
                 continue;
             }
-            let svg = self.get_svg_with_uvs_axis(ch, vs, fontsize, fontunit, true)?;
-            svgs.push(svg);
+            if ch == '\t' {
+                svgs.push(
+                    "<span style=\"width: 4em; display: inline-block;\"></span>\n".to_string(),
+                );
+                continue;
+            }
+
+            // variation selector 0xE0100 - 0xE01EF
+            // https://www.unicode.org/reports/tr37/#VS
+            if ch as u32 >= 0xfe00 && ch as u32 <= 0xfe0f
+                || ch as u32 >= 0xE0100 && ch as u32 <= 0xE01EF
+            {
+                let ch0 = string.chars().nth(i - 1).unwrap();
+                let svg = self.get_svg_with_uvs_axis(ch0, ch, fontsize, fontunit, true)?;
+                svgs.pop();
+                svgs.push(svg);
+            } else {
+                let svg = self.get_svg_with_uvs_axis(ch, '\0', fontsize, fontunit, true)?;
+                svgs.push(svg);
+            }
         }
+
         for svg in svgs {
             html += &svg;
         }
@@ -1382,6 +1403,19 @@ fn from_opentype<R: BinaryReader>(file: &mut R, header: &OTFHeader) -> Result<Fo
                     println!("{}", &font.gdef.as_ref().unwrap().to_string());
                 }
             }
+            #[cfg(feature = "layout")]
+            b"vhea" => {
+                let vhea = vhea::VHEA::new(file, record.offset, record.length)?;
+                font.vhea = Some(vhea);
+            }
+            #[cfg(feature = "layout")]
+            b"vmtx" => {
+                let vmtx_pos = Pointer {
+                    offset: record.offset,
+                    length: record.length,
+                };
+                font.vmtx_pos = Some(vmtx_pos);
+            }
             _ => {
                 debug_assert!(true, "Unknown table tag")
             }
@@ -1395,6 +1429,11 @@ fn from_opentype<R: BinaryReader>(file: &mut R, header: &OTFHeader) -> Result<Fo
 
     let hmtx = hmtx::HMTX::new(file, offset, length, number_of_hmetrics, num_glyphs)?;
     font.hmtx = Some(hmtx);
+
+    let offset = font.vmtx_pos.as_ref().unwrap().offset;
+    let length = font.vmtx_pos.as_ref().unwrap().length;
+    let vmtx = vmtx::VMTX::new(file, offset, length, number_of_hmetrics, num_glyphs)?;
+    font.vmtx = Some(vmtx);
 
     if let Some(offset) = font.loca_pos.as_ref() {
         let length = font.loca_pos.as_ref().unwrap().length;

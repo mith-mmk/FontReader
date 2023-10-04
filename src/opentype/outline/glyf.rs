@@ -269,16 +269,14 @@ impl Glyph {
             FontLayout::Vertical(layout) => {
                 // let bsb = (layout.advance_height - parsed.y_max as isize) as i16;
                 let x_min = 0;
-                let y_max = layout.advance_height;
+                let y_min = layout.tsb;
                 //        let y_max = layout.accender - layout.descender + layout.line_gap;
                 let x_max = layout.accender - layout.descender;
-                let y_min = - layout.line_gap;
+                let y_max = x_max - y_min as isize;
                 let height = fontsize;
-                let width = x_min as f64 + x_max as f64;
-                let width = width * height / y_max as f64;
 
                 let height_str = format!("{}{}", height, fontunit);
-                let width_str = format!("{}{}", width, fontunit);
+                let width_str = format!("{}{}", height, fontunit);
                 let mut svg = format!("<svg width=\"{}\" height=\"{}\" viewBox=\"{} {} {} {}\" xmlns=\"http://www.w3.org/2000/svg\">\n", width_str, height_str, x_min, y_min, x_max, y_max);
                 #[cfg(debug_assertions)]
                 {
@@ -287,8 +285,8 @@ impl Glyph {
                         parsed.x_min, parsed.y_min, parsed.x_max, parsed.y_max
                     );
                     svg += &format!(
-                        "<!-- layout height {} accender {}  descender {} line_gap {}-->\n",
-                        layout.advance_height, layout.accender, layout.descender, layout.line_gap
+                        "<!-- layout height {} accender {}  descender {} tsb {}-->\n",
+                        layout.advance_height, layout.accender, layout.descender, layout.tsb
                     );
                 }
                 svg
@@ -310,7 +308,7 @@ impl Glyph {
     ) -> String {
         let y_max = match layout {
             FontLayout::Horizontal(layout) => layout.accender as i16 + layout.line_gap as i16,
-            FontLayout::Vertical(layout) => layout.advance_height as i16,
+            FontLayout::Vertical(layout) => layout.accender as i16 - layout.descender as i16,
             FontLayout::Unknown => 0,
         };
 
