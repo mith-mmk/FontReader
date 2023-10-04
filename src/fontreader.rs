@@ -486,9 +486,11 @@ impl Font {
         // svg ?
         // sbix ?
         // cff ?
+
         #[cfg(feature = "cff")]
         if let Some(cff) = self.cff.as_ref() {
-            let glyph_id = self.cmap.as_ref().unwrap().get_glyph_position(ch as u32) as usize;
+            let glyf_data = self.get_glyph_with_uvs_axis(ch, vs, is_vert);
+            let glyph_id = glyf_data.glyph_id;
             let layout = self.get_layout(glyph_id as usize, is_vert);
             let string = cff.to_svg(glyph_id, fontsize, fontunit, &layout, 0.0, 0.0);
             return string;
@@ -1142,6 +1144,7 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Result<Font, Error> {
             let mut loca_table = None;
             let mut glyf_table = None;
             let mut sbix_table = None;
+            let mut vmtx_table = None;
             for table in woff.tables {
                 let tag: [u8; 4] = [
                     (table.tag >> 24) as u8,
@@ -1237,6 +1240,14 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Result<Font, Error> {
                         let gdef = gdef::GDEF::new(&mut reader, 0, table.data.len() as usize)?;
                         font.gdef = Some(gdef);
                     }
+                    b"vhea" => {
+                        let mut reader = BytesReader::new(&table.data);
+                        let vhea = vhea::VHEA::new(&mut reader, 0, table.data.len() as u32)?;
+                        font.vhea = Some(vhea);
+                    }
+                    b"vmtx" => {
+                        vmtx_table = Some(table);
+                    }
                     _ => {
                         debug_assert!(true, "Unknown table tag")
                     }
@@ -1251,6 +1262,17 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Result<Font, Error> {
                 font.maxp.as_ref().unwrap().num_glyphs,
             )?;
             font.hmtx = Some(hmtx);
+            if let Some(vmtx_table) = vmtx_table {
+                let mut reader = BytesReader::new(&vmtx_table.data);
+                let vmtx = vmtx::VMTX::new(
+                    &mut reader,
+                    0,
+                    vmtx_table.data.len() as u32,
+                    font.vhea.as_ref().unwrap().number_of_hmetrics,
+                    font.maxp.as_ref().unwrap().num_glyphs,
+                )?;
+                font.vmtx = Some(vmtx);
+            }
             let mut reader = BytesReader::new(&loca_table.as_ref().unwrap().data);
             let index_to_loc_format = font.head.as_ref().unwrap().index_to_loc_format as usize;
             let loca = loca::LOCA::new_by_size(
@@ -1430,10 +1452,12 @@ fn from_opentype<R: BinaryReader>(file: &mut R, header: &OTFHeader) -> Result<Fo
     let hmtx = hmtx::HMTX::new(file, offset, length, number_of_hmetrics, num_glyphs)?;
     font.hmtx = Some(hmtx);
 
-    let offset = font.vmtx_pos.as_ref().unwrap().offset;
-    let length = font.vmtx_pos.as_ref().unwrap().length;
-    let vmtx = vmtx::VMTX::new(file, offset, length, number_of_hmetrics, num_glyphs)?;
-    font.vmtx = Some(vmtx);
+    if font.vmtx_pos.is_some() {
+        let offset = font.vmtx_pos.as_ref().unwrap().offset;
+        let length = font.vmtx_pos.as_ref().unwrap().length;
+        let vmtx = vmtx::VMTX::new(file, offset, length, number_of_hmetrics, num_glyphs)?;
+        font.vmtx = Some(vmtx);    
+    }
 
     if let Some(offset) = font.loca_pos.as_ref() {
         let length = font.loca_pos.as_ref().unwrap().length;

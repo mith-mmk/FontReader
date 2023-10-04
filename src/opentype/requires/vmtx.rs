@@ -28,8 +28,9 @@ impl VMTX {
     pub(crate) fn get_metrix(&self, i: usize) -> VerticalMetric {
         let v_metric = self.v_metrics.get(i);
         if v_metric.is_none() {
+            let v_metric = self.v_metrics.last();
             return VerticalMetric {
-                advance_height: 0,
+                advance_height: v_metric.unwrap().advance_height,
                 top_side_bearing: 0,
             };
         }
