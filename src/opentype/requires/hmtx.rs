@@ -6,7 +6,6 @@ use std::{fmt, io::SeekFrom};
 #[derive(Debug, Clone)]
 pub(crate) struct HMTX {
     pub(crate) h_metrics: Box<Vec<LongHorMetric>>,
-    pub(crate) left_side_bearings: Box<Vec<u16>>,
 }
 
 impl fmt::Display for HMTX {
@@ -49,13 +48,6 @@ impl HMTX {
                 break;
             }
         }
-        for (i, left_side_bearing) in self.left_side_bearings.iter().enumerate() {
-            let left_side_bearing = format!("{i} Left Side Bearing {}\n", left_side_bearing);
-            string += &left_side_bearing;
-            if max_len < i {
-                break;
-            }
-        }
         string
     }
 }
@@ -84,14 +76,16 @@ fn get_hmtx<R: bin_rs::reader::BinaryReader>(
             left_side_bearing,
         });
     }
-    let mut left_side_bearings = Vec::new();
+    let advance_width = h_metrics.last().unwrap().advance_width;
     let number = num_glyphs - number_of_hmetrics;
     for _ in 0..number {
-        let left_side_bearing = file.read_u16_be()?;
-        left_side_bearings.push(left_side_bearing);
+        let left_side_bearing = file.read_i16_be()?;
+        h_metrics.push(LongHorMetric {
+            advance_width,
+            left_side_bearing,
+        });
     }
     Ok(HMTX {
         h_metrics: Box::new(h_metrics),
-        left_side_bearings: Box::new(left_side_bearings),
     })
 }
