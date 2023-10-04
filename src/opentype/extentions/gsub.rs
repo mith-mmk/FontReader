@@ -4,15 +4,7 @@
 
 use std::io::SeekFrom;
 
-use crate::opentype::{
-    layouts::{
-        feature::Feature,
-        lookup::{Lookup, LookupSubstitution},
-        script::ParsedScript,
-        *,
-    },
-    Glyph,
-};
+use crate::opentype::layouts::{feature::Feature, lookup::Lookup, script::ParsedScript, *};
 use bin_rs::reader::BinaryReader;
 
 #[derive(Debug, Clone)]

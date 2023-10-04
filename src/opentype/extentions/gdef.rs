@@ -152,7 +152,7 @@ impl AttachPointList {
         let mut string = String::new();
         string += &format!("coverage: {}\n", self.coverage.to_string());
         for attach_point in self.attach_point.iter() {
-            string += &format!("attach_point: {:?}\n", attach_point.point_indices);
+            string += &format!("attach_point: {}\n", attach_point.to_string());
         }
         string
     }

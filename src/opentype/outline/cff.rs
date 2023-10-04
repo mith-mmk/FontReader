@@ -1,11 +1,8 @@
 // CFF is Adobe Type 1 font format, which is a compact binary format.
 use bin_rs::reader::BinaryReader;
-use std::{collections::HashMap, default, error::Error, f32::consts::E, io::SeekFrom};
+use std::{collections::HashMap, error::Error, io::SeekFrom};
 
-use crate::{
-    fontreader::{FontLayout, HorizontalLayout},
-    opentype::{color::svg, layouts},
-};
+use crate::fontreader::FontLayout;
 
 // Compare this snippet from src/outline/cff.rs:
 

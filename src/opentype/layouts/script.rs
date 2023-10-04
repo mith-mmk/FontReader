@@ -1,6 +1,6 @@
 use super::*;
 use bin_rs::reader::BinaryReader;
-use std::{default, io::SeekFrom};
+use std::io::SeekFrom;
 
 #[derive(Debug, Clone)]
 pub(crate) struct Script {

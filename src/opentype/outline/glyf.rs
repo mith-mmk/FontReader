@@ -267,7 +267,7 @@ impl Glyph {
                 svg
             }
             FontLayout::Vertical(layout) => {
-                let bsb = (layout.advance_height - parsed.y_max as isize) as i16;
+                // let bsb = (layout.advance_height - parsed.y_max as isize) as i16;
                 let x_min = 0;
                 let y_max = layout.advance_height;
                 //        let y_max = layout.accender - layout.descender + layout.line_gap;
@@ -279,7 +279,7 @@ impl Glyph {
 
                 let height_str = format!("{}{}", height, fontunit);
                 let width_str = format!("{}{}", width, fontunit);
-                let mut svg = format!("<svg width=\"{}\" height=\"{}\" viewBox=\"{} {} {} {}\" xmlns=\"http://www.w3.org/2000/svg\">", width_str, height_str, x_min, y_min, x_max, y_max);
+                let svg = format!("<svg width=\"{}\" height=\"{}\" viewBox=\"{} {} {} {}\" xmlns=\"http://www.w3.org/2000/svg\">", width_str, height_str, x_min, y_min, x_max, y_max);
                 svg
             }
             FontLayout::Unknown => "".to_string(),

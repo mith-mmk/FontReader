@@ -11,7 +11,6 @@ use crate::opentype::color::{colr, cpal};
 use crate::opentype::extentions::gdef;
 #[cfg(feature = "layout")]
 use crate::opentype::extentions::gsub;
-use crate::opentype::layouts;
 use crate::opentype::platforms::PlatformID;
 use crate::opentype::requires::cmap::CmapEncodings;
 use crate::opentype::requires::hmtx::LongHorMetric;
@@ -274,10 +273,10 @@ impl Font {
         let cmap = if self.current_font == 0 {
             self.cmap.as_ref().unwrap()
         } else {
-                self.more_fonts[self.current_font - 1]
-                    .cmap
-                    .as_ref()
-                    .unwrap()
+            self.more_fonts[self.current_font - 1]
+                .cmap
+                .as_ref()
+                .unwrap()
         };
 
         let glyph_id = cmap.get_glyph_position_from_uvs(code, vs) as usize;
@@ -630,7 +629,6 @@ impl Font {
                 "glyf is none".to_string(),
             ));
         }
-
     }
 
     pub fn get_svg_with_uvs(
