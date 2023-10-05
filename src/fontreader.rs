@@ -296,11 +296,11 @@ impl Font {
         } else {
             glyph_id
         };
+        let layout = self.get_layout(glyph_id, is_vert);
 
         #[cfg(feature = "cff")]
         {
             if self.cff.is_some() {
-                let layout = self.get_layout(glyph_id, is_vert);
                 let cff = self.cff.as_ref().unwrap();
 
                 let string = cff.to_code(glyph_id, &layout);
@@ -312,7 +312,7 @@ impl Font {
 
                 return GriphData {
                     glyph_id,
-                    open_type_glyf: open_type_glyf,
+                    open_type_glyf,
                 };
             }
         }
@@ -328,7 +328,6 @@ impl Font {
 
         //        let pos = cmap.get_glyph_position(code);
         let glyph = glyf.get_glyph(glyph_id as usize).unwrap();
-        let layout = self.get_layout(glyph_id as usize, is_vert);
         let open_type_glyph = OpenTypeGlyph {
             layout,
             glyph: FontData::Glyph(glyph.clone()),
@@ -1299,7 +1298,7 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Result<Font, Error> {
             }
             #[cfg(debug_assertions)]
             {
-                font_debug(&font);
+                // font_debug(&font);
             }
             Ok(font)
         }
@@ -1413,7 +1412,7 @@ fn from_opentype<R: BinaryReader>(file: &mut R, header: &OTFHeader) -> Result<Fo
                 font.gsub = Some(gsub);
                 #[cfg(debug_assertions)]
                 {
-                    println!("{}", &font.gsub.as_ref().unwrap().to_string());
+                    // println!("{}", &font.gsub.as_ref().unwrap().to_string());
                 }
             }
             #[cfg(feature = "layout")]
@@ -1422,7 +1421,7 @@ fn from_opentype<R: BinaryReader>(file: &mut R, header: &OTFHeader) -> Result<Fo
                 font.gdef = Some(gdef);
                 #[cfg(debug_assertions)]
                 {
-                    println!("{}", &font.gdef.as_ref().unwrap().to_string());
+                    // println!("{}", &font.gdef.as_ref().unwrap().to_string());
                 }
             }
             #[cfg(feature = "layout")]

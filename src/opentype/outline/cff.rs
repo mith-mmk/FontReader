@@ -2050,9 +2050,9 @@ impl CFF {
                 let advance_height = layout.advance_height as f64;
                 // let width = self.width + parce_data.width;
                 let height = self.bbox[3] - self.bbox[1] as f64;
-                let width = (descender + accender) as f64 / advance_height * fontsize;
+                let width = (accender - descender) as f64 / advance_height * fontsize;
                 let h = format!("{}{}", fontsize, fontunit);
-                let w = format!("{}{}", width, fontunit);
+                let w = format!("{}{}", fontsize, fontunit);
                 let self_width = if let Some(width) = parce_data.width {
                     self.width + width
                 } else {
@@ -2064,7 +2064,7 @@ impl CFF {
                     " width=\"{}\" height=\"{}\" viewbox=\"{} {} {} {}\">\n",
                     w,
                     h,
-                    0, // parce_data.min_x,
+                    0, 
                     self.bbox[1],
                     self_width,
                     (self.bbox[3] - self.bbox[1])
@@ -2077,8 +2077,8 @@ impl CFF {
                     );
                     svg += &format!("<!-- bbox {:?} -->\n", self.bbox);
                     svg += &format!(
-                        "<!-- advance_height {} accender {} descender {} line_gap {}-->\n",
-                        layout.advance_height, accender, descender, line_gap
+                        "<!-- advance_height {} accender {} descender {} line_gap {} tsb{}-->\n",
+                        layout.advance_height, accender, descender, line_gap, layout.tsb
                     );
                 }
                 svg
