@@ -41,6 +41,11 @@ fn main() {
                 println!("{}", font.get_name_raw());
                 println!("{}", font.get_maxp_raw());
                 println!("{}", font.get_post_raw());
+                println!("{}", font.get_hhea_raw());
+                #[cfg(feature = "layout")]
+                {
+                    println!("{}", font.get_vhea_raw());
+                }
             }
         }
     }

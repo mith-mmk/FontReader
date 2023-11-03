@@ -87,18 +87,37 @@ impl SBIX {
     pub(crate) fn get_svg(
         &self,
         gid: u32,
-        fonsize: f64,
+        fontsize: f64,
         fontunit: &str,
         _: &crate::fontreader::FontLayout,
         _: f64,
         _: f64,
     ) -> Option<String> {
-        let strike = &self.strikes[self.strikes.len() - 1];
+        let strike = {
+            let mut result = self.strikes.last().unwrap();
+            for strike in self.strikes.iter() {
+                let fontsize = fontsize as u16;
+                if fontunit == "px" {
+                    if strike.ppem > fontsize {
+                        result = strike;
+                        break;
+                    }
+                } else if fontunit == "pt" {
+                    let ppem = (strike.ppem as f64 * 72.0 / 96.0) as u16;
+                    if ppem > fontsize {
+                        result = strike;
+                        break;
+                    }
+                }
+            }
+            result
+        };
+        // let strike = &self.strikes[self.strikes.len() - 1];
         let glyph_data = &strike.glyph_data[gid as usize];
         if glyph_data.is_none() {
             return None;
         }
-        let width = format!("{}{}", fonsize, fontunit);
+        let width = format!("{}{}", fontsize, fontunit);
         let height = width.clone();
         let binary = &glyph_data.as_ref().unwrap().glyph_data;
         let bytes = u32::to_be_bytes(glyph_data.as_ref().unwrap().graphic_type);
@@ -113,7 +132,9 @@ impl SBIX {
                 base64 = format!("data:image/jpeg;base64,{}", base64);
             }
             _ => {
-                let mut string = "<svg xmlns=\"http://www.w3.org/2000/svg\" version=\"1.1\" width=\"100%\" height=\"100%\" viewBox=\"0 0 1000 1000\">\n".to_string();
+                let mut string = format!(
+                    "<svg xmlns=\"http://www.w3.org/2000/svg\" version=\"1.1\" width=\"{}\" height=\"{}\" >\n",
+                    width, height);
                 string += "</svg>\n";
                 return None;
             }

@@ -27,7 +27,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let output_file = "./test/tategaki.html";
     let filename: PathBuf = PathBuf::from(fontname);
-    let font = Font::get_font_from_file(&filename).unwrap();
+    let font = Font::get_font_from_file(&filename)?;
     let _len = font.get_font_count();
     /*
     let res = font.set_font(len - 1);

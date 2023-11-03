@@ -25,7 +25,7 @@ pub(crate) struct VHEA {
     pub(crate) reserved3: i16,
     pub(crate) reserved4: i16,
     pub(crate) metric_data_format: i16,
-    pub(crate) number_of_hmetrics: u16,
+    pub(crate) number_of_vmetrics: u16,
 }
 
 impl fmt::Display for VHEA {
@@ -56,7 +56,7 @@ impl VHEA {
     }
 
     pub(crate) fn to_string(&self) -> String {
-        let mut string = "hhea\n".to_string();
+        let mut string = "vhea\n".to_string();
         let version = format!("Version {}.{}\n", self.major_version, self.minor_version);
         string += &version;
         let ascender = format!("Ascender {}\n", self.ascender);
@@ -90,8 +90,8 @@ impl VHEA {
         string += &reserved4;
         let metric_data_format = format!("Metric Data Format {}\n", self.metric_data_format);
         string += &metric_data_format;
-        let number_of_hmetrics = format!("Number of HMetrics {}\n", self.number_of_hmetrics);
-        string += &number_of_hmetrics;
+        let number_of_vmetrics = format!("Number of HMetrics {}\n", self.number_of_vmetrics);
+        string += &number_of_vmetrics;
         string
     }
 }
@@ -116,7 +116,7 @@ fn get_vhea<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> Result<
     let reserved3 = file.read_i16_be()?;
     let reserved4 = file.read_i16_be()?;
     let metric_data_format = file.read_i16_be()?;
-    let number_of_hmetrics = file.read_u16_be()?;
+    let number_of_vmetrics = file.read_u16_be()?;
 
     Ok(VHEA {
         major_version,
@@ -136,6 +136,6 @@ fn get_vhea<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> Result<
         reserved3,
         reserved4,
         metric_data_format,
-        number_of_hmetrics,
+        number_of_vmetrics,
     })
 }

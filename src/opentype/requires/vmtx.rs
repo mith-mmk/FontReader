@@ -19,10 +19,10 @@ impl VMTX {
         file: &mut R,
         offest: u32,
         length: u32,
-        number_of_hmetrics: u16,
+        number_of_vmetrics: u16,
         num_glyphs: u16,
     ) -> Result<Self, std::io::Error> {
-        get_vmtx(file, offest, length, number_of_hmetrics, num_glyphs)
+        get_vmtx(file, offest, length, number_of_vmetrics, num_glyphs)
     }
 
     pub(crate) fn get_metrix(&self, i: usize) -> VerticalMetric {
@@ -63,13 +63,12 @@ fn get_vmtx<R: bin_rs::reader::BinaryReader>(
     file: &mut R,
     offest: u32,
     _length: u32,
-    number_of_hmetrics: u16,
+    number_of_vmetrics: u16,
     num_glyphs: u16,
 ) -> Result<VMTX, std::io::Error> {
-    let file = file;
     file.seek(SeekFrom::Start(offest as u64))?;
     let mut v_metrics = Vec::new();
-    for _ in 0..number_of_hmetrics {
+    for _ in 0..number_of_vmetrics {
         let advance_height = file.read_u16_be()?;
         let top_side_bearing = file.read_i16_be()?;
         v_metrics.push(VerticalMetric {
@@ -78,7 +77,7 @@ fn get_vmtx<R: bin_rs::reader::BinaryReader>(
         });
     }
     let advance_height = v_metrics.last().unwrap().advance_height;
-    let number = num_glyphs - number_of_hmetrics;
+    let number = num_glyphs - number_of_vmetrics;
     for _ in 0..number {
         let top_side_bearing = file.read_i16_be()?;
         v_metrics.push(VerticalMetric {

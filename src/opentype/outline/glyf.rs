@@ -270,9 +270,13 @@ impl Glyph {
                 // let bsb = (layout.advance_height - parsed.y_max as isize) as i16;
                 let x_min = 0;
                 let y_min = layout.tsb;
-                //        let y_max = layout.accender - layout.descender + layout.line_gap;
-                let x_max = layout.accender - layout.descender;
-                let y_max = x_max - y_min as isize;
+                let descender = if layout.descender < 0 {
+                    layout.descender
+                } else {
+                    - layout.descender
+                };
+                let x_max = layout.accender - descender;
+                let y_max = layout.advance_height - layout.tsb;
                 let height = fontsize;
 
                 let height_str = format!("{}{}", height, fontunit);

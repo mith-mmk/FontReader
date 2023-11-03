@@ -13,8 +13,10 @@ use crate::opentype::extentions::gdef;
 use crate::opentype::extentions::gsub;
 use crate::opentype::platforms::PlatformID;
 use crate::opentype::requires::cmap::CmapEncodings;
+use crate::opentype::requires::hhea::HHEA;
 use crate::opentype::requires::hmtx::LongHorMetric;
 use crate::opentype::requires::name::NameID;
+use crate::opentype::requires::vhea::VHEA;
 use crate::opentype::requires::vmtx::VerticalMetric;
 use crate::opentype::requires::*;
 use crate::opentype::{outline::*, OTFHeader};
@@ -196,6 +198,7 @@ impl Font {
                 accender: vhea.get_accender() as isize,
                 descender: vhea.get_descender() as isize,
                 line_gap: vhea.get_line_gap() as isize,
+                vhea: vhea.clone(),
             });
         } else {
             return None;
@@ -227,6 +230,7 @@ impl Font {
             accender,
             descender,
             line_gap,
+            hhea: hhea.clone(),
         }
     }
 
@@ -822,6 +826,20 @@ impl Font {
         };
         colr.to_string()
     }
+    #[cfg(debug_assertions)]
+    #[cfg(feature = "layout")]
+    pub fn get_vhea_raw(&self) -> String {
+        let vhea = if self.current_font == 0 {
+            self.vhea.as_ref().unwrap()
+        } else {
+            self.more_fonts[self.current_font - 1]
+                .vhea
+                .as_ref()
+                .unwrap()
+        };
+        vhea.to_string()
+    }
+
 
     #[cfg(debug_assertions)]
     #[cfg(feature = "layout")]
@@ -994,6 +1012,7 @@ pub struct HorizontalLayout {
     pub accender: isize,
     pub descender: isize,
     pub line_gap: isize,
+    pub(crate) hhea: HHEA,
 }
 
 #[derive(Debug, Clone)]
@@ -1003,6 +1022,7 @@ pub struct VerticalLayout {
     pub accender: isize,
     pub descender: isize,
     pub line_gap: isize,
+    pub(crate) vhea: VHEA,
 }
 
 #[derive(Debug, Clone)]
@@ -1267,7 +1287,7 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Result<Font, Error> {
                     &mut reader,
                     0,
                     vmtx_table.data.len() as u32,
-                    font.vhea.as_ref().unwrap().number_of_hmetrics,
+                    font.vhea.as_ref().unwrap().number_of_vmetrics,
                     font.maxp.as_ref().unwrap().num_glyphs,
                 )?;
                 font.vmtx = Some(vmtx);
@@ -1452,9 +1472,10 @@ fn from_opentype<R: BinaryReader>(file: &mut R, header: &OTFHeader) -> Result<Fo
     font.hmtx = Some(hmtx);
 
     if font.vmtx_pos.is_some() {
+        let number_of_vmetrics = font.vhea.as_ref().unwrap().number_of_vmetrics;
         let offset = font.vmtx_pos.as_ref().unwrap().offset;
         let length = font.vmtx_pos.as_ref().unwrap().length;
-        let vmtx = vmtx::VMTX::new(file, offset, length, number_of_hmetrics, num_glyphs)?;
+        let vmtx = vmtx::VMTX::new(file, offset, length, number_of_vmetrics, num_glyphs)?;
         font.vmtx = Some(vmtx);    
     }
 
