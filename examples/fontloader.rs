@@ -12,7 +12,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         {
             // $env:windir\fonts\msgothic.ttc
             let windir = env::var("windir")?;
-            format!("{}\\fonts\\msgothic.ttc", windir)
+            format!("{}\\fonts\\YuGothM.ttc", windir)
         }
         #[cfg(target_os = "macos")]
         {
@@ -27,7 +27,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let output_file = "./test/read.html";
     let filename: PathBuf = PathBuf::from(fontname);
-    let font = Font::get_font_from_file(&filename).unwrap();
+    let mut font = Font::get_font_from_file(&filename).unwrap();
+    font.set_font(1).unwrap();
     let _len = font.get_font_count();
     /*
     let res = font.set_font(len - 1);

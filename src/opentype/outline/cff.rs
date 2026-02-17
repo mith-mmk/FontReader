@@ -18,6 +18,21 @@ type SID = u16;
 type Card32 = u32;
 */
 
+/*
+    Header HEADER
+    Name INDEX
+    Top Dict INDEX(DICT)
+    String INDEX
+    Global Subr (CharString)
+    Encodings
+    Charsets
+    FDSSelect CIDFonts only
+    CharStrings INDEX / per font
+    private dict INDEX(DICT) / per font
+    local subr (CharString) / per font
+    Copyriht and Trademark notices INDEX
+*/
+
 #[derive(Debug, Clone)]
 pub(crate) struct CFF {
     pub(crate) header: Header,

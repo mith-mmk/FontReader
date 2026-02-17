@@ -845,6 +845,9 @@ impl Font {
     #[cfg(feature = "layout")]
     pub fn get_gdef_raw(&self) -> String {
         let gdef = if self.current_font == 0 {
+            if self.gdef.is_none() {
+                return "".to_string();
+            }
             self.gdef.as_ref().unwrap()
         } else {
             self.more_fonts[self.current_font - 1]

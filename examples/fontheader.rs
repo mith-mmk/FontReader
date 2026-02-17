@@ -14,7 +14,7 @@ fn main() {
         {
             // $env:windir\fonts\msgothic.ttc
             let windir = env::var("windir").unwrap();
-            format!("{}\\fonts\\msgothic.ttc", windir)
+            format!("{}\\fonts\\yumin.ttf", windir)
         }
         #[cfg(target_os = "macos")]
         {
