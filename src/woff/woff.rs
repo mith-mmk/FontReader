@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use bin_rs::reader::BinaryReader;
 use miniz_oxide::inflate::decompress_to_vec_zlib;
 
@@ -111,9 +113,9 @@ impl WOFF {
             table_record.comp_length = reader.read_u32()?;
             table_record.orig_length = reader.read_u32()?;
             table_record.orig_checksum = reader.read_u32()?;
-            let tag_str = crate::util::u32_to_string(table_record.tag);
             #[cfg(debug_assertions)]
             {
+                let tag_str = crate::util::u32_to_string(table_record.tag);
                 print!("tag: {} {:08X} ", tag_str, table_record.tag);
                 print!("offset: {:08X} ", table_record.offset);
                 print!("comp_length: {} ", table_record.comp_length);

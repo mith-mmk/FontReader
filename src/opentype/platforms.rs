@@ -1,3 +1,5 @@
+#![allow(non_local_definitions)]
+
 use num_derive::FromPrimitive;
 
 #[derive(FromPrimitive, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]

@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 // name is a table that contains font name information.
 use std::io::Error;
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]

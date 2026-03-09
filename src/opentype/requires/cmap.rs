@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use bin_rs::reader::BinaryReader;
 use std::{fmt, io::Error};
 

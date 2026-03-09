@@ -243,27 +243,38 @@ impl Glyph {
 
                 let height_str = format!("{}{}", height, fontunit);
                 let width_str = format!("{}{}", width, fontunit);
-                let mut svg = format!("<svg width=\"{}\" height=\"{}\" viewBox=\"{} {} {} {}\" xmlns=\"http://www.w3.org/2000/svg\">", width_str, height_str, x_min, y_min, x_max, y_max);
-                #[cfg(debug_assertions)]
-                {
-                    let rsb = (layout.advance_width - parsed.x_max as isize) as i16;
-                    svg += &format!(
-                        "<!-- lsb {} accender {} descender {} line_gap {} avance width {}-->",
-                        layout.lsb,
-                        layout.accender,
-                        layout.descender,
-                        layout.line_gap,
-                        layout.advance_width
+                let svg = {
+                    let base = format!(
+                        "<svg width=\"{}\" height=\"{}\" viewBox=\"{} {} {} {}\" xmlns=\"http://www.w3.org/2000/svg\">",
+                        width_str, height_str, x_min, y_min, x_max, y_max
                     );
-                    svg += &format!(
-                        "<!-- x min {} y min {} x max {} y max {} -->",
-                        parsed.x_min, parsed.y_min, parsed.x_max, parsed.y_max
-                    );
-                    svg += &format!(
-                        "<!-- offset {} length {} lsb {} advanced width {} rsb {} -->",
-                        parsed.offset, parsed.length, layout.lsb, layout.advance_width, rsb
-                    );
-                }
+                    #[cfg(debug_assertions)]
+                    {
+                        let rsb = (layout.advance_width - parsed.x_max as isize) as i16;
+                        format!(
+                            "{}<!-- lsb {} accender {} descender {} line_gap {} avance width {}--><!-- x min {} y min {} x max {} y max {} --><!-- offset {} length {} lsb {} advanced width {} rsb {} -->",
+                            base,
+                            layout.lsb,
+                            layout.accender,
+                            layout.descender,
+                            layout.line_gap,
+                            layout.advance_width,
+                            parsed.x_min,
+                            parsed.y_min,
+                            parsed.x_max,
+                            parsed.y_max,
+                            parsed.offset,
+                            parsed.length,
+                            layout.lsb,
+                            layout.advance_width,
+                            rsb
+                        )
+                    }
+                    #[cfg(not(debug_assertions))]
+                    {
+                        base
+                    }
+                };
                 svg
             }
             FontLayout::Vertical(layout) => {
@@ -281,18 +292,31 @@ impl Glyph {
 
                 let height_str = format!("{}{}", height, fontunit);
                 let width_str = format!("{}{}", height, fontunit);
-                let mut svg = format!("<svg width=\"{}\" height=\"{}\" viewBox=\"{} {} {} {}\" xmlns=\"http://www.w3.org/2000/svg\">\n", width_str, height_str, x_min, y_min, x_max, y_max);
-                #[cfg(debug_assertions)]
-                {
-                    svg += &format!(
-                        "<!-- x min {} y min {} x max {} y max {} -->\n",
-                        parsed.x_min, parsed.y_min, parsed.x_max, parsed.y_max
+                let svg = {
+                    let base = format!(
+                        "<svg width=\"{}\" height=\"{}\" viewBox=\"{} {} {} {}\" xmlns=\"http://www.w3.org/2000/svg\">\n",
+                        width_str, height_str, x_min, y_min, x_max, y_max
                     );
-                    svg += &format!(
-                        "<!-- layout height {} accender {}  descender {} tsb {}-->\n",
-                        layout.advance_height, layout.accender, layout.descender, layout.tsb
-                    );
-                }
+                    #[cfg(debug_assertions)]
+                    {
+                        format!(
+                            "{}<!-- x min {} y min {} x max {} y max {} -->\n<!-- layout height {} accender {}  descender {} tsb {}-->\n",
+                            base,
+                            parsed.x_min,
+                            parsed.y_min,
+                            parsed.x_max,
+                            parsed.y_max,
+                            layout.advance_height,
+                            layout.accender,
+                            layout.descender,
+                            layout.tsb
+                        )
+                    }
+                    #[cfg(not(debug_assertions))]
+                    {
+                        base
+                    }
+                };
                 svg
             }
             FontLayout::Unknown => "".to_string(),

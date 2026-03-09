@@ -8,6 +8,7 @@ use crate::fontheader;
 use crate::opentype::color::sbix;
 use crate::opentype::color::svg;
 use crate::opentype::color::{colr, cpal};
+#[cfg(feature = "layout")]
 use crate::opentype::extentions::gdef;
 #[cfg(feature = "layout")]
 use crate::opentype::extentions::gsub;
@@ -1015,6 +1016,7 @@ pub struct HorizontalLayout {
     pub accender: isize,
     pub descender: isize,
     pub line_gap: isize,
+    #[allow(dead_code)]
     pub(crate) hhea: HHEA,
 }
 
@@ -1025,6 +1027,7 @@ pub struct VerticalLayout {
     pub accender: isize,
     pub descender: isize,
     pub line_gap: isize,
+    #[allow(dead_code)]
     pub(crate) vhea: VHEA,
 }
 
@@ -1042,6 +1045,7 @@ fn font_load_from_file(filename: &PathBuf) -> Result<Font, Error> {
 }
 
 #[cfg(debug_assertions)]
+#[allow(dead_code)]
 fn font_debug(_font: &Font) {
     // create or open file
     let filename = "test/font.txt";

@@ -317,7 +317,7 @@ impl LookupList {
                 let ligature_glyph = reader.read_u16_be()?;
                 let component_count = reader.read_u16_be()?;
                 let mut component_glyph_ids = Vec::new();
-                for _ in 0..component_count {
+                for _ in 0..(component_count -1) { // ???
                     component_glyph_ids.push(reader.read_u16_be()?);
                 }
                 ligature_table.push(LigatureTable {

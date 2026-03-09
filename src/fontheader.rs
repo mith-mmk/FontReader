@@ -37,14 +37,14 @@ impl TableRecord {
     }
 }
 
-#[cfg(target_feature = "impl")]
+#[cfg(any())]
 pub fn fixed_to_f32(value: Fixed) -> f32 {
     let integer = (value >> 16) as f32;
     let decimal = (value & 0xFFFF) as f32 / 65536.0;
     integer + decimal
 }
 
-#[cfg(target_feature = "impl")]
+#[cfg(any())]
 pub fn f2dot14_to_f32(value: F2DOT14) -> f32 {
     let integer = (value >> 14) as f32;
     let decimal = (value & 0x3FFF) as f32 / 16384.0;

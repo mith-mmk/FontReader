@@ -19,6 +19,7 @@ while (Table < EndPtr)
 return Sum;
 } */
 
+#[allow(dead_code)]
 pub(crate) fn check_sum(table: Vec<u8>) -> u32 {
     let mut sum = 0;
     for i in 0..table.len() / 4 {

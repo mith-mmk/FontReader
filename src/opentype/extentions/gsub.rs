@@ -109,13 +109,13 @@ impl GSUB {
     }
 
     // ccmp Glyph Composition / Decomposition
-    pub fn lookup_ccmp(&self, glyph_id: usize) -> Option<Vec<u16>> {
+    pub fn lookup_ccmp(&self, _glyph_id: usize) -> Option<Vec<u16>> {
         let script = self.get_script(b"DFLT")?;
         let features = self.get_features(&b"ccmp", script);
         for feature in features.iter() {
             for lookup_index in feature.lookup_list_indices.iter() {
                 let lookup = self.lookups.lookups[*lookup_index as usize].clone();
-                for subtable in lookup.subtables.iter() {
+                for _subtable in lookup.subtables.iter() {
                     // get glyph_ids from subtable
                 }
             }
