@@ -3,7 +3,7 @@ use std::{fmt, io::SeekFrom};
 
 use bin_rs::reader::BinaryReader;
 
-use crate::fontreader::FontLayout;
+use crate::fontreader::{FontLayout, PathCommand};
 
 use super::loca;
 /*
@@ -437,6 +437,115 @@ impl Glyph {
         }
         svg += "Z\"/>";
         svg
+    }
+
+    pub fn to_path_commands(&self, layout: &FontLayout, sx: f64, sy: f64) -> Vec<PathCommand> {
+        let parsed = self.parse();
+        Self::to_path_commands_parsed(&parsed, layout, sx, sy)
+    }
+
+    pub fn to_path_commands_parsed(
+        parsed: &ParsedGlyph,
+        layout: &FontLayout,
+        sx: f64,
+        sy: f64,
+    ) -> Vec<PathCommand> {
+        let y_max = match layout {
+            FontLayout::Horizontal(layout) => layout.accender as i16 + layout.line_gap as i16,
+            FontLayout::Vertical(layout) => layout.accender as i16 - layout.descender as i16,
+            FontLayout::Unknown => 0,
+        };
+
+        let mut commands = Vec::new();
+        let mut pos = 0;
+        let mut befor_on_curve = false;
+        let mut path_start = true;
+        let mut x = sx as i16;
+        let mut y = sy as i16;
+        let mut start_x = sx as i16;
+        let mut start_y = sy as i16;
+
+        for i in 0..parsed.flags.len() {
+            x += parsed.xs[i];
+            y += parsed.ys[i];
+            let on_curve = parsed.on_curves[i];
+            let next_x;
+            let next_y;
+            if parsed.end_pts_of_contours[pos] == i || i == parsed.flags.len() - 1 {
+                next_x = start_x;
+                next_y = start_y;
+            } else {
+                next_x = x + parsed.xs[i + 1];
+                next_y = y + parsed.ys[i + 1];
+            }
+            let next_on_curve = if i + 1 < parsed.on_curves.len() {
+                parsed.on_curves[i + 1]
+            } else {
+                true
+            };
+            if path_start {
+                if on_curve {
+                    start_x = x;
+                    start_y = y;
+                } else {
+                    start_x = (x + next_x) / 2;
+                    start_y = (y + next_y) / 2;
+                }
+                if i != 0 {
+                    commands.push(PathCommand::ClosePath);
+                }
+
+                commands.push(PathCommand::MoveTo {
+                    x: start_x as f64,
+                    y: (y_max - start_y) as f64,
+                });
+                path_start = false;
+            } else if on_curve {
+                if befor_on_curve {
+                    commands.push(PathCommand::LineTo {
+                        x: x as f64,
+                        y: (y_max - y) as f64,
+                    });
+                }
+            } else if befor_on_curve {
+                if next_on_curve {
+                    commands.push(PathCommand::QuadTo {
+                        cx: x as f64,
+                        cy: (y_max - y) as f64,
+                        x: next_x as f64,
+                        y: (y_max - next_y) as f64,
+                    });
+                } else {
+                    commands.push(PathCommand::QuadTo {
+                        cx: x as f64,
+                        cy: (y_max - y) as f64,
+                        x: ((x + next_x) / 2) as f64,
+                        y: (y_max - ((y + next_y) / 2)) as f64,
+                    });
+                }
+            } else if next_on_curve {
+                commands.push(PathCommand::LineTo {
+                    x: next_x as f64,
+                    y: (y_max - next_y) as f64,
+                });
+            } else {
+                commands.push(PathCommand::QuadTo {
+                    cx: x as f64,
+                    cy: (y_max - y) as f64,
+                    x: ((x + next_x) / 2) as f64,
+                    y: (y_max - ((y + next_y) / 2)) as f64,
+                });
+            }
+            if i >= parsed.end_pts_of_contours[pos] {
+                pos += 1;
+                path_start = true;
+            }
+            befor_on_curve = on_curve;
+        }
+        if !commands.is_empty() {
+            commands.push(PathCommand::ClosePath);
+        }
+        commands
     }
 
     pub fn to_svg(

@@ -26,6 +26,24 @@ use crate::opentype::{outline::*, OTFHeader};
 use std::io::{BufWriter, Write};
 
 #[derive(Debug, Clone)]
+pub enum PathCommand {
+    MoveTo { x: f64, y: f64 },
+    LineTo { x: f64, y: f64 },
+    QuadTo { cx: f64, cy: f64, x: f64, y: f64 },
+    ClosePath,
+}
+
+#[derive(Debug, Clone)]
+pub struct GlyphCommands {
+    pub ch: char,
+    pub glyph_id: usize,
+    pub origin_x: f64,
+    pub origin_y: f64,
+    pub advance_width: f64,
+    pub commands: Vec<PathCommand>,
+}
+
+#[derive(Debug, Clone)]
 
 pub enum GlyphFormat {
     OpenTypeGlyph,
@@ -158,6 +176,11 @@ impl Font {
 
     pub fn get_font_from_file(filename: &PathBuf) -> Result<Self, Error> {
         font_load_from_file(filename)
+    }
+
+    pub fn get_font_from_buffer(fontdata: &[u8]) -> Result<Self, Error> {
+        let mut reader = BytesReader::new(fontdata);
+        font_load(&mut reader)
     }
 
     pub(crate) fn get_h_metrix(&self, id: usize) -> LongHorMetric {
@@ -639,6 +662,140 @@ impl Font {
         self.get_svg_with_uvs(ch, '\u{0}', fontsize, fontunit)
     }
 
+    fn current_hhea(&self) -> Result<&HHEA, Error> {
+        if self.current_font == 0 {
+            self.hhea
+                .as_ref()
+                .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "hhea is none"))
+        } else {
+            self.more_fonts[self.current_font - 1]
+                .hhea
+                .as_ref()
+                .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "hhea is none"))
+        }
+    }
+
+    fn default_line_height(&self) -> Result<f64, Error> {
+        let hhea = self.current_hhea()?;
+        Ok((hhea.get_accender() - hhea.get_descender() + hhea.get_line_gap()) as f64)
+    }
+
+    pub fn text2commands(&self, text: &str) -> Result<Vec<GlyphCommands>, Error> {
+        let mut result = Vec::new();
+        let mut cursor_x = 0.0;
+        let mut line_index = 0usize;
+        let line_height = self.default_line_height()?;
+        let tab_advance = line_height;
+
+        for ch in text.chars() {
+            match ch {
+                '\r' => continue,
+                '\n' => {
+                    cursor_x = 0.0;
+                    line_index += 1;
+                    continue;
+                }
+                '\t' => {
+                    cursor_x += tab_advance * 4.0;
+                    continue;
+                }
+                _ => {}
+            }
+
+            let glyph_data = self.get_glyph(ch);
+            let open_type_glyph = glyph_data
+                .open_type_glyf
+                .as_ref()
+                .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "glyph is none"))?;
+            let origin_y = -(line_index as f64 * line_height);
+
+            match &open_type_glyph.glyph {
+                FontData::Glyph(glyph) => {
+                    let advance_width = match &open_type_glyph.layout {
+                        FontLayout::Horizontal(layout) => layout.advance_width as f64,
+                        FontLayout::Vertical(layout) => layout.advance_height as f64,
+                        FontLayout::Unknown => 0.0,
+                    };
+                    let commands = glyph.to_path_commands(&open_type_glyph.layout, cursor_x, origin_y);
+                    result.push(GlyphCommands {
+                        ch,
+                        glyph_id: glyph_data.glyph_id,
+                        origin_x: cursor_x,
+                        origin_y,
+                        advance_width,
+                        commands,
+                    });
+                    cursor_x += advance_width;
+                }
+                _ => {
+                    return Err(Error::new(
+                        std::io::ErrorKind::Other,
+                        "text2commands supports glyf outlines only",
+                    ));
+                }
+            }
+        }
+
+        Ok(result)
+    }
+
+    pub fn text2svg(&self, text: &str, fontsize: f64, fontunit: &str) -> Result<String, Error> {
+        let glyphs = self.text2commands(text)?;
+        let line_height = self.default_line_height()?;
+        let mut d_list = Vec::new();
+        let mut min_x = 0.0;
+        let mut min_y = 0.0;
+        let mut max_x = 0.0;
+        let mut max_y = 0.0;
+        let mut has_point = false;
+
+        for glyph in glyphs.iter() {
+            let d = path_commands_to_svg_path(&glyph.commands);
+            if d.is_empty() {
+                continue;
+            }
+            let (glyph_min_x, glyph_min_y, glyph_max_x, glyph_max_y) =
+                path_command_bounds(&glyph.commands);
+            if !has_point {
+                min_x = glyph_min_x;
+                min_y = glyph_min_y;
+                max_x = glyph_max_x;
+                max_y = glyph_max_y;
+                has_point = true;
+            } else {
+                min_x = min_x.min(glyph_min_x);
+                min_y = min_y.min(glyph_min_y);
+                max_x = max_x.max(glyph_max_x);
+                max_y = max_y.max(glyph_max_y);
+            }
+            d_list.push(d);
+        }
+
+        if !has_point {
+            let size = format!("0{}", fontunit);
+            return Ok(format!(
+                "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{}\" height=\"{}\" viewBox=\"0 0 0 0\"></svg>",
+                size, size
+            ));
+        }
+
+        let view_width = (max_x - min_x).max(1.0);
+        let view_height = (max_y - min_y).max(1.0);
+        let scale = fontsize / line_height.max(1.0);
+        let width = view_width * scale;
+        let height = view_height * scale;
+
+        let mut svg = format!(
+            "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{}{}\" height=\"{}{}\" viewBox=\"{} {} {} {}\">",
+            width, fontunit, height, fontunit, min_x, min_y, view_width, view_height
+        );
+        for d in d_list {
+            svg += &format!("<path d=\"{}\" fill=\"currentColor\"/>", d);
+        }
+        svg += "</svg>";
+        Ok(svg)
+    }
+
     pub fn get_name(&self, name_id: NameID, locale: &String) -> Result<String, Error> {
         let name_table = if self.current_font == 0 {
             if self.name_table.is_none() {
@@ -1042,6 +1199,55 @@ fn font_load_from_file(filename: &PathBuf) -> Result<Font, Error> {
     let reader = BufReader::new(file);
     let mut reader = StreamReader::new(reader);
     font_load(&mut reader)
+}
+
+fn path_commands_to_svg_path(commands: &[PathCommand]) -> String {
+    let mut d = String::new();
+    for command in commands {
+        match command {
+            PathCommand::MoveTo { x, y } => d += &format!("M{} {} ", x, y),
+            PathCommand::LineTo { x, y } => d += &format!("L{} {} ", x, y),
+            PathCommand::QuadTo { cx, cy, x, y } => d += &format!("Q{} {} {} {} ", cx, cy, x, y),
+            PathCommand::ClosePath => d += "Z ",
+        }
+    }
+    d.trim_end().to_string()
+}
+
+fn path_command_bounds(commands: &[PathCommand]) -> (f64, f64, f64, f64) {
+    let mut min_x = 0.0;
+    let mut min_y = 0.0;
+    let mut max_x = 0.0;
+    let mut max_y = 0.0;
+    let mut has_point = false;
+
+    let mut add_point = |x: f64, y: f64| {
+        if !has_point {
+            min_x = x;
+            min_y = y;
+            max_x = x;
+            max_y = y;
+            has_point = true;
+        } else {
+            min_x = min_x.min(x);
+            min_y = min_y.min(y);
+            max_x = max_x.max(x);
+            max_y = max_y.max(y);
+        }
+    };
+
+    for command in commands {
+        match command {
+            PathCommand::MoveTo { x, y } | PathCommand::LineTo { x, y } => add_point(*x, *y),
+            PathCommand::QuadTo { cx, cy, x, y } => {
+                add_point(*cx, *cy);
+                add_point(*x, *y);
+            }
+            PathCommand::ClosePath => {}
+        }
+    }
+
+    (min_x, min_y, max_x, max_y)
 }
 
 #[cfg(debug_assertions)]
