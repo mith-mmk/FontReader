@@ -22,6 +22,7 @@ pub(crate) struct TableRecord {
 }
 
 impl TableRecord {
+    #[allow(dead_code)]
     pub(crate) fn to_string(self) -> String {
         let mut string = String::new();
         string.push_str("table tag: ");

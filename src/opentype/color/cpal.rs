@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::io::SeekFrom;
 
 use bin_rs::reader::BinaryReader;

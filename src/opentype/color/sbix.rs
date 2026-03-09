@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::io::SeekFrom;
 
 use base64::{engine::general_purpose, Engine as _};

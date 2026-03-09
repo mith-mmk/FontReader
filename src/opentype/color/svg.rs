@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use miniz_oxide::inflate::decompress_to_vec_zlib;
 use std::io::SeekFrom;
 
