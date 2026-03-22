@@ -210,24 +210,10 @@ fn get_os2<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> Result<O
     let s_typo_line_gap = file.read_i16_be()?;
     // 76
     let us_win_ascent = file.read_u16_be()?;
-    let _us_win_descent = file.read_u16_be()?;
-    let _ul_code_page_range1 = file.read_u32_be()?;
-    let _ul_code_page_range2 = file.read_u32_be()?;
-    let _sx_height = file.read_i16_be()?;
-    let _s_cap_height = file.read_i16_be()?;
-    let _us_default_char = file.read_u16_be()?;
-    let _us_break_char = file.read_u16_be()?;
-    let _us_max_context = file.read_u16_be()?;
-    // 96
-
-    let _us_lower_optical_point_size = file.read_u16_be()?;
-    let _us_upper_optical_point_size = file.read_u16_be()?;
-
-    let mut us_win_descent = 0;
+    let us_win_descent = file.read_u16_be()?;
     let mut ul_code_page_range1 = 0;
     let mut ul_code_page_range2 = 0;
     if version >= 1 {
-        us_win_descent = file.read_u16_be()?;
         ul_code_page_range1 = file.read_u32_be()?;
         ul_code_page_range2 = file.read_u32_be()?;
     }

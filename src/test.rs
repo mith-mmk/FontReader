@@ -941,6 +941,12 @@ mod tests {
             .join("notosanswoff2.woff2")
     }
 
+    fn woff_font_path() -> std::path::PathBuf {
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("fonts")
+            .join("MS-Gothic.ttf.woff")
+    }
+
     #[cfg(feature = "layout")]
     fn japanese_font_path() -> std::path::PathBuf {
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -978,6 +984,14 @@ mod tests {
         let bytes = std::fs::read(&path).expect("read woff2 bytes");
         let font = crate::fontload_buffer(&bytes).expect("load woff2 from buffer");
         let svg = font.text2svg("A", 24.0, "px").expect("render woff2 text");
+        assert!(svg.contains("<svg"));
+    }
+
+    #[test]
+    fn fontload_from_woff_file_works() {
+        let path = woff_font_path();
+        let font = crate::fontload_file(&path).expect("load woff font");
+        let svg = font.text2svg("A", 24.0, "px").expect("render woff text");
         assert!(svg.contains("<svg"));
     }
 

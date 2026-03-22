@@ -17,7 +17,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let string = font.get_info()?;
     println!("{}", string);
     let string = text_content(&args, "./test/read.txt")?;
-    let html = font.get_html_vert(&string, 64.0, "px")?;
-    std::fs::write(output_file, html)?;
+    match font.get_html_vert(&string, 64.0, "px") {
+        Ok(html) => std::fs::write(output_file, html)?,
+        Err(err) => eprintln!("render skipped: {}", err),
+    }
     Ok(())
 }
