@@ -1,9 +1,10 @@
-use std::{env, path::Path};
+mod common;
 
+use common::font_folder;
 use fontloader::fontheader;
 
-fn get_font_type(folder: &String) {
-    let dir = Path::new(&folder).read_dir().unwrap();
+fn get_font_type(folder: &std::path::Path) {
+    let dir = folder.read_dir().unwrap();
     let mut font_files = Vec::new();
     for filename in dir {
         let filename = filename.unwrap().path();
@@ -28,28 +29,7 @@ fn get_font_type(folder: &String) {
 }
 
 fn main() {
-    // agrs[1] is the folder name
     let args: Vec<String> = std::env::args().collect();
-    // argv.len()?
-    let folder = if args.len() >= 2 {
-        args[1].to_string()
-    } else {
-        #[cfg(target_os = "windows")]
-        {
-            // $env:windir\fonts\msgothic.ttc
-            let windir = env::var("windir").unwrap();
-            format!("{}\\fonts\\", windir)
-        }
-        #[cfg(target_os = "macos")]
-        {
-            // let home = env::var("HOME").unwrap();
-            let home = "/System";
-            format!("{}/Library/Fonts/", home)
-        }
-        #[cfg(target_os = "linux")]
-        {
-            "/usr/share/fonts".to_string()
-        }
-    };
-    get_font_type(&folder);
+    let folder = font_folder(&args);
+    get_font_type(folder.as_path());
 }

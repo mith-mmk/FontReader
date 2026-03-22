@@ -935,6 +935,12 @@ mod tests {
             .join("ZenMaruGothic-Regular.ttf")
     }
 
+    fn woff2_font_path() -> std::path::PathBuf {
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("fonts")
+            .join("notosanswoff2.woff2")
+    }
+
     #[cfg(feature = "layout")]
     fn japanese_font_path() -> std::path::PathBuf {
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -956,6 +962,23 @@ mod tests {
         let bytes = std::fs::read(&path).expect("read font bytes");
         let font = crate::fontload_buffer(&bytes).expect("load from buffer");
         assert!(font.font().get_font_count() >= 1);
+    }
+
+    #[test]
+    fn fontload_from_woff2_file_works() {
+        let path = woff2_font_path();
+        let font = crate::fontload_file(&path).expect("load woff2 from file");
+        let svg = font.text2svg("A", 24.0, "px").expect("render woff2 text");
+        assert!(svg.starts_with("<svg"));
+    }
+
+    #[test]
+    fn fontload_from_woff2_buffer_works() {
+        let path = woff2_font_path();
+        let bytes = std::fs::read(&path).expect("read woff2 bytes");
+        let font = crate::fontload_buffer(&bytes).expect("load woff2 from buffer");
+        let svg = font.text2svg("A", 24.0, "px").expect("render woff2 text");
+        assert!(svg.contains("<svg"));
     }
 
     #[test]

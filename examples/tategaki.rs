@@ -1,45 +1,22 @@
+mod common;
+
+use common::{font_index, font_path, output_path, text_content};
 use fontloader::Font;
-use std::{env, path::PathBuf};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // agrs[1] is the folder name
     let args: Vec<String> = std::env::args().collect();
-    // argv.len()?
-    let fontname = if args.len() >= 2 {
-        args[1].to_string()
-    } else {
-        #[cfg(target_os = "windows")]
-        {
-            // $env:windir\fonts\msgothic.ttc
-            let windir = env::var("windir")?;
-            format!("{}\\fonts\\msgothic.ttc", windir)
-        }
-        #[cfg(target_os = "macos")]
-        {
-            let home = env::var("HOME")?;
-            format!("{}/Library/Fonts/ヒラギノ角ゴシック W4.ttc", home)
-        }
-        #[cfg(target_os = "linux")]
-        {
-            "/usr/share/fonts".to_string()
-        }
-    };
-
-    let output_file = "./test/tategaki.html";
-    let filename: PathBuf = PathBuf::from(fontname);
-    let font = Font::get_font_from_file(&filename)?;
-    let _len = font.get_font_count();
-    /*
-    let res = font.set_font(len - 1);
-    if res.is_err() {
-        print!("error: {:?}", res);
+    let filename = font_path(&args);
+    let output_file = output_path(&args, "./test/tategaki.html");
+    let mut font = Font::get_font_from_file(&filename)?;
+    let font_count = font.get_font_count();
+    if font_count > 0 {
+        let index = font_index(&args, font_count.saturating_sub(1)).min(font_count.saturating_sub(1));
+        font.set_font(index)?;
     }
-    */
 
     let string = font.get_info()?;
     println!("{}", string);
-    let text_file = "./test/read.txt";
-    let string = std::fs::read_to_string(text_file)?;
+    let string = text_content(&args, "./test/read.txt")?;
     let html = font.get_html_vert(&string, 64.0, "px")?;
     std::fs::write(output_file, html)?;
     Ok(())

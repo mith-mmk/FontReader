@@ -28,11 +28,11 @@ fonts/* がフォント
     - [ ] font
     - [ ] font collection
     - [ ] woff
-    - [ ] woff2
+    - [+] woff2
 
 # Exampleの変更
-- ハードコーディングになっている部分を引数で渡せるようにする
-- txtを渡しているところは-s "string"で代替出来るようにする
+- [+] ハードコーディングになっている部分を引数で渡せるようにする
+- [+] txtを渡しているところは-s "string"で代替出来るようにする
   
 # API
 - [ ] FontFamiry Class
@@ -134,7 +134,7 @@ pub enum GlyphCommand {
 - [ ] 古ハングル
 - [ ] その他
 # format
-- [ ] woff2対応
+- [+] woff2対応
 - [ ] 境界条件をチェックしpanic!を回避
 - [ ] svg svgのサイズが巨大なので文字毎にsvgを切り出す
 # Layout 対応状況

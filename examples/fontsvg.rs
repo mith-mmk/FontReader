@@ -1,7 +1,7 @@
+mod common;
+
+use common::font_path;
 use fontloader::{opentype::NameID, Font};
-#[cfg(target_os = "windows")]
-use std::env;
-use std::path::PathBuf;
 /*
     一つのSVGファイルに複数のSVGが含まれている。
 
@@ -9,29 +9,8 @@ use std::path::PathBuf;
 */
 
 fn main() {
-    // agrs[1] is the folder name
     let args: Vec<String> = std::env::args().collect();
-    // argv.len()?
-    let filename = if args.len() >= 2 {
-        args[1].to_string()
-    } else {
-        #[cfg(target_os = "windows")]
-        {
-            // $env:windir\fonts\msgothic.ttc
-            let windir = env::var("windir").unwrap();
-            format!("{}\\fonts\\msgothic.ttc", windir)
-        }
-        #[cfg(target_os = "macos")]
-        {
-            format!("/System/Library/Fonts/ヒラギノ角ゴシック W4.ttc")
-        }
-        #[cfg(target_os = "linux")]
-        {
-            "/usr/share/fonts".to_string()
-        }
-    };
-
-    let filename = PathBuf::from(filename);
+    let filename = font_path(&args);
     let font = Font::get_font_from_file(&filename);
     if let Ok(mut font) = font {
         let font_number = font.get_font_count();

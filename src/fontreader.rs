@@ -1,7 +1,6 @@
-use bin_rs::reader::{BinaryReader, BytesReader, StreamReader};
+use bin_rs::reader::{BinaryReader, BytesReader};
 use std::collections::HashMap;
-use std::io::BufReader;
-use std::io::Error;
+use std::io::{Error, ErrorKind, SeekFrom};
 use std::{fs::File, path::PathBuf};
 
 use crate::fontheader;
@@ -180,6 +179,19 @@ impl Font {
 
     pub fn get_font_from_buffer(fontdata: &[u8]) -> Result<Self, Error> {
         let mut reader = BytesReader::new(fontdata);
+        let font_type = fontheader::get_font_type(&mut reader)?;
+        if let fontheader::FontHeaders::WOFF2(_) = font_type {
+            let mut input = fontdata;
+            let ttf = woff2::decode::convert_woff2_to_ttf(&mut input).map_err(|err| {
+                Error::new(
+                    ErrorKind::InvalidData,
+                    format!("Failed to decode WOFF2 font: {err}"),
+                )
+            })?;
+            return Self::get_font_from_buffer(&ttf);
+        }
+
+        reader.seek(SeekFrom::Start(0))?;
         font_load(&mut reader)
     }
 
@@ -1237,10 +1249,8 @@ struct Pointer {
 }
 
 fn font_load_from_file(filename: &PathBuf) -> Result<Font, Error> {
-    let file = File::open(filename)?;
-    let reader = BufReader::new(file);
-    let mut reader = StreamReader::new(reader);
-    font_load(&mut reader)
+    let fontdata = std::fs::read(filename)?;
+    Font::get_font_from_buffer(&fontdata)
 }
 
 fn path_commands_to_svg_path(commands: &[PathCommand]) -> String {
