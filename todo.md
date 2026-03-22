@@ -15,7 +15,7 @@ fonts/* がフォント
 - [+] text measure
 - [+] lookup (すべてのパターン)
 - [+] cmap (すべてのパターン)
-- [ ] 異字体セレクタ
+- [+] 異字体セレクタ
 - [+] emoji
 - [+] 合字
     - [ ] llga
@@ -24,11 +24,27 @@ fonts/* がフォント
     - [ ] 古ハングル
     - [ ] その他
 - [+] 縦書き
+- loader
+    - [ ] font
+    - [ ] font collection
+    - [ ] woff
+    - [ ] woff2
 
+# Exampleの変更
+- ハードコーディングになっている部分を引数で渡せるようにする
+- txtを渡しているところは-s "string"で代替出来るようにする
+  
 # API
 - [ ] FontFamiry Class
   - [ ] FontFamiryにフォールバックして探すシステム
     - [ ] 最下位にLast Resortが来る
+    - [ ] FontFamiryでfont weight, font style itaric, bold, normalを切り替えられる様にする
+      - [ ] font-size
+      - [ ] font-stretch
+      - [ ] font-style
+      - [ ] font-variant
+      - [ ] font-weight
+      - [ ] line-height
 - [ ] Font Class
   - LoadedFontのラッパー
     - defalut font size, fontのフォールバック情報などのデフォルト情報を持つ
@@ -130,9 +146,10 @@ pub enum GlyphCommand {
 # GSUB
 
 - パース済み: `ScriptList`, `FeatureList`, `LookupList`
-- [ ] 実装済み: 単一置換ベースの縦書き置換 `lookup_vertical()`
+- [+] 実装済み: 単一置換ベースの縦書き置換 `lookup_vertical()`
 - [ ] 部分実装: `lookup_ccmp()` は存在するが、結果展開は未実装
-- [ ] 未実装: `lookup_locale()`, `lookup_liga()`, `lookup_width()`, `lookup_number()`
+- [+] 実装済み: `lookup_locale()`, `lookup_liga()`
+- [ ] 未実装: `lookup_width()`, `lookup_number()`
 - [ ] aalt
 - [ ] dlig
 - [ ] expt

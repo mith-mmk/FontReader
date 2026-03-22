@@ -935,6 +935,13 @@ mod tests {
             .join("ZenMaruGothic-Regular.ttf")
     }
 
+    #[cfg(feature = "layout")]
+    fn japanese_font_path() -> std::path::PathBuf {
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("fonts")
+            .join("NotoSansJP-Regular.otf")
+    }
+
     #[test]
     fn fontload_from_file_works() {
         let path = sample_font_path();
@@ -985,5 +992,123 @@ mod tests {
         let html = font.font().get_html_vert("A", 24.0, "px").expect("html vert");
         assert!(html.contains("writing-mode: vertical-rl"));
         assert!(html.contains("<svg"));
+    }
+
+    #[test]
+    fn variation_selector_real_font_uses_format14() {
+        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("fonts")
+            .join("NotoSansJP-Regular.otf");
+        let font = crate::fontload_file(&path).expect("load uvs font");
+        let cmap = font.font().cmap.as_ref().expect("cmap");
+        let format14 = cmap
+            .cmap_encodings
+            .iter()
+            .find_map(|encoding| match encoding.cmap_subtable.as_ref() {
+                CmapSubtable::Format14(format14) => Some(format14),
+                _ => None,
+            })
+            .expect("expected format 14 cmap");
+        let var_selector_record = format14
+            .var_selector_records
+            .first()
+            .expect("expected at least one var selector record");
+        let mapping = var_selector_record
+            .non_default_uvs
+            .unicode_value_ranges
+            .first()
+            .expect("expected at least one UVS mapping");
+        let var_selector = var_selector_record.var_selector;
+        let unicode_value = mapping.unicode_value;
+        let glyph_id = mapping.glyph_id;
+        let base = cmap.get_glyph_position(unicode_value);
+        let uvs = cmap.get_glyph_position_from_uvs(unicode_value, var_selector);
+        assert_eq!(uvs, glyph_id);
+        assert!(base > 0);
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn lookup_locale_uses_real_japanese_locl_data() {
+        let path = japanese_font_path();
+        let font = crate::fontload_file(&path).expect("load japanese font");
+        let gsub = font.font().gsub.as_ref().expect("gsub");
+        let max_glyphs = font.font().maxp.as_ref().expect("maxp").num_glyphs as usize;
+        let locale = "ja-JP".to_string();
+
+        let mut found = None;
+        for glyph_id in 1..=max_glyphs {
+            let localized = gsub.lookup_locale(glyph_id, &locale);
+            if localized != glyph_id {
+                found = Some((glyph_id, localized));
+                break;
+            }
+        }
+
+        let (glyph_id, localized) = found.expect("expected at least one locl substitution");
+        assert_ne!(glyph_id, localized);
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn lookup_liga_sequence_uses_real_font_data() {
+        let path = japanese_font_path();
+        let font = crate::fontload_file(&path).expect("load japanese font");
+        let gsub = font.font().gsub.as_ref().expect("gsub");
+        let cmap = font.font().cmap.as_ref().expect("cmap");
+        let candidates = [
+            vec!['f', 'i'],
+            vec!['f', 'l'],
+            vec!['f', 'f'],
+            vec!['T', 'o'],
+        ];
+
+        for candidate in candidates.iter() {
+            let glyph_ids: Vec<usize> = candidate
+                .iter()
+                .map(|ch| cmap.get_glyph_position(*ch as u32) as usize)
+                .collect();
+            if glyph_ids.iter().any(|glyph_id| *glyph_id == 0) {
+                continue;
+            }
+
+            if let Some(ligature_glyph) = gsub.lookup_liga_sequence(&glyph_ids) {
+                assert_ne!(ligature_glyph, glyph_ids[0]);
+                return;
+            }
+        }
+
+        panic!("expected at least one ligature sequence in real font data");
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn vertical_lookup_uses_real_font_data() {
+        let path = japanese_font_path();
+        let font = crate::fontload_file(&path).expect("load japanese font");
+        let gsub = font.font().gsub.as_ref().expect("gsub");
+        let cmap = font.font().cmap.as_ref().expect("cmap");
+
+        let candidates = [
+            '(', ')', '[', ']', '{', '}', '!', '?', ',', '.', ':', ';', '、', '。', '「', '」',
+            '（', '）', 'ー', '〜', '＜', '＞',
+        ];
+        let mut found = None;
+
+        for ch in candidates.iter() {
+            let glyph_id = cmap.get_glyph_position(*ch as u32) as u16;
+            if glyph_id == 0 {
+                continue;
+            }
+
+            let vertical = gsub.lookup_vertical(glyph_id).unwrap_or(glyph_id);
+            if vertical != glyph_id {
+                found = Some((*ch, glyph_id, vertical));
+                break;
+            }
+        }
+
+        let (ch, horizontal, vertical) = found.expect("expected at least one vertical substitution");
+        assert_ne!(horizontal, vertical, "vertical form should differ for {ch}");
     }
 }

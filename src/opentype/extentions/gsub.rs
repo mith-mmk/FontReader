@@ -3,8 +3,9 @@
 // only check lookup Format1.1 , 4, 5, 6.1, 7
 
 use std::io::SeekFrom;
+use std::collections::HashSet;
 
-use crate::opentype::layouts::{feature::Feature, lookup::Lookup, script::ParsedScript, *};
+use crate::opentype::layouts::{feature::Feature, lookup::{Lookup, LookupResult}, script::ParsedScript, *};
 use bin_rs::reader::BinaryReader;
 
 #[derive(Debug, Clone)]
@@ -108,6 +109,189 @@ impl GSUB {
         lookups
     }
 
+    fn locale_to_language_system_tag(locale: &str) -> Option<u32> {
+        let locale = locale.trim();
+        if locale.is_empty() {
+            return None;
+        }
+
+        let primary = locale
+            .split(|c| c == '-' || c == '_')
+            .next()
+            .unwrap_or(locale)
+            .trim();
+        if primary.is_empty() {
+            return None;
+        }
+
+        let lower = primary.to_ascii_lowercase();
+        let tag = match lower.as_str() {
+            "default" => [0, 0, 0, 0],
+            "ja" | "jp" | "jpn" => *b"JAN ",
+            _ => {
+                let mut tag = [b' '; 4];
+                for (i, ch) in primary.chars().take(4).enumerate() {
+                    tag[i] = ch.to_ascii_uppercase() as u8;
+                }
+                tag
+            }
+        };
+
+        Some(u32::from_be_bytes(tag))
+    }
+
+    fn get_language_systems<'a>(
+        &'a self,
+        script: &'a ParsedScript,
+        locale: Option<&str>,
+    ) -> Vec<&'a crate::opentype::layouts::LanguageSystemRecord> {
+        let mut systems = Vec::new();
+
+        if let Some(locale) = locale {
+            if let Some(tag) = Self::locale_to_language_system_tag(locale) {
+                if let Some(language_system) = script
+                    .language_systems
+                    .iter()
+                    .find(|record| record.language_system_tag == tag)
+                {
+                    systems.push(language_system);
+                }
+            }
+
+            if systems.is_empty() {
+                if let Some(default_system) = script
+                    .language_systems
+                    .iter()
+                    .find(|record| record.language_system_tag == 0)
+                {
+                    systems.push(default_system);
+                }
+            }
+
+            if systems.is_empty() {
+                if let Some(first) = script.language_systems.first() {
+                    systems.push(first);
+                }
+            }
+        } else {
+            if let Some(default_system) = script
+                .language_systems
+                .iter()
+                .find(|record| record.language_system_tag == 0)
+            {
+                systems.push(default_system);
+            }
+
+            for system in script.language_systems.iter() {
+                if system.language_system_tag != 0 {
+                    systems.push(system);
+                }
+            }
+        }
+
+        systems
+    }
+
+    fn lookup_single_feature(
+        &self,
+        glyph_id: usize,
+        locale: Option<&str>,
+        feature_tags: &[[u8; 4]],
+    ) -> Option<usize> {
+        let mut seen_lookup_indices = HashSet::new();
+        for script in self.scripts.scripts.iter() {
+            for language_system in self.get_language_systems(script, locale).iter() {
+                for feature_index in language_system.language_system.feature_indexes.iter() {
+                    let feature = &self.features.features[*feature_index as usize];
+                    let feature_tag = feature.feature_tag;
+                    if !feature_tags
+                        .iter()
+                        .any(|tag| feature_tag == u32::from_be_bytes(*tag))
+                    {
+                        continue;
+                    }
+
+                    for lookup_index in feature.lookup_list_indices.iter() {
+                        if !seen_lookup_indices.insert(*lookup_index) {
+                            continue;
+                        }
+                        let lookup = &self.lookups.lookups[*lookup_index as usize];
+                        for subtable in lookup.subtables.iter() {
+                            match subtable.get_lookup(glyph_id) {
+                                LookupResult::Single(result) => return Some(result as usize),
+                                LookupResult::Multiple(results) => {
+                                    if let Some(result) = results.first() {
+                                        return Some(*result as usize);
+                                    }
+                                }
+                                LookupResult::Ligature(results) => {
+                                    if let Some(result) = results.first() {
+                                        return Some(result.ligature_glyph as usize);
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        None
+    }
+
+    fn lookup_ligature_feature(
+        &self,
+        glyph_ids: &[usize],
+        locale: Option<&str>,
+        feature_tags: &[[u8; 4]],
+    ) -> Option<usize> {
+        let first_glyph = *glyph_ids.first()?;
+        let mut seen_lookup_indices = HashSet::new();
+        for script in self.scripts.scripts.iter() {
+            for language_system in self.get_language_systems(script, locale).iter() {
+                for feature_index in language_system.language_system.feature_indexes.iter() {
+                    let feature = &self.features.features[*feature_index as usize];
+                    let feature_tag = feature.feature_tag;
+                    if !feature_tags
+                        .iter()
+                        .any(|tag| feature_tag == u32::from_be_bytes(*tag))
+                    {
+                        continue;
+                    }
+
+                    for lookup_index in feature.lookup_list_indices.iter() {
+                        if !seen_lookup_indices.insert(*lookup_index) {
+                            continue;
+                        }
+                        let lookup = &self.lookups.lookups[*lookup_index as usize];
+                        for subtable in lookup.subtables.iter() {
+                            if let LookupResult::Ligature(records) = subtable.get_lookup(first_glyph)
+                            {
+                                for record in records.iter() {
+                                    let expected_len = record.component_count as usize;
+                                    if expected_len != glyph_ids.len() {
+                                        continue;
+                                    }
+                                    if record
+                                        .component_glyph_ids
+                                        .iter()
+                                        .map(|glyph_id| *glyph_id as usize)
+                                        .eq(glyph_ids.iter().copied().skip(1))
+                                    {
+                                        return Some(record.ligature_glyph as usize);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        None
+    }
+
     // ccmp Glyph Composition / Decomposition
     pub fn lookup_ccmp(&self, _glyph_id: usize) -> Option<Vec<u16>> {
         let script = self.get_script(b"DFLT")?;
@@ -125,31 +309,23 @@ impl GSUB {
 
     // vert, vrt2, vrtr
     pub fn lookup_vertical(&self, glyph_id: u16) -> Option<u16> {
-        let script = self.get_script(b"DFLT")?;
-                
-        let features = self.get_features(&b"vert", script);
-        for feature in features.iter() {
-            for lookup_index in feature.lookup_list_indices.iter() {
-                let lookup = self.lookups.lookups[*lookup_index as usize].clone();
-                for subtable in lookup.subtables.iter() {
-                    let result = subtable.get_single_glyph_id(glyph_id);
-                    if result.is_some() {
-                        return result;
-                    }
-                }
-            }
-        }
-        None
+        self.lookup_single_feature(glyph_id as usize, None, &[*b"vert", *b"vrt2", *b"vrtr"])
+            .map(|glyph_id| glyph_id as u16)
     }
 
     // locl
-    pub fn lookup_locale(&self, _griph_ids: usize, _locale: &String) -> usize {
-        todo!("lookup_locale")
+    pub fn lookup_locale(&self, griph_ids: usize, locale: &String) -> usize {
+        self.lookup_single_feature(griph_ids, Some(locale.as_str()), &[*b"locl"])
+            .unwrap_or(griph_ids)
     }
 
     // liga
-    pub fn lookup_liga(&self, _griph_ids: usize) -> usize {
-        todo!("lookup_liga")
+    pub fn lookup_liga(&self, griph_ids: usize) -> usize {
+        self.lookup_liga_sequence(&[griph_ids]).unwrap_or(griph_ids)
+    }
+
+    pub fn lookup_liga_sequence(&self, griph_ids: &[usize]) -> Option<usize> {
+        self.lookup_ligature_feature(griph_ids, None, &[*b"liga", *b"dlig"])
     }
 
     // hwid, fwid, qwid, twid, pkna

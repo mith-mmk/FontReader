@@ -801,8 +801,8 @@ pub(crate) struct UnicodeValueRange {
 
 #[derive(Debug, Clone)]
 pub(crate) struct NonDefautUVS {
-    num_unicode_value_ranges: u32,
-    unicode_value_ranges: Vec<UVSMapping>,
+    pub(crate) num_unicode_value_ranges: u32,
+    pub(crate) unicode_value_ranges: Vec<UVSMapping>,
 }
 
 impl NonDefautUVS {
@@ -825,8 +825,8 @@ impl NonDefautUVS {
 
 #[derive(Debug, Clone)]
 pub(crate) struct UVSMapping {
-    unicode_value: u32,
-    glyph_id: u32,
+    pub(crate) unicode_value: u32,
+    pub(crate) glyph_id: u32,
 }
 
 impl UVSMapping {
