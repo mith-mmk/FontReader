@@ -996,6 +996,21 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "cff")]
+    fn cff_cid_font_renders_svg() {
+        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("fonts")
+            .join("NotoSansJP-Black.otf");
+        let font = crate::fontload_file(&path).expect("load cff font");
+        let svg = font
+            .font()
+            .get_svg('漢', 24.0, "px")
+            .expect("render cff text");
+        assert!(svg.contains("<svg"));
+        assert!(svg.contains("<path"));
+    }
+
+    #[test]
     fn fontload_from_source_file_works() {
         let path = sample_font_path();
         let font = crate::fontload(crate::FontSource::File(path.as_path())).expect("load source");

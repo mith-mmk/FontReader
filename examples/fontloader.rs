@@ -7,6 +7,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
     let filename = font_path(&args);
     let output_file = output_path(&args, "./test/read.html");
+    print!("{:?}, output filename:{:?}", filename, output_file);
     let mut font = Font::get_font_from_file(&filename).unwrap();
     let font_count = font.get_font_count();
     if font_count > 0 {

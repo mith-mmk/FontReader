@@ -48,11 +48,29 @@ pub(crate) struct CFF {
     pub(crate) char_string: CharString,
     // pub(crate) fd_Select: FDSelect,
     // pub(crate) fd_dict_index: FDDistIndex,
+    pub(crate) fd_select: Option<FDSelect>,
+    pub(crate) fd_arrays: Vec<FontDict>,
     pub(crate) private_dict: Option<PrivateDict>,
     pub(crate) gsubr: Option<CharString>,
     pub(crate) subr: Option<CharString>,
     pub(crate) default_width: f64,
     pub(crate) width: f64,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct FontDict {
+    pub(crate) dict: Dict,
+    pub(crate) private_dict: Option<PrivateDict>,
+    pub(crate) subr: Option<CharString>,
+    pub(crate) default_width: f64,
+    pub(crate) width: f64,
+}
+
+#[derive(Debug, Clone)]
+struct GlyphContext {
+    default_width: f64,
+    width: f64,
+    subr: Option<CharString>,
 }
 
 struct ParcePack {
@@ -63,6 +81,8 @@ struct ParcePack {
     stacks: Box<Vec<f64>>,
     is_first: usize,
     hints: usize,
+    subr: Option<CharString>,
+    gsubr: Option<CharString>,
     commands: Box<Commands>,
 }
 
@@ -88,6 +108,50 @@ impl Commands {
 }
 
 impl CFF {
+    fn parse_private_dict<R: BinaryReader>(
+        reader: &mut R,
+        cff_offset: u64,
+        private: &[i32],
+        fallback_default_width: f64,
+        fallback_width: f64,
+    ) -> Result<(Option<PrivateDict>, Option<CharString>, f64, f64), Box<dyn Error>> {
+        let private_dict_offset = private[1] as u64 + cff_offset;
+        reader.seek(SeekFrom::Start(private_dict_offset))?;
+        let buffer = reader.read_bytes_as_vec(private[0] as usize)?;
+        let private_dict = Dict::parse(&buffer)?;
+        let default_width = private_dict
+            .get_f64(0, 20)
+            .unwrap_or(fallback_default_width);
+        let width = private_dict.get_f64(0, 21).unwrap_or(fallback_width);
+        let subr = if let Some(sub_offset) = private_dict.get_i32(0, 19) {
+            let subr_offset = sub_offset as u64 + private_dict_offset;
+            Some(CharString::new(reader, subr_offset)?)
+        } else {
+            None
+        };
+        Ok((Some(private_dict), subr, default_width, width))
+    }
+
+    fn glyph_context(&self, gid: usize) -> GlyphContext {
+        if let Some(fd_select) = self.fd_select.as_ref() {
+            if let Some(fd_index) = fd_select.get(gid) {
+                if let Some(font_dict) = self.fd_arrays.get(fd_index as usize) {
+                    return GlyphContext {
+                        default_width: font_dict.default_width,
+                        width: font_dict.width,
+                        subr: font_dict.subr.clone(),
+                    };
+                }
+            }
+        }
+
+        GlyphContext {
+            default_width: self.default_width,
+            width: self.width,
+            subr: self.subr.clone(),
+        }
+    }
+
     pub(crate) fn new<R: BinaryReader>(
         reader: &mut R,
         offset: u32,
@@ -127,7 +191,6 @@ impl CFF {
         let variation_store = VariationStore::new(reader)?;
         */
 
-        let n_glyphs = top_dict.get_i32(0, 15).unwrap() as usize;
         let encording_offset = top_dict.get_i32(0, 16); // none
         let fd_array_offset = top_dict.get_i32(12, 36);
         let fd_select_offset = top_dict.get_i32(12, 37);
@@ -151,7 +214,6 @@ impl CFF {
             }
             println!("string_index: {:?}", string_index);
             println!("top_dict: {}", top_dict.to_string());
-            println!("n_glyphs: {}", n_glyphs);
             println!("encording: {:?}", encording_offset);
             println!("fd_array: {:?}", fd_array_offset);
             println!("fd_select: {:?}", fd_select_offset);
@@ -163,76 +225,90 @@ impl CFF {
             println!("private: {:?}", private);
         }
 
-        // must CID = GID
-        let charsets_offset = charsets_offset as u64 + offset;
-
-        let charsets = Charsets::new(reader, charsets_offset, n_glyphs as u32)?;
         let char_strings_offset = char_strings_offset as u64 + offset;
         let char_string = CharString::new(reader, char_strings_offset)?;
+        let n_glyphs = char_string.data.data.len();
+        let charsets_offset = charsets_offset as u64 + offset;
+        let charsets = Charsets::new(reader, charsets_offset, n_glyphs as u32)?;
 
         let private = top_dict.get_i32_array(0, 18);
         let mut subr = None;
         let private_dict = if let Some(private) = private {
-            let _ = private[0] as u32; //
-            let private_dict_offset = private[1] as u64 + offset;
-            reader.seek(SeekFrom::Start(private_dict_offset as u64))?;
-            let buffer = reader.read_bytes_as_vec(private[0] as usize)?;
-            let private_dict = Dict::parse(&buffer)?;
-            default_width = private_dict.get_f64(0, 20).unwrap_or(0.0);
-            width = private_dict.get_f64(0, 21).unwrap_or(width);
+            let (private_dict, private_subr, private_default_width, private_width) =
+                Self::parse_private_dict(reader, offset, &private, default_width, width)?;
+            default_width = private_default_width;
+            width = private_width;
             #[cfg(debug_assertions)]
             {
-                println!("private_dict: {}", private_dict.to_string());
-                println!("defaultWidthX: {:?}", private_dict.get_f64(0, 20));
-                println!("normalWidthX: {:?}", private_dict.get_f64(0, 21));
+                if let Some(private_dict) = private_dict.as_ref() {
+                    println!("private_dict: {}", private_dict.to_string());
+                    println!("defaultWidthX: {:?}", private_dict.get_f64(0, 20));
+                    println!("normalWidthX: {:?}", private_dict.get_f64(0, 21));
+                }
             }
-            if let Some(sub_offset) = private_dict.get_i32(0, 19) {
-                let subr_offset = sub_offset as u64 + private_dict_offset;
-                let subrtn = CharString::new(reader, subr_offset)?;
-                subr = Some(subrtn)
-            }
+            subr = private_subr;
 
-            Some(private_dict)
+            private_dict
         } else {
             None
         };
+        let mut fd_select = None;
+        let mut fd_arrays = Vec::new();
         if ros.is_some() {
-            let fd_array_offset = (fd_array_offset.unwrap() as u64 + offset) as u64;
-            reader.seek(SeekFrom::Start(fd_array_offset))?;
-            let fd_arrays = Index::parse(reader)?;
-            #[cfg(debug_assertions)]
-            {
-                println!("fd_arrays: {:?}", fd_arrays);
-            }
-            let font_dict = Dict::parse(&fd_arrays.data[0])?;
-            #[cfg(debug_assertions)]
-            {
-                println!("font_dict:\n{}", font_dict.to_string());
-            }
-
-            if let Some(private) = font_dict.get_i32_array(0, 18) {
-                let private_dict_offset = private[1] as u64 + offset;
-                reader.seek(SeekFrom::Start(private_dict_offset))?;
-                let buffer = reader.read_bytes_as_vec(private[0] as usize);
-                let private_dict = Dict::parse(&buffer?)?;
+            if let Some(fd_array_offset) = fd_array_offset {
+                let fd_array_offset = (fd_array_offset as u64 + offset) as u64;
+                reader.seek(SeekFrom::Start(fd_array_offset))?;
+                let fd_arrays_index = Index::parse(reader)?;
                 #[cfg(debug_assertions)]
                 {
-                    println!("private_dict: {}", private_dict.to_string());
-                    println!("defaultWidthX: {:?}", private_dict.get_f64(0, 20));
-                    println!("nominalWidthX: {:?}", private_dict.get_f64(0, 21));
+                    println!("fd_arrays: {:?}", fd_arrays_index);
                 }
-                default_width = private_dict.get_f64(0, 20).unwrap_or(default_width);
-                width = private_dict.get_f64(0, 21).unwrap_or(width);
-
-                let subr_offset = private_dict.get_i32(0, 19);
-                if let Some(subr_offset) = subr_offset {
-                    let subr_offset = subr_offset as u64 + private_dict_offset;
-                    let subrtn = CharString::new(reader, subr_offset)?;
-                    subr = Some(subrtn);
+                for data in fd_arrays_index.data {
+                    let font_dict = Dict::parse(&data)?;
+                    #[cfg(debug_assertions)]
+                    {
+                        println!("font_dict:\n{}", font_dict.to_string());
+                    }
+                    let (private_dict, subr, default_width, width) =
+                        if let Some(private) = font_dict.get_i32_array(0, 18) {
+                            let (private_dict, subr, default_width, width) = Self::parse_private_dict(
+                                reader,
+                                offset,
+                                &private,
+                                default_width,
+                                width,
+                            )?;
+                            (private_dict, subr, default_width, width)
+                        } else {
+                            (None, None, default_width, width)
+                        };
+                    fd_arrays.push(FontDict {
+                        dict: font_dict,
+                        private_dict,
+                        subr,
+                        default_width,
+                        width,
+                    });
                 }
             }
-            // let fd_select = FDSelect::new(reader, fd_select_offset.unwrap() as u32 + offset, n_glyphs);
-            // println!("fd_select: {:?}", fd_select);
+            if let Some(fd_select_offset) = fd_select_offset {
+                fd_select = Some(FDSelect::new(
+                    reader,
+                    (fd_select_offset as u64 + offset) as u32,
+                    n_glyphs,
+                )?);
+                #[cfg(debug_assertions)]
+                {
+                    println!("fd_select: {:?}", fd_select);
+                }
+            }
+            if private_dict.is_none() && !fd_arrays.is_empty() {
+                if let Some(first) = fd_arrays.first() {
+                    default_width = first.default_width;
+                    width = first.width;
+                    subr = first.subr.clone();
+                }
+            }
         }
 
         Ok(Self {
@@ -245,6 +321,8 @@ impl CFF {
             bbox,
             // fd_Select: FDSelect,
             // fd_dict_index: FDDistIndex,
+            fd_select,
+            fd_arrays,
             private_dict,
             gsubr,
             subr,
@@ -260,7 +338,8 @@ impl CFF {
             println!("gid {} cid {}", gid, cid);
         }
         let data = &self.char_string.data.data[gid as usize];
-        self.parse_data(gid, data, 24.0, "pt", layout, 0.0, 0.0, false)
+        let context = self.glyph_context(gid);
+        self.parse_data(gid, data, 24.0, "pt", layout, 0.0, 0.0, false, context)
     }
 
     fn parse(&self, data: &[u8], parce_data: &mut ParcePack) -> Option<()> {
@@ -1892,7 +1971,7 @@ impl CFF {
                     // call callsubr
                     let mut command = "callsubr".to_string();
                     let num = parce_data.stacks.pop()? as isize;
-                    if let Some(subr) = self.subr.as_ref() {
+                    if let Some(subr) = parce_data.subr.clone() {
                         let no = if subr.data.data.len() <= 1238 {
                             num + 107
                         } else if subr.data.data.len() <= 33899 {
@@ -1900,6 +1979,13 @@ impl CFF {
                         } else {
                             num + 32768
                         };
+                        if no < 0 || no as usize >= subr.data.data.len() {
+                            #[cfg(debug_assertions)]
+                            {
+                                println!("callsubr out of range: {} / {}", no, subr.data.data.len());
+                            }
+                            break;
+                        }
                         command += &format!(" {} {}\n", no, num);
                         parce_data.commands.as_mut().commands.push(command);
                         let data = &subr.data.data[no as usize];
@@ -1916,7 +2002,7 @@ impl CFF {
                     // callgsubr
                     let mut command = "callgsubr\n".to_string();
                     let num = parce_data.stacks.pop()? as isize;
-                    if let Some(subr) = self.gsubr.as_ref() {
+                    if let Some(subr) = parce_data.gsubr.clone() {
                         let no = if subr.data.data.len() <= 1238 {
                             num + 107
                         } else if subr.data.data.len() <= 33899 {
@@ -1924,6 +2010,13 @@ impl CFF {
                         } else {
                             num + 32768
                         };
+                        if no < 0 || no as usize >= subr.data.data.len() {
+                            #[cfg(debug_assertions)]
+                            {
+                                println!("callgsubr out of range: {} / {}", no, subr.data.data.len());
+                            }
+                            break;
+                        }
                         command += &format!(" {} {}\n", no, num);
                         parce_data.commands.as_mut().commands.push(command);
                         let data = &subr.data.data[no as usize];
@@ -2004,7 +2097,18 @@ impl CFF {
             ));
         }
         let data = &self.char_string.data.data[gid as usize];
-        Ok(self.parse_data(gid, &data, fontsize, fontunit, layout, sx, sy, true))
+        let context = self.glyph_context(gid);
+        Ok(self.parse_data(
+            gid,
+            &data,
+            fontsize,
+            fontunit,
+            layout,
+            sx,
+            sy,
+            true,
+            context,
+        ))
     }
 
     fn get_svg_header(
@@ -2014,6 +2118,8 @@ impl CFF {
         fontsize: f64,
         fontunit: &str,
         layout: &FontLayout,
+        nominal_width: f64,
+        default_width: f64,
     ) -> String {
         match layout {
             FontLayout::Horizontal(layout) => {
@@ -2029,9 +2135,9 @@ impl CFF {
                 let h = format!("{}{}", fontsize, fontunit);
                 let w = format!("{}{}", width / y_scale, fontunit);
                 let self_width = if let Some(width) = parce_data.width {
-                    self.width + width
+                    nominal_width + width
                 } else {
-                    self.default_width
+                    default_width
                 };
 
                 let mut svg = "<svg xmlns=\"http://www.w3.org/2000/svg\" ".to_string();
@@ -2047,8 +2153,8 @@ impl CFF {
                 #[cfg(debug_assertions)]
                 {
                     svg += &format!(
-                        "<!-- gid {} width {} {} {} height {} -->\n",
-                        gid, self.width, self_width, parce_data.min_x, height
+                        "<!-- gid {} nominal_width {} default_width {} resolved_width {} min_x {} height {} -->\n",
+                        gid, nominal_width, default_width, self_width, parce_data.min_x, height
                     );
                     svg += &format!("<!-- bbox {:?} -->\n", self.bbox);
                     svg += &format!(
@@ -2069,9 +2175,9 @@ impl CFF {
                 let h = format!("{}{}", fontsize, fontunit);
                 let w = format!("{}{}", fontsize, fontunit);
                 let self_width = if let Some(width) = parce_data.width {
-                    self.width + width
+                    nominal_width + width
                 } else {
-                    self.default_width
+                    default_width
                 };
 
                 let mut svg = "<svg xmlns=\"http://www.w3.org/2000/svg\" ".to_string();
@@ -2087,8 +2193,8 @@ impl CFF {
                 #[cfg(debug_assertions)]
                 {
                     svg += &format!(
-                        "<!-- gid {} width {} {} {} height {} -->\n",
-                        gid, self.width, self_width, parce_data.min_x, height
+                        "<!-- gid {} nominal_width {} default_width {} resolved_width {} min_x {} height {} -->\n",
+                        gid, nominal_width, default_width, self_width, parce_data.min_x, height
                     );
                     svg += &format!("<!-- bbox {:?} -->\n", self.bbox);
                     svg += &format!(
@@ -2112,6 +2218,7 @@ impl CFF {
         sx: f64,
         sy: f64,
         is_svg: bool,
+        context: GlyphContext,
     ) -> String {
         let commands = Box::new(Commands::new());
         let stacks = Box::new(Vec::with_capacity(48)); // CFF1 max stack depth 48
@@ -2124,12 +2231,22 @@ impl CFF {
             commands,
             stacks,
             is_first: 0,
+            subr: context.subr.clone(),
+            gsubr: self.gsubr.clone(),
         };
 
         self.parse(data, &mut parce_data);
         let commands = &parce_data.commands;
         if is_svg {
-            let mut svg = self.get_svg_header(gid, &parce_data, fontsize, fontunit, layout);
+            let mut svg = self.get_svg_header(
+                gid,
+                &parce_data,
+                fontsize,
+                fontunit,
+                layout,
+                context.width,
+                context.default_width,
+            );
             let y_pos = self.bbox[3] + self.bbox[1];
             svg += "<path d=\"";
             for operation in commands.operations.iter() {
@@ -2180,7 +2297,6 @@ impl FDSelect {
         n_glyphs: usize,
     ) -> Result<Self, Box<dyn Error>> {
         reader.seek(SeekFrom::Start(offset as u64))?;
-        reader.seek(SeekFrom::Start(offset as u64))?;
         let format = reader.read_u8()?;
         let mut fsds = Vec::new();
         match format {
@@ -2192,20 +2308,32 @@ impl FDSelect {
             }
             3 => {
                 let n_ranges = reader.read_u16_be()?;
-                let mut last_gid = 0;
-                let is_first_gid = reader.read_u16_be()?;
+                let mut ranges = Vec::with_capacity(n_ranges as usize + 1);
                 for _ in 0..n_ranges {
+                    let first = reader.read_u16_be()? as usize;
                     let fd = reader.read_u8()?;
-                    let sentinel_gid = reader.read_u16_be()?;
-                    for _ in last_gid..sentinel_gid {
-                        fsds.push(fd);
+                    ranges.push((first, fd));
+                }
+                let sentinel = reader.read_u16_be()? as usize;
+                for i in 0..ranges.len() {
+                    let start = ranges[i].0;
+                    let end = if i + 1 < ranges.len() {
+                        ranges[i + 1].0
+                    } else {
+                        sentinel
+                    };
+                    for _gid in start..end {
+                        fsds.push(ranges[i].1);
                     }
-                    last_gid = is_first_gid;
                 }
             }
             _ => return Err("Illegal format".into()),
         }
         Ok(Self { fsds })
+    }
+
+    pub(crate) fn get(&self, gid: usize) -> Option<u8> {
+        self.fsds.get(gid).copied()
     }
 }
 
@@ -2383,8 +2511,11 @@ pub(crate) fn operand_encoding(b: &[u8]) -> Result<(Operand, usize), Box<dyn Err
         let str = r.iter().collect::<String>();
         match str.parse::<f64>() {
             Ok(f64value) => return Ok((Operand::Real(f64value), x)),
-            Err(_) => return Err("Illegal value".into()),
+            Err(_) => return Ok((Operand::Real(0.0), x)),
         }
+    }
+    if b0 == 31 {
+        return Ok((Operand::Integer(0), 1));
     }
     Err("Illegal value".into())
 }
