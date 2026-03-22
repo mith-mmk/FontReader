@@ -739,6 +739,48 @@ impl Font {
         Ok(result)
     }
 
+    pub fn text2command(&self, text: &str) -> Result<Vec<GlyphCommands>, Error> {
+        self.text2commands(text)
+    }
+
+    pub fn measure(&self, text: &str) -> Result<f64, Error> {
+        let mut cursor_x = 0.0;
+        let mut max_line_width: f64 = 0.0;
+        let line_height = self.default_line_height()?;
+        let tab_advance = line_height;
+
+        for ch in text.chars() {
+            match ch {
+                '\r' => continue,
+                '\n' => {
+                    max_line_width = max_line_width.max(cursor_x);
+                    cursor_x = 0.0;
+                    continue;
+                }
+                '\t' => {
+                    cursor_x += tab_advance * 4.0;
+                    continue;
+                }
+                _ => {}
+            }
+
+            let glyph_data = self.get_glyph(ch);
+            let open_type_glyph = glyph_data
+                .open_type_glyf
+                .as_ref()
+                .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "glyph is none"))?;
+
+            let advance_width = match &open_type_glyph.layout {
+                FontLayout::Horizontal(layout) => layout.advance_width as f64,
+                FontLayout::Vertical(layout) => layout.advance_height as f64,
+                FontLayout::Unknown => 0.0,
+            };
+            cursor_x += advance_width;
+        }
+
+        Ok(max_line_width.max(cursor_x))
+    }
+
     pub fn text2svg(&self, text: &str, fontsize: f64, fontunit: &str) -> Result<String, Error> {
         let glyphs = self.text2commands(text)?;
         let line_height = self.default_line_height()?;

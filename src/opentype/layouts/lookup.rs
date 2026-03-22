@@ -44,32 +44,11 @@ impl Lookup {
     ) -> Result<Self, std::io::Error> {
         let mut subtables = Vec::new();
         let offset = lookup.offset;
+        let lookup_type = num_traits::FromPrimitive::from_u16(lookup.lookup_type)
+            .unwrap_or(LookupType::Unknown);
         for subtable_offset in lookup.subtable_offsets.iter() {
             let offset = offset + *subtable_offset as u64;
-
-            let lookup_type = num_traits::FromPrimitive::from_u16(lookup.lookup_type)
-                .unwrap_or(LookupType::Unknown);
-            let subtable = match lookup_type {
-                LookupType::SingleSubstitution => LookupList::get_single(reader, offset),
-                LookupType::MultipleSubstitution => LookupList::get_multiple(reader, offset),
-                LookupType::AlternateSubstitution => LookupList::get_alternate(reader, offset),
-                LookupType::LigatureSubstitution => LookupList::get_ligature(reader, offset),
-                LookupType::ContextSubstitution => LookupList::get_context(reader, offset),
-                LookupType::ChainingContextSubstitution => {
-                    LookupList::get_chaining_context(reader, offset)
-                }
-                LookupType::ExtensionSubstitution => LookupList::get_extension(reader, offset),
-                LookupType::ReverseChainingContextualSingleSubstitution => {
-                    LookupList::get_reverse_chaining_context(reader, offset)
-                }
-                _ => {
-                    return Err(std::io::Error::new(
-                        std::io::ErrorKind::Other,
-                        format!("Unknown lookup type"),
-                    ))
-                }
-            };
-            subtables.push(subtable?);
+            subtables.push(LookupList::parse_subtable(reader, lookup_type, offset)?);
         }
         Ok(Self {
             lookup_type: lookup.lookup_type,
@@ -131,6 +110,29 @@ pub enum LookupFlag {
 }
 
 impl LookupList {
+    fn parse_subtable<R: BinaryReader>(
+        reader: &mut R,
+        lookup_type: LookupType,
+        offset: u64,
+    ) -> Result<LookupSubstitution, std::io::Error> {
+        match lookup_type {
+            LookupType::SingleSubstitution => Self::get_single(reader, offset),
+            LookupType::MultipleSubstitution => Self::get_multiple(reader, offset),
+            LookupType::AlternateSubstitution => Self::get_alternate(reader, offset),
+            LookupType::LigatureSubstitution => Self::get_ligature(reader, offset),
+            LookupType::ContextSubstitution => Self::get_context(reader, offset),
+            LookupType::ChainingContextSubstitution => Self::get_chaining_context(reader, offset),
+            LookupType::ExtensionSubstitution => Self::get_extension(reader, offset),
+            LookupType::ReverseChainingContextualSingleSubstitution => {
+                Self::get_reverse_chaining_context(reader, offset)
+            }
+            _ => Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                format!("Unknown lookup type"),
+            )),
+        }
+    }
+
     pub(crate) fn get<R: BinaryReader>(
         number: usize,
         reader: &mut R,
@@ -750,29 +752,21 @@ impl LookupList {
         offset: u64,
     ) -> Result<LookupSubstitution, std::io::Error> {
         reader.seek(SeekFrom::Start(offset as u64))?;
-        let _ = reader.read_u16_be(); // 1
+        let subst_format = reader.read_u16_be()?; // 1
         let extension_lookup_type = reader.read_u16_be()?;
         let extension_offset = reader.read_u32_be()?;
 
         let offset = offset + extension_offset as u64;
-        reader.seek(SeekFrom::Start(offset as u64))?;
         let lookup_type = num_traits::FromPrimitive::from_u16(extension_lookup_type).unwrap();
-        let subtable = match lookup_type {
-            LookupType::SingleSubstitution => Self::get_single(reader, offset),
-            LookupType::MultipleSubstitution => Self::get_multiple(reader, offset),
-            LookupType::AlternateSubstitution => Self::get_alternate(reader, offset),
-            LookupType::LigatureSubstitution => Self::get_ligature(reader, offset),
-            LookupType::ContextSubstitution => Self::get_context(reader, offset),
-            LookupType::ChainingContextSubstitution => Self::get_chaining_context(reader, offset),
-            // LookupType::ExtensionSubstitution => Self::get_extension(reader, offset), // not 7
-            LookupType::ReverseChainingContextualSingleSubstitution => {
-                Self::get_reverse_chaining_context(reader, offset)
-            }
-            _ => {
-                panic!("Unknown lookup type: {:?}", lookup_type);
-            }
-        };
-        subtable
+        let subtable = Self::parse_subtable(reader, lookup_type, offset)?;
+        Ok(LookupSubstitution::ExtensionSubstitution(
+            ExtensionSubstitutionFormat1 {
+                subst_format,
+                extension_lookup_type,
+                extension_offset,
+                subtable: Box::new(subtable),
+            },
+        ))
     }
 
     fn get_reverse_chaining_context<R: BinaryReader>(
@@ -798,10 +792,11 @@ impl LookupList {
             lookahead_glyph_ids.push(reader.read_u16_be()?);
         }
         let substitute_glyph_id = reader.read_u16_be()?;
+        let coverage = Self::get_coverage(reader, offset + coverage_offset as u64)?;
         Ok(LookupSubstitution::ReverseChainSingle(
             ReverseChainSingleSubstitutionFormat1 {
                 subst_format,
-                coverage_offset,
+                coverage,
                 backtrack_glyph_count,
                 backtrack_glyph_ids,
                 input_glyph_count,
@@ -874,6 +869,11 @@ impl LookupSubstitution {
             Self::ChainingContextSubstitution(chaining) => &chaining.coverage,
             Self::ChainingContextSubstitution2(chaining2) => &chaining2.coverage,
             Self::ChainingContextSubstitution3(chaining3) => &chaining3.backtrack_coverages[0],
+            Self::ExtensionSubstitution(extension) => {
+                let (coverage, _) = extension.subtable.get_coverage();
+                coverage
+            }
+            Self::ReverseChainSingle(reverse) => &reverse.coverage,
             _ => {
                 panic!("Unknown lookup type: {:?}", self);
             }
@@ -885,6 +885,8 @@ impl LookupSubstitution {
             let coverages2 = chaining3.input_coverages.clone();
             let coverages3 = chaining3.lookahead_coverages.clone();
             coverages = Some((coverages1, coverages2, coverages3));
+        } else if let Self::ExtensionSubstitution(extension) = self {
+            coverages = extension.subtable.get_coverage().1;
         }
         (coverage, coverages)
     }
@@ -1001,11 +1003,16 @@ impl LookupSubstitution {
             Self::ChainingContextSubstitution3(_chaining3) => {
                 panic!("ChainingContextSubstitution3 is not implemented")
             }
-            Self::ExtensionSubstitution(_) => {
-                panic!("ExtensionSubstitution is not implemented")
+            Self::ExtensionSubstitution(extension) => {
+                extension.subtable.get_lookup(gliph_id)
             }
-            Self::ReverseChainSingle(_) => {
-                panic!()
+            Self::ReverseChainSingle(reverse) => {
+                let coverage = &reverse.coverage;
+                if let Some(_) = coverage.contains(gliph_id) {
+                    LookupResult::Single(reverse.substitute_glyph_id)
+                } else {
+                    LookupResult::None
+                }
             }
 
             _ => {
@@ -1218,13 +1225,14 @@ pub(crate) struct ExtensionSubstitutionFormat1 {
     pub(crate) subst_format: u16,
     pub(crate) extension_lookup_type: u16,
     pub(crate) extension_offset: u32,
+    pub(crate) subtable: Box<LookupSubstitution>,
 }
 
 // Lookup Type 8: Reverse Chaining Contextual Single Substitution Subtable
 #[derive(Debug, Clone)]
 pub(crate) struct ReverseChainSingleSubstitutionFormat1 {
     pub(crate) subst_format: u16,
-    pub(crate) coverage_offset: u16,
+    pub(crate) coverage: Coverage,
     pub(crate) backtrack_glyph_count: u16,
     pub(crate) backtrack_glyph_ids: Vec<u16>,
     pub(crate) input_glyph_count: u16,

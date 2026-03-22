@@ -7,23 +7,23 @@ fonts/* がフォント
 - [ ] 未処理、未確認タスク
 
 # TESTの実装(最優先)
-- [ ] font load from file
-- [ ] font load from net
-- [ ] font load form buffer
-- [ ] text to svg
-- [ ] text to command
-- [ ] text measure
-- [ ] lookup (すべてのパターン)
+- [+] font load from file
+- [+] font load from net
+- [+] font load form buffer
+- [+] text to svg
+- [+] text to command
+- [+] text measure
+- [+] lookup (すべてのパターン)
 - [+] cmap (すべてのパターン)
 - [ ] 異字体セレクタ
-- [ ] emoji
-- [ ] 合字
+- [+] emoji
+- [+] 合字
     - [ ] llga
     - [ ] 日本語 か+" など
     - [ ] チベット語
     - [ ] 古ハングル
     - [ ] その他
-- [ ] 縦書き
+- [+] 縦書き
 
 # API
 - [ ] FontFamiry Class
@@ -33,11 +33,11 @@ fonts/* がフォント
   - LoadedFontのラッパー
     - defalut font size, fontのフォールバック情報などのデフォルト情報を持つ
   - [+] font.text2svg(&self, &str, size: Option<f32>) -> String // textをsvgに変換して返す 
-  - font.text2command(&self, &str, size: Option<f32>) -> &FontCommand // textをコマンドにして返す
+  - [+] font.text2command(&self, &str, size: Option<f32>) -> &FontCommand // textをコマンドにして返す
   - font.ritchtext2svg(&self, &FontText, size: Option<f32>) -> String // textをsvgに変換して返す 
   - font.ritchtext2command(&self, &FontText, size: Option<f32>) -> &FontCommand // textをコマンドにして返す
 
-  - font.measure(FontText) -> f32 // 長さ(px)
+  - [+] font.measure(FontText) -> f32 // 長さ(px)
   - font.set_fontsize(f32)
   - font.get_fontsize() -> f32
   - font.set_line_spacing(f32)
@@ -108,7 +108,7 @@ pub enum GlyphCommand {
 - load_font フォントロード form any
 - [ ] load_font_from_file フォントロード from NET(exclude WASM)
 - [ ] load_font_from__buffer フォントロード from buffer
-- [ ] load_font_from__net フォントロード from NET(exclude WASM)
+- [+] load_font_from__net フォントロード from NET(exclude WASM)
 
 # 合字対応
 - [ ] llaga
@@ -120,6 +120,7 @@ pub enum GlyphCommand {
 # format
 - [ ] woff2対応
 - [ ] 境界条件をチェックしpanic!を回避
+- [ ] svg svgのサイズが巨大なので文字毎にsvgを切り出す
 # Layout 対応状況
 
 `layout` feature は一部のみ実装されています。

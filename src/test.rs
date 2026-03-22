@@ -7,9 +7,10 @@ mod tests {
             AlternateSet, AlternateSubstitutionFormat1, ChainSubRule, ChainSubRuleSet,
             ChainingContextSubstitutionFormat1, ChainingContextSubstitutionFormat2,
             ChainingContextSubstitutionFormat3, ContextSubstitutionFormat1, LigatureSet,
-            LigatureSubstitutionFormat1, LigatureTable, LookupResult, LookupSubstitution,
-            MultipleSubstitutionFormat1, SequenceRule, SequenceRuleSet, SequenceTable,
-            SequenceLookupRecords, SingleSubstitutionFormat1, SingleSubstitutionFormat2,
+            LigatureSubstitutionFormat1, LigatureTable, LookupList, LookupResult,
+            LookupSubstitution, LookupType, MultipleSubstitutionFormat1, SequenceRule,
+            SequenceRuleSet, SequenceTable, SequenceLookupRecords, SingleSubstitutionFormat1,
+            SingleSubstitutionFormat2,
         },
     };
 
@@ -389,6 +390,228 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "layout")]
+    fn build_lookup_list(tables: Vec<Vec<u8>>) -> Vec<u8> {
+        let mut buffer = Vec::new();
+        push_u16(&mut buffer, tables.len() as u16);
+
+        let offsets_pos = buffer.len();
+        buffer.resize(buffer.len() + tables.len() * 2, 0);
+
+        let mut offsets = Vec::new();
+        for table in tables {
+            offsets.push(buffer.len() as u16);
+            buffer.extend_from_slice(&table);
+        }
+
+        for (index, offset) in offsets.iter().enumerate() {
+            let start = offsets_pos + index * 2;
+            buffer[start..start + 2].copy_from_slice(&offset.to_be_bytes());
+        }
+
+        buffer
+    }
+
+    #[cfg(feature = "layout")]
+    fn lookup_single_subtable(glyph_id: u16, delta_glyph_id: i16) -> Vec<u8> {
+        let mut buffer = Vec::new();
+        push_u16(&mut buffer, 1);
+        push_u16(&mut buffer, 6);
+        push_u16(&mut buffer, delta_glyph_id as u16);
+        push_u16(&mut buffer, 1);
+        push_u16(&mut buffer, 1);
+        push_u16(&mut buffer, glyph_id);
+        buffer
+    }
+
+    #[cfg(feature = "layout")]
+    fn build_lookup_record(lookup_type: u16, subtable: Vec<u8>) -> Vec<u8> {
+        let mut buffer = Vec::new();
+        push_u16(&mut buffer, lookup_type);
+        push_u16(&mut buffer, 0);
+        push_u16(&mut buffer, 1);
+        push_u16(&mut buffer, 8);
+        buffer.extend_from_slice(&subtable);
+        buffer
+    }
+
+    #[cfg(feature = "layout")]
+    fn lookup_extension_subtable(glyph_id: u16, delta_glyph_id: i16) -> Vec<u8> {
+        let mut buffer = Vec::new();
+        push_u16(&mut buffer, 1);
+        push_u16(&mut buffer, LookupType::SingleSubstitution as u16);
+        push_u32(&mut buffer, 8);
+        buffer.extend_from_slice(&lookup_single_subtable(glyph_id, delta_glyph_id));
+        build_lookup_record(LookupType::ExtensionSubstitution as u16, buffer)
+    }
+
+    #[cfg(feature = "layout")]
+    fn lookup_reverse_chain_subtable(
+        coverage_glyph_id: u16,
+        substitute_glyph_id: u16,
+        backtrack_glyph_id: u16,
+        input_glyph_id: u16,
+        lookahead_glyph_id: u16,
+    ) -> Vec<u8> {
+        let mut buffer = Vec::new();
+        push_u16(&mut buffer, 1);
+        push_u16(&mut buffer, 0);
+        push_u16(&mut buffer, 1);
+        push_u16(&mut buffer, backtrack_glyph_id);
+        push_u16(&mut buffer, 1);
+        push_u16(&mut buffer, input_glyph_id);
+        push_u16(&mut buffer, 1);
+        push_u16(&mut buffer, lookahead_glyph_id);
+        push_u16(&mut buffer, substitute_glyph_id);
+
+        let coverage_offset = buffer.len() as u16;
+        push_u16(&mut buffer, 1);
+        push_u16(&mut buffer, 1);
+        push_u16(&mut buffer, coverage_glyph_id);
+        buffer[2..4].copy_from_slice(&coverage_offset.to_be_bytes());
+        build_lookup_record(
+            LookupType::ReverseChainingContextualSingleSubstitution as u16,
+            buffer,
+        )
+    }
+
+    #[cfg(feature = "layout")]
+    fn parse_lookup_list(tables: Vec<Vec<u8>>) -> LookupList {
+        let buffer = build_lookup_list(tables);
+        let mut reader = BytesReader::new(&buffer);
+        LookupList::new(&mut reader, 0, buffer.len() as u32).unwrap()
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn lookup_extension_and_reverse_chain_parse_and_resolve() {
+        let lookup_list = parse_lookup_list(vec![
+            lookup_extension_subtable(0x0041, 4),
+            lookup_reverse_chain_subtable(0x0042, 0x0201, 0x0030, 0x0043, 0x0044),
+        ]);
+
+        match &lookup_list.lookups[0].subtables[0] {
+            LookupSubstitution::ExtensionSubstitution(extension) => {
+                assert_eq!(extension.subst_format, 1);
+                assert_eq!(extension.extension_lookup_type, LookupType::SingleSubstitution as u16);
+                assert_eq!(extension.extension_offset, 8);
+                match extension.subtable.as_ref() {
+                    LookupSubstitution::Single(single) => {
+                        assert_eq!(single.delta_glyph_id, 4);
+                        assert_eq!(single.coverage.contains(0x0041), Some(0));
+                    }
+                    _ => panic!("expected nested single substitution"),
+                }
+                match extension.subtable.get_lookup(0x0041) {
+                    LookupResult::Single(glyph_id) => assert_eq!(glyph_id, 4),
+                    _ => panic!("expected single result"),
+                }
+            }
+            _ => panic!("expected extension substitution"),
+        }
+
+        match &lookup_list.lookups[1].subtables[0] {
+            LookupSubstitution::ReverseChainSingle(reverse) => {
+                assert_eq!(reverse.subst_format, 1);
+                assert_eq!(reverse.coverage.contains(0x0042), Some(0));
+                assert_eq!(reverse.backtrack_glyph_ids, vec![0x0030]);
+                assert_eq!(reverse.input_glyph_ids, vec![0x0043]);
+                assert_eq!(reverse.lookahead_glyph_ids, vec![0x0044]);
+                match lookup_list.lookups[1].subtables[0].get_lookup(0x0042) {
+                    LookupResult::Single(glyph_id) => assert_eq!(glyph_id, 0x0201),
+                    _ => panic!("expected single result"),
+                }
+                match lookup_list.lookups[1].subtables[0].get_lookup(0x0041) {
+                    LookupResult::None => {}
+                    _ => panic!("expected no result"),
+                }
+            }
+            _ => panic!("expected reverse chain substitution"),
+        }
+    }
+
+    #[test]
+    #[cfg(not(target_arch = "wasm32"))]
+    fn fontload_from_net_works() {
+        let path = sample_font_path();
+        let bytes = std::fs::read(&path).expect("read font bytes");
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind tcp listener");
+        let addr = listener.local_addr().expect("local addr");
+
+        let server = std::thread::spawn(move || {
+            let (mut socket, _) = listener.accept().expect("accept");
+            let mut request = Vec::new();
+            let mut buf = [0u8; 1024];
+            loop {
+                let read = std::io::Read::read(&mut socket, &mut buf).expect("read request");
+                if read == 0 {
+                    break;
+                }
+                request.extend_from_slice(&buf[..read]);
+                if request.windows(4).any(|window| window == b"\r\n\r\n") {
+                    break;
+                }
+            }
+
+            let response = format!(
+                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                bytes.len()
+            );
+            std::io::Write::write_all(&mut socket, response.as_bytes()).expect("write header");
+            std::io::Write::write_all(&mut socket, &bytes).expect("write body");
+        });
+
+        let url = format!("http://127.0.0.1:{}/font.ttf", addr.port());
+        let font = crate::load_font_from_net(&url).expect("load from net");
+        assert!(font.font().get_font_count() >= 1);
+
+        server.join().expect("server thread");
+    }
+
+    #[test]
+    fn emoji_font_renders_svg() {
+        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("fonts")
+            .join("NotoColorEmoji-Regular.ttf");
+        let font = crate::fontload_file(&path).expect("load emoji font");
+        let svg = font.font().get_svg('😀', 32.0, "px").expect("emoji svg");
+        assert!(svg.contains("<svg"));
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn ligature_lookup_returns_multiple_alternatives() {
+        let ligature = LookupSubstitution::Ligature(LigatureSubstitutionFormat1 {
+            subst_format: 1,
+            coverage: coverage_format1(&[0x0066]),
+            ligature_set_count: 1,
+            ligature_set: vec![LigatureSet {
+                ligature_count: 2,
+                ligature_table: vec![
+                    LigatureTable {
+                        ligature_glyph: 0xfb01,
+                        component_count: 2,
+                        component_glyph_ids: vec![0x0069],
+                    },
+                    LigatureTable {
+                        ligature_glyph: 0xfb02,
+                        component_count: 2,
+                        component_glyph_ids: vec![0x006c],
+                    },
+                ],
+            }],
+        });
+
+        match ligature.get_lookup(0x0066) {
+            LookupResult::Ligature(records) => {
+                assert_eq!(records.len(), 2);
+                assert_eq!(records[0].ligature_glyph, 0xfb01);
+                assert_eq!(records[1].ligature_glyph, 0xfb02);
+            }
+            _ => panic!("unexpected lookup result"),
+        }
+    }
+
     use bin_rs::reader::BytesReader;
     use crate::opentype::requires::cmap::{
         self, CmapEncodings, CmapSubtable, EncodingRecord,
@@ -704,5 +927,63 @@ mod tests {
         assert_eq!(cmap.get_glyph_position(0x2764), 20);
         assert_eq!(cmap.get_glyph_position_from_uvs(0x2764, 0xFE0F), 77);
         assert_eq!(cmap.get_glyph_position_from_uvs(0x2764, 0xFE0E), 20);
+    }
+
+    fn sample_font_path() -> std::path::PathBuf {
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("fonts")
+            .join("ZenMaruGothic-Regular.ttf")
+    }
+
+    #[test]
+    fn fontload_from_file_works() {
+        let path = sample_font_path();
+        let font = crate::fontload_file(&path).expect("load from file");
+        assert!(font.font().get_font_count() >= 1);
+        assert!(!font.font().get_info().is_err());
+    }
+
+    #[test]
+    fn fontload_from_buffer_works() {
+        let path = sample_font_path();
+        let bytes = std::fs::read(&path).expect("read font bytes");
+        let font = crate::fontload_buffer(&bytes).expect("load from buffer");
+        assert!(font.font().get_font_count() >= 1);
+    }
+
+    #[test]
+    fn fontload_from_source_file_works() {
+        let path = sample_font_path();
+        let font = crate::fontload(crate::FontSource::File(path.as_path())).expect("load source");
+        assert!(font.font().get_font_count() >= 1);
+    }
+
+    #[test]
+    fn text_to_command_and_svg_and_measure_work() {
+        let path = sample_font_path();
+        let font = crate::fontload_file(&path).expect("load font");
+
+        let commands = font.text2command("A").expect("text2command");
+        assert_eq!(commands.len(), 1);
+        assert!(commands[0].advance_width > 0.0);
+        assert!(!commands[0].commands.is_empty());
+
+        let svg = font.text2svg("A", 24.0, "px").expect("text2svg");
+        assert!(svg.starts_with("<svg"));
+        assert!(svg.contains("<path"));
+
+        let width = font.measure("A").expect("measure");
+        assert!(width > 0.0);
+        let two_line_width = font.measure("A\nB").expect("measure multiline");
+        assert!(two_line_width >= width);
+    }
+
+    #[test]
+    fn vertical_html_path_is_enabled() {
+        let path = sample_font_path();
+        let font = crate::fontload_file(&path).expect("load font");
+        let html = font.font().get_html_vert("A", 24.0, "px").expect("html vert");
+        assert!(html.contains("writing-mode: vertical-rl"));
+        assert!(html.contains("<svg"));
     }
 }
