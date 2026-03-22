@@ -1,5 +1,29 @@
 # todo
-# TESTの実装
+fonts/* がフォント
+- [+] 実装済み
+- [x] 動作確認済み
+- [*] 実装済みだが動作に不具合あり
+- [-] 実装遅延
+- [ ] 未処理、未確認タスク
+
+# TESTの実装(最優先)
+- [ ] font load from file
+- [ ] font load from net
+- [ ] font load form buffer
+- [ ] text to svg
+- [ ] text to command
+- [ ] text measure
+- [ ] lookup (すべてのパターン)
+- [+] cmap (すべてのパターン)
+- [ ] 異字体セレクタ
+- [ ] emoji
+- [ ] 合字
+    - [ ] llga
+    - [ ] 日本語 か+" など
+    - [ ] チベット語
+    - [ ] 古ハングル
+    - [ ] その他
+- [ ] 縦書き
 
 # API
 - [ ] FontFamiry Class
@@ -82,23 +106,55 @@ pub enum GlyphCommand {
 
 ## APIの破壊的変更
 - load_font フォントロード form any
-- load_font_from_file フォントロード from NET(exclude WASM)
-- load_font_from__buffer フォントロード from buffer
-- load_font_from__net フォントロード from NET(exclude WASM)
+- [ ] load_font_from_file フォントロード from NET(exclude WASM)
+- [ ] load_font_from__buffer フォントロード from buffer
+- [ ] load_font_from__net フォントロード from NET(exclude WASM)
 
+# 合字対応
+- [ ] llaga
+- [ ] アラビア文字
+- [ ] 日本語
+- [ ] チベット語
+- [ ] 古ハングル
+- [ ] その他
 # format
-- woff2対応
-
+- [ ] woff2対応
+- [ ] 境界条件をチェックしpanic!を回避
 # Layout 対応状況
 
 `layout` feature は一部のみ実装されています。
 
-### GSUB
+- [ ] layout featureの拡張
+
+# GSUB
 
 - パース済み: `ScriptList`, `FeatureList`, `LookupList`
-- 実装済み: 単一置換ベースの縦書き置換 `lookup_vertical()`
-- 部分実装: `lookup_ccmp()` は存在するが、結果展開は未実装
-- 未実装: `lookup_locale()`, `lookup_liga()`, `lookup_width()`, `lookup_number()`
+- [ ] 実装済み: 単一置換ベースの縦書き置換 `lookup_vertical()`
+- [ ] 部分実装: `lookup_ccmp()` は存在するが、結果展開は未実装
+- [ ] 未実装: `lookup_locale()`, `lookup_liga()`, `lookup_width()`, `lookup_number()`
+- [ ] aalt
+- [ ] dlig
+- [ ] expt
+- [ ] fwid
+- [ ] hwid
+- [ ] jp78
+- [ ] jp90
+- [ ] llga
+- [ ] nlck
+- [ ] pwid
+- [ ] trad
+- [ ] vert
+- [ ] vrt2
+- [ ] zero
+
+# GPOS
+- [ ] 実装
+- [ ] palt
+- [ ] vpal
+- [ ] kern
+- [ ] vkrn
+- [ ] halt
+- [ ] vhal
 
 ### Lookup パース
 - [ ] Type 1 Single Substitution: パース済み、展開可能
@@ -117,6 +173,7 @@ pub enum GlyphCommand {
 - [ ] Type 8 Reverse Chaining Contextual Single Substitution: パース済み、適用は未実装
 
 ### GDEF
-
 - [ ]パース済み: glyph class definition, attach list, ligature caret list, mark attach class definition, mark glyph sets definition
 - [] shaping 処理に統合
+  
+# todo.mdの更新
