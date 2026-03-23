@@ -4,7 +4,13 @@ pub mod opentype;
 pub(crate) mod util;
 pub type Font = fontreader::Font;
 pub use fontreader::{GlyphCommands, PathCommand};
-pub mod commads;
+pub mod commands;
+pub use commands as commads;
+pub use commands::{
+    text2commands, Command, FillRule, FontMetrics, FontOptions, FontRef, FontStretch, FontStyle,
+    FontVariant, FontWeight, Glyph, GlyphBounds, GlyphFlow, GlyphLayer, GlyphMetrics, GlyphPaint,
+    GlyphRun, PathGlyphLayer, PositionedGlyph, RasterGlyphLayer, RasterGlyphSource,
+};
 #[cfg(test)]
 mod test;
 pub mod woff;
@@ -12,8 +18,11 @@ pub mod woff;
 
 use std::io::Error;
 use std::io::ErrorKind;
+#[cfg(not(target_arch = "wasm32"))]
 use std::io::Read;
+#[cfg(not(target_arch = "wasm32"))]
 use std::io::Write;
+#[cfg(not(target_arch = "wasm32"))]
 use std::net::TcpStream;
 use std::path::Path;
 
@@ -29,6 +38,15 @@ pub struct LoadedFont {
 impl LoadedFont {
     pub fn text2svg(&self, text: &str, fontsize: f64, fontunit: &str) -> Result<String, Error> {
         self.font.text2svg(text, fontsize, fontunit)
+    }
+
+    pub fn text2glyph_run<'a>(
+        &'a self,
+        text: &str,
+        mut options: FontOptions<'a>,
+    ) -> Result<GlyphRun, Error> {
+        options.font = Some(FontRef::Loaded(self));
+        crate::commands::text2commands(text, options)
     }
 
     pub fn text2commands(&self, text: &str) -> Result<Vec<GlyphCommands>, Error> {
@@ -53,14 +71,23 @@ pub fn fontload_file(path: impl AsRef<Path>) -> Result<LoadedFont, Error> {
     Ok(LoadedFont { font })
 }
 
+pub fn load_font_from_file(path: impl AsRef<Path>) -> Result<LoadedFont, Error> {
+    fontload_file(path)
+}
+
 pub fn fontload_buffer(buffer: &[u8]) -> Result<LoadedFont, Error> {
     let font = fontreader::Font::get_font_from_buffer(buffer)?;
     Ok(LoadedFont { font })
 }
 
+pub fn load_font_from_buffer(buffer: &[u8]) -> Result<LoadedFont, Error> {
+    fontload_buffer(buffer)
+}
+
 pub fn load_font_from_net(url: &str) -> Result<LoadedFont, Error> {
     #[cfg(target_arch = "wasm32")]
     {
+        let _ = url;
         return Err(Error::new(
             ErrorKind::Unsupported,
             "network font loading is not supported on wasm32",
@@ -83,6 +110,10 @@ pub fn fontload(source: FontSource<'_>) -> Result<LoadedFont, Error> {
         FontSource::File(path) => fontload_file(path),
         FontSource::Buffer(buffer) => fontload_buffer(buffer),
     }
+}
+
+pub fn load_font(source: FontSource<'_>) -> Result<LoadedFont, Error> {
+    fontload(source)
 }
 
 #[cfg(not(target_arch = "wasm32"))]

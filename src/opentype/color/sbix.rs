@@ -27,6 +27,14 @@ pub(crate) struct GlyphData {
     glyph_data: Vec<u8>,
 }
 
+#[derive(Debug, Clone)]
+pub(crate) struct RasterGlyphData {
+    pub(crate) offset_x: f32,
+    pub(crate) offset_y: f32,
+    pub(crate) graphic_type: u32,
+    pub(crate) glyph_data: Vec<u8>,
+}
+
 impl SBIX {
     pub(crate) fn new<R: BinaryReader>(
         reader: &mut R,
@@ -86,6 +94,51 @@ impl SBIX {
         string
     }
 
+    fn select_strike(&self, font_size: f32, fontunit: &str) -> Option<&Strike> {
+        let mut result = self.strikes.last()?;
+        for strike in self.strikes.iter() {
+            if fontunit == "pt" {
+                let ppem = strike.ppem as f32 * 72.0 / 96.0;
+                if ppem > font_size {
+                    result = strike;
+                    break;
+                }
+            } else if strike.ppem as f32 > font_size {
+                result = strike;
+                break;
+            }
+        }
+        Some(result)
+    }
+
+    pub(crate) fn get_raster_glyph(
+        &self,
+        gid: u32,
+        font_size: f32,
+        fontunit: &str,
+    ) -> Option<RasterGlyphData> {
+        let strike = self.select_strike(font_size, fontunit)?;
+        let glyph_data = strike.glyph_data.get(gid as usize)?.as_ref()?;
+
+        let requested_ppem = if fontunit == "pt" {
+            font_size * 96.0 / 72.0
+        } else {
+            font_size
+        };
+        let scale = if strike.ppem == 0 {
+            1.0
+        } else {
+            requested_ppem / strike.ppem as f32
+        };
+
+        Some(RasterGlyphData {
+            offset_x: glyph_data.original_offset_x as f32 * scale,
+            offset_y: glyph_data.original_offset_y as f32 * scale,
+            graphic_type: glyph_data.graphic_type,
+            glyph_data: glyph_data.glyph_data.clone(),
+        })
+    }
+
     pub(crate) fn get_svg(
         &self,
         gid: u32,
@@ -95,35 +148,13 @@ impl SBIX {
         _: f64,
         _: f64,
     ) -> Option<String> {
-        let strike = {
-            let mut result = self.strikes.last().unwrap();
-            for strike in self.strikes.iter() {
-                let fontsize = fontsize as u16;
-                if fontunit == "px" {
-                    if strike.ppem > fontsize {
-                        result = strike;
-                        break;
-                    }
-                } else if fontunit == "pt" {
-                    let ppem = (strike.ppem as f64 * 72.0 / 96.0) as u16;
-                    if ppem > fontsize {
-                        result = strike;
-                        break;
-                    }
-                }
-            }
-            result
-        };
-        // let strike = &self.strikes[self.strikes.len() - 1];
-        let glyph_data = &strike.glyph_data[gid as usize];
-        if glyph_data.is_none() {
-            return None;
-        }
+        let strike = self.select_strike(fontsize as f32, fontunit)?;
+        let glyph_data = strike.glyph_data.get(gid as usize)?.as_ref()?;
         let width = format!("{}{}", fontsize, fontunit);
         let height = width.clone();
-        let binary = &glyph_data.as_ref().unwrap().glyph_data;
-        let bytes = u32::to_be_bytes(glyph_data.as_ref().unwrap().graphic_type);
-        let mut base64 = general_purpose::STANDARD.encode(&binary);
+        let binary = &glyph_data.glyph_data;
+        let bytes = u32::to_be_bytes(glyph_data.graphic_type);
+        let mut base64 = general_purpose::STANDARD.encode(binary);
         match &bytes {
             b"png " => {
                 // base64

@@ -947,6 +947,19 @@ mod tests {
             .join("MS-Gothic.ttf.woff")
     }
 
+    fn svg_font_path() -> std::path::PathBuf {
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("fonts")
+            .join("EmojiOneColor.otf")
+    }
+
+    #[cfg(feature = "cff")]
+    fn cff_font_path() -> std::path::PathBuf {
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("fonts")
+            .join("NotoSansJP-Black.otf")
+    }
+
     #[cfg(feature = "layout")]
     fn japanese_font_path() -> std::path::PathBuf {
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -967,6 +980,14 @@ mod tests {
         let path = sample_font_path();
         let bytes = std::fs::read(&path).expect("read font bytes");
         let font = crate::fontload_buffer(&bytes).expect("load from buffer");
+        assert!(font.font().get_font_count() >= 1);
+    }
+
+    #[test]
+    fn load_font_from_buffer_alias_works() {
+        let path = sample_font_path();
+        let bytes = std::fs::read(&path).expect("read font bytes");
+        let font = crate::load_font_from_buffer(&bytes).expect("load from buffer alias");
         assert!(font.font().get_font_count() >= 1);
     }
 
@@ -1035,6 +1056,64 @@ mod tests {
         assert!(width > 0.0);
         let two_line_width = font.measure("A\nB").expect("measure multiline");
         assert!(two_line_width >= width);
+    }
+
+    #[test]
+    fn glyph_run_from_truetype_outline_works() {
+        let path = sample_font_path();
+        let font = crate::load_font_from_file(&path).expect("load font");
+        let run = crate::text2commands("A", crate::FontOptions::new(&font).with_font_size(24.0))
+            .expect("glyph run");
+
+        assert_eq!(run.glyphs.len(), 1);
+        assert!(run.glyphs[0].glyph.metrics.advance_x > 0.0);
+        assert!(matches!(
+            run.glyphs[0].glyph.layers.first(),
+            Some(crate::GlyphLayer::Path(_))
+        ));
+    }
+
+    #[test]
+    #[cfg(feature = "cff")]
+    fn glyph_run_from_cff_outline_works() {
+        let font = crate::load_font_from_file(cff_font_path()).expect("load cff font");
+        let run = crate::text2commands("漢", crate::FontOptions::new(&font).with_font_size(24.0))
+            .expect("glyph run");
+
+        assert_eq!(run.glyphs.len(), 1);
+        assert!(matches!(
+            run.glyphs[0].glyph.layers.first(),
+            Some(crate::GlyphLayer::Path(_))
+        ));
+    }
+
+    #[test]
+    fn glyph_run_respects_line_height() {
+        let path = sample_font_path();
+        let font = crate::load_font_from_file(&path).expect("load font");
+        let run = crate::text2commands(
+            "A\nB",
+            crate::FontOptions::new(&font)
+                .with_font_size(24.0)
+                .with_line_height(40.0),
+        )
+        .expect("glyph run");
+
+        assert_eq!(run.glyphs.len(), 2);
+        assert_eq!(run.glyphs[0].y, 0.0);
+        assert_eq!(run.glyphs[1].y, 40.0);
+    }
+
+    #[test]
+    fn glyph_run_rejects_svg_glyphs() {
+        let font = crate::load_font_from_file(svg_font_path()).expect("load svg font");
+        let err = crate::text2commands(
+            "😀",
+            crate::FontOptions::new(&font).with_font_size(32.0),
+        )
+        .expect_err("svg glyphs should be rejected for now");
+
+        assert_eq!(err.kind(), std::io::ErrorKind::Unsupported);
     }
 
     #[test]

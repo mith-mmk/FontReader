@@ -3,6 +3,11 @@ use std::collections::HashMap;
 use std::io::{Error, ErrorKind, SeekFrom};
 use std::{fs::File, path::PathBuf};
 
+use crate::commands::{
+    Command as DrawCommand, FontMetrics as DrawFontMetrics, Glyph, GlyphBounds, GlyphFlow,
+    GlyphLayer, GlyphMetrics as DrawGlyphMetrics, GlyphPaint, GlyphRun, PathGlyphLayer,
+    PositionedGlyph, RasterGlyphLayer,
+};
 use crate::fontheader;
 use crate::opentype::color::sbix;
 use crate::opentype::color::svg;
@@ -687,9 +692,244 @@ impl Font {
         }
     }
 
+    fn current_head(&self) -> Result<&head::HEAD, Error> {
+        if self.current_font == 0 {
+            self.head
+                .as_ref()
+                .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "head is none"))
+        } else {
+            self.more_fonts[self.current_font - 1]
+                .head
+                .as_ref()
+                .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "head is none"))
+        }
+    }
+
+    fn current_glyf(&self) -> Option<&glyf::GLYF> {
+        if self.current_font == 0 {
+            self.glyf.as_ref()
+        } else {
+            self.more_fonts[self.current_font - 1].glyf.as_ref()
+        }
+    }
+
+    fn current_colr(&self) -> Option<&colr::COLR> {
+        if self.current_font == 0 {
+            self.colr.as_ref()
+        } else {
+            self.more_fonts[self.current_font - 1].colr.as_ref()
+        }
+    }
+
+    fn current_cpal(&self) -> Option<&cpal::CPAL> {
+        if self.current_font == 0 {
+            self.cpal.as_ref()
+        } else {
+            self.more_fonts[self.current_font - 1].cpal.as_ref()
+        }
+    }
+
+    fn current_sbix(&self) -> Option<&sbix::SBIX> {
+        if self.current_font == 0 {
+            self.sbix.as_ref()
+        } else {
+            self.more_fonts[self.current_font - 1].sbix.as_ref()
+        }
+    }
+
+    fn current_svg_table(&self) -> Option<&svg::SVG> {
+        if self.current_font == 0 {
+            self.svg.as_ref()
+        } else {
+            self.more_fonts[self.current_font - 1].svg.as_ref()
+        }
+    }
+
+    #[cfg(feature = "cff")]
+    fn current_cff(&self) -> Option<&cff::CFF> {
+        if self.current_font == 0 {
+            self.cff.as_ref()
+        } else {
+            self.more_fonts[self.current_font - 1].cff.as_ref()
+        }
+    }
+
     fn default_line_height(&self) -> Result<f64, Error> {
         let hhea = self.current_hhea()?;
         Ok((hhea.get_accender() - hhea.get_descender() + hhea.get_line_gap()) as f64)
+    }
+
+    pub fn text2glyph_run(
+        &self,
+        text: &str,
+        options: &crate::commands::FontOptions<'_>,
+    ) -> Result<GlyphRun, Error> {
+        let _ = self.current_head()?;
+
+        if !options.font_size.is_finite() || options.font_size <= 0.0 {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "font_size must be a positive finite value",
+            ));
+        }
+
+        let default_line_height = self.default_line_height()? as f32;
+        let scale_y = options.font_size / default_line_height.max(1.0);
+        let scale_x = scale_y * options.font_stretch.0.max(0.0);
+        let line_height = options.line_height.unwrap_or(options.font_size);
+        if !line_height.is_finite() || line_height <= 0.0 {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "line_height must be a positive finite value",
+            ));
+        }
+
+        let mut glyphs = Vec::new();
+        let mut cursor_x = 0.0f32;
+        let mut cursor_y = 0.0f32;
+        let tab_advance = line_height;
+
+        for ch in text.chars() {
+            match ch {
+                '\r' => continue,
+                '\n' => {
+                    cursor_x = 0.0;
+                    cursor_y += line_height;
+                    continue;
+                }
+                '\t' => {
+                    cursor_x += tab_advance * 4.0;
+                    continue;
+                }
+                _ => {}
+            }
+
+            let glyph_data = self.get_glyph(ch);
+            let open_type_glyph = glyph_data
+                .open_type_glyf
+                .as_ref()
+                .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "glyph is none"))?;
+            let glyph_id = glyph_data.glyph_id;
+
+            let layers = if let Some(sbix) = self.current_sbix() {
+                if let Some(bitmap) = sbix.get_raster_glyph(glyph_id as u32, options.font_size, "px")
+                {
+                    let mut raster = RasterGlyphLayer::from_encoded(bitmap.glyph_data);
+                    raster.offset_x = bitmap.offset_x * options.font_stretch.0.max(0.0);
+                    raster.offset_y = bitmap.offset_y;
+                    vec![GlyphLayer::Raster(raster)]
+                } else {
+                    self.build_outline_layers(glyph_id, open_type_glyph, scale_x, scale_y, ch)?
+                }
+            } else {
+                self.build_outline_layers(glyph_id, open_type_glyph, scale_x, scale_y, ch)?
+            };
+
+            let mut metrics = glyph_metrics_from_layout(&open_type_glyph.layout, scale_x, scale_y);
+            metrics.bounds = glyph_layers_bounds(&layers);
+
+            let glyph = Glyph {
+                font: Some(font_metrics_from_layout(&open_type_glyph.layout, scale_y)),
+                metrics,
+                layers,
+            };
+            glyphs.push(PositionedGlyph::new(glyph, cursor_x, cursor_y));
+            cursor_x += metrics.advance_x;
+        }
+
+        Ok(GlyphRun::new(glyphs))
+    }
+
+    fn build_outline_layers(
+        &self,
+        glyph_id: usize,
+        open_type_glyph: &OpenTypeGlyph,
+        scale_x: f32,
+        scale_y: f32,
+        ch: char,
+    ) -> Result<Vec<GlyphLayer>, Error> {
+        if self
+            .current_svg_table()
+            .map(|svg| svg.has_glyph(glyph_id as u32))
+            .unwrap_or(false)
+        {
+            return Err(Error::new(
+                ErrorKind::Unsupported,
+                format!("SVG glyph layers are not supported yet for {:?}", ch),
+            ));
+        }
+
+        let color_layers = self.build_colr_layers(glyph_id, &open_type_glyph.layout, scale_x, scale_y);
+        if !color_layers.is_empty() {
+            return Ok(color_layers);
+        }
+
+        #[cfg(feature = "cff")]
+        if let Some(cff) = self.current_cff() {
+            let commands = cff.to_path_commands(glyph_id, 1.0)?;
+            let commands = transform_cff_commands(&commands, scale_x, scale_y);
+            return Ok(vec![GlyphLayer::Path(PathGlyphLayer::new(
+                commands,
+                GlyphPaint::CurrentColor,
+            ))]);
+        }
+
+        match &open_type_glyph.glyph {
+            FontData::Glyph(glyph) => {
+                let commands = glyph.to_path_commands(&open_type_glyph.layout, 0.0, 0.0);
+                let commands = transform_glyf_commands(&commands, &open_type_glyph.layout, scale_x, scale_y);
+                Ok(vec![GlyphLayer::Path(PathGlyphLayer::new(
+                    commands,
+                    GlyphPaint::CurrentColor,
+                ))])
+            }
+            FontData::Bitmap(_, _) => Err(Error::new(
+                ErrorKind::Unsupported,
+                "bitmap glyphs are only supported through sbix raster layers",
+            )),
+            FontData::SVG(_) => Err(Error::new(
+                ErrorKind::Unsupported,
+                "SVG glyph layers are not supported yet",
+            )),
+            _ => Err(Error::new(
+                ErrorKind::Unsupported,
+                "glyph outlines are not available for this font",
+            )),
+        }
+    }
+
+    fn build_colr_layers(
+        &self,
+        glyph_id: usize,
+        layout: &FontLayout,
+        scale_x: f32,
+        scale_y: f32,
+    ) -> Vec<GlyphLayer> {
+        let (Some(colr), Some(cpal), Some(glyf)) =
+            (self.current_colr(), self.current_cpal(), self.current_glyf())
+        else {
+            return Vec::new();
+        };
+
+        let mut layers = Vec::new();
+        for layer in colr.get_layer_record(glyph_id as u16) {
+            let Some(glyph) = glyf.get_glyph(layer.glyph_id as usize) else {
+                continue;
+            };
+            let commands = glyph.to_path_commands(layout, 0.0, 0.0);
+            let commands = transform_glyf_commands(&commands, layout, scale_x, scale_y);
+            let color = cpal.get_pallet(layer.palette_index as usize);
+            let rgba = ((color.red as u32) << 24)
+                | ((color.green as u32) << 16)
+                | ((color.blue as u32) << 8)
+                | color.alpha as u32;
+            layers.push(GlyphLayer::Path(PathGlyphLayer::new(
+                commands,
+                GlyphPaint::Solid(rgba),
+            )));
+        }
+
+        layers
     }
 
     pub fn text2commands(&self, text: &str) -> Result<Vec<GlyphCommands>, Error> {
@@ -1249,8 +1489,20 @@ struct Pointer {
 }
 
 fn font_load_from_file(filename: &PathBuf) -> Result<Font, Error> {
-    let fontdata = std::fs::read(filename)?;
-    Font::get_font_from_buffer(&fontdata)
+    #[cfg(target_arch = "wasm32")]
+    {
+        let _ = filename;
+        return Err(Error::new(
+            ErrorKind::Unsupported,
+            "file font loading is not supported on wasm32",
+        ));
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let fontdata = std::fs::read(filename)?;
+        Font::get_font_from_buffer(&fontdata)
+    }
 }
 
 fn path_commands_to_svg_path(commands: &[PathCommand]) -> String {
@@ -1300,6 +1552,166 @@ fn path_command_bounds(commands: &[PathCommand]) -> (f64, f64, f64, f64) {
     }
 
     (min_x, min_y, max_x, max_y)
+}
+
+fn glyph_baseline_shift(layout: &FontLayout) -> f32 {
+    match layout {
+        FontLayout::Horizontal(layout) => (layout.accender + layout.line_gap) as f32,
+        FontLayout::Vertical(layout) => (layout.accender - layout.descender) as f32,
+        FontLayout::Unknown => 0.0,
+    }
+}
+
+fn transform_glyf_commands(
+    commands: &[PathCommand],
+    layout: &FontLayout,
+    scale_x: f32,
+    scale_y: f32,
+) -> Vec<DrawCommand> {
+    let baseline_shift = glyph_baseline_shift(layout) as f64;
+    commands
+        .iter()
+        .map(|command| match command {
+            PathCommand::MoveTo { x, y } => {
+                DrawCommand::MoveTo(*x as f32 * scale_x, (*y - baseline_shift) as f32 * scale_y)
+            }
+            PathCommand::LineTo { x, y } => {
+                DrawCommand::Line(*x as f32 * scale_x, (*y - baseline_shift) as f32 * scale_y)
+            }
+            PathCommand::QuadTo { cx, cy, x, y } => DrawCommand::Bezier(
+                (*cx as f32 * scale_x, (*cy - baseline_shift) as f32 * scale_y),
+                (*x as f32 * scale_x, (*y - baseline_shift) as f32 * scale_y),
+            ),
+            PathCommand::ClosePath => DrawCommand::Close,
+        })
+        .collect()
+}
+
+fn transform_cff_commands(
+    commands: &[DrawCommand],
+    scale_x: f32,
+    scale_y: f32,
+) -> Vec<DrawCommand> {
+    commands
+        .iter()
+        .map(|command| match command {
+            DrawCommand::MoveTo(x, y) => DrawCommand::MoveTo(*x * scale_x, *y * scale_y),
+            DrawCommand::Line(x, y) => DrawCommand::Line(*x * scale_x, *y * scale_y),
+            DrawCommand::Bezier((cx, cy), (x, y)) => DrawCommand::Bezier(
+                (*cx * scale_x, *cy * scale_y),
+                (*x * scale_x, *y * scale_y),
+            ),
+            DrawCommand::CubicBezier((xa, ya), (xb, yb), (xc, yc)) => DrawCommand::CubicBezier(
+                (*xa * scale_x, *ya * scale_y),
+                (*xb * scale_x, *yb * scale_y),
+                (*xc * scale_x, *yc * scale_y),
+            ),
+            DrawCommand::Close => DrawCommand::Close,
+        })
+        .collect()
+}
+
+fn font_metrics_from_layout(layout: &FontLayout, scale_y: f32) -> DrawFontMetrics {
+    match layout {
+        FontLayout::Horizontal(layout) => DrawFontMetrics {
+            ascent: layout.accender as f32 * scale_y,
+            descent: (-layout.descender) as f32 * scale_y,
+            line_gap: layout.line_gap as f32 * scale_y,
+            flow: GlyphFlow::Horizontal,
+        },
+        FontLayout::Vertical(layout) => DrawFontMetrics {
+            ascent: layout.accender as f32 * scale_y,
+            descent: (-layout.descender) as f32 * scale_y,
+            line_gap: layout.line_gap as f32 * scale_y,
+            flow: GlyphFlow::Vertical,
+        },
+        FontLayout::Unknown => DrawFontMetrics {
+            ascent: 0.0,
+            descent: 0.0,
+            line_gap: 0.0,
+            flow: GlyphFlow::Horizontal,
+        },
+    }
+}
+
+fn glyph_metrics_from_layout(
+    layout: &FontLayout,
+    scale_x: f32,
+    scale_y: f32,
+) -> DrawGlyphMetrics {
+    match layout {
+        FontLayout::Horizontal(layout) => DrawGlyphMetrics {
+            advance_x: layout.advance_width as f32 * scale_x,
+            advance_y: 0.0,
+            bearing_x: layout.lsb as f32 * scale_x,
+            bearing_y: layout.accender as f32 * scale_y,
+            bounds: None,
+        },
+        FontLayout::Vertical(layout) => DrawGlyphMetrics {
+            advance_x: 0.0,
+            advance_y: layout.advance_height as f32 * scale_y,
+            bearing_x: 0.0,
+            bearing_y: layout.accender as f32 * scale_y,
+            bounds: None,
+        },
+        FontLayout::Unknown => DrawGlyphMetrics::default(),
+    }
+}
+
+fn glyph_layers_bounds(layers: &[GlyphLayer]) -> Option<GlyphBounds> {
+    let mut bounds = None;
+
+    for layer in layers {
+        match layer {
+            GlyphLayer::Path(path) => {
+                for command in path.commands.iter() {
+                    match command {
+                        DrawCommand::MoveTo(x, y) | DrawCommand::Line(x, y) => {
+                            extend_bounds(&mut bounds, *x + path.offset_x, *y + path.offset_y);
+                        }
+                        DrawCommand::Bezier((cx, cy), (x, y)) => {
+                            extend_bounds(&mut bounds, *cx + path.offset_x, *cy + path.offset_y);
+                            extend_bounds(&mut bounds, *x + path.offset_x, *y + path.offset_y);
+                        }
+                        DrawCommand::CubicBezier((xa, ya), (xb, yb), (xc, yc)) => {
+                            extend_bounds(&mut bounds, *xa + path.offset_x, *ya + path.offset_y);
+                            extend_bounds(&mut bounds, *xb + path.offset_x, *yb + path.offset_y);
+                            extend_bounds(&mut bounds, *xc + path.offset_x, *yc + path.offset_y);
+                        }
+                        DrawCommand::Close => {}
+                    }
+                }
+            }
+            GlyphLayer::Raster(raster) => {
+                if let (Some(width), Some(height)) = (raster.width, raster.height) {
+                    extend_bounds(&mut bounds, raster.offset_x, raster.offset_y);
+                    extend_bounds(
+                        &mut bounds,
+                        raster.offset_x + width as f32,
+                        raster.offset_y + height as f32,
+                    );
+                }
+            }
+        }
+    }
+
+    bounds
+}
+
+fn extend_bounds(bounds: &mut Option<GlyphBounds>, x: f32, y: f32) {
+    if let Some(bounds) = bounds.as_mut() {
+        bounds.min_x = bounds.min_x.min(x);
+        bounds.min_y = bounds.min_y.min(y);
+        bounds.max_x = bounds.max_x.max(x);
+        bounds.max_y = bounds.max_y.max(y);
+    } else {
+        *bounds = Some(GlyphBounds {
+            min_x: x,
+            min_y: y,
+            max_x: x,
+            max_y: y,
+        });
+    }
 }
 
 #[cfg(debug_assertions)]

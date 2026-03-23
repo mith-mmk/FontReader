@@ -58,6 +58,14 @@ impl SVG {
         string
     }
 
+    pub(crate) fn has_glyph(&self, gid: u32) -> bool {
+        let gid = gid as u16;
+        self.svg_document_list
+            .svg_document_records
+            .iter()
+            .any(|record| record.start_glyph_id <= gid && gid <= record.end_glyph_id)
+    }
+
     pub(crate) fn get_svg(
         &self,
         gid: u32,

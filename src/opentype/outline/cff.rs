@@ -2,6 +2,7 @@
 use bin_rs::reader::BinaryReader;
 use std::{collections::HashMap, error::Error, io::SeekFrom};
 
+use crate::commands::Command;
 use crate::fontreader::FontLayout;
 
 // Compare this snippet from src/outline/cff.rs:
@@ -340,6 +341,65 @@ impl CFF {
         let data = &self.char_string.data.data[gid as usize];
         let context = self.glyph_context(gid);
         self.parse_data(gid, data, 24.0, "pt", layout, 0.0, 0.0, false, context)
+    }
+
+    pub(crate) fn to_path_commands(
+        &self,
+        gid: usize,
+        scale: f32,
+    ) -> Result<Vec<Command>, std::io::Error> {
+        if gid >= self.char_string.data.data.len() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                format!("gid {} is not found", gid),
+            ));
+        }
+
+        let data = &self.char_string.data.data[gid];
+        let context = self.glyph_context(gid);
+        let parce_data = self.parse_operations(data, context.clone());
+        let mut commands = Vec::new();
+
+        for operation in parce_data.commands.operations.iter() {
+            match operation {
+                Operation::M(x, y) => {
+                    commands.push(Command::MoveTo(*x as f32 * scale, -*y as f32 * scale));
+                }
+                Operation::L(x, y) => {
+                    commands.push(Command::Line(*x as f32 * scale, -*y as f32 * scale));
+                }
+                Operation::C(xa, ya, xb, yb, xc, yc) => {
+                    commands.push(Command::CubicBezier(
+                        (*xa as f32 * scale, -*ya as f32 * scale),
+                        (*xb as f32 * scale, -*yb as f32 * scale),
+                        (*xc as f32 * scale, -*yc as f32 * scale),
+                    ));
+                }
+                Operation::Z => commands.push(Command::Close),
+            }
+        }
+
+        Ok(commands)
+    }
+
+    fn parse_operations(&self, data: &[u8], context: GlyphContext) -> ParcePack {
+        let commands = Box::new(Commands::new());
+        let stacks = Box::new(Vec::with_capacity(48)); // CFF1 max stack depth 48
+        let mut parce_data = ParcePack {
+            x: 0.0,
+            y: 0.0,
+            hints: 0,
+            min_x: 0.0,
+            width: None,
+            commands,
+            stacks,
+            is_first: 0,
+            subr: context.subr.clone(),
+            gsubr: self.gsubr.clone(),
+        };
+
+        self.parse(data, &mut parce_data);
+        parce_data
     }
 
     fn parse(&self, data: &[u8], parce_data: &mut ParcePack) -> Option<()> {
@@ -2220,22 +2280,7 @@ impl CFF {
         is_svg: bool,
         context: GlyphContext,
     ) -> String {
-        let commands = Box::new(Commands::new());
-        let stacks = Box::new(Vec::with_capacity(48)); // CFF1 max stack depth 48
-        let mut parce_data = ParcePack {
-            x: 0.0,
-            y: 0.0,
-            hints: 0,
-            min_x: 0.0,
-            width: None,
-            commands,
-            stacks,
-            is_first: 0,
-            subr: context.subr.clone(),
-            gsubr: self.gsubr.clone(),
-        };
-
-        self.parse(data, &mut parce_data);
+        let parce_data = self.parse_operations(data, context.clone());
         let commands = &parce_data.commands;
         if is_svg {
             let mut svg = self.get_svg_header(

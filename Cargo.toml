@@ -16,6 +16,7 @@ full = ["encoding", "layout", "cff"]
 encoding = ["iconv"]
 layout = []
 cff = []
+cff2 = []
 
 [dependencies]
 # MUST

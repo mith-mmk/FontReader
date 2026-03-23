@@ -1,9 +1,6 @@
 use crate::woff::woff::WOFFHeader;
 use crate::{opentype::OTFHeader, opentype::TTCHeader, util::u32_to_string};
-use bin_rs::{
-    reader::{BinaryReader, BytesReader, StreamReader},
-    Endian,
-};
+use bin_rs::{reader::{BinaryReader, BytesReader}, Endian};
 use std::path::PathBuf;
 
 // pub type F2DOT14 = i16;
@@ -255,10 +252,20 @@ pub struct WOFF2Header {
 }
 
 pub fn get_font_type_from_file(filename: &PathBuf) -> Result<FontHeaders, std::io::Error> {
-    let file = std::fs::File::open(filename).unwrap();
-    let reader = std::io::BufReader::new(file);
-    let mut file = StreamReader::new(reader);
-    get_font_type(&mut file)
+    #[cfg(target_arch = "wasm32")]
+    {
+        let _ = filename;
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::Unsupported,
+            "file font loading is not supported on wasm32",
+        ));
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let fontdata = std::fs::read(filename)?;
+        get_font_type_from_buffer(&fontdata)
+    }
 }
 
 pub fn get_font_type<B: BinaryReader>(file: &mut B) -> Result<FontHeaders, std::io::Error> {

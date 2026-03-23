@@ -7,23 +7,23 @@ fonts/* がフォント
 - [ ] 未処理、未確認タスク
 
 # 最優先
-- [ ] web assemblyでもコンパイル出来るようにする
-- [ ] fontをbufferからloadする機能
-- [ ] commands.rsを利用し、pub fn text2commands(&text, FontOptions) -> Result<GlyphRun, Error>を実装
-    - [ ] TrueType, CFFは Pathに収納
-    - [ ] sbixはRasterに収納
-    - [ ] svgは忘れる（取りあえずエラー）
-    - [ ] FontOptionsに必要なオプション
-        - [ ] FontFamiry, Font Name or Font // FontFamiry以下はまだ実装していないので省略
-        - [ ] font-size
-        - [ ] font-stretch
-        - [ ] font-style
-        - [ ] font-variant
-        - [ ] font-weight
-        - [ ] line-height
-- [ ] 上記を実現するのに不足している機能
-- [ ] `todo.md`の更新
-- [ ] `README.ja.md`, `README.md`の更新
+- [+] web assemblyでもコンパイル出来るようにする
+- [+] fontをbufferからloadする機能
+- [*] commands.rsを利用し、pub fn text2commands(&text, FontOptions) -> Result<GlyphRun, Error>を実装
+    - [+] TrueType, CFFは Pathに収納
+    - [+] sbixはRasterに収納 // 実装済み。手元の sbix フォントは未所持なので自動テストは未追加
+    - [+] svgは忘れる（取りあえずエラー）
+    - [*] FontOptionsに必要なオプション
+        - [*] FontFamiry, Font Name or Font // 現状は loaded Font を直接渡す。font family / name lookup は未実装
+        - [+] font-size
+        - [+] font-stretch
+        - [+] font-style
+        - [+] font-variant
+        - [+] font-weight
+        - [+] line-height
+- [+] 上記を実現するのに不足している機能
+- [+] `todo.md`の更新
+- [+] `README.ja.md`, `README.md`の更新
 
 # TESTの実装(最優先)
 - [+] font load from file
@@ -143,10 +143,10 @@ pub enum GlyphCommand {
 
 
 ## APIの破壊的変更
-- load_font フォントロード form any
-- [ ] load_font_from_file フォントロード from NET(exclude WASM)
-- [ ] load_font_from__buffer フォントロード from buffer
-- [+] load_font_from__net フォントロード from NET(exclude WASM)
+- [+] load_font フォントロード from any
+- [+] load_font_from_file フォントロード from file(exclude WASM)
+- [+] load_font_from_buffer フォントロード from buffer
+- [+] load_font_from_net フォントロード from NET(exclude WASM)
 
 # 合字対応
 - [ ] llaga
