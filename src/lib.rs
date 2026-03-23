@@ -4,9 +4,11 @@ pub mod opentype;
 pub(crate) mod util;
 pub type Font = fontreader::Font;
 pub use fontreader::{GlyphCommands, PathCommand};
+pub mod commads;
 #[cfg(test)]
 mod test;
 pub mod woff;
+
 
 use std::io::Error;
 use std::io::ErrorKind;

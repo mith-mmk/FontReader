@@ -6,6 +6,25 @@ fonts/* がフォント
 - [-] 実装遅延
 - [ ] 未処理、未確認タスク
 
+# 最優先
+- [ ] web assemblyでもコンパイル出来るようにする
+- [ ] fontをbufferからloadする機能
+- [ ] commands.rsを利用し、pub fn text2commands(&text, FontOptions) -> Result<GlyphRun, Error>を実装
+    - [ ] TrueType, CFFは Pathに収納
+    - [ ] sbixはRasterに収納
+    - [ ] svgは忘れる（取りあえずエラー）
+    - [ ] FontOptionsに必要なオプション
+        - [ ] FontFamiry, Font Name or Font // FontFamiry以下はまだ実装していないので省略
+        - [ ] font-size
+        - [ ] font-stretch
+        - [ ] font-style
+        - [ ] font-variant
+        - [ ] font-weight
+        - [ ] line-height
+- [ ] 上記を実現するのに不足している機能
+- [ ] `todo.md`の更新
+- [ ] `README.ja.md`, `README.md`の更新
+
 # TESTの実装(最優先)
 - [+] font load from file
 - [+] font load from net
