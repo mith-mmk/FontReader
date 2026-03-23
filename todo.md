@@ -5,25 +5,8 @@ fonts/* がフォント
 - [*] 実装済みだが動作に不具合あり
 - [-] 実装遅延
 - [ ] 未処理、未確認タスク
-
-# 最優先
-- [+] web assemblyでもコンパイル出来るようにする
-- [+] fontをbufferからloadする機能
-- [*] commands.rsを利用し、pub fn text2commands(&text, FontOptions) -> Result<GlyphRun, Error>を実装
-    - [+] TrueType, CFFは Pathに収納
-    - [+] sbixはRasterに収納 // 実装済み。手元の sbix フォントは未所持なので自動テストは未追加
-    - [+] svgは忘れる（取りあえずエラー）
-    - [*] FontOptionsに必要なオプション
-        - [*] FontFamiry, Font Name or Font // 現状は loaded Font を直接渡す。font family / name lookup は未実装
-        - [+] font-size
-        - [+] font-stretch
-        - [+] font-style
-        - [+] font-variant
-        - [+] font-weight
-        - [+] line-height
-- [+] 上記を実現するのに不足している機能
-- [+] `todo.md`の更新
-- [+] `README.ja.md`, `README.md`の更新
+# issue
+- fira_sansで i が読めない
 
 # TESTの実装(最優先)
 - [+] font load from file
