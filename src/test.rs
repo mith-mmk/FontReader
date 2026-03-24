@@ -953,6 +953,13 @@ mod tests {
             .join("EmojiOneColor.otf")
     }
 
+    fn segoe_emoji_font_path() -> std::path::PathBuf {
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("fonts")
+            .join("windows")
+            .join("seguiemj.ttf")
+    }
+
     #[cfg(feature = "cff")]
     fn cff_font_path() -> std::path::PathBuf {
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -1114,6 +1121,53 @@ mod tests {
         .expect_err("svg glyphs should be rejected for now");
 
         assert_eq!(err.kind(), std::io::ErrorKind::Unsupported);
+    }
+
+    #[test]
+    fn glyph_run_colr_layers_keep_cpal_argb32_paint() {
+        let font = crate::load_font_from_file(segoe_emoji_font_path()).expect("load segoe emoji");
+        let inner = font.font();
+        let glyph_id = inner
+            .cmap
+            .as_ref()
+            .expect("cmap")
+            .get_glyph_position('🥺' as u32) as usize;
+        let expected_layers = inner
+            .colr
+            .as_ref()
+            .expect("colr")
+            .get_layer_record(glyph_id as u16);
+        let cpal = inner.cpal.as_ref().expect("cpal");
+        let run = crate::text2commands("🥺", crate::FontOptions::new(&font).with_font_size(32.0))
+            .expect("glyph run");
+
+        assert_eq!(run.glyphs.len(), 1);
+        assert_eq!(run.glyphs[0].glyph.layers.len(), expected_layers.len());
+
+        for (actual, expected) in run.glyphs[0]
+            .glyph
+            .layers
+            .iter()
+            .zip(expected_layers.iter())
+        {
+            let color = cpal.get_pallet(expected.palette_index as usize);
+            let expected_argb = ((color.alpha as u32) << 24)
+                | ((color.red as u32) << 16)
+                | ((color.green as u32) << 8)
+                | color.blue as u32;
+
+            match actual {
+                crate::GlyphLayer::Path(path) => match path.paint {
+                    crate::GlyphPaint::Solid(argb) => assert_eq!(argb, expected_argb),
+                    crate::GlyphPaint::CurrentColor => {
+                        panic!("expected COLR glyph layer to keep CPAL color")
+                    }
+                },
+                crate::GlyphLayer::Raster(_) => {
+                    panic!("expected COLR glyph to use only path layers")
+                }
+            }
+        }
     }
 
     #[test]

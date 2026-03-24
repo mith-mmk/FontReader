@@ -15,7 +15,9 @@ Japanese: [README.ja.md](README.ja.md)
 - Font lookup by family or name is not implemented yet, so pass a loaded font for now.
 - TrueType and CFF glyphs are returned as `GlyphLayer::Path`.
 - `sbix` glyphs are returned as `GlyphLayer::Raster`.
+- COLR/CPAL colors are carried in `GlyphPaint::Solid(0xAARRGGBB)` so they can be passed directly to `paintcore::path::draw_glyphs`.
 - SVG glyph layers currently return `ErrorKind::Unsupported`.
+- The legacy `font.text2command()` API only returns outline commands and does not carry per-layer paint. Use `fontloader::text2commands(..., FontOptions)` when you need color glyph data.
 
 ```rust
 use fontloader::{load_font_from_buffer, text2commands, FontOptions, GlyphLayer};

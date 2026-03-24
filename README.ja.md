@@ -15,7 +15,9 @@ English: [README.md](README.md)
 - `font-family` / `font-name` でのフォント探索は未実装なので、当面はロード済みフォントを渡してください。
 - TrueType / CFF は `GlyphLayer::Path` として返します。
 - `sbix` は `GlyphLayer::Raster` として返します。
+- COLR/CPAL の色は `GlyphPaint::Solid(0xAARRGGBB)` に詰めて返すので、そのまま `paintcore::path::draw_glyphs` に渡せます。
 - SVG glyph は現状 `ErrorKind::Unsupported` を返します。
+- 既存の `font.text2command()` は輪郭コマンドだけを返す旧 API で、レイヤーごとの色は保持しません。カラーグリフを扱う場合は `fontloader::text2commands(..., FontOptions)` を使ってください。
 
 ```rust
 use fontloader::{load_font_from_buffer, text2commands, FontOptions, GlyphLayer};

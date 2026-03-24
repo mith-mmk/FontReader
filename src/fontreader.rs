@@ -919,13 +919,13 @@ impl Font {
             let commands = glyph.to_path_commands(layout, 0.0, 0.0);
             let commands = transform_glyf_commands(&commands, layout, scale_x, scale_y);
             let color = cpal.get_pallet(layer.palette_index as usize);
-            let rgba = ((color.red as u32) << 24)
-                | ((color.green as u32) << 16)
-                | ((color.blue as u32) << 8)
-                | color.alpha as u32;
+            let argb = ((color.alpha as u32) << 24)
+                | ((color.red as u32) << 16)
+                | ((color.green as u32) << 8)
+                | color.blue as u32;
             layers.push(GlyphLayer::Path(PathGlyphLayer::new(
                 commands,
-                GlyphPaint::Solid(rgba),
+                GlyphPaint::Solid(argb),
             )));
         }
 
