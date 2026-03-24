@@ -20,6 +20,39 @@ pub(crate) struct GLYF {
     pub(crate) griphs: Box<Vec<Glyph>>,
 }
 
+const ARG_1_AND_2_ARE_WORDS: u16 = 0x0001;
+const ARGS_ARE_XY_VALUES: u16 = 0x0002;
+const ROUND_XY_TO_GRID: u16 = 0x0004;
+const WE_HAVE_A_SCALE: u16 = 0x0008;
+const MORE_COMPONENTS: u16 = 0x0020;
+const WE_HAVE_AN_X_AND_Y_SCALE: u16 = 0x0040;
+const WE_HAVE_A_TWO_BY_TWO: u16 = 0x0080;
+const WE_HAVE_INSTRUCTIONS: u16 = 0x0100;
+const SCALED_COMPONENT_OFFSET: u16 = 0x0800;
+
+#[derive(Debug, Clone, Copy)]
+struct CompositeTransform {
+    xx: f64,
+    xy: f64,
+    yx: f64,
+    yy: f64,
+    dx: f64,
+    dy: f64,
+}
+
+impl Default for CompositeTransform {
+    fn default() -> Self {
+        Self {
+            xx: 1.0,
+            xy: 0.0,
+            yx: 0.0,
+            yy: 1.0,
+            dx: 0.0,
+            dy: 0.0,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Glyph {
     pub glyphs: Box<Vec<u8>>,
@@ -642,6 +675,53 @@ impl GLYF {
         self.griphs.get(index)
     }
 
+    pub fn to_path_commands(
+        &self,
+        index: usize,
+        layout: &FontLayout,
+        sx: f64,
+        sy: f64,
+    ) -> Vec<PathCommand> {
+        let mut commands = self.to_path_commands_recursive(index, layout, 0);
+        if sx != 0.0 || sy != 0.0 {
+            commands = translate_path_commands(&commands, sx, sy);
+        }
+        commands
+    }
+
+    pub(crate) fn get_svg_path(
+        &self,
+        index: usize,
+        layout: &FontLayout,
+        sx: f64,
+        sy: f64,
+    ) -> String {
+        let commands = self.to_path_commands(index, layout, sx, sy);
+        if commands.is_empty() {
+            return "<path d=\"\"/>".to_string();
+        }
+        format!("<path d=\"{}\"/>", path_commands_to_svg_path(&commands))
+    }
+
+    pub fn to_svg(
+        &self,
+        index: usize,
+        fonsize: f64,
+        fontunit: &str,
+        layout: &FontLayout,
+        sx: f64,
+        sy: f64,
+    ) -> String {
+        let Some(glyph) = self.get_glyph(index) else {
+            return String::new();
+        };
+        let parsed = glyph.parse();
+        let mut svg = Glyph::get_svg_header_from_parsed(&parsed, fonsize, fontunit, layout);
+        svg += &self.get_svg_path(index, layout, sx, sy);
+        svg += "\n</svg>";
+        svg
+    }
+
     pub(crate) fn to_string(&self) -> String {
         let mut string = "glyf\n".to_string();
         string += &format!("number of glyphs {}\n", self.griphs.len());
@@ -655,6 +735,209 @@ impl GLYF {
         }
         string
     }
+
+    fn to_path_commands_recursive(
+        &self,
+        index: usize,
+        layout: &FontLayout,
+        depth: usize,
+    ) -> Vec<PathCommand> {
+        if depth > 16 {
+            return Vec::new();
+        }
+
+        let Some(glyph) = self.get_glyph(index) else {
+            return Vec::new();
+        };
+        let parsed = glyph.parse();
+        if parsed.number_of_contours >= 0 {
+            return Glyph::to_path_commands_parsed(&parsed, layout, 0.0, 0.0);
+        }
+
+        self.composite_to_path_commands(glyph, layout, depth)
+    }
+
+    fn composite_to_path_commands(
+        &self,
+        glyph: &Glyph,
+        layout: &FontLayout,
+        depth: usize,
+    ) -> Vec<PathCommand> {
+        let mut offset = 10usize;
+        let mut commands = Vec::new();
+        let y_max = layout_y_max(layout);
+
+        while offset + 4 <= glyph.glyphs.len() {
+            let flags = read_u16(&glyph.glyphs, &mut offset);
+            let component_index = read_u16(&glyph.glyphs, &mut offset) as usize;
+            let args_are_words = flags & ARG_1_AND_2_ARE_WORDS != 0;
+            let args_are_xy_values = flags & ARGS_ARE_XY_VALUES != 0;
+
+            let (arg1, arg2) = if args_are_words {
+                if offset + 4 > glyph.glyphs.len() {
+                    break;
+                }
+                (
+                    read_i16(&glyph.glyphs, &mut offset) as f64,
+                    read_i16(&glyph.glyphs, &mut offset) as f64,
+                )
+            } else {
+                if offset + 2 > glyph.glyphs.len() {
+                    break;
+                }
+                (
+                    read_i8(&glyph.glyphs, &mut offset) as f64,
+                    read_i8(&glyph.glyphs, &mut offset) as f64,
+                )
+            };
+
+            let mut transform = CompositeTransform::default();
+            if args_are_xy_values {
+                transform.dx = arg1;
+                transform.dy = arg2;
+            }
+
+            if flags & WE_HAVE_A_SCALE != 0 {
+                let scale = read_f2dot14(&glyph.glyphs, &mut offset);
+                transform.xx = scale;
+                transform.yy = scale;
+            } else if flags & WE_HAVE_AN_X_AND_Y_SCALE != 0 {
+                transform.xx = read_f2dot14(&glyph.glyphs, &mut offset);
+                transform.yy = read_f2dot14(&glyph.glyphs, &mut offset);
+            } else if flags & WE_HAVE_A_TWO_BY_TWO != 0 {
+                transform.xx = read_f2dot14(&glyph.glyphs, &mut offset);
+                transform.yx = read_f2dot14(&glyph.glyphs, &mut offset);
+                transform.xy = read_f2dot14(&glyph.glyphs, &mut offset);
+                transform.yy = read_f2dot14(&glyph.glyphs, &mut offset);
+            }
+
+            if flags & SCALED_COMPONENT_OFFSET != 0 {
+                let dx = transform.xx * transform.dx + transform.xy * transform.dy;
+                let dy = transform.yx * transform.dx + transform.yy * transform.dy;
+                transform.dx = dx;
+                transform.dy = dy;
+            }
+            if flags & ROUND_XY_TO_GRID != 0 {
+                transform.dx = transform.dx.round();
+                transform.dy = transform.dy.round();
+            }
+
+            let component_commands = self.to_path_commands_recursive(component_index, layout, depth + 1);
+            commands.extend(transform_path_commands(
+                &component_commands,
+                y_max,
+                transform,
+            ));
+
+            if flags & MORE_COMPONENTS == 0 {
+                if flags & WE_HAVE_INSTRUCTIONS != 0 && offset + 2 <= glyph.glyphs.len() {
+                    let _ = read_u16(&glyph.glyphs, &mut offset);
+                }
+                break;
+            }
+        }
+
+        commands
+    }
+}
+
+fn layout_y_max(layout: &FontLayout) -> f64 {
+    match layout {
+        FontLayout::Horizontal(layout) => (layout.accender + layout.line_gap) as f64,
+        FontLayout::Vertical(layout) => (layout.accender - layout.descender) as f64,
+        FontLayout::Unknown => 0.0,
+    }
+}
+
+fn transform_path_commands(
+    commands: &[PathCommand],
+    y_max: f64,
+    transform: CompositeTransform,
+) -> Vec<PathCommand> {
+    commands
+        .iter()
+        .map(|command| match command {
+            PathCommand::MoveTo { x, y } => {
+                let (x, y) = transform_screen_point(*x, *y, y_max, transform);
+                PathCommand::MoveTo { x, y }
+            }
+            PathCommand::LineTo { x, y } => {
+                let (x, y) = transform_screen_point(*x, *y, y_max, transform);
+                PathCommand::LineTo { x, y }
+            }
+            PathCommand::QuadTo { cx, cy, x, y } => {
+                let (cx, cy) = transform_screen_point(*cx, *cy, y_max, transform);
+                let (x, y) = transform_screen_point(*x, *y, y_max, transform);
+                PathCommand::QuadTo { cx, cy, x, y }
+            }
+            PathCommand::ClosePath => PathCommand::ClosePath,
+        })
+        .collect()
+}
+
+fn translate_path_commands(commands: &[PathCommand], dx: f64, dy: f64) -> Vec<PathCommand> {
+    commands
+        .iter()
+        .map(|command| match command {
+            PathCommand::MoveTo { x, y } => PathCommand::MoveTo {
+                x: *x + dx,
+                y: *y + dy,
+            },
+            PathCommand::LineTo { x, y } => PathCommand::LineTo {
+                x: *x + dx,
+                y: *y + dy,
+            },
+            PathCommand::QuadTo { cx, cy, x, y } => PathCommand::QuadTo {
+                cx: *cx + dx,
+                cy: *cy + dy,
+                x: *x + dx,
+                y: *y + dy,
+            },
+            PathCommand::ClosePath => PathCommand::ClosePath,
+        })
+        .collect()
+}
+
+fn transform_screen_point(x: f64, y: f64, y_max: f64, transform: CompositeTransform) -> (f64, f64) {
+    let raw_y = y_max - y;
+    let transformed_x = transform.xx * x + transform.xy * raw_y + transform.dx;
+    let transformed_y = transform.yx * x + transform.yy * raw_y + transform.dy;
+    (transformed_x, y_max - transformed_y)
+}
+
+fn read_u16(buf: &[u8], offset: &mut usize) -> u16 {
+    let value = u16::from_be_bytes([buf[*offset], buf[*offset + 1]]);
+    *offset += 2;
+    value
+}
+
+fn read_i16(buf: &[u8], offset: &mut usize) -> i16 {
+    let value = i16::from_be_bytes([buf[*offset], buf[*offset + 1]]);
+    *offset += 2;
+    value
+}
+
+fn read_i8(buf: &[u8], offset: &mut usize) -> i8 {
+    let value = buf[*offset] as i8;
+    *offset += 1;
+    value
+}
+
+fn read_f2dot14(buf: &[u8], offset: &mut usize) -> f64 {
+    read_i16(buf, offset) as f64 / 16384.0
+}
+
+fn path_commands_to_svg_path(commands: &[PathCommand]) -> String {
+    let mut d = String::new();
+    for command in commands {
+        match command {
+            PathCommand::MoveTo { x, y } => d += &format!("M{} {} ", x, y),
+            PathCommand::LineTo { x, y } => d += &format!("L{} {} ", x, y),
+            PathCommand::QuadTo { cx, cy, x, y } => d += &format!("Q{} {} {} {} ", cx, cy, x, y),
+            PathCommand::ClosePath => d += "Z ",
+        }
+    }
+    d.trim_end().to_string()
 }
 
 fn get_glyf<R: BinaryReader>(file: &mut R, offset: u32, _length: u32, loca: &loca::LOCA) -> GLYF {

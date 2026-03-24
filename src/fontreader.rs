@@ -470,7 +470,7 @@ impl Font {
             if let Some(colr) = colr.as_ref() {
                 let layers = colr.get_layer_record(pos as u16);
                 if layers.is_empty() {
-                    return Ok(glyph.to_svg(fontsize, fontunit, &layout, 0.0, 0.0));
+                    return Ok(glyf.to_svg(glyph_id, fontsize, fontunit, &layout, 0.0, 0.0));
                 }
                 let mut string = glyph.get_svg_heder(fontsize, fontunit, &layout);
                 #[cfg(debug_assertions)]
@@ -480,7 +480,6 @@ impl Font {
 
                 for layer in layers {
                     let glyf_id = layer.glyph_id as u32;
-                    let glyf = glyf.get_glyph(glyf_id as usize).unwrap();
                     let pallet = cpal
                         .as_ref()
                         .unwrap()
@@ -497,7 +496,7 @@ impl Font {
                         "<g fill=\"rgba({}, {}, {}, {})\">\n",
                         pallet.red, pallet.green, pallet.blue, pallet.alpha
                     );
-                    string += &glyf.get_svg_path(&layout);
+                    string += &glyf.get_svg_path(glyf_id as usize, &layout, 0.0, 0.0);
                     string += "</g>\n";
                 }
                 string += "</svg>";
@@ -505,11 +504,11 @@ impl Font {
             } else {
                 #[cfg(debug_assertions)]
                 {
-                    let string = glyph.to_svg(fontsize, fontunit, &layout, 0.0, 0.0);
+                    let string = glyf.to_svg(glyph_id, fontsize, fontunit, &layout, 0.0, 0.0);
                     return Ok(format!("<!-- glyf id: {} -->{}", pos, string));
                 }
                 #[cfg(not(debug_assertions))]
-                Ok(glyph.to_svg(fontsize, fontunit, &layout, 0.0, 0.0))
+                Ok(glyf.to_svg(glyph_id, fontsize, fontunit, &layout, 0.0, 0.0))
             }
         } else {
             return Err(Error::new(
@@ -616,7 +615,7 @@ impl Font {
             if let Some(colr) = colr.as_ref() {
                 let layers = colr.get_layer_record(glyph_id as u16);
                 if layers.is_empty() {
-                    return Ok(glyph.to_svg(fontsize, fontunit, &layout, 0.0, 0.0));
+                    return Ok(glyf.to_svg(glyph_id, fontsize, fontunit, &layout, 0.0, 0.0));
                 }
                 let mut string = glyph.get_svg_heder(fontsize, fontunit, &layout);
                 #[cfg(debug_assertions)]
@@ -626,7 +625,6 @@ impl Font {
 
                 for layer in layers {
                     let glyf_id = layer.glyph_id as u32;
-                    let glyf = glyf.get_glyph(glyf_id as usize).unwrap();
                     let pallet = cpal
                         .as_ref()
                         .unwrap()
@@ -643,7 +641,7 @@ impl Font {
                         "<g fill=\"rgba({}, {}, {}, {})\">\n",
                         pallet.red, pallet.green, pallet.blue, pallet.alpha
                     );
-                    string += &glyf.get_svg_path(&layout);
+                    string += &glyf.get_svg_path(glyf_id as usize, &layout, 0.0, 0.0);
                     string += "</g>\n";
                 }
                 string += "</svg>";
@@ -651,11 +649,11 @@ impl Font {
             } else {
                 #[cfg(debug_assertions)]
                 {
-                    let string = glyph.to_svg(fontsize, fontunit, &layout, 0.0, 0.0);
+                    let string = glyf.to_svg(glyph_id, fontsize, fontunit, &layout, 0.0, 0.0);
                     return Ok(format!("<!-- {} glyf id: {} -->{}", ch, glyph_id, string));
                 }
                 #[cfg(not(debug_assertions))]
-                Ok(glyph.to_svg(fontsize, fontunit, &layout, 0.0, 0.0))
+                Ok(glyf.to_svg(glyph_id, fontsize, fontunit, &layout, 0.0, 0.0))
             }
         } else {
             return Err(Error::new(
@@ -875,8 +873,11 @@ impl Font {
         }
 
         match &open_type_glyph.glyph {
-            FontData::Glyph(glyph) => {
-                let commands = glyph.to_path_commands(&open_type_glyph.layout, 0.0, 0.0);
+            FontData::Glyph(_) => {
+                let glyf = self.current_glyf().ok_or_else(|| {
+                    Error::new(std::io::ErrorKind::Other, "glyf is none")
+                })?;
+                let commands = glyf.to_path_commands(glyph_id, &open_type_glyph.layout, 0.0, 0.0);
                 let commands = transform_glyf_commands(&commands, &open_type_glyph.layout, scale_x, scale_y);
                 Ok(vec![GlyphLayer::Path(PathGlyphLayer::new(
                     commands,
@@ -913,10 +914,10 @@ impl Font {
 
         let mut layers = Vec::new();
         for layer in colr.get_layer_record(glyph_id as u16) {
-            let Some(glyph) = glyf.get_glyph(layer.glyph_id as usize) else {
+            if glyf.get_glyph(layer.glyph_id as usize).is_none() {
                 continue;
-            };
-            let commands = glyph.to_path_commands(layout, 0.0, 0.0);
+            }
+            let commands = glyf.to_path_commands(layer.glyph_id as usize, layout, 0.0, 0.0);
             let commands = transform_glyf_commands(&commands, layout, scale_x, scale_y);
             let color = cpal.get_pallet(layer.palette_index as usize);
             let rgba = ((color.red as u32) << 24)
@@ -962,13 +963,21 @@ impl Font {
             let origin_y = -(line_index as f64 * line_height);
 
             match &open_type_glyph.glyph {
-                FontData::Glyph(glyph) => {
+                FontData::Glyph(_) => {
                     let advance_width = match &open_type_glyph.layout {
                         FontLayout::Horizontal(layout) => layout.advance_width as f64,
                         FontLayout::Vertical(layout) => layout.advance_height as f64,
                         FontLayout::Unknown => 0.0,
                     };
-                    let commands = glyph.to_path_commands(&open_type_glyph.layout, cursor_x, origin_y);
+                    let glyf = self.current_glyf().ok_or_else(|| {
+                        Error::new(std::io::ErrorKind::Other, "glyf is none")
+                    })?;
+                    let commands = glyf.to_path_commands(
+                        glyph_data.glyph_id,
+                        &open_type_glyph.layout,
+                        cursor_x,
+                        origin_y,
+                    );
                     result.push(GlyphCommands {
                         ch,
                         glyph_id: glyph_data.glyph_id,

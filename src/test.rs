@@ -947,10 +947,24 @@ mod tests {
             .join("MS-Gothic.ttf.woff")
     }
 
+    fn fira_sans_black_path() -> std::path::PathBuf {
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("fonts")
+            .join("Fira_Sans")
+            .join("FiraSans-Black.ttf")
+    }
+
     fn svg_font_path() -> std::path::PathBuf {
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("fonts")
             .join("EmojiOneColor.otf")
+    }
+
+    fn segoe_emoji_font_path() -> std::path::PathBuf {
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("fonts")
+            .join("windows")
+            .join("seguiemj.ttf")
     }
 
     #[cfg(feature = "cff")]
@@ -1114,6 +1128,87 @@ mod tests {
         .expect_err("svg glyphs should be rejected for now");
 
         assert_eq!(err.kind(), std::io::ErrorKind::Unsupported);
+    }
+
+    #[test]
+    fn fira_sans_black_i_and_j_have_outline_commands() {
+        let font = crate::load_font_from_file(fira_sans_black_path()).expect("load fira sans");
+
+        for ch in ['i', 'j'] {
+            let commands = font.text2command(&ch.to_string()).expect("text2command");
+            assert_eq!(commands.len(), 1, "expected one glyph for {ch}");
+            assert!(
+                !commands[0].commands.is_empty(),
+                "expected outline commands for {ch}"
+            );
+        }
+    }
+
+    #[test]
+    fn fira_sans_black_i_or_j_is_composite_glyph() {
+        let font = crate::load_font_from_file(fira_sans_black_path()).expect("load fira sans");
+        let inner = font.font();
+
+        let mut found_composite = false;
+        for ch in ['i', 'j'] {
+            let glyph_id = inner
+                .cmap
+                .as_ref()
+                .expect("cmap")
+                .get_glyph_position(ch as u32) as usize;
+            let glyph = inner
+                .glyf
+                .as_ref()
+                .expect("glyf")
+                .get_glyph(glyph_id)
+                .expect("glyph");
+            let parsed = glyph.parse();
+            if parsed.number_of_contours < 0 {
+                found_composite = true;
+            }
+        }
+
+        assert!(found_composite, "expected i or j to be a composite glyph");
+    }
+
+    #[test]
+    fn emoji_one_color_pleading_face_keeps_all_colr_layers() {
+        let font = crate::load_font_from_file(segoe_emoji_font_path()).expect("load segoe emoji");
+        let inner = font.font();
+        let glyph_id = inner
+            .cmap
+            .as_ref()
+            .expect("cmap")
+            .get_glyph_position('🥺' as u32) as usize;
+        let expected_layers = inner
+            .colr
+            .as_ref()
+            .expect("colr")
+            .get_layer_record(glyph_id as u16)
+            .len();
+        assert!(expected_layers > 0, "expected COLR layers for pleading face");
+        let run = crate::text2commands("🥺", crate::FontOptions::new(&font).with_font_size(32.0))
+            .expect("glyph run");
+
+        assert_eq!(run.glyphs.len(), 1);
+        assert_eq!(
+            run.glyphs[0].glyph.layers.len(),
+            expected_layers,
+            "glyph run should keep all COLR layers"
+        );
+        for (index, layer) in run.glyphs[0].glyph.layers.iter().enumerate() {
+            match layer {
+                crate::GlyphLayer::Path(path) => {
+                    assert!(
+                        !path.commands.is_empty(),
+                        "expected COLR layer {index} to have outline commands"
+                    );
+                }
+                crate::GlyphLayer::Raster(_) => {
+                    panic!("expected COLR glyph to produce only path layers");
+                }
+            }
+        }
     }
 
     #[test]
