@@ -1,3 +1,6 @@
+# memo
+windowsにおけるpython環境は
+% vpy web
 # todo
 fonts/* がフォント
 - [+] 実装済み
@@ -6,7 +9,9 @@ fonts/* がフォント
 - [-] 実装遅延
 - [ ] 未処理、未確認タスク
 # issue
-- fira_sansで i が読めない
+- [ ] Fira_Sans/FiraSans-Blackで 小文字 [i] [j] が表示されない(このフォントかなり読めてない)
+- [ ] カラーemojiの一部が欠落している レイヤーが1つ足りていない(以前表示出来ていた🥺のデータがおかしいのでエンバグ)
+- [+] issue: OS2 Headerのoutbound
 
 # TESTの実装(最優先)
 - [+] font load from file
@@ -32,7 +37,6 @@ fonts/* がフォント
 - [+] woff
 - [+] woff2
 - [+] otf (CID-keyed CFF / FDSelect)
-- [+] woffで以下のエラーが出るissue OS2 Headerのoutbound
 
 
 # Exampleの変更
@@ -63,66 +67,6 @@ fonts/* がフォント
   - font.get_fontsize() -> f32
   - font.set_line_spacing(f32)
   - font.get_line_spacing() -> 32
-
-- FontCommand
-```
-pub struct FontText {
-  // todo!
-
-}
-
-
-pub struct FontCommand {
-    pub glyph_count: usize,
-    pub vertical: bool,
-    pub line_spacing: f32,
-    pub runs: Vec<FontRun>,
-}
-
-FontRun {
-  font_id: usize,
-  glyphs: Vec<GlyphInfo>
-}
-
-pub struct GlpyhInfo {
-  glyph_id: u32,
-  x: f32,
-  y: f32,
-  advance_width: f32,
-  x_offset: f32,
-  y_offset: f32,
-  bbox: (f32,f32,f32,f32),
-  width: f32,がでて動かなくなっています
-  ascent: f32,
-  descent: f32,
-  // baseline_y 0.0
-  color: u32,   // RGBA32 color for color font
-  pub mod data: Vec<GlyphData>
-}
-
-pub enum GlyphType {
-  PATH(Vec<GlyphData>), // open type, 
-  IMAGE(Vec<u8>), //Image(apple emoji)
-  SVG(String) , // google emoji
-}
-
-
-struct GlyphData {
-  command : Vec<GlyphCommand>
-
-}
-
-pub enum GlyphCommand {
-    Color(u8,u8,u8,u8),
-    Line(f32, f32),
-    MoveTo(f32, f32),
-    QuadTo((f32, f32), (f32, f32)),
-    CubicTo((f32, f32), (f32, f32), (f32, f32)),
-    Fill,
-    Close,
-}
-
-```
 
 
 ## APIの破壊的変更
