@@ -122,6 +122,19 @@ pub struct Font {
     current_font: usize,
 }
 
+#[derive(Debug, Clone, Copy)]
+enum ResolvedTextUnit {
+    Glyph(ResolvedGlyph),
+    Newline,
+    Tab,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ResolvedGlyph {
+    ch: char,
+    glyph_id: usize,
+}
+
 impl Font {
     fn empty() -> Self {
         Self {
@@ -276,26 +289,7 @@ impl Font {
     }
 
     pub fn get_glyph_from_id(&self, glyph_id: usize) -> GriphData {
-        let glyf = if self.current_font == 0 {
-            self.glyf.as_ref().unwrap()
-        } else {
-            self.more_fonts[self.current_font - 1]
-                .glyf
-                .as_ref()
-                .unwrap()
-        };
-
-        let glyph = glyf.get_glyph(glyph_id).unwrap();
-        let layout = self.get_layout(glyph_id, false);
-        let open_type_glyph = OpenTypeGlyph {
-            layout,
-            glyph: FontData::Glyph(glyph.clone()),
-        };
-
-        GriphData {
-            glyph_id,
-            open_type_glyf: Some(open_type_glyph),
-        }
+        self.get_glyph_from_id_axis(glyph_id, false)
     }
 
     pub fn get_layout(&self, glyph_id: usize, is_vert: bool) -> FontLayout {
@@ -313,75 +307,8 @@ impl Font {
     }
 
     pub fn get_glyph_with_uvs_axis(&self, ch: char, vs: char, is_vert: bool) -> GriphData {
-        let code = ch as u32;
-        let vs = vs as u32;
-        let cmap = if self.current_font == 0 {
-            self.cmap.as_ref().unwrap()
-        } else {
-            self.more_fonts[self.current_font - 1]
-                .cmap
-                .as_ref()
-                .unwrap()
-        };
-
-        let glyph_id = cmap.get_glyph_position_from_uvs(code, vs) as usize;
-
-        #[cfg(feature = "layout")]
-        let glyph_id = if is_vert {
-            if let Some(gsub) = self.gsub.as_ref() {
-                let result = gsub.lookup_vertical(glyph_id as u16);
-                if result.is_some() {
-                    result.unwrap() as usize
-                } else {
-                    glyph_id
-                }
-            } else {
-                glyph_id
-            }
-        } else {
-            glyph_id
-        };
-        let layout = self.get_layout(glyph_id, is_vert);
-
-        #[cfg(feature = "cff")]
-        {
-            if self.cff.is_some() {
-                let cff = self.cff.as_ref().unwrap();
-
-                let string = cff.to_code(glyph_id, &layout);
-                // println!("cff string: {}", string);
-                let open_type_glyf = Some(OpenTypeGlyph {
-                    layout,
-                    glyph: FontData::CFF(string.as_bytes().to_vec()),
-                });
-
-                return GriphData {
-                    glyph_id,
-                    open_type_glyf,
-                };
-            }
-        }
-
-        let glyf = if self.current_font == 0 {
-            self.glyf.as_ref().unwrap()
-        } else {
-            self.more_fonts[self.current_font - 1]
-                .glyf
-                .as_ref()
-                .unwrap()
-        };
-
-        //        let pos = cmap.get_glyph_position(code);
-        let glyph = glyf.get_glyph(glyph_id as usize).unwrap();
-        let open_type_glyph = OpenTypeGlyph {
-            layout,
-            glyph: FontData::Glyph(glyph.clone()),
-        };
-
-        GriphData {
-            glyph_id: glyph_id as usize,
-            open_type_glyf: Some(open_type_glyph),
-        }
+        let glyph_id = self.resolve_glyph_id_with_uvs(ch, vs, is_vert).unwrap();
+        self.get_glyph_from_id_axis(glyph_id, is_vert)
     }
 
     pub fn get_glyph_with_uvs(&self, ch: char, vs: char) -> GriphData {
@@ -703,6 +630,19 @@ impl Font {
         }
     }
 
+    fn current_cmap(&self) -> Result<&CmapEncodings, Error> {
+        if self.current_font == 0 {
+            self.cmap
+                .as_ref()
+                .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "cmap is none"))
+        } else {
+            self.more_fonts[self.current_font - 1]
+                .cmap
+                .as_ref()
+                .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "cmap is none"))
+        }
+    }
+
     fn current_glyf(&self) -> Option<&glyf::GLYF> {
         if self.current_font == 0 {
             self.glyf.as_ref()
@@ -743,6 +683,15 @@ impl Font {
         }
     }
 
+    #[cfg(feature = "layout")]
+    fn current_gsub(&self) -> Option<&gsub::GSUB> {
+        if self.current_font == 0 {
+            self.gsub.as_ref()
+        } else {
+            self.more_fonts[self.current_font - 1].gsub.as_ref()
+        }
+    }
+
     #[cfg(feature = "cff")]
     fn current_cff(&self) -> Option<&cff::CFF> {
         if self.current_font == 0 {
@@ -750,6 +699,151 @@ impl Font {
         } else {
             self.more_fonts[self.current_font - 1].cff.as_ref()
         }
+    }
+
+    fn get_glyph_from_id_axis(&self, glyph_id: usize, is_vert: bool) -> GriphData {
+        let layout = self.get_layout(glyph_id, is_vert);
+
+        #[cfg(feature = "cff")]
+        if let Some(cff) = self.current_cff() {
+            let string = cff.to_code(glyph_id, &layout);
+            let open_type_glyf = Some(OpenTypeGlyph {
+                layout,
+                glyph: FontData::CFF(string.as_bytes().to_vec()),
+            });
+
+            return GriphData {
+                glyph_id,
+                open_type_glyf,
+            };
+        }
+
+        let glyf = self.current_glyf().unwrap();
+        let glyph = glyf.get_glyph(glyph_id).unwrap();
+        let open_type_glyph = OpenTypeGlyph {
+            layout,
+            glyph: FontData::Glyph(glyph.clone()),
+        };
+
+        GriphData {
+            glyph_id,
+            open_type_glyf: Some(open_type_glyph),
+        }
+    }
+
+    fn resolve_glyph_id_with_uvs(&self, ch: char, vs: char, is_vert: bool) -> Result<usize, Error> {
+        let glyph_id = self
+            .current_cmap()?
+            .get_glyph_position_from_uvs(ch as u32, vs as u32) as usize;
+
+        #[cfg(feature = "layout")]
+        {
+            if is_vert {
+                if let Some(gsub) = self.current_gsub() {
+                    return Ok(gsub.lookup_vertical(glyph_id as u16).unwrap_or(glyph_id as u16) as usize);
+                }
+            }
+        }
+
+        Ok(glyph_id)
+    }
+
+    fn is_variation_selector(ch: char) -> bool {
+        (0xfe00..=0xfe0f).contains(&(ch as u32)) || (0xE0100..=0xE01EF).contains(&(ch as u32))
+    }
+
+    fn flush_shaped_glyphs(
+        &self,
+        output: &mut Vec<ResolvedTextUnit>,
+        glyphs: &mut Vec<ResolvedGlyph>,
+    ) {
+        if glyphs.is_empty() {
+            return;
+        }
+
+        #[cfg(feature = "layout")]
+        if let Some(gsub) = self.current_gsub() {
+            const MAX_LIGATURE_COMPONENTS: usize = 8;
+
+            let glyph_ids: Vec<usize> = glyphs.iter().map(|glyph| glyph.glyph_id).collect();
+            let mut index = 0;
+            while index < glyphs.len() {
+                let max_len = (glyphs.len() - index).min(MAX_LIGATURE_COMPONENTS);
+                let mut matched = None;
+                for len in (2..=max_len).rev() {
+                    if let Some(glyph_id) = gsub.lookup_liga_sequence(&glyph_ids[index..index + len])
+                    {
+                        matched = Some((glyph_id, len));
+                        break;
+                    }
+                }
+
+                if let Some((glyph_id, len)) = matched {
+                    output.push(ResolvedTextUnit::Glyph(ResolvedGlyph {
+                        ch: glyphs[index].ch,
+                        glyph_id,
+                    }));
+                    index += len;
+                } else {
+                    output.push(ResolvedTextUnit::Glyph(glyphs[index]));
+                    index += 1;
+                }
+            }
+            glyphs.clear();
+            return;
+        }
+
+        output.extend(glyphs.iter().copied().map(ResolvedTextUnit::Glyph));
+        glyphs.clear();
+    }
+
+    fn shape_text_units(&self, text: &str, is_vert: bool) -> Result<Vec<ResolvedTextUnit>, Error> {
+        let chars: Vec<char> = text.chars().collect();
+        let mut output = Vec::new();
+        let mut pending_glyphs = Vec::new();
+        let mut index = 0;
+
+        while index < chars.len() {
+            let ch = chars[index];
+            match ch {
+                '\r' => {
+                    index += 1;
+                    continue;
+                }
+                '\n' => {
+                    self.flush_shaped_glyphs(&mut output, &mut pending_glyphs);
+                    output.push(ResolvedTextUnit::Newline);
+                    index += 1;
+                    continue;
+                }
+                '\t' => {
+                    self.flush_shaped_glyphs(&mut output, &mut pending_glyphs);
+                    output.push(ResolvedTextUnit::Tab);
+                    index += 1;
+                    continue;
+                }
+                _ => {}
+            }
+
+            if Self::is_variation_selector(ch) {
+                index += 1;
+                continue;
+            }
+
+            let mut vs = '\0';
+            let mut consumed = 1;
+            if index + 1 < chars.len() && Self::is_variation_selector(chars[index + 1]) {
+                vs = chars[index + 1];
+                consumed = 2;
+            }
+
+            let glyph_id = self.resolve_glyph_id_with_uvs(ch, vs, is_vert)?;
+            pending_glyphs.push(ResolvedGlyph { ch, glyph_id });
+            index += consumed;
+        }
+
+        self.flush_shaped_glyphs(&mut output, &mut pending_glyphs);
+        Ok(output)
     }
 
     fn default_line_height(&self) -> Result<f64, Error> {
@@ -787,52 +881,63 @@ impl Font {
         let mut cursor_y = 0.0f32;
         let tab_advance = line_height;
 
-        for ch in text.chars() {
-            match ch {
-                '\r' => continue,
-                '\n' => {
+        for unit in self.shape_text_units(text, false)? {
+            match unit {
+                ResolvedTextUnit::Newline => {
                     cursor_x = 0.0;
                     cursor_y += line_height;
-                    continue;
                 }
-                '\t' => {
+                ResolvedTextUnit::Tab => {
                     cursor_x += tab_advance * 4.0;
-                    continue;
                 }
-                _ => {}
+                ResolvedTextUnit::Glyph(resolved) => {
+                    let glyph_data = self.get_glyph_from_id_axis(resolved.glyph_id, false);
+                    let open_type_glyph = glyph_data
+                        .open_type_glyf
+                        .as_ref()
+                        .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "glyph is none"))?;
+                    let glyph_id = glyph_data.glyph_id;
+
+                    let layers = if let Some(sbix) = self.current_sbix() {
+                        if let Some(bitmap) =
+                            sbix.get_raster_glyph(glyph_id as u32, options.font_size, "px")
+                        {
+                            let mut raster = RasterGlyphLayer::from_encoded(bitmap.glyph_data);
+                            raster.offset_x = bitmap.offset_x * options.font_stretch.0.max(0.0);
+                            raster.offset_y = bitmap.offset_y;
+                            vec![GlyphLayer::Raster(raster)]
+                        } else {
+                            self.build_outline_layers(
+                                glyph_id,
+                                open_type_glyph,
+                                scale_x,
+                                scale_y,
+                                resolved.ch,
+                            )?
+                        }
+                    } else {
+                        self.build_outline_layers(
+                            glyph_id,
+                            open_type_glyph,
+                            scale_x,
+                            scale_y,
+                            resolved.ch,
+                        )?
+                    };
+
+                    let mut metrics =
+                        glyph_metrics_from_layout(&open_type_glyph.layout, scale_x, scale_y);
+                    metrics.bounds = glyph_layers_bounds(&layers);
+
+                    let glyph = Glyph {
+                        font: Some(font_metrics_from_layout(&open_type_glyph.layout, scale_y)),
+                        metrics,
+                        layers,
+                    };
+                    glyphs.push(PositionedGlyph::new(glyph, cursor_x, cursor_y));
+                    cursor_x += metrics.advance_x;
+                }
             }
-
-            let glyph_data = self.get_glyph(ch);
-            let open_type_glyph = glyph_data
-                .open_type_glyf
-                .as_ref()
-                .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "glyph is none"))?;
-            let glyph_id = glyph_data.glyph_id;
-
-            let layers = if let Some(sbix) = self.current_sbix() {
-                if let Some(bitmap) = sbix.get_raster_glyph(glyph_id as u32, options.font_size, "px")
-                {
-                    let mut raster = RasterGlyphLayer::from_encoded(bitmap.glyph_data);
-                    raster.offset_x = bitmap.offset_x * options.font_stretch.0.max(0.0);
-                    raster.offset_y = bitmap.offset_y;
-                    vec![GlyphLayer::Raster(raster)]
-                } else {
-                    self.build_outline_layers(glyph_id, open_type_glyph, scale_x, scale_y, ch)?
-                }
-            } else {
-                self.build_outline_layers(glyph_id, open_type_glyph, scale_x, scale_y, ch)?
-            };
-
-            let mut metrics = glyph_metrics_from_layout(&open_type_glyph.layout, scale_x, scale_y);
-            metrics.bounds = glyph_layers_bounds(&layers);
-
-            let glyph = Glyph {
-                font: Some(font_metrics_from_layout(&open_type_glyph.layout, scale_y)),
-                metrics,
-                layers,
-            };
-            glyphs.push(PositionedGlyph::new(glyph, cursor_x, cursor_y));
-            cursor_x += metrics.advance_x;
         }
 
         Ok(GlyphRun::new(glyphs))
@@ -940,59 +1045,56 @@ impl Font {
         let line_height = self.default_line_height()?;
         let tab_advance = line_height;
 
-        for ch in text.chars() {
-            match ch {
-                '\r' => continue,
-                '\n' => {
+        for unit in self.shape_text_units(text, false)? {
+            match unit {
+                ResolvedTextUnit::Newline => {
                     cursor_x = 0.0;
                     line_index += 1;
-                    continue;
                 }
-                '\t' => {
+                ResolvedTextUnit::Tab => {
                     cursor_x += tab_advance * 4.0;
-                    continue;
                 }
-                _ => {}
-            }
+                ResolvedTextUnit::Glyph(resolved) => {
+                    let glyph_data = self.get_glyph_from_id_axis(resolved.glyph_id, false);
+                    let open_type_glyph = glyph_data
+                        .open_type_glyf
+                        .as_ref()
+                        .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "glyph is none"))?;
+                    let origin_y = -(line_index as f64 * line_height);
 
-            let glyph_data = self.get_glyph(ch);
-            let open_type_glyph = glyph_data
-                .open_type_glyf
-                .as_ref()
-                .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "glyph is none"))?;
-            let origin_y = -(line_index as f64 * line_height);
-
-            match &open_type_glyph.glyph {
-                FontData::Glyph(_) => {
-                    let advance_width = match &open_type_glyph.layout {
-                        FontLayout::Horizontal(layout) => layout.advance_width as f64,
-                        FontLayout::Vertical(layout) => layout.advance_height as f64,
-                        FontLayout::Unknown => 0.0,
-                    };
-                    let glyf = self
-                        .current_glyf()
-                        .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "glyf is none"))?;
-                    let commands = glyf.to_path_commands(
-                        glyph_data.glyph_id,
-                        &open_type_glyph.layout,
-                        cursor_x,
-                        origin_y,
-                    );
-                    result.push(GlyphCommands {
-                        ch,
-                        glyph_id: glyph_data.glyph_id,
-                        origin_x: cursor_x,
-                        origin_y,
-                        advance_width,
-                        commands,
-                    });
-                    cursor_x += advance_width;
-                }
-                _ => {
-                    return Err(Error::new(
-                        std::io::ErrorKind::Other,
-                        "text2commands supports glyf outlines only",
-                    ));
+                    match &open_type_glyph.glyph {
+                        FontData::Glyph(_) => {
+                            let advance_width = match &open_type_glyph.layout {
+                                FontLayout::Horizontal(layout) => layout.advance_width as f64,
+                                FontLayout::Vertical(layout) => layout.advance_height as f64,
+                                FontLayout::Unknown => 0.0,
+                            };
+                            let glyf = self.current_glyf().ok_or_else(|| {
+                                Error::new(std::io::ErrorKind::Other, "glyf is none")
+                            })?;
+                            let commands = glyf.to_path_commands(
+                                glyph_data.glyph_id,
+                                &open_type_glyph.layout,
+                                cursor_x,
+                                origin_y,
+                            );
+                            result.push(GlyphCommands {
+                                ch: resolved.ch,
+                                glyph_id: glyph_data.glyph_id,
+                                origin_x: cursor_x,
+                                origin_y,
+                                advance_width,
+                                commands,
+                            });
+                            cursor_x += advance_width;
+                        }
+                        _ => {
+                            return Err(Error::new(
+                                std::io::ErrorKind::Other,
+                                "text2commands supports glyf outlines only",
+                            ));
+                        }
+                    }
                 }
             }
         }
@@ -1010,33 +1112,30 @@ impl Font {
         let line_height = self.default_line_height()?;
         let tab_advance = line_height;
 
-        for ch in text.chars() {
-            match ch {
-                '\r' => continue,
-                '\n' => {
+        for unit in self.shape_text_units(text, false)? {
+            match unit {
+                ResolvedTextUnit::Newline => {
                     max_line_width = max_line_width.max(cursor_x);
                     cursor_x = 0.0;
-                    continue;
                 }
-                '\t' => {
+                ResolvedTextUnit::Tab => {
                     cursor_x += tab_advance * 4.0;
-                    continue;
                 }
-                _ => {}
+                ResolvedTextUnit::Glyph(resolved) => {
+                    let glyph_data = self.get_glyph_from_id_axis(resolved.glyph_id, false);
+                    let open_type_glyph = glyph_data
+                        .open_type_glyf
+                        .as_ref()
+                        .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "glyph is none"))?;
+
+                    let advance_width = match &open_type_glyph.layout {
+                        FontLayout::Horizontal(layout) => layout.advance_width as f64,
+                        FontLayout::Vertical(layout) => layout.advance_height as f64,
+                        FontLayout::Unknown => 0.0,
+                    };
+                    cursor_x += advance_width;
+                }
             }
-
-            let glyph_data = self.get_glyph(ch);
-            let open_type_glyph = glyph_data
-                .open_type_glyf
-                .as_ref()
-                .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "glyph is none"))?;
-
-            let advance_width = match &open_type_glyph.layout {
-                FontLayout::Horizontal(layout) => layout.advance_width as f64,
-                FontLayout::Vertical(layout) => layout.advance_height as f64,
-                FontLayout::Unknown => 0.0,
-            };
-            cursor_x += advance_width;
         }
 
         Ok(max_line_width.max(cursor_x))

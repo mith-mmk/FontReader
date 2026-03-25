@@ -1,5 +1,6 @@
 # todo
-fonts/* がフォント
+_test* が作業用フォルダ
+_test_fonts/* がテスト用フォント
 - [+] 実装済み
 - [x] 動作確認済み
 - [*] 実装済みだが動作に不具合あり
@@ -35,8 +36,10 @@ fonts/* がフォント
 - [+] lookup (すべてのパターン)
 - [+] cmap (すべてのパターン)
 - [+] 異字体セレクタ
+    - [x] text2commands で format 14 の実データを 1 glyph cluster として扱う
 - [+] emoji
 - [+] 合字
+    - [x] text2command / text2commands で基本合字(liga / dlig) を実データで確認
     - [ ] llga
     - [ ] 日本語 か+" など
     - [ ] チベット語
@@ -44,8 +47,8 @@ fonts/* がフォント
     - [ ] その他
 - [+] 縦書き
 - loader
-    - [ ] font
-    - [ ] font collection
+    - [x] font
+    - [x] font collection
 - [+] woff
 - [+] woff2
 - [+] otf (CID-keyed CFF / FDSelect)
@@ -164,7 +167,9 @@ pub enum GlyphCommand {
 
 `layout` feature は一部のみ実装されています。
 
-- [ ] layout featureの拡張
+- [*] layout featureの拡張
+    - [x] text2command / text2commands / measure で variation selector と基本合字(liga / dlig) を利用
+    - [ ] locale / ccmp / context chaining などの shaping 拡張
 
 # opentype
 - [+] True TYpe
@@ -177,6 +182,7 @@ pub enum GlyphCommand {
 - [+] 実装済み: 単一置換ベースの縦書き置換 `lookup_vertical()`
 - [ ] 部分実装: `lookup_ccmp()` は存在するが、結果展開は未実装
 - [+] 実装済み: `lookup_locale()`, `lookup_liga()`
+- [*] text API への反映: `text2command()`, `text2commands()`, `measure()` で variation selector と基本合字 `liga` / `dlig` を利用
 - [ ] 未実装: `lookup_width()`, `lookup_number()`
 - [ ] aalt
 - [ ] dlig
