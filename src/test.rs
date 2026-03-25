@@ -953,6 +953,13 @@ mod tests {
             .join("EmojiOneColor.otf")
     }
 
+    fn fira_sans_black_path() -> std::path::PathBuf {
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("fonts")
+            .join("Fira_Sans")
+            .join("FiraSans-Black.ttf")
+    }
+
     fn segoe_emoji_font_path() -> std::path::PathBuf {
         std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("fonts")
@@ -1124,6 +1131,47 @@ mod tests {
     }
 
     #[test]
+    fn fira_sans_black_i_and_j_have_outline_commands() {
+        let font = crate::load_font_from_file(fira_sans_black_path()).expect("load fira sans");
+
+        for ch in ['i', 'j'] {
+            let commands = font.text2command(&ch.to_string()).expect("text2command");
+            assert_eq!(commands.len(), 1, "expected one glyph for {ch}");
+            assert!(
+                !commands[0].commands.is_empty(),
+                "expected outline commands for {ch}"
+            );
+        }
+    }
+
+    #[test]
+    fn glyph_run_fira_sans_black_keeps_outline_layers() {
+        let font = crate::load_font_from_file(fira_sans_black_path()).expect("load fira sans");
+        let run = crate::text2commands("ij", crate::FontOptions::new(&font).with_font_size(32.0))
+            .expect("glyph run");
+
+        assert_eq!(run.glyphs.len(), 2);
+        for (index, glyph) in run.glyphs.iter().enumerate() {
+            assert!(
+                glyph.glyph.metrics.bounds.is_some(),
+                "expected bounds for glyph {index}"
+            );
+            match glyph.glyph.layers.first() {
+                Some(crate::GlyphLayer::Path(path)) => {
+                    assert!(
+                        !path.commands.is_empty(),
+                        "expected path commands for glyph {index}"
+                    );
+                }
+                Some(crate::GlyphLayer::Raster(_)) => {
+                    panic!("expected outline layer for Fira Sans glyph {index}");
+                }
+                None => panic!("expected at least one layer for glyph {index}"),
+            }
+        }
+    }
+
+    #[test]
     fn glyph_run_colr_layers_keep_cpal_argb32_paint() {
         let font = crate::load_font_from_file(segoe_emoji_font_path()).expect("load segoe emoji");
         let inner = font.font();
@@ -1165,6 +1213,33 @@ mod tests {
                 },
                 crate::GlyphLayer::Raster(_) => {
                     panic!("expected COLR glyph to use only path layers")
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn glyph_run_colr_layers_keep_non_empty_commands() {
+        let font = crate::load_font_from_file(segoe_emoji_font_path()).expect("load segoe emoji");
+        let run = crate::text2commands("🥺", crate::FontOptions::new(&font).with_font_size(32.0))
+            .expect("glyph run");
+
+        assert_eq!(run.glyphs.len(), 1);
+        assert!(
+            !run.glyphs[0].glyph.layers.is_empty(),
+            "expected at least one COLR layer"
+        );
+
+        for (index, layer) in run.glyphs[0].glyph.layers.iter().enumerate() {
+            match layer {
+                crate::GlyphLayer::Path(path) => {
+                    assert!(
+                        !path.commands.is_empty(),
+                        "expected non-empty path commands for COLR layer {index}"
+                    );
+                }
+                crate::GlyphLayer::Raster(_) => {
+                    panic!("expected COLR glyph to use only path layers");
                 }
             }
         }
