@@ -570,9 +570,7 @@ mod tests {
 
     #[test]
     fn emoji_font_renders_svg() {
-        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("fonts")
-            .join("NotoColorEmoji-Regular.ttf");
+        let path = test_fonts_dir().join("NotoColorEmoji-Regular.ttf");
         let font = crate::fontload_file(&path).expect("load emoji font");
         let svg = font.font().get_svg('😀', 32.0, "px").expect("emoji svg");
         assert!(svg.contains("<svg"));
@@ -929,22 +927,20 @@ mod tests {
         assert_eq!(cmap.get_glyph_position_from_uvs(0x2764, 0xFE0E), 20);
     }
 
+    fn test_fonts_dir() -> std::path::PathBuf {
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("_test_fonts")
+    }
+
     fn sample_font_path() -> std::path::PathBuf {
-        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("fonts")
-            .join("ZenMaruGothic-Regular.ttf")
+        test_fonts_dir().join("ZenMaruGothic-Regular.ttf")
     }
 
     fn woff2_font_path() -> std::path::PathBuf {
-        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("fonts")
-            .join("notosanswoff2.woff2")
+        test_fonts_dir().join("notosanswoff2.woff2")
     }
 
     fn woff_font_path() -> std::path::PathBuf {
-        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("fonts")
-            .join("MS-Gothic.ttf.woff")
+        test_fonts_dir().join("MS-Gothic.ttf.woff")
     }
 
     fn fira_sans_black_path() -> std::path::PathBuf {
@@ -955,37 +951,36 @@ mod tests {
     }
 
     fn svg_font_path() -> std::path::PathBuf {
-        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("fonts")
-            .join("EmojiOneColor.otf")
+        test_fonts_dir().join("EmojiOneColor.otf")
     }
 
     fn fira_sans_black_path() -> std::path::PathBuf {
-        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("fonts")
+        test_fonts_dir()
             .join("Fira_Sans")
             .join("FiraSans-Black.ttf")
     }
 
+    fn fira_sans_regular_path() -> std::path::PathBuf {
+        test_fonts_dir()
+            .join("Fira_Sans")
+            .join("FiraSans-Regular.ttf")
+    }
+
     fn segoe_emoji_font_path() -> std::path::PathBuf {
-        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("fonts")
-            .join("windows")
-            .join("seguiemj.ttf")
+        test_fonts_dir().join("windows").join("seguiemj.ttf")
+    }
+
+    fn collection_font_path() -> std::path::PathBuf {
+        test_fonts_dir().join("windows").join("msgothic.ttc")
     }
 
     #[cfg(feature = "cff")]
     fn cff_font_path() -> std::path::PathBuf {
-        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("fonts")
-            .join("NotoSansJP-Black.otf")
+        test_fonts_dir().join("NotoSansJP-Black.otf")
     }
 
-    #[cfg(feature = "layout")]
     fn japanese_font_path() -> std::path::PathBuf {
-        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("fonts")
-            .join("NotoSansJP-Regular.otf")
+        test_fonts_dir().join("NotoSansJP-Regular.otf")
     }
 
     #[test]
@@ -1010,6 +1005,28 @@ mod tests {
         let bytes = std::fs::read(&path).expect("read font bytes");
         let font = crate::load_font_from_buffer(&bytes).expect("load from buffer alias");
         assert!(font.font().get_font_count() >= 1);
+    }
+
+    #[test]
+    fn load_font_from_source_buffer_works() {
+        let path = sample_font_path();
+        let bytes = std::fs::read(&path).expect("read font bytes");
+        let font =
+            crate::load_font(crate::FontSource::Buffer(&bytes)).expect("load source buffer");
+        assert!(font.font().get_font_count() >= 1);
+    }
+
+    #[test]
+    fn fontload_from_collection_file_works() {
+        let font = crate::fontload_file(collection_font_path()).expect("load font collection");
+        assert!(font.font().get_font_count() > 1);
+    }
+
+    #[test]
+    fn fontload_from_collection_buffer_works() {
+        let bytes = std::fs::read(collection_font_path()).expect("read collection bytes");
+        let font = crate::fontload_buffer(&bytes).expect("load font collection from buffer");
+        assert!(font.font().get_font_count() > 1);
     }
 
     #[test]
@@ -1040,10 +1057,7 @@ mod tests {
     #[test]
     #[cfg(feature = "cff")]
     fn cff_cid_font_renders_svg() {
-        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("fonts")
-            .join("NotoSansJP-Black.otf");
-        let font = crate::fontload_file(&path).expect("load cff font");
+        let font = crate::fontload_file(cff_font_path()).expect("load cff font");
         let svg = font
             .font()
             .get_svg('漢', 24.0, "px")
@@ -1263,10 +1277,7 @@ mod tests {
 
     #[test]
     fn variation_selector_real_font_uses_format14() {
-        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("fonts")
-            .join("NotoSansJP-Regular.otf");
-        let font = crate::fontload_file(&path).expect("load uvs font");
+        let font = crate::fontload_file(japanese_font_path()).expect("load uvs font");
         let cmap = font.font().cmap.as_ref().expect("cmap");
         let format14 = cmap
             .cmap_encodings
@@ -1292,6 +1303,44 @@ mod tests {
         let uvs = cmap.get_glyph_position_from_uvs(unicode_value, var_selector);
         assert_eq!(uvs, glyph_id);
         assert!(base > 0);
+    }
+
+    #[test]
+    #[cfg(feature = "cff")]
+    fn glyph_run_uses_real_variation_selector_as_single_cluster() {
+        let font = crate::load_font_from_file(japanese_font_path()).expect("load uvs font");
+        let cmap = font.font().cmap.as_ref().expect("cmap");
+        let format14 = cmap
+            .cmap_encodings
+            .iter()
+            .find_map(|encoding| match encoding.cmap_subtable.as_ref() {
+                CmapSubtable::Format14(format14) => Some(format14),
+                _ => None,
+            })
+            .expect("expected format 14 cmap");
+        let var_selector_record = format14
+            .var_selector_records
+            .first()
+            .expect("expected at least one var selector record");
+        let mapping = var_selector_record
+            .non_default_uvs
+            .unicode_value_ranges
+            .first()
+            .expect("expected at least one UVS mapping");
+        let text = format!(
+            "{}{}",
+            char::from_u32(mapping.unicode_value).expect("unicode scalar"),
+            char::from_u32(var_selector_record.var_selector).expect("variation selector")
+        );
+
+        let run = crate::text2commands(&text, crate::FontOptions::new(&font).with_font_size(32.0))
+            .expect("glyph run");
+
+        assert_eq!(run.glyphs.len(), 1);
+        assert!(matches!(
+            run.glyphs[0].glyph.layers.first(),
+            Some(crate::GlyphLayer::Path(_))
+        ));
     }
 
     #[test]
@@ -1346,6 +1395,43 @@ mod tests {
         }
 
         panic!("expected at least one ligature sequence in real font data");
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn text2command_uses_real_ligature_glyph_when_layout_enabled() {
+        let font = crate::load_font_from_file(fira_sans_regular_path()).expect("load fira sans");
+        let cmap = font.font().cmap.as_ref().expect("cmap");
+        let gsub = font.font().gsub.as_ref().expect("gsub");
+        let glyph_ids = [
+            cmap.get_glyph_position('f' as u32) as usize,
+            cmap.get_glyph_position('i' as u32) as usize,
+        ];
+        let ligature_glyph = gsub
+            .lookup_liga_sequence(&glyph_ids)
+            .expect("expected fi ligature in Fira Sans");
+
+        let commands = font.text2command("fi").expect("text2command");
+
+        assert_eq!(commands.len(), 1);
+        assert_eq!(commands[0].glyph_id, ligature_glyph);
+        assert!(!commands[0].commands.is_empty());
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn glyph_run_uses_real_ligature_glyph_when_layout_enabled() {
+        let font = crate::load_font_from_file(fira_sans_regular_path()).expect("load fira sans");
+        let run = crate::text2commands("fi", crate::FontOptions::new(&font).with_font_size(32.0))
+            .expect("glyph run");
+
+        assert_eq!(run.glyphs.len(), 1);
+        assert!(run.glyphs[0].glyph.metrics.advance_x > 0.0);
+        match run.glyphs[0].glyph.layers.first() {
+            Some(crate::GlyphLayer::Path(path)) => assert!(!path.commands.is_empty()),
+            Some(crate::GlyphLayer::Raster(_)) => panic!("expected outline ligature glyph"),
+            None => panic!("expected ligature layer"),
+        }
     }
 
     #[test]
