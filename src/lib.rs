@@ -40,6 +40,9 @@ impl LoadedFont {
         self.font.text2svg(text, fontsize, fontunit)
     }
 
+    /// Builds a color-aware `GlyphRun`.
+    ///
+    /// Use this when the caller needs per-layer paint, COLR/CPAL colors, or raster glyph layers.
     pub fn text2glyph_run<'a>(
         &'a self,
         text: &str,
@@ -49,10 +52,16 @@ impl LoadedFont {
         crate::commands::text2commands(text, options)
     }
 
+    /// Legacy outline-only API.
+    ///
+    /// This returns `Vec<GlyphCommands>` and does not preserve per-layer paint or raster glyphs.
     pub fn text2commands(&self, text: &str) -> Result<Vec<GlyphCommands>, Error> {
         self.font.text2commands(text)
     }
 
+    /// Legacy outline-only API.
+    ///
+    /// This is an alias of `LoadedFont::text2commands()` and does not preserve color glyph data.
     pub fn text2command(&self, text: &str) -> Result<Vec<GlyphCommands>, Error> {
         self.font.text2command(text)
     }

@@ -55,7 +55,10 @@ impl Default for GlyphMetrics {
     }
 }
 
-/// Paint for vector glyph layers. `CurrentColor` maps to the color passed into `draw_glyphs`.
+/// Paint for vector glyph layers.
+///
+/// `Solid(u32)` uses packed `0xAARRGGBB`, which matches `paintcore::path::draw_glyphs`.
+/// `CurrentColor` maps to the default color passed into the renderer.
 #[derive(Debug, Clone, Copy)]
 pub enum GlyphPaint {
     Solid(u32),

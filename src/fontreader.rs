@@ -874,9 +874,9 @@ impl Font {
 
         match &open_type_glyph.glyph {
             FontData::Glyph(_) => {
-                let glyf = self.current_glyf().ok_or_else(|| {
-                    Error::new(std::io::ErrorKind::Other, "glyf is none")
-                })?;
+                let glyf = self
+                    .current_glyf()
+                    .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "glyf is none"))?;
                 let commands = glyf.to_path_commands(glyph_id, &open_type_glyph.layout, 0.0, 0.0);
                 let commands = transform_glyf_commands(&commands, &open_type_glyph.layout, scale_x, scale_y);
                 Ok(vec![GlyphLayer::Path(PathGlyphLayer::new(
@@ -920,13 +920,13 @@ impl Font {
             let commands = glyf.to_path_commands(layer.glyph_id as usize, layout, 0.0, 0.0);
             let commands = transform_glyf_commands(&commands, layout, scale_x, scale_y);
             let color = cpal.get_pallet(layer.palette_index as usize);
-            let rgba = ((color.red as u32) << 24)
-                | ((color.green as u32) << 16)
-                | ((color.blue as u32) << 8)
-                | color.alpha as u32;
+            let argb = ((color.alpha as u32) << 24)
+                | ((color.red as u32) << 16)
+                | ((color.green as u32) << 8)
+                | color.blue as u32;
             layers.push(GlyphLayer::Path(PathGlyphLayer::new(
                 commands,
-                GlyphPaint::Solid(rgba),
+                GlyphPaint::Solid(argb),
             )));
         }
 
@@ -969,9 +969,9 @@ impl Font {
                         FontLayout::Vertical(layout) => layout.advance_height as f64,
                         FontLayout::Unknown => 0.0,
                     };
-                    let glyf = self.current_glyf().ok_or_else(|| {
-                        Error::new(std::io::ErrorKind::Other, "glyf is none")
-                    })?;
+                    let glyf = self
+                        .current_glyf()
+                        .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "glyf is none"))?;
                     let commands = glyf.to_path_commands(
                         glyph_data.glyph_id,
                         &open_type_glyph.layout,

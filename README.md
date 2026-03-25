@@ -15,7 +15,28 @@ Japanese: [README.ja.md](README.ja.md)
 - Font lookup by family or name is not implemented yet, so pass a loaded font for now.
 - TrueType and CFF glyphs are returned as `GlyphLayer::Path`.
 - `sbix` glyphs are returned as `GlyphLayer::Raster`.
+- COLR/CPAL colors are carried in `GlyphPaint::Solid(0xAARRGGBB)` so they can be passed directly to `paintcore::path::draw_glyphs`.
 - SVG glyph layers currently return `ErrorKind::Unsupported`.
+- The legacy `font.text2command()` API only returns outline commands and does not carry per-layer paint. Use `fontloader::text2commands(..., FontOptions)` when you need color glyph data.
+
+## Renderer Integration
+
+When connecting `fontloader` to a renderer such as `paintcore::path::draw_glyphs`, use the
+`GlyphRun` API rather than the legacy outline-only API.
+
+- Use `fontloader::text2commands(text, FontOptions)` or `LoadedFont::text2glyph_run()`.
+- `GlyphPaint::Solid(u32)` uses packed `0xAARRGGBB`.
+- `GlyphPaint::CurrentColor` means "use the default color passed into the renderer".
+- COLR/CPAL glyphs keep their per-layer colors in `GlyphPaint::Solid(...)`.
+- `sbix` glyphs are emitted as `GlyphLayer::Raster`.
+- `font.text2command()` and `font.text2commands()` return `Vec<GlyphCommands>` for legacy
+  outline workflows only. They do not preserve layer paint, raster glyph payloads, or color font
+  information.
+
+In short:
+
+- Color-aware rendering: `GlyphRun`
+- Outline-only compatibility: `GlyphCommands`
 
 ```rust
 use fontloader::{load_font_from_buffer, text2commands, FontOptions, GlyphLayer};
