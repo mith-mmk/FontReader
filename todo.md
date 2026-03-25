@@ -6,12 +6,8 @@ fonts/* がフォント
 - [-] 実装遅延
 - [ ] 未処理、未確認タスク
 
-# 今からやるタスク一覧
-- [x] Fira_Sans/FiraSans-Blackで 小文字 [i] [j] が表示されない(複合グリフ展開対応とテスト追加で解消)
-- [x] カラーemojiの一部が欠落している レイヤーが1つ足りていない(複合グリフ展開対応とCOLR回帰テストで解消)
-- [+] issue: OS2 Headerのoutbound
-
 # TESTの実装(最優先)
+- [ ] FontFamiy Class
 - [+] font load from file
 - [+] font load from net
 - [+] font load form buffer
@@ -44,8 +40,8 @@ fonts/* がフォント
 # API
 - [ ] FontFamiry Class
   - [ ] FontFamiryにフォールバックして探すシステム
-    - [ ] 最下位にLast Resortが来る
-    - [ ] FontFamiryでfont weight, font style itaric, bold, normalを切り替えられる様にする
+    - [ ] デフォルトフォント -> CJKフォント -> ローカルフォント -> emoji 最後にLast Resortが来る
+    - [ ] FontFamiryでfont weight, font style itaric, bold, normalを切り替えられる様にする(入れ子になる?)
       - [ ] font-size
       - [ ] font-stretch
       - [ ] font-style
@@ -148,3 +144,9 @@ fonts/* がフォント
 - [] shaping 処理に統合
   
 # todo.mdの更新
+
+
+# 終了したIssues一覧
+- [x] Fira_Sans/FiraSans-Blackで 小文字 [i] [j] が表示されない(複合グリフ展開対応とテスト追加で解消)
+- [x] カラーemojiの一部が欠落している レイヤーが1つ足りていない(複合グリフ展開対応とCOLR回帰テストで解消)
+- [+] issue: OS2 Headerのoutbound

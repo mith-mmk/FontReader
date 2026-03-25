@@ -1,6 +1,6 @@
 /target
 .vscode
 /fonts
-/test
+/_test*
 .DS_Store
 /binary
