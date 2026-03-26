@@ -12,6 +12,7 @@ Japanese: [README.ja.md](README.ja.md)
 - Pass a loaded font directly with `FontOptions::new(&font)`.
 - `font_size` and `line_height` are resolved in pixels.
 - `font_stretch`, `font_style`, `font_variant`, and `font_weight` are part of `FontOptions`.
+- `FontOptions::with_locale("ja-JP")` can request GSUB `locl` substitutions when the `layout` feature is enabled.
 - Font lookup by family or name is not implemented yet, so pass a loaded font for now.
 - TrueType and CFF glyphs are returned as `GlyphLayer::Path`.
 - `sbix` glyphs are returned as `GlyphLayer::Raster`.
@@ -85,7 +86,9 @@ The library now compiles for `wasm32-unknown-unknown`.
 - Parsed: ScriptList, FeatureList, LookupList
 - Implemented: `lookup_vertical()` for single substitution based vertical forms
 - Partial: `lookup_ccmp()` exists but does not expand results yet
-- Not implemented: `lookup_locale()`, `lookup_liga()`, `lookup_width()`, `lookup_number()`
+- Implemented: `lookup_locale()` and `lookup_liga()`
+- Text APIs: `text2command()`, `text2commands()`, and `measure()` apply variation selectors and basic `locl` / `liga` / `dlig` shaping
+- Not implemented: `lookup_width()`, `lookup_number()`
 
 ### Lookup parsing
 

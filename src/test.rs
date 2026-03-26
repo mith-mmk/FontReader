@@ -1343,11 +1343,11 @@ mod tests {
         let font = crate::fontload_file(&path).expect("load japanese font");
         let gsub = font.font().gsub.as_ref().expect("gsub");
         let max_glyphs = font.font().maxp.as_ref().expect("maxp").num_glyphs as usize;
-        let locale = "ja-JP".to_string();
+        let locale = "ja-JP";
 
         let mut found = None;
         for glyph_id in 1..=max_glyphs {
-            let localized = gsub.lookup_locale(glyph_id, &locale);
+            let localized = gsub.lookup_locale(glyph_id, locale);
             if localized != glyph_id {
                 found = Some((glyph_id, localized));
                 break;
@@ -1356,6 +1356,53 @@ mod tests {
 
         let (glyph_id, localized) = found.expect("expected at least one locl substitution");
         assert_ne!(glyph_id, localized);
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn text_api_uses_real_japanese_locl_substitution_when_requested() {
+        let font = crate::load_font_from_file(japanese_font_path()).expect("load japanese font");
+        let cmap = font.font().cmap.as_ref().expect("cmap");
+        let gsub = font.font().gsub.as_ref().expect("gsub");
+        let locale = "ja-JP";
+
+        let mut found = None;
+        for codepoint in 0x20u32..=0xFFFF {
+            let Some(ch) = char::from_u32(codepoint) else {
+                continue;
+            };
+            if ch.is_control() {
+                continue;
+            }
+            let glyph_id = cmap.get_glyph_position(codepoint) as usize;
+            if glyph_id == 0 {
+                continue;
+            }
+
+            let localized = gsub.lookup_locale(glyph_id, locale);
+            if localized != glyph_id {
+                found = Some((ch, glyph_id, localized));
+                break;
+            }
+        }
+
+        let (ch, glyph_id, localized) = found.expect("expected locl-mapped character");
+        let glyph_ids = font
+            .font()
+            .debug_shape_glyph_ids(&ch.to_string(), Some(locale))
+            .expect("shape glyph ids");
+
+        assert_eq!(glyph_ids, vec![localized]);
+        assert_ne!(glyph_id, localized);
+
+        let run = crate::text2commands(
+            &ch.to_string(),
+            crate::FontOptions::new(&font)
+                .with_font_size(32.0)
+                .with_locale(locale),
+        )
+        .expect("glyph run");
+        assert_eq!(run.glyphs.len(), 1);
     }
 
     #[test]

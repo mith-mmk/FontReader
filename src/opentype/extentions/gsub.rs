@@ -314,8 +314,8 @@ impl GSUB {
     }
 
     // locl
-    pub fn lookup_locale(&self, griph_ids: usize, locale: &String) -> usize {
-        self.lookup_single_feature(griph_ids, Some(locale.as_str()), &[*b"locl"])
+    pub fn lookup_locale(&self, griph_ids: usize, locale: &str) -> usize {
+        self.lookup_single_feature(griph_ids, Some(locale), &[*b"locl"])
             .unwrap_or(griph_ids)
     }
 

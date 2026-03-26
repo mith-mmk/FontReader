@@ -267,6 +267,7 @@ pub struct FontOptions<'a> {
     pub font: Option<FontRef<'a>>,
     pub font_family: Option<&'a str>,
     pub font_name: Option<&'a str>,
+    pub locale: Option<&'a str>,
     pub font_size: f32,
     pub font_stretch: FontStretch,
     pub font_style: FontStyle,
@@ -289,6 +290,7 @@ impl<'a> FontOptions<'a> {
             font: Some(font),
             font_family: None,
             font_name: None,
+            locale: None,
             font_size: 16.0,
             font_stretch: FontStretch::default(),
             font_style: FontStyle::default(),
@@ -325,6 +327,11 @@ impl<'a> FontOptions<'a> {
 
     pub fn with_font_family(mut self, font_family: &'a str) -> Self {
         self.font_family = Some(font_family);
+        self
+    }
+
+    pub fn with_locale(mut self, locale: &'a str) -> Self {
+        self.locale = Some(locale);
         self
     }
 

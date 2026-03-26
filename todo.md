@@ -34,6 +34,8 @@ _test_fonts/* がテスト用フォント
 - [+] text to command
 - [+] text measure
 - [+] lookup (すべてのパターン)
+- [+] locale
+    - [x] text2commands で実フォントの `locl` を確認
 - [+] cmap (すべてのパターン)
 - [+] 異字体セレクタ
     - [x] text2commands で format 14 の実データを 1 glyph cluster として扱う
@@ -41,7 +43,7 @@ _test_fonts/* がテスト用フォント
 - [+] 合字
     - [x] text2command / text2commands で基本合字(liga / dlig) を実データで確認
     - [ ] llga
-    - [ ] 日本語 か+" など
+    - [ ] 日本語  U+30D2（ヒ） + U+309A → ピ など
     - [ ] チベット語
     - [ ] 古ハングル
     - [ ] その他
@@ -84,66 +86,6 @@ _test_fonts/* がテスト用フォント
   - font.set_line_spacing(f32)
   - font.get_line_spacing() -> 32
 
-- FontCommand
-```
-pub struct FontText {
-  // todo!
-
-}
-
-
-pub struct FontCommand {
-    pub glyph_count: usize,
-    pub vertical: bool,
-    pub line_spacing: f32,
-    pub runs: Vec<FontRun>,
-}
-
-FontRun {
-  font_id: usize,
-  glyphs: Vec<GlyphInfo>
-}
-
-pub struct GlpyhInfo {
-  glyph_id: u32,
-  x: f32,
-  y: f32,
-  advance_width: f32,
-  x_offset: f32,
-  y_offset: f32,
-  bbox: (f32,f32,f32,f32),
-  width: f32,がでて動かなくなっています
-  ascent: f32,
-  descent: f32,
-  // baseline_y 0.0
-  color: u32,   // RGBA32 color for color font
-  pub mod data: Vec<GlyphData>
-}
-
-pub enum GlyphType {
-  PATH(Vec<GlyphData>), // open type, 
-  IMAGE(Vec<u8>), //Image(apple emoji)
-  SVG(String) , // google emoji
-}
-
-
-struct GlyphData {
-  command : Vec<GlyphCommand>
-
-}
-
-pub enum GlyphCommand {
-    Color(u8,u8,u8,u8),
-    Line(f32, f32),
-    MoveTo(f32, f32),
-    QuadTo((f32, f32), (f32, f32)),
-    CubicTo((f32, f32), (f32, f32), (f32, f32)),
-    Fill,
-    Close,
-}
-
-```
-
 
 ## APIの破壊的変更
 - [+] load_font フォントロード from any
@@ -169,7 +111,8 @@ pub enum GlyphCommand {
 
 - [*] layout featureの拡張
     - [x] text2command / text2commands / measure で variation selector と基本合字(liga / dlig) を利用
-    - [ ] locale / ccmp / context chaining などの shaping 拡張
+    - [x] `FontOptions::with_locale()` から `locl` shaping を利用
+    - [ ] ccmp / context chaining などの shaping 拡張
 
 # opentype
 - [+] True TYpe
@@ -182,7 +125,7 @@ pub enum GlyphCommand {
 - [+] 実装済み: 単一置換ベースの縦書き置換 `lookup_vertical()`
 - [ ] 部分実装: `lookup_ccmp()` は存在するが、結果展開は未実装
 - [+] 実装済み: `lookup_locale()`, `lookup_liga()`
-- [*] text API への反映: `text2command()`, `text2commands()`, `measure()` で variation selector と基本合字 `liga` / `dlig` を利用
+- [*] text API への反映: `text2command()`, `text2commands()`, `measure()` で variation selector と基本的な `locl` / `liga` / `dlig` を利用
 - [ ] 未実装: `lookup_width()`, `lookup_number()`
 - [ ] aalt
 - [ ] dlig

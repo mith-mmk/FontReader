@@ -731,7 +731,12 @@ impl Font {
         }
     }
 
-    fn resolve_glyph_id_with_uvs(&self, ch: char, vs: char, is_vert: bool) -> Result<usize, Error> {
+    fn resolve_glyph_id_with_uvs(
+        &self,
+        ch: char,
+        vs: char,
+        is_vert: bool,
+    ) -> Result<usize, Error> {
         let glyph_id = self
             .current_cmap()?
             .get_glyph_position_from_uvs(ch as u32, vs as u32) as usize;
@@ -744,6 +749,9 @@ impl Font {
                 }
             }
         }
+
+        #[cfg(not(feature = "layout"))]
+        let _ = is_vert;
 
         Ok(glyph_id)
     }
@@ -797,7 +805,15 @@ impl Font {
         glyphs.clear();
     }
 
-    fn shape_text_units(&self, text: &str, is_vert: bool) -> Result<Vec<ResolvedTextUnit>, Error> {
+    fn shape_text_units(
+        &self,
+        text: &str,
+        is_vert: bool,
+        locale: Option<&str>,
+    ) -> Result<Vec<ResolvedTextUnit>, Error> {
+        #[cfg(not(feature = "layout"))]
+        let _ = locale;
+
         let chars: Vec<char> = text.chars().collect();
         let mut output = Vec::new();
         let mut pending_glyphs = Vec::new();
@@ -838,12 +854,37 @@ impl Font {
             }
 
             let glyph_id = self.resolve_glyph_id_with_uvs(ch, vs, is_vert)?;
+            #[cfg(feature = "layout")]
+            let glyph_id = if let Some(locale) = locale {
+                if let Some(gsub) = self.current_gsub() {
+                    gsub.lookup_locale(glyph_id, locale)
+                } else {
+                    glyph_id
+                }
+            } else {
+                glyph_id
+            };
             pending_glyphs.push(ResolvedGlyph { ch, glyph_id });
             index += consumed;
         }
 
         self.flush_shaped_glyphs(&mut output, &mut pending_glyphs);
         Ok(output)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn debug_shape_glyph_ids(
+        &self,
+        text: &str,
+        locale: Option<&str>,
+    ) -> Result<Vec<usize>, Error> {
+        let mut glyph_ids = Vec::new();
+        for unit in self.shape_text_units(text, false, locale)? {
+            if let ResolvedTextUnit::Glyph(glyph) = unit {
+                glyph_ids.push(glyph.glyph_id);
+            }
+        }
+        Ok(glyph_ids)
     }
 
     fn default_line_height(&self) -> Result<f64, Error> {
@@ -881,7 +922,7 @@ impl Font {
         let mut cursor_y = 0.0f32;
         let tab_advance = line_height;
 
-        for unit in self.shape_text_units(text, false)? {
+        for unit in self.shape_text_units(text, false, options.locale)? {
             match unit {
                 ResolvedTextUnit::Newline => {
                     cursor_x = 0.0;
@@ -1045,7 +1086,7 @@ impl Font {
         let line_height = self.default_line_height()?;
         let tab_advance = line_height;
 
-        for unit in self.shape_text_units(text, false)? {
+        for unit in self.shape_text_units(text, false, None)? {
             match unit {
                 ResolvedTextUnit::Newline => {
                     cursor_x = 0.0;
@@ -1112,7 +1153,7 @@ impl Font {
         let line_height = self.default_line_height()?;
         let tab_advance = line_height;
 
-        for unit in self.shape_text_units(text, false)? {
+        for unit in self.shape_text_units(text, false, None)? {
             match unit {
                 ResolvedTextUnit::Newline => {
                     max_line_width = max_line_width.max(cursor_x);

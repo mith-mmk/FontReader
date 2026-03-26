@@ -12,6 +12,7 @@ English: [README.md](README.md)
 - `FontOptions::new(&font)` でロード済みフォントをそのまま渡せます。
 - `font_size` と `line_height` は px として解釈されます。
 - `font_stretch`、`font_style`、`font_variant`、`font_weight` を `FontOptions` に保持できます。
+- `layout` feature 有効時は `FontOptions::with_locale("ja-JP")` で GSUB `locl` を要求できます。
 - `font-family` / `font-name` でのフォント探索は未実装なので、当面はロード済みフォントを渡してください。
 - TrueType / CFF は `GlyphLayer::Path` として返します。
 - `sbix` は `GlyphLayer::Raster` として返します。
@@ -83,7 +84,9 @@ for glyph in &run.glyphs {
 - パース済み: `ScriptList`, `FeatureList`, `LookupList`
 - 実装済み: 単一置換ベースの縦書き置換 `lookup_vertical()`
 - 部分実装: `lookup_ccmp()` は存在するが、結果展開は未実装
-- 未実装: `lookup_locale()`, `lookup_liga()`, `lookup_width()`, `lookup_number()`
+- 実装済み: `lookup_locale()`, `lookup_liga()`
+- text API: `text2command()`, `text2commands()`, `measure()` で variation selector と基本的な `locl` / `liga` / `dlig` shaping を利用
+- 未実装: `lookup_width()`, `lookup_number()`
 
 ### Lookup パース
 
