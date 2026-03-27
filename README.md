@@ -15,18 +15,19 @@ Japanese: [README.ja.md](README.ja.md)
 - `FontOptions::with_locale("ja-JP")` can request GSUB `locl` substitutions when the `layout` feature is enabled.
 - `FontOptions::from_family(&family)` can resolve a cached `FontFamily` entry by family/name/weight/style/stretch.
 - `FontFamily` matching is currently cache-based. Fallback chains and Last Resort selection are not implemented yet.
+- `FontFamily` now exposes `text2svg()`, `text2commands()`, `text2glyph_run()`, `measure()`, and `options()` as the higher-level family entrypoint.
 - TrueType and CFF glyphs are returned as `GlyphLayer::Path`.
 - `sbix` glyphs are returned as `GlyphLayer::Raster`.
 - COLR/CPAL colors are carried in `GlyphPaint::Solid(0xAARRGGBB)` so they can be passed directly to `paintcore::path::draw_glyphs`.
 - SVG glyph layers currently return `ErrorKind::Unsupported`.
-- The legacy `font.text2command()` API only returns outline commands and does not carry per-layer paint. Use `fontloader::text2commands(..., FontOptions)` when you need color glyph data.
+- The legacy `font.text2command()` API only returns outline commands and does not carry per-layer paint. It is now deprecated. Use `fontloader::text2commands(..., FontOptions)`, `LoadedFont::text2glyph_run()`, or `FontFamily::text2glyph_run()` when you need color glyph data.
 
 ## Renderer Integration
 
 When connecting `fontloader` to a renderer such as `paintcore::path::draw_glyphs`, use the
 `GlyphRun` API rather than the legacy outline-only API.
 
-- Use `fontloader::text2commands(text, FontOptions)` or `LoadedFont::text2glyph_run()`.
+- Use `fontloader::text2commands(text, FontOptions)`, `LoadedFont::text2glyph_run()`, or `FontFamily::text2glyph_run()`.
 - `GlyphPaint::Solid(u32)` uses packed `0xAARRGGBB`.
 - `GlyphPaint::CurrentColor` means "use the default color passed into the renderer".
 - COLR/CPAL glyphs keep their per-layer colors in `GlyphPaint::Solid(...)`.
@@ -67,8 +68,8 @@ for glyph in &run.glyphs {
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-`load_font`, `load_font_from_file`, and `load_font_from_buffer` are available as new aliases for
-the existing `fontload*` APIs.
+`load_font`, `load_font_from_file`, and `load_font_from_buffer` are the preferred loader APIs.
+The old `fontload*` aliases remain for compatibility but are deprecated.
 
 ## Chunked font loading
 
@@ -108,6 +109,8 @@ if buffer.is_complete() {
 - Resolve a face during shaping with `FontOptions::from_family(&family)` plus
   `with_font_family(...)`, `with_font_name(...)`, `with_font_weight(...)`,
   `with_font_style(...)`, and `with_font_stretch(...)`.
+- For direct use, `family.options()` returns `FontOptions` already anchored to the family.
+- `family.text2svg(...)` and `family.measure(...)` use the best cached face for the family with default matching.
 
 This is meant for parallel fetch / reassembly first. It is not a true lazy WOFF2 decoder.
 
@@ -138,6 +141,12 @@ let run = text2commands(
     FontOptions::from_family(&family)
         .with_font_family("Fira Sans")
         .with_font_weight(FontWeight::BLACK),
+)?;
+assert!(!run.glyphs.is_empty());
+
+let run = family.text2commands(
+    "Hello",
+    family.options().with_font_weight(FontWeight::BLACK),
 )?;
 assert!(!run.glyphs.is_empty());
 # Ok::<(), Box<dyn std::error::Error>>(())

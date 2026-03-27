@@ -1,3 +1,4 @@
+#[allow(deprecated)]
 mod tests {
     #[cfg(feature = "layout")]
     use crate::opentype::layouts::{
@@ -1172,6 +1173,23 @@ mod tests {
         )
         .expect("render from family");
         assert_eq!(run.glyphs.len(), 1);
+
+        let run = family
+            .text2commands(
+                "A",
+                family
+                    .options()
+                    .with_font_weight(crate::FontWeight::BLACK)
+                    .with_font_size(24.0),
+            )
+            .expect("render from family method");
+        assert_eq!(run.glyphs.len(), 1);
+
+        let svg = family.text2svg("A", 24.0, "px").expect("svg from family");
+        assert!(svg.starts_with("<svg"));
+
+        let width = family.measure("A").expect("measure from family");
+        assert!(width > 0.0);
     }
 
     #[test]

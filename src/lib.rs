@@ -5,6 +5,7 @@ pub(crate) mod util;
 pub type Font = fontreader::Font;
 pub use fontreader::{GlyphCommands, PathCommand};
 pub mod commands;
+#[deprecated(note = "use `fontloader::commands` instead")]
 pub use commands as commads;
 pub use commands::{
     text2commands, Command, FillRule, FontMetrics, FontOptions, FontRef, FontStretch, FontStyle,
@@ -149,6 +150,14 @@ impl FontFamily {
         self.faces.iter().map(|face| &face.descriptor).collect()
     }
 
+    /// Returns default `FontOptions` anchored to this family.
+    ///
+    /// The returned options resolve against this family's cache and default the requested
+    /// family name to `self.name()`.
+    pub fn options(&self) -> FontOptions<'_> {
+        FontOptions::from_family(self).with_font_family(self.name())
+    }
+
     pub fn begin_chunked_face(
         &mut self,
         face_id: impl Into<String>,
@@ -243,6 +252,56 @@ impl FontFamily {
                 ),
             )
         })
+    }
+
+    fn resolve_default_loaded_font(&self) -> Result<&LoadedFont, Error> {
+        self.resolve_loaded_font(
+            Some(self.name()),
+            None,
+            FontWeight::default(),
+            FontStyle::default(),
+            FontStretch::default(),
+        )
+        .ok_or_else(|| {
+            Error::new(
+                ErrorKind::NotFound,
+                format!("no cached font face matched family={:?}", self.name()),
+            )
+        })
+    }
+
+    pub fn text2svg(&self, text: &str, fontsize: f64, fontunit: &str) -> Result<String, Error> {
+        self.resolve_default_loaded_font()?
+            .text2svg(text, fontsize, fontunit)
+    }
+
+    /// Builds a color-aware `GlyphRun` using this family's cache.
+    ///
+    /// The passed options are resolved against this family, and `font_family` defaults to the
+    /// family name when omitted.
+    pub fn text2glyph_run<'a>(
+        &'a self,
+        text: &str,
+        mut options: FontOptions<'a>,
+    ) -> Result<GlyphRun, Error> {
+        options.font = Some(FontRef::Family(self));
+        if options.font_family.is_none() {
+            options.font_family = Some(self.name());
+        }
+        crate::commands::text2commands(text, options)
+    }
+
+    /// Convenience alias of `FontFamily::text2glyph_run()`.
+    pub fn text2commands<'a>(
+        &'a self,
+        text: &str,
+        options: FontOptions<'a>,
+    ) -> Result<GlyphRun, Error> {
+        self.text2glyph_run(text, options)
+    }
+
+    pub fn measure(&self, text: &str) -> Result<f64, Error> {
+        self.resolve_default_loaded_font()?.measure(text)
     }
 
     fn find_best_face(
@@ -477,6 +536,9 @@ impl LoadedFont {
     /// Legacy outline-only API.
     ///
     /// This returns `Vec<GlyphCommands>` and does not preserve per-layer paint or raster glyphs.
+    #[deprecated(
+        note = "use `LoadedFont::text2glyph_run()` or `fontloader::text2commands(text, FontOptions)` instead"
+    )]
     pub fn text2commands(&self, text: &str) -> Result<Vec<GlyphCommands>, Error> {
         self.font.text2commands(text)
     }
@@ -484,6 +546,9 @@ impl LoadedFont {
     /// Legacy outline-only API.
     ///
     /// This is an alias of `LoadedFont::text2commands()` and does not preserve color glyph data.
+    #[deprecated(
+        note = "use `LoadedFont::text2glyph_run()` or `fontloader::text2commands(text, FontOptions)` instead"
+    )]
     pub fn text2command(&self, text: &str) -> Result<Vec<GlyphCommands>, Error> {
         self.font.text2command(text)
     }
@@ -497,22 +562,24 @@ impl LoadedFont {
     }
 }
 
+#[deprecated(note = "use `load_font_from_file()` instead")]
 pub fn fontload_file(path: impl AsRef<Path>) -> Result<LoadedFont, Error> {
+    load_font_from_file(path)
+}
+
+pub fn load_font_from_file(path: impl AsRef<Path>) -> Result<LoadedFont, Error> {
     let font = fontreader::Font::get_font_from_file(&path.as_ref().to_path_buf())?;
     Ok(LoadedFont { font })
 }
 
-pub fn load_font_from_file(path: impl AsRef<Path>) -> Result<LoadedFont, Error> {
-    fontload_file(path)
-}
-
+#[deprecated(note = "use `load_font_from_buffer()` instead")]
 pub fn fontload_buffer(buffer: &[u8]) -> Result<LoadedFont, Error> {
-    let font = fontreader::Font::get_font_from_buffer(buffer)?;
-    Ok(LoadedFont { font })
+    load_font_from_buffer(buffer)
 }
 
 pub fn load_font_from_buffer(buffer: &[u8]) -> Result<LoadedFont, Error> {
-    fontload_buffer(buffer)
+    let font = fontreader::Font::get_font_from_buffer(buffer)?;
+    Ok(LoadedFont { font })
 }
 
 pub fn load_font_from_net(url: &str) -> Result<LoadedFont, Error> {
@@ -528,23 +595,25 @@ pub fn load_font_from_net(url: &str) -> Result<LoadedFont, Error> {
     #[cfg(not(target_arch = "wasm32"))]
     {
         let bytes = fetch_http_font(url)?;
-        fontload_buffer(&bytes)
+        load_font_from_buffer(&bytes)
     }
 }
 
+#[deprecated(note = "use `load_font_from_net()` instead")]
 pub fn fontload_net(url: &str) -> Result<LoadedFont, Error> {
     load_font_from_net(url)
 }
 
+#[deprecated(note = "use `load_font()` instead")]
 pub fn fontload(source: FontSource<'_>) -> Result<LoadedFont, Error> {
-    match source {
-        FontSource::File(path) => fontload_file(path),
-        FontSource::Buffer(buffer) => fontload_buffer(buffer),
-    }
+    load_font(source)
 }
 
 pub fn load_font(source: FontSource<'_>) -> Result<LoadedFont, Error> {
-    fontload(source)
+    match source {
+        FontSource::File(path) => load_font_from_file(path),
+        FontSource::Buffer(buffer) => load_font_from_buffer(buffer),
+    }
 }
 
 #[cfg(not(target_arch = "wasm32"))]

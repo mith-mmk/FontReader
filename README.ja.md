@@ -15,18 +15,19 @@ English: [README.md](README.md)
 - `layout` feature 有効時は `FontOptions::with_locale("ja-JP")` で GSUB `locl` を要求できます。
 - `FontOptions::from_family(&family)` を使うと、キャッシュ済みの `FontFamily` から family/name/weight/style/stretch 条件で face を選べます。
 - ただし現状の `FontFamily` は cache ベースの選択のみで、fallback chain や Last Resort 自動選択は未実装です。
+- `FontFamily` は高レベル API として `text2svg()`, `text2commands()`, `text2glyph_run()`, `measure()`, `options()` を持つようになりました。
 - TrueType / CFF は `GlyphLayer::Path` として返します。
 - `sbix` は `GlyphLayer::Raster` として返します。
 - COLR/CPAL の色は `GlyphPaint::Solid(0xAARRGGBB)` に詰めて返すので、そのまま `paintcore::path::draw_glyphs` に渡せます。
 - SVG glyph は現状 `ErrorKind::Unsupported` を返します。
-- 既存の `font.text2command()` は輪郭コマンドだけを返す旧 API で、レイヤーごとの色は保持しません。カラーグリフを扱う場合は `fontloader::text2commands(..., FontOptions)` を使ってください。
+- 既存の `font.text2command()` は輪郭コマンドだけを返す旧 API で、レイヤーごとの色は保持しません。いまは deprecated です。カラーグリフを扱う場合は `fontloader::text2commands(..., FontOptions)`、`LoadedFont::text2glyph_run()`、または `FontFamily::text2glyph_run()` を使ってください。
 
 ## Renderer 連携仕様
 
 `paintcore::path::draw_glyphs` のような描画系に渡す場合は、旧来の outline-only API ではなく
 `GlyphRun` API を使ってください。
 
-- `fontloader::text2commands(text, FontOptions)` または `LoadedFont::text2glyph_run()` を使います。
+- `fontloader::text2commands(text, FontOptions)`、`LoadedFont::text2glyph_run()`、または `FontFamily::text2glyph_run()` を使います。
 - `GlyphPaint::Solid(u32)` の色形式は `0xAARRGGBB` です。
 - `GlyphPaint::CurrentColor` は「レンダラに渡した既定色を使う」という意味です。
 - COLR/CPAL glyph はレイヤーごとの色を `GlyphPaint::Solid(...)` に保持します。
@@ -78,6 +79,8 @@ for glyph in &run.glyphs {
 - shaping 時は `FontOptions::from_family(&family)` に
   `with_font_family(...)`, `with_font_name(...)`, `with_font_weight(...)`,
   `with_font_style(...)`, `with_font_stretch(...)` を組み合わせて face を解決します。
+- `family.options()` を使うと、その `FontFamily` にひも付いた `FontOptions` をそのまま作れます。
+- `family.text2svg(...)` と `family.measure(...)` は、default の face 解決で直接使えます。
 
 これは「並列取得して再構成する」ための層で、WOFF2 を真の lazy decode するものではありません。
 
@@ -110,11 +113,17 @@ let run = text2commands(
         .with_font_weight(FontWeight::BLACK),
 )?;
 assert!(!run.glyphs.is_empty());
+
+let run = family.text2commands(
+    "Hello",
+    family.options().with_font_weight(FontWeight::BLACK),
+)?;
+assert!(!run.glyphs.is_empty());
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-既存の `fontload*` API に加えて、`load_font`、`load_font_from_file`、
-`load_font_from_buffer` エイリアスも使えます。
+`load_font`、`load_font_from_file`、`load_font_from_buffer` が推奨 loader API です。
+既存の `fontload*` エイリアスは互換のため残っていますが deprecated です。
 
 ## 分割フォント読み込み
 

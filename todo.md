@@ -88,6 +88,7 @@ _test_fonts/* がテスト用フォント
       - [ ] line-height を family default として保持
   - [x] `ChunkedFontBuffer` を使った face の取得途中状態を保持
   - [x] chunk 完了後に face を cache へ昇格
+  - [x] `text2svg()` / `text2commands()` / `text2glyph_run()` / `measure()` / `options()` を `FontFamily` に追加
 - [ ] Font Class
   - LoadedFontのラッパー
     - defalut font size, fontのフォールバック情報などのデフォルト情報を持つ
@@ -110,6 +111,10 @@ _test_fonts/* がテスト用フォント
 - [+] load_font_from_net フォントロード from NET(exclude WASM)
 - [+] ChunkedFontBuffer による分割 buffer の再構成
 - [+] `FontOptions::from_family()` / `with_family()` から `FontFamily` cache を利用
+- [+] 重複していた旧 API に `#[deprecated]` を付与
+    - [x] `fontload*` 系 alias
+    - [x] `LoadedFont::text2command()` / `LoadedFont::text2commands()`
+    - [x] `fontloader::commads`
 
 # 合字対応
 - [ ] llaga
