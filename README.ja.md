@@ -13,7 +13,8 @@ English: [README.md](README.md)
 - `font_size` と `line_height` は px として解釈されます。
 - `font_stretch`、`font_style`、`font_variant`、`font_weight` を `FontOptions` に保持できます。
 - `layout` feature 有効時は `FontOptions::with_locale("ja-JP")` で GSUB `locl` を要求できます。
-- `font-family` / `font-name` でのフォント探索は未実装なので、当面はロード済みフォントを渡してください。
+- `FontOptions::from_family(&family)` を使うと、キャッシュ済みの `FontFamily` から family/name/weight/style/stretch 条件で face を選べます。
+- ただし現状の `FontFamily` は cache ベースの選択のみで、fallback chain や Last Resort 自動選択は未実装です。
 - TrueType / CFF は `GlyphLayer::Path` として返します。
 - `sbix` は `GlyphLayer::Raster` として返します。
 - COLR/CPAL の色は `GlyphPaint::Solid(0xAARRGGBB)` に詰めて返すので、そのまま `paintcore::path::draw_glyphs` に渡せます。
@@ -65,8 +66,81 @@ for glyph in &run.glyphs {
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
+## FontFamily キャッシュ
+
+`FontFamily` は、ロード済みフォントと `ChunkedFontBuffer` の上に置く取得・キャッシュ層です。
+
+- 完全にロード済みの face は `add_loaded_font()` または `add_face(...)` で登録します。
+- 分割取得中の face は `begin_chunked_face(face_id, descriptor, total_size)` で登録します。
+- chunk は `append_chunk(face_id, offset, bytes)` で順不同に投入できます。
+- 追加取得が必要な範囲は `missing_ranges(face_id)` で確認できます。
+- すべてそろったら `finalize_chunked_face(face_id)` で cache に昇格します。
+- shaping 時は `FontOptions::from_family(&family)` に
+  `with_font_family(...)`, `with_font_name(...)`, `with_font_weight(...)`,
+  `with_font_style(...)`, `with_font_stretch(...)` を組み合わせて face を解決します。
+
+これは「並列取得して再構成する」ための層で、WOFF2 を真の lazy decode するものではありません。
+
+```rust
+use fontloader::{
+    text2commands, FontFaceDescriptor, FontFamily, FontOptions, FontStyle, FontWeight,
+};
+
+let mut family = FontFamily::new("Fira Sans");
+family.begin_chunked_face(
+    "fira-black",
+    FontFaceDescriptor::new("Fira Sans")
+        .with_font_name("Fira Sans Black")
+        .with_font_weight(FontWeight::BLACK)
+        .with_font_style(FontStyle::Normal),
+    total_size,
+)?;
+
+family.append_chunk("fira-black", 0, first_chunk)?;
+family.append_chunk("fira-black", next_offset, second_chunk)?;
+
+if family.missing_ranges("fira-black")?.is_empty() {
+    family.finalize_chunked_face("fira-black")?;
+}
+
+let run = text2commands(
+    "Hello",
+    FontOptions::from_family(&family)
+        .with_font_family("Fira Sans")
+        .with_font_weight(FontWeight::BLACK),
+)?;
+assert!(!run.glyphs.is_empty());
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
 既存の `fontload*` API に加えて、`load_font`、`load_font_from_file`、
 `load_font_from_buffer` エイリアスも使えます。
+
+## 分割フォント読み込み
+
+並列取得や range request でフォントを集める場合は、`ChunkedFontBuffer` で完全な
+buffer に再構成してから decode できます。
+
+- WOFF2 が複数の byte range に分かれて届くケースを想定しています。
+- 現在の WOFF2 decode は、完全な byte stream がそろってから実行する前提です。
+- `append(offset, bytes)` は順不同の chunk を受け付けます。
+- `missing_ranges()` で未取得の範囲を確認できます。
+- `into_loaded_font()` / `load_font()` で既存 loader に渡せます。
+
+```rust
+use fontloader::ChunkedFontBuffer;
+
+let mut buffer = ChunkedFontBuffer::new(total_size)?;
+buffer.append(1024, chunk_b)?;
+buffer.append(0, chunk_a)?;
+
+if buffer.is_complete() {
+    let font = buffer.into_loaded_font()?;
+    let width = font.measure("Hello")?;
+    assert!(width > 0.0);
+}
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
 
 ## WebAssembly
 

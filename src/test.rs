@@ -976,6 +976,33 @@ mod tests {
         test_fonts_dir().join("NotoSansJP-Regular.otf")
     }
 
+    fn real_variation_sequence(font: &crate::LoadedFont) -> (String, usize) {
+        let cmap = font.font().cmap.as_ref().expect("cmap");
+        let format14 = cmap
+            .cmap_encodings
+            .iter()
+            .find_map(|encoding| match encoding.cmap_subtable.as_ref() {
+                CmapSubtable::Format14(format14) => Some(format14),
+                _ => None,
+            })
+            .expect("expected format 14 cmap");
+        let var_selector_record = format14
+            .var_selector_records
+            .first()
+            .expect("expected at least one var selector record");
+        let mapping = var_selector_record
+            .non_default_uvs
+            .unicode_value_ranges
+            .first()
+            .expect("expected at least one UVS mapping");
+        let text = format!(
+            "{}{}",
+            char::from_u32(mapping.unicode_value).expect("unicode scalar"),
+            char::from_u32(var_selector_record.var_selector).expect("variation selector")
+        );
+        (text, mapping.glyph_id as usize)
+    }
+
     #[test]
     fn fontload_from_file_works() {
         let path = sample_font_path();
@@ -1037,6 +1064,152 @@ mod tests {
         let font = crate::fontload_buffer(&bytes).expect("load woff2 from buffer");
         let svg = font.text2svg("A", 24.0, "px").expect("render woff2 text");
         assert!(svg.contains("<svg"));
+    }
+
+    #[test]
+    fn chunked_font_buffer_reports_missing_ranges() {
+        let mut buffer = crate::ChunkedFontBuffer::new(10).expect("create chunked buffer");
+        assert_eq!(buffer.missing_ranges(), vec![(0, 10)]);
+
+        buffer.append(2, &[1, 2, 3]).expect("append middle chunk");
+        assert_eq!(buffer.filled_len(), 3);
+        assert_eq!(buffer.missing_ranges(), vec![(0, 2), (5, 10)]);
+
+        buffer.append(0, &[9, 8]).expect("append front chunk");
+        buffer.append(5, &[7, 6, 5, 4, 3]).expect("append tail chunk");
+        assert!(buffer.is_complete());
+        assert!(buffer.missing_ranges().is_empty());
+    }
+
+    #[test]
+    fn chunked_font_buffer_reassembles_woff2_out_of_order() {
+        let bytes = std::fs::read(woff2_font_path()).expect("read woff2 bytes");
+        let mut buffer =
+            crate::ChunkedFontBuffer::new(bytes.len()).expect("create chunked font buffer");
+        let chunk_size = (bytes.len() / 5).max(1);
+        let mut chunks = Vec::new();
+        let mut offset = 0usize;
+        while offset < bytes.len() {
+            let end = (offset + chunk_size).min(bytes.len());
+            chunks.push((offset, bytes[offset..end].to_vec()));
+            offset = end;
+        }
+
+        for (offset, chunk) in chunks.into_iter().rev() {
+            buffer.append(offset, &chunk).expect("append chunk");
+        }
+
+        assert!(buffer.is_complete());
+        let font = buffer.into_loaded_font().expect("load reconstructed woff2");
+        let svg = font.text2svg("A", 24.0, "px").expect("render reconstructed woff2");
+        assert!(svg.contains("<svg"));
+    }
+
+    #[test]
+    fn chunked_font_buffer_rejects_incomplete_decode() {
+        let bytes = std::fs::read(woff2_font_path()).expect("read woff2 bytes");
+        let mut buffer =
+            crate::ChunkedFontBuffer::new(bytes.len()).expect("create chunked font buffer");
+        let halfway = bytes.len() / 2;
+        buffer
+            .append(0, &bytes[..halfway])
+            .expect("append partial bytes");
+
+        match buffer.load_font() {
+            Ok(_) => panic!("incomplete buffer should not decode"),
+            Err(err) => assert_eq!(err.kind(), std::io::ErrorKind::WouldBlock),
+        }
+    }
+
+    #[test]
+    fn chunked_font_buffer_rejects_conflicting_overlaps() {
+        let mut buffer = crate::ChunkedFontBuffer::new(8).expect("create chunked buffer");
+        buffer.append(2, &[1, 2, 3]).expect("append initial bytes");
+        let err = buffer
+            .append(3, &[9, 3])
+            .expect_err("overlapping conflicting bytes should fail");
+        assert_eq!(err.kind(), std::io::ErrorKind::InvalidData);
+    }
+
+    #[test]
+    fn font_family_selects_best_cached_face() {
+        let regular =
+            crate::load_font_from_file(fira_sans_regular_path()).expect("load regular fira sans");
+        let black =
+            crate::load_font_from_file(fira_sans_black_path()).expect("load black fira sans");
+
+        let mut family = crate::FontFamily::new("Fira Sans");
+        family.add_face(
+            crate::FontFaceDescriptor::new("Fira Sans")
+                .with_font_name("Fira Sans Regular")
+                .with_font_weight(crate::FontWeight::NORMAL),
+            regular,
+        );
+        family.add_face(
+            crate::FontFaceDescriptor::new("Fira Sans")
+                .with_font_name("Fira Sans Black")
+                .with_font_weight(crate::FontWeight::BLACK),
+            black,
+        );
+
+        let descriptor = family
+            .resolve_descriptor(
+                Some("Fira Sans"),
+                None,
+                crate::FontWeight::BLACK,
+                crate::FontStyle::Normal,
+                crate::FontStretch::NORMAL,
+            )
+            .expect("resolve cached face");
+        assert_eq!(descriptor.font_name.as_deref(), Some("Fira Sans Black"));
+
+        let run = crate::text2commands(
+            "A",
+            crate::FontOptions::from_family(&family)
+                .with_font_family("Fira Sans")
+                .with_font_weight(crate::FontWeight::BLACK)
+                .with_font_size(24.0),
+        )
+        .expect("render from family");
+        assert_eq!(run.glyphs.len(), 1);
+    }
+
+    #[test]
+    fn font_family_promotes_chunked_face_into_cache() {
+        let bytes = std::fs::read(woff2_font_path()).expect("read woff2 bytes");
+        let mut family = crate::FontFamily::new("Noto Sans");
+        family
+            .begin_chunked_face(
+                "noto-regular",
+                crate::FontFaceDescriptor::new("Noto Sans")
+                    .with_font_name("Noto Sans WOFF2")
+                    .with_font_weight(crate::FontWeight::NORMAL),
+                bytes.len(),
+            )
+            .expect("begin chunked face");
+
+        let split = bytes.len() / 3;
+        family
+            .append_chunk("noto-regular", split, &bytes[split..split * 2])
+            .expect("append middle chunk");
+        assert!(!family
+            .missing_ranges("noto-regular")
+            .expect("missing ranges")
+            .is_empty());
+        family
+            .append_chunk("noto-regular", 0, &bytes[..split])
+            .expect("append first chunk");
+        family
+            .append_chunk("noto-regular", split * 2, &bytes[split * 2..])
+            .expect("append tail chunk");
+
+        let font = family
+            .finalize_chunked_face("noto-regular")
+            .expect("finalize chunked face");
+        let width = font.measure("A").expect("measure finalized font");
+        assert!(width > 0.0);
+        assert_eq!(family.pending_faces_len(), 0);
+        assert_eq!(family.cached_faces_len(), 1);
     }
 
     #[test]
@@ -1302,29 +1475,7 @@ mod tests {
     #[cfg(feature = "cff")]
     fn glyph_run_uses_real_variation_selector_as_single_cluster() {
         let font = crate::load_font_from_file(japanese_font_path()).expect("load uvs font");
-        let cmap = font.font().cmap.as_ref().expect("cmap");
-        let format14 = cmap
-            .cmap_encodings
-            .iter()
-            .find_map(|encoding| match encoding.cmap_subtable.as_ref() {
-                CmapSubtable::Format14(format14) => Some(format14),
-                _ => None,
-            })
-            .expect("expected format 14 cmap");
-        let var_selector_record = format14
-            .var_selector_records
-            .first()
-            .expect("expected at least one var selector record");
-        let mapping = var_selector_record
-            .non_default_uvs
-            .unicode_value_ranges
-            .first()
-            .expect("expected at least one UVS mapping");
-        let text = format!(
-            "{}{}",
-            char::from_u32(mapping.unicode_value).expect("unicode scalar"),
-            char::from_u32(var_selector_record.var_selector).expect("variation selector")
-        );
+        let (text, _) = real_variation_sequence(&font);
 
         let run = crate::text2commands(&text, crate::FontOptions::new(&font).with_font_size(32.0))
             .expect("glyph run");
@@ -1334,6 +1485,38 @@ mod tests {
             run.glyphs[0].glyph.layers.first(),
             Some(crate::GlyphLayer::Path(_))
         ));
+    }
+
+    #[test]
+    #[cfg(feature = "cff")]
+    fn measure_uses_real_variation_selector_glyph() {
+        let font = crate::load_font_from_file(japanese_font_path()).expect("load uvs font");
+        let (text, expected_glyph_id) = real_variation_sequence(&font);
+
+        let glyph_ids = font
+            .font()
+            .debug_shape_glyph_ids(&text, None)
+            .expect("shape glyph ids with uvs");
+        assert_eq!(glyph_ids, vec![expected_glyph_id]);
+
+        let width = font.measure(&text).expect("measure with uvs");
+        assert!(width > 0.0);
+    }
+
+    #[test]
+    #[cfg(feature = "cff")]
+    fn html_uses_single_svg_for_variation_selector_cluster_and_ignores_stray_selector() {
+        let font = crate::load_font_from_file(japanese_font_path()).expect("load uvs font");
+        let (text, _) = real_variation_sequence(&font);
+
+        let html = font.font().get_html(&text, 32.0, "px").expect("html with uvs");
+        assert_eq!(html.matches("<svg").count(), 1);
+
+        let html_with_stray = font
+            .font()
+            .get_html(&format!("\u{FE0F}{text}"), 32.0, "px")
+            .expect("html with stray selector");
+        assert_eq!(html_with_stray.matches("<svg").count(), 1);
     }
 
     #[test]

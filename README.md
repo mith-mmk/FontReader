@@ -13,7 +13,8 @@ Japanese: [README.ja.md](README.ja.md)
 - `font_size` and `line_height` are resolved in pixels.
 - `font_stretch`, `font_style`, `font_variant`, and `font_weight` are part of `FontOptions`.
 - `FontOptions::with_locale("ja-JP")` can request GSUB `locl` substitutions when the `layout` feature is enabled.
-- Font lookup by family or name is not implemented yet, so pass a loaded font for now.
+- `FontOptions::from_family(&family)` can resolve a cached `FontFamily` entry by family/name/weight/style/stretch.
+- `FontFamily` matching is currently cache-based. Fallback chains and Last Resort selection are not implemented yet.
 - TrueType and CFF glyphs are returned as `GlyphLayer::Path`.
 - `sbix` glyphs are returned as `GlyphLayer::Raster`.
 - COLR/CPAL colors are carried in `GlyphPaint::Solid(0xAARRGGBB)` so they can be passed directly to `paintcore::path::draw_glyphs`.
@@ -68,6 +69,79 @@ for glyph in &run.glyphs {
 
 `load_font`, `load_font_from_file`, and `load_font_from_buffer` are available as new aliases for
 the existing `fontload*` APIs.
+
+## Chunked font loading
+
+For parallel or range-based downloads, use `ChunkedFontBuffer` to rebuild a complete font buffer
+before decoding it.
+
+- This is especially useful for WOFF2 delivery split into multiple byte ranges.
+- The current WOFF2 path still requires the complete byte stream before decode.
+- `append(offset, bytes)` accepts chunks in any order.
+- `missing_ranges()` reports which byte ranges still need to be fetched.
+- `into_loaded_font()` and `load_font()` hand the reconstructed bytes to the existing loader.
+
+```rust
+use fontloader::ChunkedFontBuffer;
+
+let mut buffer = ChunkedFontBuffer::new(total_size)?;
+buffer.append(1024, chunk_b)?;
+buffer.append(0, chunk_a)?;
+
+if buffer.is_complete() {
+    let font = buffer.into_loaded_font()?;
+    let width = font.measure("Hello")?;
+    assert!(width > 0.0);
+}
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+## FontFamily cache
+
+`FontFamily` sits on top of loaded fonts and `ChunkedFontBuffer`.
+
+- Register a fully loaded face with `add_loaded_font()` or `add_face(...)`.
+- Register an in-flight face with `begin_chunked_face(face_id, descriptor, total_size)`.
+- Feed chunks in any order with `append_chunk(face_id, offset, bytes)`.
+- Inspect `missing_ranges(face_id)` when you need more byte ranges.
+- Promote the finished face into the cache with `finalize_chunked_face(face_id)`.
+- Resolve a face during shaping with `FontOptions::from_family(&family)` plus
+  `with_font_family(...)`, `with_font_name(...)`, `with_font_weight(...)`,
+  `with_font_style(...)`, and `with_font_stretch(...)`.
+
+This is meant for parallel fetch / reassembly first. It is not a true lazy WOFF2 decoder.
+
+```rust
+use fontloader::{
+    text2commands, FontFaceDescriptor, FontFamily, FontOptions, FontStyle, FontWeight,
+};
+
+let mut family = FontFamily::new("Fira Sans");
+family.begin_chunked_face(
+    "fira-black",
+    FontFaceDescriptor::new("Fira Sans")
+        .with_font_name("Fira Sans Black")
+        .with_font_weight(FontWeight::BLACK)
+        .with_font_style(FontStyle::Normal),
+    total_size,
+)?;
+
+family.append_chunk("fira-black", 0, first_chunk)?;
+family.append_chunk("fira-black", next_offset, second_chunk)?;
+
+if family.missing_ranges("fira-black")?.is_empty() {
+    family.finalize_chunked_face("fira-black")?;
+}
+
+let run = text2commands(
+    "Hello",
+    FontOptions::from_family(&family)
+        .with_font_family("Fira Sans")
+        .with_font_weight(FontWeight::BLACK),
+)?;
+assert!(!run.glyphs.is_empty());
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
 
 ## WebAssembly
 

@@ -168,6 +168,18 @@ impl OS2 {
         string += &us_upper_optical_point_size;
         string
     }
+
+    pub(crate) fn weight_class(&self) -> u16 {
+        self.us_weight_class
+    }
+
+    pub(crate) fn width_class(&self) -> u16 {
+        self.us_width_class
+    }
+
+    pub(crate) fn selection_flags(&self) -> u16 {
+        self.fs_selection
+    }
 }
 
 fn get_os2<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> Result<OS2, Error> {

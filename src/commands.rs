@@ -251,15 +251,7 @@ impl Default for FontWeight {
 pub enum FontRef<'a> {
     Loaded(&'a crate::LoadedFont),
     Parsed(&'a crate::fontreader::Font),
-}
-
-impl<'a> FontRef<'a> {
-    pub fn as_font(self) -> &'a crate::fontreader::Font {
-        match self {
-            Self::Loaded(font) => font.font(),
-            Self::Parsed(font) => font,
-        }
-    }
+    Family(&'a crate::FontFamily),
 }
 
 #[derive(Clone, Copy)]
@@ -279,6 +271,10 @@ pub struct FontOptions<'a> {
 impl<'a> FontOptions<'a> {
     pub fn new(font: &'a crate::LoadedFont) -> Self {
         Self::from_font_ref(FontRef::Loaded(font))
+    }
+
+    pub fn from_family(font_family: &'a crate::FontFamily) -> Self {
+        Self::from_font_ref(FontRef::Family(font_family))
     }
 
     pub fn from_font(font: &'a crate::fontreader::Font) -> Self {
@@ -310,6 +306,11 @@ impl<'a> FontOptions<'a> {
         self
     }
 
+    pub fn with_family(mut self, font_family: &'a crate::FontFamily) -> Self {
+        self.font = Some(FontRef::Family(font_family));
+        self
+    }
+
     pub fn with_font_size(mut self, font_size: f32) -> Self {
         self.font_size = font_size;
         self
@@ -317,6 +318,26 @@ impl<'a> FontOptions<'a> {
 
     pub fn with_line_height(mut self, line_height: f32) -> Self {
         self.line_height = Some(line_height);
+        self
+    }
+
+    pub fn with_font_stretch(mut self, font_stretch: FontStretch) -> Self {
+        self.font_stretch = font_stretch;
+        self
+    }
+
+    pub fn with_font_style(mut self, font_style: FontStyle) -> Self {
+        self.font_style = font_style;
+        self
+    }
+
+    pub fn with_font_variant(mut self, font_variant: FontVariant) -> Self {
+        self.font_variant = font_variant;
+        self
+    }
+
+    pub fn with_font_weight(mut self, font_weight: FontWeight) -> Self {
+        self.font_weight = font_weight;
         self
     }
 
@@ -337,7 +358,11 @@ impl<'a> FontOptions<'a> {
 
     pub fn resolve_font(&self) -> Result<&'a crate::fontreader::Font, Error> {
         if let Some(font) = self.font {
-            return Ok(font.as_font());
+            return match font {
+                FontRef::Loaded(font) => Ok(font.font()),
+                FontRef::Parsed(font) => Ok(font),
+                FontRef::Family(font_family) => Ok(font_family.resolve_font_options(self)?.font()),
+            };
         }
 
         if self.font_name.is_some() || self.font_family.is_some() {

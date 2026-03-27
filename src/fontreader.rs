@@ -130,6 +130,16 @@ enum ResolvedTextUnit {
 }
 
 #[derive(Debug, Clone, Copy)]
+enum ParsedTextUnit {
+    Glyph {
+        ch: char,
+        variation_selector: char,
+    },
+    Newline,
+    Tab,
+}
+
+#[derive(Debug, Clone, Copy)]
 struct ResolvedGlyph {
     ch: char,
     glyph_id: usize,
@@ -760,6 +770,47 @@ impl Font {
         (0xfe00..=0xfe0f).contains(&(ch as u32)) || (0xE0100..=0xE01EF).contains(&(ch as u32))
     }
 
+    fn parse_text_units(&self, text: &str) -> Vec<ParsedTextUnit> {
+        let chars: Vec<char> = text.chars().collect();
+        let mut units = Vec::new();
+        let mut index = 0;
+
+        while index < chars.len() {
+            let ch = chars[index];
+            match ch {
+                '\r' => {
+                    index += 1;
+                }
+                '\n' => {
+                    units.push(ParsedTextUnit::Newline);
+                    index += 1;
+                }
+                '\t' => {
+                    units.push(ParsedTextUnit::Tab);
+                    index += 1;
+                }
+                _ if Self::is_variation_selector(ch) => {
+                    index += 1;
+                }
+                _ => {
+                    let mut variation_selector = '\0';
+                    let mut consumed = 1;
+                    if index + 1 < chars.len() && Self::is_variation_selector(chars[index + 1]) {
+                        variation_selector = chars[index + 1];
+                        consumed = 2;
+                    }
+                    units.push(ParsedTextUnit::Glyph {
+                        ch,
+                        variation_selector,
+                    });
+                    index += consumed;
+                }
+            }
+        }
+
+        units
+    }
+
     fn flush_shaped_glyphs(
         &self,
         output: &mut Vec<ResolvedTextUnit>,
@@ -814,62 +865,69 @@ impl Font {
         #[cfg(not(feature = "layout"))]
         let _ = locale;
 
-        let chars: Vec<char> = text.chars().collect();
         let mut output = Vec::new();
         let mut pending_glyphs = Vec::new();
-        let mut index = 0;
 
-        while index < chars.len() {
-            let ch = chars[index];
-            match ch {
-                '\r' => {
-                    index += 1;
-                    continue;
-                }
-                '\n' => {
+        for unit in self.parse_text_units(text) {
+            match unit {
+                ParsedTextUnit::Newline => {
                     self.flush_shaped_glyphs(&mut output, &mut pending_glyphs);
                     output.push(ResolvedTextUnit::Newline);
-                    index += 1;
-                    continue;
                 }
-                '\t' => {
+                ParsedTextUnit::Tab => {
                     self.flush_shaped_glyphs(&mut output, &mut pending_glyphs);
                     output.push(ResolvedTextUnit::Tab);
-                    index += 1;
-                    continue;
                 }
-                _ => {}
-            }
-
-            if Self::is_variation_selector(ch) {
-                index += 1;
-                continue;
-            }
-
-            let mut vs = '\0';
-            let mut consumed = 1;
-            if index + 1 < chars.len() && Self::is_variation_selector(chars[index + 1]) {
-                vs = chars[index + 1];
-                consumed = 2;
-            }
-
-            let glyph_id = self.resolve_glyph_id_with_uvs(ch, vs, is_vert)?;
-            #[cfg(feature = "layout")]
-            let glyph_id = if let Some(locale) = locale {
-                if let Some(gsub) = self.current_gsub() {
-                    gsub.lookup_locale(glyph_id, locale)
-                } else {
-                    glyph_id
+                ParsedTextUnit::Glyph {
+                    ch,
+                    variation_selector,
+                } => {
+                    let glyph_id =
+                        self.resolve_glyph_id_with_uvs(ch, variation_selector, is_vert)?;
+                    #[cfg(feature = "layout")]
+                    let glyph_id = if let Some(locale) = locale {
+                        if let Some(gsub) = self.current_gsub() {
+                            gsub.lookup_locale(glyph_id, locale)
+                        } else {
+                            glyph_id
+                        }
+                    } else {
+                        glyph_id
+                    };
+                    pending_glyphs.push(ResolvedGlyph { ch, glyph_id });
                 }
-            } else {
-                glyph_id
-            };
-            pending_glyphs.push(ResolvedGlyph { ch, glyph_id });
-            index += consumed;
+            }
         }
 
         self.flush_shaped_glyphs(&mut output, &mut pending_glyphs);
         Ok(output)
+    }
+
+    fn push_svg_html_unit(
+        &self,
+        svgs: &mut Vec<String>,
+        unit: ParsedTextUnit,
+        fontsize: f64,
+        fontunit: &str,
+        is_vert: bool,
+    ) -> Result<(), Error> {
+        match unit {
+            ParsedTextUnit::Newline => {
+                svgs.push("<br>".to_string());
+            }
+            ParsedTextUnit::Tab => {
+                svgs.push("<span style=\"width: 4em; display: inline-block;\"></span>\n".to_string());
+            }
+            ParsedTextUnit::Glyph {
+                ch,
+                variation_selector,
+            } => {
+                let svg =
+                    self.get_svg_with_uvs_axis(ch, variation_selector, fontsize, fontunit, is_vert)?;
+                svgs.push(svg);
+            }
+        }
+        Ok(())
     }
 
     #[cfg(test)]
@@ -1264,6 +1322,88 @@ impl Font {
         name_table.get_name(name_id, locale, platform_id)
     }
 
+    pub(crate) fn face_family_name(&self) -> String {
+        let locale = "en-US".to_string();
+        self.get_name(NameID::TypographicFamilyName, &locale)
+            .ok()
+            .filter(|name| !name.trim().is_empty())
+            .or_else(|| {
+                self.get_name(NameID::FontFamilyName, &locale)
+                    .ok()
+                    .filter(|name| !name.trim().is_empty())
+            })
+            .unwrap_or_else(|| "Unknown Family".to_string())
+    }
+
+    pub(crate) fn face_full_name(&self) -> Option<String> {
+        let locale = "en-US".to_string();
+        self.get_name(NameID::FullFontName, &locale)
+            .ok()
+            .filter(|name| !name.trim().is_empty())
+            .or_else(|| {
+                self.get_name(NameID::PostScriptName, &locale)
+                    .ok()
+                    .filter(|name| !name.trim().is_empty())
+            })
+    }
+
+    pub(crate) fn face_weight_class(&self) -> u16 {
+        let os2 = if self.current_font == 0 {
+            self.os2.as_ref()
+        } else {
+            self.more_fonts[self.current_font - 1].os2.as_ref()
+        };
+        os2.map(|os2| os2.weight_class()).unwrap_or(400)
+    }
+
+    pub(crate) fn face_width_class(&self) -> u16 {
+        let os2 = if self.current_font == 0 {
+            self.os2.as_ref()
+        } else {
+            self.more_fonts[self.current_font - 1].os2.as_ref()
+        };
+        os2.map(|os2| os2.width_class()).unwrap_or(5)
+    }
+
+    pub(crate) fn face_is_italic(&self) -> bool {
+        let head_mac_style = if self.current_font == 0 {
+            self.head.as_ref().map(|head| head.mac_style)
+        } else {
+            self.more_fonts[self.current_font - 1]
+                .head
+                .as_ref()
+                .map(|head| head.mac_style)
+        }
+        .unwrap_or(0);
+        if head_mac_style & 0x0002 == 0x0002 {
+            return true;
+        }
+
+        let post_italic_angle = if self.current_font == 0 {
+            self.post.as_ref().map(|post| post.italic_angle)
+        } else {
+            self.more_fonts[self.current_font - 1]
+                .post
+                .as_ref()
+                .map(|post| post.italic_angle)
+        }
+        .unwrap_or(0);
+        if post_italic_angle != 0 {
+            return true;
+        }
+
+        let os2_selection = if self.current_font == 0 {
+            self.os2.as_ref().map(|os2| os2.selection_flags())
+        } else {
+            self.more_fonts[self.current_font - 1]
+                .os2
+                .as_ref()
+                .map(|os2| os2.selection_flags())
+        }
+        .unwrap_or(0);
+        os2_selection & 0x0001 == 0x0001
+    }
+
     #[cfg(debug_assertions)]
     pub fn get_name_raw(&self) -> String {
         let name = if self.current_font == 0 {
@@ -1483,34 +1623,8 @@ impl Font {
         html += "</head>\n";
         html += "<body>\n";
         let mut svgs = Vec::new();
-        for (i, ch) in string.chars().enumerate() {
-            if ch == '\n' {
-                svgs.push("<br>".to_string());
-                continue;
-            }
-            if ch == '\r' {
-                continue;
-            }
-            if ch == '\t' {
-                svgs.push(
-                    "<span style=\"width: 4em; display: inline-block;\"></span>\n".to_string(),
-                );
-                continue;
-            }
-
-            // variation selector 0xE0100 - 0xE01EF
-            // https://www.unicode.org/reports/tr37/#VS
-            if ch as u32 >= 0xfe00 && ch as u32 <= 0xfe0f
-                || ch as u32 >= 0xE0100 && ch as u32 <= 0xE01EF
-            {
-                let ch0 = string.chars().nth(i - 1).unwrap();
-                let svg = self.get_svg_with_uvs_axis(ch0, ch, fontsize, fontunit, true)?;
-                svgs.pop();
-                svgs.push(svg);
-            } else {
-                let svg = self.get_svg_with_uvs_axis(ch, '\0', fontsize, fontunit, true)?;
-                svgs.push(svg);
-            }
+        for unit in self.parse_text_units(string) {
+            self.push_svg_html_unit(&mut svgs, unit, fontsize, fontunit, true)?;
         }
 
         for svg in svgs {
@@ -1530,34 +1644,8 @@ impl Font {
         html += "</head>\n";
         html += "<body>\n";
         let mut svgs = Vec::new();
-        for (i, ch) in string.chars().enumerate() {
-            if ch == '\n' {
-                svgs.push("<br>".to_string());
-                continue;
-            }
-            if ch == '\r' {
-                continue;
-            }
-            if ch == '\t' {
-                svgs.push(
-                    "<span style=\"width: 4em; display: inline-block;\"></span>\n".to_string(),
-                );
-                continue;
-            }
-
-            // variation selector 0xE0100 - 0xE01EF
-            // https://www.unicode.org/reports/tr37/#VS
-            if ch as u32 >= 0xfe00 && ch as u32 <= 0xfe0f
-                || ch as u32 >= 0xE0100 && ch as u32 <= 0xE01EF
-            {
-                let ch0 = string.chars().nth(i - 1).unwrap();
-                let svg = self.get_svg_with_uvs(ch0, ch, fontsize, fontunit)?;
-                svgs.pop();
-                svgs.push(svg);
-            } else {
-                let svg = self.get_svg(ch, fontsize, fontunit)?;
-                svgs.push(svg);
-            }
+        for unit in self.parse_text_units(string) {
+            self.push_svg_html_unit(&mut svgs, unit, fontsize, fontunit, false)?;
         }
         for svg in svgs {
             html += &svg;
