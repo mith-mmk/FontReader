@@ -1350,6 +1350,44 @@ mod tests {
     }
 
     #[cfg(feature = "layout")]
+    fn first_real_arabic_rlig_sequence(font: &crate::LoadedFont) -> Option<(String, usize)> {
+        let gsub = font.font().gsub.as_ref()?;
+        let cmap = font.font().cmap.as_ref()?;
+        let candidates: Vec<char> = (0x0621u32..=0x064Au32)
+            .filter_map(char::from_u32)
+            .filter(|ch| cmap.get_glyph_position(*ch as u32) != 0)
+            .collect();
+
+        for left in candidates.iter().copied() {
+            let left_glyph = cmap.get_glyph_position(left as u32) as usize;
+            let left_forms = gsub.lookup_joining_forms(left_glyph, Some("ar"));
+            for right in candidates.iter().copied() {
+                let right_glyph = cmap.get_glyph_position(right as u32) as usize;
+                let right_forms = gsub.lookup_joining_forms(right_glyph, Some("ar"));
+
+                let joined = [
+                    left_forms.substitute(
+                        left_glyph,
+                        false,
+                        left_forms.can_join_to_next() && right_forms.can_join_to_prev(),
+                    ),
+                    right_forms.substitute(
+                        right_glyph,
+                        left_forms.can_join_to_next() && right_forms.can_join_to_prev(),
+                        false,
+                    ),
+                ];
+
+                if let Some(ligature) = gsub.lookup_rlig_sequence(&joined, Some("ar")) {
+                    return Some((format!("{left}{right}"), ligature));
+                }
+            }
+        }
+
+        None
+    }
+
+    #[cfg(feature = "layout")]
     fn first_real_kern_pair(font: &crate::LoadedFont) -> Option<(char, char, i16)> {
         let gpos = font.font().gpos.as_ref()?;
         let cmap = font.font().cmap.as_ref()?;
@@ -2521,6 +2559,66 @@ mod tests {
             .expect("family rtl arabic glyph run");
         assert_eq!(run.glyphs.len(), expected_glyph_ids.len());
         assert!(run.glyphs[0].x > run.glyphs[1].x);
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn rtl_shaping_uses_real_arabic_required_ligature() {
+        let font = crate::load_font_from_file(rtl_font_path()).expect("load rtl font");
+        let (text, expected_ligature) =
+            first_real_arabic_rlig_sequence(&font).expect("expected arabic required ligature");
+
+        let glyph_ids = font
+            .font()
+            .debug_shape_glyph_ids_with_direction(&text, Some("ar"), true)
+            .expect("shape rtl glyph ids");
+        assert_eq!(glyph_ids, vec![expected_ligature]);
+
+        let run = crate::text2commands(
+            &text,
+            crate::FontOptions::new(&font)
+                .with_font_size(32.0)
+                .with_locale("ar")
+                .with_right_to_left(),
+        )
+        .expect("rtl arabic ligature glyph run");
+        assert_eq!(run.glyphs.len(), 1);
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn font_family_text2commands_uses_real_arabic_required_ligature() {
+        let font = crate::load_font_from_file(rtl_font_path()).expect("load rtl font");
+        let (text, expected_ligature) =
+            first_real_arabic_rlig_sequence(&font).expect("expected arabic required ligature");
+        let mut family = crate::FontFamily::new("Arial");
+        family.add_loaded_font(font);
+
+        let run = family
+            .text2commands(
+                &text,
+                family
+                    .options()
+                    .with_font_size(32.0)
+                    .with_locale("ar")
+                    .with_right_to_left(),
+            )
+            .expect("family rtl arabic ligature glyph run");
+        assert_eq!(run.glyphs.len(), 1);
+
+        let glyph_ids = family
+            .resolve_loaded_font(
+                Some("Arial"),
+                None,
+                crate::FontWeight::default(),
+                crate::FontStyle::default(),
+                crate::FontStretch::default(),
+            )
+            .expect("resolved family font")
+            .font()
+            .debug_shape_glyph_ids_with_direction(&text, Some("ar"), true)
+            .expect("shape rtl glyph ids");
+        assert_eq!(glyph_ids, vec![expected_ligature]);
     }
 
     #[test]

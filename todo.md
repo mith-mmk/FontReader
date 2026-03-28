@@ -58,7 +58,8 @@ _test_fonts/* がテスト用フォント
 - [+] 右から左に書く言語
     - [x] `FontOptions::with_right_to_left()` で Hebrew の RTL 配置を `text2commands` / `measure` / `FontFamily` で確認
     - [x] GSUB `isol` / `init` / `medi` / `fina` を使う Arabic joining を `text2commands` / `FontFamily` で確認
-    - [ ] `rlig` や context/chaining 依存の script 固有 shaping
+    - [x] GSUB `rlig` required ligature を `text2commands` / `FontFamily` で確認
+    - [ ] context/chaining 依存の script 固有 shaping
 - loader
     - [x] font
     - [x] font collection
@@ -129,7 +130,8 @@ _test_fonts/* がテスト用フォント
 - [ ] llaga
 - [*] アラビア文字
     - [x] `isol` / `init` / `medi` / `fina`
-    - [ ] `rlig` / context / chaining
+    - [x] `rlig`
+    - [ ] context / chaining
 - [ ] 日本語
 - [ ] チベット語
 - [ ] 古ハングル
@@ -150,6 +152,7 @@ _test_fonts/* がテスト用フォント
     - [*] ccmp / context chaining などの shaping 拡張
         - [x] `ccmp` の multiple / ligature / extension を text API shaping に反映
         - [x] RTL で `isol` / `init` / `medi` / `fina` を利用
+        - [x] RTL で `rlig` を利用
         - [ ] context / chaining の適用拡張
 
 # opentype
@@ -183,7 +186,8 @@ _test_fonts/* がテスト用フォント
     - [x] `TextDirection::TopToBottom` で縦メトリクスと縦書き置換を利用
     - [x] `TextDirection::RightToLeft` で RTL の inline 進行方向を利用
     - [x] Arabic joining (`isol` / `init` / `medi` / `fina`)
-    - [ ] `rlig` や context/chaining ベースの RTL shaping
+    - [x] Arabic required ligature (`rlig`)
+    - [ ] context/chaining ベースの RTL shaping
 - [ ] 未実装: `lookup_width()`, `lookup_number()`
 - [ ] aalt
 - [ ] dlig

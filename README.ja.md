@@ -173,7 +173,8 @@ if buffer.is_complete() {
 - text API: `text2command()`, `text2commands()`, `measure()` で variation selector と基本的な `locl` / `liga` / `dlig` / `ccmp` shaping を利用
 - 方向指定 API: `FontOptions::with_vertical_flow()` で縦メトリクスと GSUB の縦書き置換を利用し、`with_right_to_left()` で RTL の inline 進行方向を利用
 - RTL shaping: GSUB の `isol` / `init` / `medi` / `fina` があるフォントでは、アラビア文字の joining form を適用
-- 現状の制限: `rlig` や context/chaining 依存の高度な RTL shaping は未実装
+- RTL shaping: GSUB の `rlig` required ligature も、存在するフォントでは RTL shaping に反映
+- 現状の制限: context/chaining 依存の高度な RTL shaping は未実装
 - 未実装: `lookup_width()`, `lookup_number()`
 
 ### Lookup パース

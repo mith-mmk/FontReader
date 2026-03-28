@@ -890,8 +890,15 @@ impl Font {
                 let max_len = (expanded_glyphs.len() - index).min(MAX_LIGATURE_COMPONENTS);
                 let mut matched = None;
                 for len in (2..=max_len).rev() {
-                    if let Some(glyph_id) =
-                        gsub.lookup_liga_sequence(&glyph_ids[index..index + len])
+                    if is_right_to_left {
+                        if let Some(glyph_id) =
+                            gsub.lookup_rlig_sequence(&glyph_ids[index..index + len], locale)
+                        {
+                            matched = Some((glyph_id, len));
+                            break;
+                        }
+                    }
+                    if let Some(glyph_id) = gsub.lookup_liga_sequence(&glyph_ids[index..index + len])
                     {
                         matched = Some((glyph_id, len));
                         break;
