@@ -603,6 +603,63 @@ impl GSUB {
                 }
                 false
             }
+            crate::opentype::layouts::lookup::LookupSubstitution::ChainingContextSubstitution2(
+                chaining,
+            ) => {
+                let Some(_) = chaining.coverage.contains(glyph_id) else {
+                    return false;
+                };
+                let Some(input_class_def) = chaining.input_class_def.as_ref() else {
+                    return false;
+                };
+                let current_class = input_class_def.get_class(glyph_id as u16) as usize;
+                let Some(rule_set) = chaining.chain_sub_class_sets.get(current_class) else {
+                    return false;
+                };
+
+                for rule in &rule_set.chained_class_seq_rules {
+                    if rule.backtrack_sequences.len() > index {
+                        continue;
+                    }
+                    if index + rule.input_sequences.len() + rule.lookahead_class_ids.len() >= glyphs.len() + 1 {
+                        continue;
+                    }
+
+                    let backtrack_matches = if let Some(backtrack_class_def) =
+                        chaining.backtrack_class_def.as_ref()
+                    {
+                        rule.backtrack_sequences.iter().enumerate().all(|(offset, expected)| {
+                            backtrack_class_def.get_class(glyphs[index - 1 - offset].0 as u16)
+                                == *expected
+                        })
+                    } else {
+                        rule.backtrack_sequences.is_empty()
+                    };
+                    let input_matches = rule.input_sequences.iter().enumerate().all(|(offset, expected)| {
+                        input_class_def.get_class(glyphs[index + 1 + offset].0 as u16) == *expected
+                    });
+                    let lookahead_matches = if let Some(lookahead_class_def) =
+                        chaining.lookahead_class_def.as_ref()
+                    {
+                        rule.lookahead_class_ids.iter().enumerate().all(|(offset, expected)| {
+                            lookahead_class_def.get_class(
+                                glyphs[index + 1 + rule.input_sequences.len() + offset].0 as u16,
+                            ) == *expected
+                        })
+                    } else {
+                        rule.lookahead_class_ids.is_empty()
+                    };
+
+                    if !(backtrack_matches && input_matches && lookahead_matches) {
+                        continue;
+                    }
+
+                    if self.apply_sequence_lookup_records(&rule.seq_lookup_records, glyphs, index) {
+                        return true;
+                    }
+                }
+                false
+            }
             crate::opentype::layouts::lookup::LookupSubstitution::ChainingContextSubstitution3(
                 chaining,
             ) => {

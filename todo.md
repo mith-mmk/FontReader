@@ -159,8 +159,8 @@ _test_fonts/* がテスト用フォント
         - [x] RTL で `rlig` を利用
         - [*] context / chaining の適用拡張
             - [x] Context Format 1 / 2 / 3
-            - [x] Chaining Context Format 1 / 3
-            - [ ] Chaining Context Format 2
+            - [x] Chaining Context Format 1 / 2 / 3
+            - [ ] script 固有の chaining 拡張
 
 # opentype
 - [x] True Type
@@ -196,8 +196,8 @@ _test_fonts/* がテスト用フォント
     - [x] Arabic required ligature (`rlig`)
     - [*] context/chaining ベースの RTL shaping
         - [x] Context Format 1 / 2 / 3 の feature-sequence 適用
-        - [x] Chaining Context Format 1 / 3 の feature-sequence 適用
-        - [ ] Chaining Context Format 2
+        - [x] Chaining Context Format 1 / 2 / 3 の feature-sequence 適用
+        - [ ] script 固有の chaining ルール拡張
 - [ ] 未実装: `lookup_width()`, `lookup_number()`
 - [ ] aalt
 - [ ] dlig
@@ -226,7 +226,7 @@ _test_fonts/* がテスト用フォント
     - [x] Format 3
 - [ ] Type 6 Chaining Context Substitution:
     - [x] Format 1
-    - [ ] Format 2 は一部のみ適用
+    - [x] Format 2 はパース済みで、feature-sequence 適用器から部分適用可能
     - [x] Format 3
 - [*] Type 7 Extension Substitution: パース済み、single / multiple / ligature は適用可能
 - [ ] Type 8 Reverse Chaining Contextual Single Substitution: パース済み、適用は未実装

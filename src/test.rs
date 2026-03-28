@@ -349,6 +349,11 @@ mod tests {
                     class: 4,
                 }],
                 coverage: coverage_format1(&[90]),
+                backtrack_class_def: None,
+                input_class_def: None,
+                lookahead_class_def: None,
+                chain_sub_class_set_count: 0,
+                chain_sub_class_sets: vec![],
             });
         match chaining2.get_lookup(90) {
             LookupResult::Multiple(classes) => assert_eq!(classes, vec![4]),
@@ -774,25 +779,36 @@ mod tests {
         push_u16(&mut active_rule_set, 4);
         active_rule_set.extend_from_slice(&rule);
 
-        let class0_offset = 14u16;
-        let class1_offset = class0_offset + empty_rule_set.len() as u16;
-        let class2_offset = class1_offset + active_rule_set.len() as u16;
-        let class_def_offset = class2_offset + empty_rule_set.len() as u16;
-        let coverage_offset = class_def_offset + class_def.len() as u16;
-
         let mut subtable = Vec::new();
         push_u16(&mut subtable, 2);
-        push_u16(&mut subtable, coverage_offset);
-        push_u16(&mut subtable, class_def_offset);
+        let coverage_offset_pos = subtable.len();
+        push_u16(&mut subtable, 0);
+        let class_def_offset_pos = subtable.len();
+        push_u16(&mut subtable, 0);
         push_u16(&mut subtable, 3);
-        push_u16(&mut subtable, class0_offset);
-        push_u16(&mut subtable, class1_offset);
-        push_u16(&mut subtable, class2_offset);
+        let class_set_offsets_pos = subtable.len();
+        subtable.resize(subtable.len() + 3 * 2, 0);
+        let class0_offset = subtable.len() as u16;
         subtable.extend_from_slice(&empty_rule_set);
+        let class1_offset = subtable.len() as u16;
         subtable.extend_from_slice(&active_rule_set);
+        let class2_offset = subtable.len() as u16;
         subtable.extend_from_slice(&empty_rule_set);
+        let class_def_offset = subtable.len() as u16;
         subtable.extend_from_slice(&class_def);
+        let coverage_offset = subtable.len() as u16;
         subtable.extend_from_slice(&coverage);
+
+        subtable[coverage_offset_pos..coverage_offset_pos + 2]
+            .copy_from_slice(&coverage_offset.to_be_bytes());
+        subtable[class_def_offset_pos..class_def_offset_pos + 2]
+            .copy_from_slice(&class_def_offset.to_be_bytes());
+        subtable[class_set_offsets_pos..class_set_offsets_pos + 2]
+            .copy_from_slice(&class0_offset.to_be_bytes());
+        subtable[class_set_offsets_pos + 2..class_set_offsets_pos + 4]
+            .copy_from_slice(&class1_offset.to_be_bytes());
+        subtable[class_set_offsets_pos + 4..class_set_offsets_pos + 6]
+            .copy_from_slice(&class2_offset.to_be_bytes());
 
         build_lookup_record(LookupType::ContextSubstitution as u16, subtable)
     }
@@ -897,6 +913,91 @@ mod tests {
         push_u16(&mut subtable, rule_set_offset);
         subtable.extend_from_slice(&rule_set);
         subtable.extend_from_slice(&coverage);
+
+        build_lookup_record(LookupType::ChainingContextSubstitution as u16, subtable)
+    }
+
+    #[cfg(feature = "layout")]
+    fn lookup_chaining_context_format2_record(
+        coverage_glyph_id: u16,
+        backtrack_classes: &[u16],
+        input_classes: &[u16],
+        lookahead_classes: &[u16],
+        sequence_index: u16,
+        lookup_list_index: u16,
+    ) -> Vec<u8> {
+        let coverage = coverage_table(&[coverage_glyph_id]);
+        let backtrack_class_def = class_def_format1_table(coverage_glyph_id - 1, &[backtrack_classes[0]]);
+        let input_class_def = class_def_format1_table(coverage_glyph_id, &[1, input_classes[0]]);
+        let lookahead_class_def = class_def_format1_table(coverage_glyph_id + 2, &[lookahead_classes[0]]);
+
+        let mut rule = Vec::new();
+        push_u16(&mut rule, backtrack_classes.len() as u16);
+        for class_id in backtrack_classes {
+            push_u16(&mut rule, *class_id);
+        }
+        push_u16(&mut rule, (input_classes.len() + 1) as u16);
+        for class_id in input_classes {
+            push_u16(&mut rule, *class_id);
+        }
+        push_u16(&mut rule, lookahead_classes.len() as u16);
+        for class_id in lookahead_classes {
+            push_u16(&mut rule, *class_id);
+        }
+        push_u16(&mut rule, 1);
+        push_u16(&mut rule, sequence_index);
+        push_u16(&mut rule, lookup_list_index);
+
+        let mut empty_rule_set = Vec::new();
+        push_u16(&mut empty_rule_set, 0);
+
+        let mut active_rule_set = Vec::new();
+        push_u16(&mut active_rule_set, 1);
+        push_u16(&mut active_rule_set, 4);
+        active_rule_set.extend_from_slice(&rule);
+
+        let mut subtable = Vec::new();
+        push_u16(&mut subtable, 2);
+        let coverage_offset_pos = subtable.len();
+        push_u16(&mut subtable, 0);
+        let backtrack_class_def_offset_pos = subtable.len();
+        push_u16(&mut subtable, 0);
+        let input_class_def_offset_pos = subtable.len();
+        push_u16(&mut subtable, 0);
+        let lookahead_class_def_offset_pos = subtable.len();
+        push_u16(&mut subtable, 0);
+        push_u16(&mut subtable, 3);
+        let class_set_offsets_pos = subtable.len();
+        subtable.resize(subtable.len() + 3 * 2, 0);
+        let class0_offset = subtable.len() as u16;
+        subtable.extend_from_slice(&empty_rule_set);
+        let class1_offset = subtable.len() as u16;
+        subtable.extend_from_slice(&active_rule_set);
+        let class2_offset = subtable.len() as u16;
+        subtable.extend_from_slice(&empty_rule_set);
+        let backtrack_class_def_offset = subtable.len() as u16;
+        subtable.extend_from_slice(&backtrack_class_def);
+        let input_class_def_offset = subtable.len() as u16;
+        subtable.extend_from_slice(&input_class_def);
+        let lookahead_class_def_offset = subtable.len() as u16;
+        subtable.extend_from_slice(&lookahead_class_def);
+        let coverage_offset = subtable.len() as u16;
+        subtable.extend_from_slice(&coverage);
+
+        subtable[coverage_offset_pos..coverage_offset_pos + 2]
+            .copy_from_slice(&coverage_offset.to_be_bytes());
+        subtable[backtrack_class_def_offset_pos..backtrack_class_def_offset_pos + 2]
+            .copy_from_slice(&backtrack_class_def_offset.to_be_bytes());
+        subtable[input_class_def_offset_pos..input_class_def_offset_pos + 2]
+            .copy_from_slice(&input_class_def_offset.to_be_bytes());
+        subtable[lookahead_class_def_offset_pos..lookahead_class_def_offset_pos + 2]
+            .copy_from_slice(&lookahead_class_def_offset.to_be_bytes());
+        subtable[class_set_offsets_pos..class_set_offsets_pos + 2]
+            .copy_from_slice(&class0_offset.to_be_bytes());
+        subtable[class_set_offsets_pos + 2..class_set_offsets_pos + 4]
+            .copy_from_slice(&class1_offset.to_be_bytes());
+        subtable[class_set_offsets_pos + 4..class_set_offsets_pos + 6]
+            .copy_from_slice(&class2_offset.to_be_bytes());
 
         build_lookup_record(LookupType::ChainingContextSubstitution as u16, subtable)
     }
@@ -1201,6 +1302,24 @@ mod tests {
         gsub.apply_feature_sequence(&mut glyphs, None, &[*b"calt"]);
 
         assert_eq!(glyphs, vec![(10, 0), (66, 1), (12, 2)]);
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn gsub_apply_feature_sequence_supports_chaining_context_format2() {
+        let gsub = parse_gsub(build_gsub_table_with_feature_lookups(
+            *b"calt",
+            &[0],
+            vec![
+                lookup_chaining_context_format2_record(20, &[1], &[2], &[1], 1, 1),
+                lookup_single_record(21, 123),
+            ],
+        ));
+        let mut glyphs = vec![(19usize, 0usize), (20usize, 1usize), (21usize, 2usize), (22usize, 3usize)];
+
+        gsub.apply_feature_sequence(&mut glyphs, None, &[*b"calt"]);
+
+        assert_eq!(glyphs, vec![(19, 0), (20, 1), (123, 2), (22, 3)]);
     }
 
     #[test]
