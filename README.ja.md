@@ -174,7 +174,9 @@ if buffer.is_complete() {
 - 方向指定 API: `FontOptions::with_vertical_flow()` で縦メトリクスと GSUB の縦書き置換を利用し、`with_right_to_left()` で RTL の inline 進行方向を利用
 - RTL shaping: GSUB の `isol` / `init` / `medi` / `fina` があるフォントでは、アラビア文字の joining form を適用
 - RTL shaping: GSUB の `rlig` required ligature も、存在するフォントでは RTL shaping に反映
-- 現状の制限: context/chaining 依存の高度な RTL shaping は未実装
+- 部分実装: GSUB の Context / Chaining Context Format 3 は、新しい feature-sequence 適用器経由で反映
+- 部分実装: Context Format 1 / 2 と Chaining Context Format 1 も、feature-sequence 適用器に接続済み
+- 現状の制限: context/chaining は未実装のケースも多く、特に Chaining Context Format 2 やより広い script 固有 RTL shaping は未完成
 - 未実装: `lookup_width()`, `lookup_number()`
 
 ### Lookup パース
@@ -184,12 +186,13 @@ if buffer.is_complete() {
 - Type 3 Alternate Substitution: パース済み、展開可能
 - Type 4 Ligature Substitution: パース済み、展開可能
 - Type 5 Context Substitution:
-  Format 1 は展開可能
-  Format 2 と Format 3 はパースのみで、適用は未完成
+  Format 1 はパース済みで、feature-sequence 適用器から部分適用可能
+  Format 2 はパース済みで、feature-sequence 適用器から部分適用可能
+  Format 3 はパース済みで、feature-sequence 適用器から利用可能
 - Type 6 Chaining Context Substitution:
-  Format 1 は展開可能
+  Format 1 はパース済みで、feature-sequence 適用器から部分適用可能
   Format 2 は一部のみ適用
-  Format 3 はパースのみで、適用は未実装。未対応でも panic せず無視します
+  Format 3 はパース済みで、feature-sequence 適用器から利用可能
 - Type 7 Extension Substitution: パース済み、適用は未実装
 - Type 8 Reverse Chaining Contextual Single Substitution: パース済み、適用は未実装
 

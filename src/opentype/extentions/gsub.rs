@@ -395,6 +395,239 @@ impl GSUB {
         false
     }
 
+    fn matches_input_coverages(
+        coverages: &[crate::opentype::layouts::coverage::Coverage],
+        glyphs: &[(usize, usize)],
+        start: usize,
+    ) -> bool {
+        if start + coverages.len() > glyphs.len() {
+            return false;
+        }
+
+        coverages.iter().enumerate().all(|(offset, coverage)| {
+            coverage.contains(glyphs[start + offset].0).is_some()
+        })
+    }
+
+    fn matches_backtrack_coverages(
+        coverages: &[crate::opentype::layouts::coverage::Coverage],
+        glyphs: &[(usize, usize)],
+        start: usize,
+    ) -> bool {
+        if coverages.len() > start {
+            return false;
+        }
+
+        coverages.iter().enumerate().all(|(offset, coverage)| {
+            coverage.contains(glyphs[start - 1 - offset].0).is_some()
+        })
+    }
+
+    fn matches_lookahead_coverages(
+        coverages: &[crate::opentype::layouts::coverage::Coverage],
+        glyphs: &[(usize, usize)],
+        start: usize,
+    ) -> bool {
+        if start + coverages.len() > glyphs.len() {
+            return false;
+        }
+
+        coverages.iter().enumerate().all(|(offset, coverage)| {
+            coverage.contains(glyphs[start + offset].0).is_some()
+        })
+    }
+
+    fn apply_lookup_index_at(
+        &self,
+        lookup_list_index: u16,
+        glyphs: &mut Vec<(usize, usize)>,
+        index: usize,
+    ) -> bool {
+        let Some(lookup) = self.lookups.lookups.get(lookup_list_index as usize) else {
+            return false;
+        };
+
+        for subtable in &lookup.subtables {
+            if self.apply_subtable_at_with_tables(subtable, glyphs, index) {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    fn apply_sequence_lookup_records(
+        &self,
+        records: &crate::opentype::layouts::lookup::SequenceLookupRecords,
+        glyphs: &mut Vec<(usize, usize)>,
+        start_index: usize,
+    ) -> bool {
+        let mut changed = false;
+
+        for record in &records.lookup_records {
+            let target_index = start_index.saturating_add(record.sequence_index as usize);
+            if target_index >= glyphs.len() {
+                continue;
+            }
+            if self.apply_lookup_index_at(record.lookup_list_index, glyphs, target_index) {
+                changed = true;
+            }
+        }
+
+        changed
+    }
+
+    fn apply_subtable_at_with_tables(
+        &self,
+        subtable: &crate::opentype::layouts::lookup::LookupSubstitution,
+        glyphs: &mut Vec<(usize, usize)>,
+        index: usize,
+    ) -> bool {
+        let Some((glyph_id, _source_index)) = glyphs.get(index).copied() else {
+            return false;
+        };
+
+        match subtable {
+            crate::opentype::layouts::lookup::LookupSubstitution::ContextSubstitution(context) => {
+                let Some(rule_set_index) = context.coverage.contains(glyph_id) else {
+                    return false;
+                };
+                let Some(rule_set) = context.rule_sets.get(rule_set_index) else {
+                    return false;
+                };
+
+                for rule in &rule_set.rules {
+                    if index + rule.input_sequence.len() >= glyphs.len() + 1 {
+                        continue;
+                    }
+                    let matches = rule
+                        .input_sequence
+                        .iter()
+                        .enumerate()
+                        .all(|(offset, expected)| glyphs[index + 1 + offset].0 == *expected as usize);
+                    if !matches {
+                        continue;
+                    }
+
+                    let mut changed = false;
+                    for lookup_index in &rule.lookup_indexes {
+                        if self.apply_lookup_index_at(*lookup_index, glyphs, index) {
+                            changed = true;
+                        }
+                    }
+                    if changed {
+                        return true;
+                    }
+                }
+                false
+            }
+            crate::opentype::layouts::lookup::LookupSubstitution::ContextSubstitution2(context) => {
+                let Some(_) = context.coverage.contains(glyph_id) else {
+                    return false;
+                };
+                let rule_set_index = context.class_def.get_class(glyph_id as u16) as usize;
+                let Some(rule_set) = context.class_seq_rule_sets.get(rule_set_index) else {
+                    return false;
+                };
+
+                for rule in &rule_set.class_seq_rules {
+                    if index + rule.input_sequences.len() >= glyphs.len() + 1 {
+                        continue;
+                    }
+                    let matches = rule.input_sequences.iter().enumerate().all(|(offset, expected)| {
+                        context.class_def.get_class(glyphs[index + 1 + offset].0 as u16) == *expected
+                    });
+                    if !matches {
+                        continue;
+                    }
+                    if self.apply_sequence_lookup_records(&rule.seq_lookup_records, glyphs, index) {
+                        return true;
+                    }
+                }
+                false
+            }
+            crate::opentype::layouts::lookup::LookupSubstitution::ContextSubstitution3(context) => {
+                if !Self::matches_input_coverages(&context.coverages, glyphs, index) {
+                    return false;
+                }
+                self.apply_sequence_lookup_records(&context.seq_lookup_records, glyphs, index)
+            }
+            crate::opentype::layouts::lookup::LookupSubstitution::ChainingContextSubstitution(
+                chaining,
+            ) => {
+                let Some(rule_set_index) = chaining.coverage.contains(glyph_id) else {
+                    return false;
+                };
+                let Some(rule_set) = chaining.chain_sub_rule_set.get(rule_set_index) else {
+                    return false;
+                };
+
+                for rule in &rule_set.chain_sub_rule {
+                    if rule.backtrack_glyph_ids.len() > index {
+                        continue;
+                    }
+                    if index + rule.input_glyph_ids.len() + rule.lookahead_glyph_ids.len() >= glyphs.len() + 1 {
+                        continue;
+                    }
+                    let backtrack_matches = rule
+                        .backtrack_glyph_ids
+                        .iter()
+                        .enumerate()
+                        .all(|(offset, expected)| glyphs[index - 1 - offset].0 == *expected as usize);
+                    let input_matches = rule
+                        .input_glyph_ids
+                        .iter()
+                        .enumerate()
+                        .all(|(offset, expected)| glyphs[index + 1 + offset].0 == *expected as usize);
+                    let lookahead_matches = rule
+                        .lookahead_glyph_ids
+                        .iter()
+                        .enumerate()
+                        .all(|(offset, expected)| {
+                            glyphs[index + 1 + rule.input_glyph_ids.len() + offset].0
+                                == *expected as usize
+                        });
+                    if !(backtrack_matches && input_matches && lookahead_matches) {
+                        continue;
+                    }
+
+                    let mut changed = false;
+                    for lookup_index in &rule.lookup_indexes {
+                        if self.apply_lookup_index_at(*lookup_index, glyphs, index) {
+                            changed = true;
+                        }
+                    }
+                    if changed {
+                        return true;
+                    }
+                }
+                false
+            }
+            crate::opentype::layouts::lookup::LookupSubstitution::ChainingContextSubstitution3(
+                chaining,
+            ) => {
+                if !Self::matches_backtrack_coverages(&chaining.backtrack_coverages, glyphs, index) {
+                    return false;
+                }
+                if !Self::matches_input_coverages(&chaining.input_coverages, glyphs, index) {
+                    return false;
+                }
+                if !Self::matches_lookahead_coverages(
+                    &chaining.lookahead_coverages,
+                    glyphs,
+                    index + chaining.input_coverages.len(),
+                ) {
+                    return false;
+                }
+                self.apply_sequence_lookup_records(&chaining.seq_lookup_records, glyphs, index)
+            }
+            crate::opentype::layouts::lookup::LookupSubstitution::ExtensionSubstitution(extension) => {
+                self.apply_subtable_at_with_tables(&extension.subtable, glyphs, index)
+            }
+            _ => Self::apply_subtable_at(subtable, glyphs, index),
+        }
+    }
+
     pub(crate) fn apply_lookup_once(lookup: &Lookup, glyphs: &mut Vec<(usize, usize)>) -> bool {
         let mut index = 0usize;
         while index < glyphs.len() {
@@ -408,8 +641,30 @@ impl GSUB {
         false
     }
 
-    pub(crate) fn apply_ccmp_sequence(&self, glyphs: &mut Vec<(usize, usize)>) {
-        let lookups = self.collect_feature_lookups(None, &[*b"ccmp"]);
+    pub(crate) fn apply_lookup_once_with_tables(
+        &self,
+        lookup: &Lookup,
+        glyphs: &mut Vec<(usize, usize)>,
+    ) -> bool {
+        let mut index = 0usize;
+        while index < glyphs.len() {
+            for subtable in &lookup.subtables {
+                if self.apply_subtable_at_with_tables(subtable, glyphs, index) {
+                    return true;
+                }
+            }
+            index += 1;
+        }
+        false
+    }
+
+    pub(crate) fn apply_feature_sequence(
+        &self,
+        glyphs: &mut Vec<(usize, usize)>,
+        locale: Option<&str>,
+        feature_tags: &[[u8; 4]],
+    ) {
+        let lookups = self.collect_feature_lookups(locale, feature_tags);
         if lookups.is_empty() || glyphs.is_empty() {
             return;
         }
@@ -420,7 +675,7 @@ impl GSUB {
         loop {
             let mut changed = false;
             for lookup in &lookups {
-                if Self::apply_lookup_once(lookup, glyphs) {
+                if self.apply_lookup_once_with_tables(lookup, glyphs) {
                     changed = true;
                 }
             }
@@ -429,6 +684,10 @@ impl GSUB {
                 break;
             }
         }
+    }
+
+    pub(crate) fn apply_ccmp_sequence(&self, glyphs: &mut Vec<(usize, usize)>) {
+        self.apply_feature_sequence(glyphs, None, &[*b"ccmp"]);
     }
 
     pub(crate) fn lookup_joining_forms(
@@ -471,6 +730,14 @@ impl GSUB {
             };
             glyphs[index].0 = forms[index].substitute(glyphs[index].0, join_prev, join_next);
         }
+    }
+
+    pub(crate) fn apply_rtl_contextual_sequence(
+        &self,
+        glyphs: &mut Vec<(usize, usize)>,
+        locale: Option<&str>,
+    ) {
+        self.apply_feature_sequence(glyphs, locale, &[*b"rlig", *b"calt"]);
     }
 
     // ccmp Glyph Composition / Decomposition

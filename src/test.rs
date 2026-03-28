@@ -621,6 +621,16 @@ mod tests {
 
     #[cfg(feature = "layout")]
     fn build_gsub_table(feature_tag: [u8; 4], lookups: Vec<Vec<u8>>) -> Vec<u8> {
+        let feature_lookup_indices: Vec<u16> = (0..lookups.len() as u16).collect();
+        build_gsub_table_with_feature_lookups(feature_tag, &feature_lookup_indices, lookups)
+    }
+
+    #[cfg(feature = "layout")]
+    fn build_gsub_table_with_feature_lookups(
+        feature_tag: [u8; 4],
+        feature_lookup_indices: &[u16],
+        lookups: Vec<Vec<u8>>,
+    ) -> Vec<u8> {
         let mut script_list = Vec::new();
         push_u16(&mut script_list, 1);
         script_list.extend_from_slice(b"DFLT");
@@ -637,9 +647,9 @@ mod tests {
         feature_list.extend_from_slice(&feature_tag);
         push_u16(&mut feature_list, 8);
         push_u16(&mut feature_list, 0);
-        push_u16(&mut feature_list, lookups.len() as u16);
-        for lookup_index in 0..lookups.len() as u16 {
-            push_u16(&mut feature_list, lookup_index);
+        push_u16(&mut feature_list, feature_lookup_indices.len() as u16);
+        for lookup_index in feature_lookup_indices {
+            push_u16(&mut feature_list, *lookup_index);
         }
 
         let lookup_list = build_lookup_list(lookups);
@@ -657,6 +667,238 @@ mod tests {
         buffer.extend_from_slice(&feature_list);
         buffer.extend_from_slice(&lookup_list);
         buffer
+    }
+
+    #[cfg(feature = "layout")]
+    fn lookup_context_format3_record(
+        coverages: &[Vec<u8>],
+        sequence_index: u16,
+        lookup_list_index: u16,
+    ) -> Vec<u8> {
+        let mut subtable = Vec::new();
+        push_u16(&mut subtable, 3);
+        push_u16(&mut subtable, coverages.len() as u16);
+        push_u16(&mut subtable, 1);
+
+        let offsets_pos = subtable.len();
+        subtable.resize(subtable.len() + coverages.len() * 2, 0);
+        push_u16(&mut subtable, sequence_index);
+        push_u16(&mut subtable, lookup_list_index);
+
+        let mut offsets = Vec::new();
+        for coverage in coverages {
+            offsets.push(subtable.len() as u16);
+            subtable.extend_from_slice(coverage);
+        }
+
+        for (index, offset) in offsets.iter().enumerate() {
+            let start = offsets_pos + index * 2;
+            subtable[start..start + 2].copy_from_slice(&offset.to_be_bytes());
+        }
+
+        build_lookup_record(LookupType::ContextSubstitution as u16, subtable)
+    }
+
+    #[cfg(feature = "layout")]
+    fn class_def_format1_table(start_glyph_id: u16, class_values: &[u16]) -> Vec<u8> {
+        let mut buffer = Vec::new();
+        push_u16(&mut buffer, 1);
+        push_u16(&mut buffer, start_glyph_id);
+        push_u16(&mut buffer, class_values.len() as u16);
+        for class_value in class_values {
+            push_u16(&mut buffer, *class_value);
+        }
+        buffer
+    }
+
+    #[cfg(feature = "layout")]
+    fn lookup_context_format1_record(
+        coverage_glyph_id: u16,
+        input_sequence: &[u16],
+        lookup_indexes: &[u16],
+    ) -> Vec<u8> {
+        let coverage = coverage_table(&[coverage_glyph_id]);
+        let mut rule = Vec::new();
+        push_u16(&mut rule, (input_sequence.len() + 1) as u16);
+        push_u16(&mut rule, lookup_indexes.len() as u16);
+        for glyph_id in input_sequence {
+            push_u16(&mut rule, *glyph_id);
+        }
+        for lookup_index in lookup_indexes {
+            push_u16(&mut rule, *lookup_index);
+        }
+
+        let mut rule_set = Vec::new();
+        push_u16(&mut rule_set, 1);
+        push_u16(&mut rule_set, 4);
+        rule_set.extend_from_slice(&rule);
+
+        let rule_set_offset = 8u16;
+        let coverage_offset = rule_set_offset + rule_set.len() as u16;
+        let mut subtable = Vec::new();
+        push_u16(&mut subtable, 1);
+        push_u16(&mut subtable, coverage_offset);
+        push_u16(&mut subtable, 1);
+        push_u16(&mut subtable, rule_set_offset);
+        subtable.extend_from_slice(&rule_set);
+        subtable.extend_from_slice(&coverage);
+
+        build_lookup_record(LookupType::ContextSubstitution as u16, subtable)
+    }
+
+    #[cfg(feature = "layout")]
+    fn lookup_context_format2_record(
+        coverage_glyph_id: u16,
+        class_values: &[u16],
+        input_classes: &[u16],
+        sequence_index: u16,
+        lookup_list_index: u16,
+    ) -> Vec<u8> {
+        let coverage = coverage_table(&[coverage_glyph_id]);
+        let class_def = class_def_format1_table(coverage_glyph_id, class_values);
+
+        let mut rule = Vec::new();
+        push_u16(&mut rule, (input_classes.len() + 1) as u16);
+        push_u16(&mut rule, 1);
+        for class_id in input_classes {
+            push_u16(&mut rule, *class_id);
+        }
+        push_u16(&mut rule, sequence_index);
+        push_u16(&mut rule, lookup_list_index);
+
+        let mut empty_rule_set = Vec::new();
+        push_u16(&mut empty_rule_set, 0);
+
+        let mut active_rule_set = Vec::new();
+        push_u16(&mut active_rule_set, 1);
+        push_u16(&mut active_rule_set, 4);
+        active_rule_set.extend_from_slice(&rule);
+
+        let class0_offset = 14u16;
+        let class1_offset = class0_offset + empty_rule_set.len() as u16;
+        let class2_offset = class1_offset + active_rule_set.len() as u16;
+        let class_def_offset = class2_offset + empty_rule_set.len() as u16;
+        let coverage_offset = class_def_offset + class_def.len() as u16;
+
+        let mut subtable = Vec::new();
+        push_u16(&mut subtable, 2);
+        push_u16(&mut subtable, coverage_offset);
+        push_u16(&mut subtable, class_def_offset);
+        push_u16(&mut subtable, 3);
+        push_u16(&mut subtable, class0_offset);
+        push_u16(&mut subtable, class1_offset);
+        push_u16(&mut subtable, class2_offset);
+        subtable.extend_from_slice(&empty_rule_set);
+        subtable.extend_from_slice(&active_rule_set);
+        subtable.extend_from_slice(&empty_rule_set);
+        subtable.extend_from_slice(&class_def);
+        subtable.extend_from_slice(&coverage);
+
+        build_lookup_record(LookupType::ContextSubstitution as u16, subtable)
+    }
+
+    #[cfg(feature = "layout")]
+    fn lookup_chaining_context_format3_record(
+        backtrack_coverages: &[Vec<u8>],
+        input_coverages: &[Vec<u8>],
+        lookahead_coverages: &[Vec<u8>],
+        sequence_index: u16,
+        lookup_list_index: u16,
+    ) -> Vec<u8> {
+        let mut subtable = Vec::new();
+        push_u16(&mut subtable, 3);
+        push_u16(&mut subtable, backtrack_coverages.len() as u16);
+
+        let backtrack_offsets_pos = subtable.len();
+        subtable.resize(subtable.len() + backtrack_coverages.len() * 2, 0);
+
+        push_u16(&mut subtable, input_coverages.len() as u16);
+        let input_offsets_pos = subtable.len();
+        subtable.resize(subtable.len() + input_coverages.len() * 2, 0);
+
+        push_u16(&mut subtable, lookahead_coverages.len() as u16);
+        let lookahead_offsets_pos = subtable.len();
+        subtable.resize(subtable.len() + lookahead_coverages.len() * 2, 0);
+
+        push_u16(&mut subtable, 1);
+        push_u16(&mut subtable, sequence_index);
+        push_u16(&mut subtable, lookup_list_index);
+
+        let mut backtrack_offsets = Vec::new();
+        for coverage in backtrack_coverages {
+            backtrack_offsets.push(subtable.len() as u16);
+            subtable.extend_from_slice(coverage);
+        }
+        let mut input_offsets = Vec::new();
+        for coverage in input_coverages {
+            input_offsets.push(subtable.len() as u16);
+            subtable.extend_from_slice(coverage);
+        }
+        let mut lookahead_offsets = Vec::new();
+        for coverage in lookahead_coverages {
+            lookahead_offsets.push(subtable.len() as u16);
+            subtable.extend_from_slice(coverage);
+        }
+
+        for (index, offset) in backtrack_offsets.iter().enumerate() {
+            let start = backtrack_offsets_pos + index * 2;
+            subtable[start..start + 2].copy_from_slice(&offset.to_be_bytes());
+        }
+        for (index, offset) in input_offsets.iter().enumerate() {
+            let start = input_offsets_pos + index * 2;
+            subtable[start..start + 2].copy_from_slice(&offset.to_be_bytes());
+        }
+        for (index, offset) in lookahead_offsets.iter().enumerate() {
+            let start = lookahead_offsets_pos + index * 2;
+            subtable[start..start + 2].copy_from_slice(&offset.to_be_bytes());
+        }
+
+        build_lookup_record(LookupType::ChainingContextSubstitution as u16, subtable)
+    }
+
+    #[cfg(feature = "layout")]
+    fn lookup_chaining_context_format1_record(
+        coverage_glyph_id: u16,
+        backtrack_glyph_ids: &[u16],
+        input_glyph_ids: &[u16],
+        lookahead_glyph_ids: &[u16],
+        lookup_indexes: &[u16],
+    ) -> Vec<u8> {
+        let coverage = coverage_table(&[coverage_glyph_id]);
+        let mut rule = Vec::new();
+        push_u16(&mut rule, backtrack_glyph_ids.len() as u16);
+        for glyph_id in backtrack_glyph_ids {
+            push_u16(&mut rule, *glyph_id);
+        }
+        push_u16(&mut rule, input_glyph_ids.len() as u16);
+        for glyph_id in input_glyph_ids {
+            push_u16(&mut rule, *glyph_id);
+        }
+        push_u16(&mut rule, lookahead_glyph_ids.len() as u16);
+        for glyph_id in lookahead_glyph_ids {
+            push_u16(&mut rule, *glyph_id);
+        }
+        push_u16(&mut rule, lookup_indexes.len() as u16);
+        for lookup_index in lookup_indexes {
+            push_u16(&mut rule, *lookup_index);
+        }
+
+        let mut rule_set = Vec::new();
+        push_u16(&mut rule_set, 1);
+        push_u16(&mut rule_set, 4);
+        rule_set.extend_from_slice(&rule);
+
+        let rule_set_offset = 8u16;
+        let coverage_offset = rule_set_offset + rule_set.len() as u16;
+        let mut subtable = Vec::new();
+        push_u16(&mut subtable, 1);
+        push_u16(&mut subtable, coverage_offset);
+        push_u16(&mut subtable, 1);
+        push_u16(&mut subtable, rule_set_offset);
+        subtable.extend_from_slice(&rule_set);
+        subtable.extend_from_slice(&coverage);
+
+        build_lookup_record(LookupType::ChainingContextSubstitution as u16, subtable)
     }
 
     #[cfg(feature = "layout")]
@@ -678,6 +920,18 @@ mod tests {
         subtable.extend_from_slice(&sequence);
         subtable.extend_from_slice(&coverage);
         build_lookup_record(LookupType::MultipleSubstitution as u16, subtable)
+    }
+
+    #[cfg(feature = "layout")]
+    fn lookup_single_record(glyph_id: u16, substitute_glyph_id: u16) -> Vec<u8> {
+        let coverage = coverage_table(&[glyph_id]);
+        let mut subtable = Vec::new();
+        push_u16(&mut subtable, 2);
+        push_u16(&mut subtable, 8);
+        push_u16(&mut subtable, 1);
+        push_u16(&mut subtable, substitute_glyph_id);
+        subtable.extend_from_slice(&coverage);
+        build_lookup_record(LookupType::SingleSubstitution as u16, subtable)
     }
 
     #[cfg(feature = "layout")]
@@ -864,6 +1118,89 @@ mod tests {
         gsub.apply_ccmp_sequence(&mut glyphs);
 
         assert_eq!(glyphs, vec![(99, 0)]);
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn gsub_apply_feature_sequence_supports_context_format3() {
+        let gsub = parse_gsub(build_gsub_table_with_feature_lookups(
+            *b"calt",
+            &[0],
+            vec![
+                lookup_context_format3_record(&[coverage_table(&[10]), coverage_table(&[11])], 1, 1),
+                lookup_single_record(11, 77),
+            ],
+        ));
+        let mut glyphs = vec![(10usize, 0usize), (11usize, 1usize)];
+
+        gsub.apply_feature_sequence(&mut glyphs, None, &[*b"calt"]);
+
+        assert_eq!(glyphs, vec![(10, 0), (77, 1)]);
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn gsub_apply_feature_sequence_supports_context_format1_and_format2() {
+        let gsub = parse_gsub(build_gsub_table_with_feature_lookups(
+            *b"calt",
+            &[0, 1],
+            vec![
+                lookup_context_format1_record(10, &[11], &[2]),
+                lookup_context_format2_record(20, &[1, 2], &[2], 1, 3),
+                lookup_single_record(10, 70),
+                lookup_single_record(21, 99),
+            ],
+        ));
+
+        let mut format1_glyphs = vec![(10usize, 0usize), (11usize, 1usize)];
+        gsub.apply_feature_sequence(&mut format1_glyphs, None, &[*b"calt"]);
+        assert_eq!(format1_glyphs, vec![(70, 0), (11, 1)]);
+
+        let mut format2_glyphs = vec![(20usize, 0usize), (21usize, 1usize)];
+        gsub.apply_feature_sequence(&mut format2_glyphs, None, &[*b"calt"]);
+        assert_eq!(format2_glyphs, vec![(20, 0), (99, 1)]);
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn gsub_apply_feature_sequence_supports_chaining_context_format3() {
+        let gsub = parse_gsub(build_gsub_table_with_feature_lookups(
+            *b"calt",
+            &[0],
+            vec![
+                lookup_chaining_context_format3_record(
+                    &[coverage_table(&[10])],
+                    &[coverage_table(&[11])],
+                    &[coverage_table(&[12])],
+                    0,
+                    1,
+                ),
+                lookup_single_record(11, 88),
+            ],
+        ));
+        let mut glyphs = vec![(10usize, 0usize), (11usize, 1usize), (12usize, 2usize)];
+
+        gsub.apply_feature_sequence(&mut glyphs, None, &[*b"calt"]);
+
+        assert_eq!(glyphs, vec![(10, 0), (88, 1), (12, 2)]);
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn gsub_apply_feature_sequence_supports_chaining_context_format1() {
+        let gsub = parse_gsub(build_gsub_table_with_feature_lookups(
+            *b"calt",
+            &[0],
+            vec![
+                lookup_chaining_context_format1_record(11, &[10], &[], &[12], &[1]),
+                lookup_single_record(11, 66),
+            ],
+        ));
+        let mut glyphs = vec![(10usize, 0usize), (11usize, 1usize), (12usize, 2usize)];
+
+        gsub.apply_feature_sequence(&mut glyphs, None, &[*b"calt"]);
+
+        assert_eq!(glyphs, vec![(10, 0), (66, 1), (12, 2)]);
     }
 
     #[test]

@@ -176,7 +176,9 @@ The library now compiles for `wasm32-unknown-unknown`.
 - Direction-aware APIs: `FontOptions::with_vertical_flow()` uses vertical metrics and GSUB vertical forms when available; `with_right_to_left()` reverses inline advance for RTL layout
 - RTL shaping: Arabic joining forms through GSUB `isol` / `init` / `medi` / `fina` are applied when those features exist
 - RTL shaping: GSUB `rlig` required ligatures are also applied in RTL shaping when present
-- Current limitation: context/chaining-driven substitutions and other advanced RTL shaping are still not implemented
+- Partial context/chaining support: GSUB Context / Chaining Context Format 3 substitutions are applied through the new feature-sequence engine
+- Partial context/chaining support: Context Format 1 / 2 and Chaining Context Format 1 are also wired into the feature-sequence engine
+- Current limitation: many context/chaining cases are still unimplemented, especially Chaining Context Format 2 and broader script-specific RTL shaping
 - Not implemented: `lookup_width()`, `lookup_number()`
 
 ### Lookup parsing
@@ -186,12 +188,13 @@ The library now compiles for `wasm32-unknown-unknown`.
 - Type 3 Alternate Substitution: parsed and expandable
 - Type 4 Ligature Substitution: parsed and expandable
 - Type 5 Context Substitution:
-  Format 1 is expandable
-  Format 2 and Format 3 are parsed but not fully applied
+  Format 1 is parsed and partially applicable through the feature-sequence engine
+  Format 2 is parsed and partially applicable through the feature-sequence engine
+  Format 3 is parsed and applicable through the feature-sequence engine
 - Type 6 Chaining Context Substitution:
-  Format 1 is expandable
+  Format 1 is parsed and partially applicable through the feature-sequence engine
   Format 2 is only partially applied
-  Format 3 is parsed but not applied and is ignored instead of panicking
+  Format 3 is parsed and applicable through the feature-sequence engine
 - Type 7 Extension Substitution: parsed, not applied
 - Type 8 Reverse Chaining Contextual Single Substitution: parsed, not applied
 

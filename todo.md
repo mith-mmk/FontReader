@@ -59,7 +59,10 @@ _test_fonts/* がテスト用フォント
     - [x] `FontOptions::with_right_to_left()` で Hebrew の RTL 配置を `text2commands` / `measure` / `FontFamily` で確認
     - [x] GSUB `isol` / `init` / `medi` / `fina` を使う Arabic joining を `text2commands` / `FontFamily` で確認
     - [x] GSUB `rlig` required ligature を `text2commands` / `FontFamily` で確認
-    - [ ] context/chaining 依存の script 固有 shaping
+    - [*] context/chaining 依存の script 固有 shaping
+        - [x] GSUB Context Format 1 / 2 / 3 の適用器
+        - [x] GSUB Chaining Context Format 1 / 3 の適用器
+        - [ ] Chaining Context Format 2 と script 固有拡張
 - loader
     - [x] font
     - [x] font collection
@@ -135,7 +138,8 @@ _test_fonts/* がテスト用フォント
 - [ ] 日本語
 - [ ] チベット語
 - [ ] 古ハングル
-- [ ] その他
+- [ ] 異字体セレクタ1
+- [ ] 異字体セレクタ2
 # format
 - [+] woff2対応
 - [+] CID-keyed CFF / FDSelect
@@ -153,7 +157,10 @@ _test_fonts/* がテスト用フォント
         - [x] `ccmp` の multiple / ligature / extension を text API shaping に反映
         - [x] RTL で `isol` / `init` / `medi` / `fina` を利用
         - [x] RTL で `rlig` を利用
-        - [ ] context / chaining の適用拡張
+        - [*] context / chaining の適用拡張
+            - [x] Context Format 1 / 2 / 3
+            - [x] Chaining Context Format 1 / 3
+            - [ ] Chaining Context Format 2
 
 # opentype
 - [x] True Type
@@ -187,7 +194,10 @@ _test_fonts/* がテスト用フォント
     - [x] `TextDirection::RightToLeft` で RTL の inline 進行方向を利用
     - [x] Arabic joining (`isol` / `init` / `medi` / `fina`)
     - [x] Arabic required ligature (`rlig`)
-    - [ ] context/chaining ベースの RTL shaping
+    - [*] context/chaining ベースの RTL shaping
+        - [x] Context Format 1 / 2 / 3 の feature-sequence 適用
+        - [x] Chaining Context Format 1 / 3 の feature-sequence 適用
+        - [ ] Chaining Context Format 2
 - [ ] 未実装: `lookup_width()`, `lookup_number()`
 - [ ] aalt
 - [ ] dlig
@@ -211,13 +221,13 @@ _test_fonts/* がテスト用フォント
 - [ ] Type 3 Alternate Substitution: パース済み、展開可能
 - [x] Type 4 Ligature Substitution: パース済み、展開可能
 - [ ] Type 5 Context Substitution:
-    - [ ] Format 1 は展開可能
-    - [ ] Format 2
-    - [ ] Format 3
+    - [x] Format 1
+    - [x] Format 2
+    - [x] Format 3
 - [ ] Type 6 Chaining Context Substitution:
-    - [ ] Format 1 は展開可能
+    - [x] Format 1
     - [ ] Format 2 は一部のみ適用
-    - [ ] Format 3 はパースのみで、適用は未実装。未対応 lookup は panic せず無視
+    - [x] Format 3
 - [*] Type 7 Extension Substitution: パース済み、single / multiple / ligature は適用可能
 - [ ] Type 8 Reverse Chaining Contextual Single Substitution: パース済み、適用は未実装
 

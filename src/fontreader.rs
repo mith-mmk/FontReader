@@ -874,6 +874,7 @@ impl Font {
             gsub.apply_ccmp_sequence(&mut ccmp_glyphs);
             if is_right_to_left {
                 gsub.apply_joining_sequence(&mut ccmp_glyphs, locale);
+                gsub.apply_rtl_contextual_sequence(&mut ccmp_glyphs, locale);
             }
             let expanded_glyphs = ccmp_glyphs
                 .into_iter()
