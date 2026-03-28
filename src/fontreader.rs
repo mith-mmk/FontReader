@@ -16,6 +16,8 @@ use crate::opentype::color::{colr, cpal};
 #[cfg(feature = "layout")]
 use crate::opentype::extentions::gdef;
 #[cfg(feature = "layout")]
+use crate::opentype::extentions::gpos;
+#[cfg(feature = "layout")]
 use crate::opentype::extentions::gsub;
 use crate::opentype::platforms::PlatformID;
 use crate::opentype::requires::cmap::CmapEncodings;
@@ -127,6 +129,8 @@ pub struct Font {
     #[cfg(feature = "layout")]
     pub(crate) gdef: Option<gdef::GDEF>,
     #[cfg(feature = "layout")]
+    pub(crate) gpos: Option<gpos::GPOS>,
+    #[cfg(feature = "layout")]
     pub(crate) gsub: Option<gsub::GSUB>,
     pub(crate) svg: Option<svg::SVG>,
     pub(crate) sbix: Option<sbix::SBIX>,
@@ -161,6 +165,14 @@ struct ResolvedGlyph {
     glyph_id: usize,
 }
 
+#[derive(Debug, Clone, Copy, Default)]
+struct GlyphPositionAdjustment {
+    placement_x: f32,
+    placement_y: f32,
+    advance_x: f32,
+    advance_y: f32,
+}
+
 impl Font {
     fn empty() -> Self {
         Self {
@@ -182,6 +194,8 @@ impl Font {
             cpal: None,
             #[cfg(feature = "layout")]
             gdef: None,
+            #[cfg(feature = "layout")]
+            gpos: None,
             #[cfg(feature = "layout")]
             gsub: None,
             sbix: None,
@@ -710,6 +724,15 @@ impl Font {
     }
 
     #[cfg(feature = "layout")]
+    fn current_gpos(&self) -> Option<&gpos::GPOS> {
+        if self.current_font == 0 {
+            self.gpos.as_ref()
+        } else {
+            self.more_fonts[self.current_font - 1].gpos.as_ref()
+        }
+    }
+
+    #[cfg(feature = "layout")]
     fn current_gsub(&self) -> Option<&gsub::GSUB> {
         if self.current_font == 0 {
             self.gsub.as_ref()
@@ -841,10 +864,25 @@ impl Font {
         if let Some(gsub) = self.current_gsub() {
             const MAX_LIGATURE_COMPONENTS: usize = 8;
 
-            let glyph_ids: Vec<usize> = glyphs.iter().map(|glyph| glyph.glyph_id).collect();
+            let mut ccmp_glyphs = glyphs
+                .iter()
+                .enumerate()
+                .map(|(source_index, glyph)| (glyph.glyph_id, source_index))
+                .collect::<Vec<_>>();
+            gsub.apply_ccmp_sequence(&mut ccmp_glyphs);
+            let expanded_glyphs = ccmp_glyphs
+                .into_iter()
+                .map(|(glyph_id, source_index)| ResolvedGlyph {
+                    ch: glyphs[source_index].ch,
+                    glyph_id,
+                })
+                .collect::<Vec<_>>();
+
+            let glyph_ids: Vec<usize> =
+                expanded_glyphs.iter().map(|glyph| glyph.glyph_id).collect();
             let mut index = 0;
-            while index < glyphs.len() {
-                let max_len = (glyphs.len() - index).min(MAX_LIGATURE_COMPONENTS);
+            while index < expanded_glyphs.len() {
+                let max_len = (expanded_glyphs.len() - index).min(MAX_LIGATURE_COMPONENTS);
                 let mut matched = None;
                 for len in (2..=max_len).rev() {
                     if let Some(glyph_id) =
@@ -857,12 +895,12 @@ impl Font {
 
                 if let Some((glyph_id, len)) = matched {
                     output.push(ResolvedTextUnit::Glyph(ResolvedGlyph {
-                        ch: glyphs[index].ch,
+                        ch: expanded_glyphs[index].ch,
                         glyph_id,
                     }));
                     index += len;
                 } else {
-                    output.push(ResolvedTextUnit::Glyph(glyphs[index]));
+                    output.push(ResolvedTextUnit::Glyph(expanded_glyphs[index]));
                     index += 1;
                 }
             }
@@ -1025,6 +1063,75 @@ impl Font {
         Ok((hhea.get_accender() - hhea.get_descender() + hhea.get_line_gap()) as f64)
     }
 
+    fn glyph_unit_at(
+        units: &[ResolvedTextUnit],
+        index: usize,
+    ) -> Option<ResolvedGlyph> {
+        match units.get(index) {
+            Some(ResolvedTextUnit::Glyph(glyph)) => Some(*glyph),
+            _ => None,
+        }
+    }
+
+    fn pair_adjustment_for_index(
+        &self,
+        units: &[ResolvedTextUnit],
+        index: usize,
+        locale: Option<&str>,
+        scale_x: f32,
+        scale_y: f32,
+    ) -> GlyphPositionAdjustment {
+        #[cfg(not(feature = "layout"))]
+        {
+            let _ = (units, index, locale, scale_x, scale_y);
+            GlyphPositionAdjustment::default()
+        }
+
+        #[cfg(feature = "layout")]
+        {
+            let Some(gpos) = self.current_gpos() else {
+                return GlyphPositionAdjustment::default();
+            };
+            let Some(current) = Self::glyph_unit_at(units, index) else {
+                return GlyphPositionAdjustment::default();
+            };
+
+            let mut adjustment = GlyphPositionAdjustment::default();
+
+            if index > 0 {
+                if let Some(previous) = Self::glyph_unit_at(units, index - 1) {
+                    if let Some(pair) = gpos.lookup_pair_adjustment(
+                        previous.glyph_id as u16,
+                        current.glyph_id as u16,
+                        false,
+                        locale,
+                    ) {
+                        adjustment.placement_x += pair.second.x_placement as f32 * scale_x;
+                        adjustment.placement_y += pair.second.y_placement as f32 * scale_y;
+                        adjustment.advance_x += pair.second.x_advance as f32 * scale_x;
+                        adjustment.advance_y += pair.second.y_advance as f32 * scale_y;
+                    }
+                }
+            }
+
+            if let Some(next) = Self::glyph_unit_at(units, index + 1) {
+                if let Some(pair) = gpos.lookup_pair_adjustment(
+                    current.glyph_id as u16,
+                    next.glyph_id as u16,
+                    false,
+                    locale,
+                ) {
+                    adjustment.placement_x += pair.first.x_placement as f32 * scale_x;
+                    adjustment.placement_y += pair.first.y_placement as f32 * scale_y;
+                    adjustment.advance_x += pair.first.x_advance as f32 * scale_x;
+                    adjustment.advance_y += pair.first.y_advance as f32 * scale_y;
+                }
+            }
+
+            adjustment
+        }
+    }
+
     pub fn text2glyph_run(
         &self,
         text: &str,
@@ -1054,9 +1161,10 @@ impl Font {
         let mut cursor_x = 0.0f32;
         let mut cursor_y = 0.0f32;
         let tab_advance = line_height;
+        let shaped_units = self.shape_text_units(text, false, options.locale)?;
 
-        for unit in self.shape_text_units(text, false, options.locale)? {
-            match unit {
+        for (index, unit) in shaped_units.iter().enumerate() {
+            match *unit {
                 ResolvedTextUnit::Newline => {
                     cursor_x = 0.0;
                     cursor_y += line_height;
@@ -1101,6 +1209,15 @@ impl Font {
 
                     let mut metrics =
                         glyph_metrics_from_layout(&open_type_glyph.layout, scale_x, scale_y);
+                    let adjustment = self.pair_adjustment_for_index(
+                        &shaped_units,
+                        index,
+                        options.locale,
+                        scale_x,
+                        scale_y,
+                    );
+                    metrics.advance_x += adjustment.advance_x;
+                    metrics.advance_y += adjustment.advance_y;
                     metrics.bounds = glyph_layers_bounds(&layers);
 
                     let glyph = Glyph {
@@ -1108,8 +1225,13 @@ impl Font {
                         metrics,
                         layers,
                     };
-                    glyphs.push(PositionedGlyph::new(glyph, cursor_x, cursor_y));
+                    glyphs.push(PositionedGlyph::new(
+                        glyph,
+                        cursor_x + adjustment.placement_x,
+                        cursor_y + adjustment.placement_y,
+                    ));
                     cursor_x += metrics.advance_x;
+                    cursor_y += metrics.advance_y;
                 }
             }
         }
@@ -1222,9 +1344,10 @@ impl Font {
         let mut line_index = 0usize;
         let line_height = self.default_line_height()?;
         let tab_advance = line_height;
+        let shaped_units = self.shape_text_units(text, false, None)?;
 
-        for unit in self.shape_text_units(text, false, None)? {
-            match unit {
+        for (index, unit) in shaped_units.iter().enumerate() {
+            match *unit {
                 ResolvedTextUnit::Newline => {
                     cursor_x = 0.0;
                     line_index += 1;
@@ -1238,12 +1361,15 @@ impl Font {
                         .open_type_glyf
                         .as_ref()
                         .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "glyph is none"))?;
-                    let origin_y = -(line_index as f64 * line_height);
+                    let adjustment =
+                        self.pair_adjustment_for_index(&shaped_units, index, None, 1.0, 1.0);
+                    let origin_y = -(line_index as f64 * line_height) + adjustment.placement_y as f64;
                     let advance_width = match &open_type_glyph.layout {
                         FontLayout::Horizontal(layout) => layout.advance_width as f64,
                         FontLayout::Vertical(layout) => layout.advance_height as f64,
                         FontLayout::Unknown => 0.0,
-                    };
+                    } + adjustment.advance_x as f64;
+                    let origin_x = cursor_x + adjustment.placement_x as f64;
 
                     if let Some(sbix) = self.current_sbix() {
                         if let Some(bitmap) = sbix.get_raster_glyph(
@@ -1266,7 +1392,7 @@ impl Font {
                             result.push(GlyphCommands {
                                 ch: resolved.ch,
                                 glyph_id: glyph_data.glyph_id,
-                                origin_x: cursor_x,
+                                origin_x,
                                 origin_y,
                                 advance_width,
                                 commands: Vec::new(),
@@ -1296,13 +1422,13 @@ impl Font {
                             let commands = glyf.to_path_commands(
                                 glyph_data.glyph_id,
                                 &open_type_glyph.layout,
-                                cursor_x,
+                                origin_x,
                                 origin_y,
                             );
                             result.push(GlyphCommands {
                                 ch: resolved.ch,
                                 glyph_id: glyph_data.glyph_id,
-                                origin_x: cursor_x,
+                                origin_x,
                                 origin_y,
                                 advance_width,
                                 commands,
@@ -1333,9 +1459,10 @@ impl Font {
         let mut max_line_width: f64 = 0.0;
         let line_height = self.default_line_height()?;
         let tab_advance = line_height;
+        let shaped_units = self.shape_text_units(text, false, None)?;
 
-        for unit in self.shape_text_units(text, false, None)? {
-            match unit {
+        for (index, unit) in shaped_units.iter().enumerate() {
+            match *unit {
                 ResolvedTextUnit::Newline => {
                     max_line_width = max_line_width.max(cursor_x);
                     cursor_x = 0.0;
@@ -1350,11 +1477,13 @@ impl Font {
                         .as_ref()
                         .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "glyph is none"))?;
 
+                    let adjustment =
+                        self.pair_adjustment_for_index(&shaped_units, index, None, 1.0, 1.0);
                     let advance_width = match &open_type_glyph.layout {
                         FontLayout::Horizontal(layout) => layout.advance_width as f64,
                         FontLayout::Vertical(layout) => layout.advance_height as f64,
                         FontLayout::Unknown => 0.0,
-                    };
+                    } + adjustment.advance_x as f64;
                     cursor_x += advance_width;
                 }
             }
@@ -2320,6 +2449,12 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Result<Font, Error> {
                         font.cff = Some(cff.unwrap());
                     }
                     #[cfg(feature = "layout")]
+                    b"GPOS" => {
+                        let mut reader = BytesReader::new(&table.data);
+                        let gpos = gpos::GPOS::new(&mut reader, 0, table.data.len() as u32)?;
+                        font.gpos = Some(gpos);
+                    }
+                    #[cfg(feature = "layout")]
                     b"GSUB" => {
                         let mut reader = BytesReader::new(&table.data);
                         let gsub = gsub::GSUB::new(&mut reader, 0, table.data.len() as u32)?;
@@ -2486,6 +2621,11 @@ fn from_opentype<R: BinaryReader>(file: &mut R, header: &OTFHeader) -> Result<Fo
             b"CFF " => {
                 let cff = cff::CFF::new(file, record.offset, record.length);
                 font.cff = Some(cff.unwrap());
+            }
+            #[cfg(feature = "layout")]
+            b"GPOS" => {
+                let gpos = gpos::GPOS::new(file, record.offset, record.length)?;
+                font.gpos = Some(gpos);
             }
             #[cfg(feature = "layout")]
             b"GSUB" => {

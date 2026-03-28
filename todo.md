@@ -149,6 +149,16 @@ _test_fonts/* がテスト用フォント
 - [+] sbix
 - [ ] svg  # svgパーサーがいる
 
+
+# GPOS
+- [ ] 実装
+- [ ] palt
+- [ ] vpal
+- [ ] kern
+- [ ] vkrn
+- [ ] halt
+- [ ] vhal
+
 # GSUB
 
 - パース済み: `ScriptList`, `FeatureList`, `LookupList`
@@ -172,14 +182,6 @@ _test_fonts/* がテスト用フォント
 - [ ] vrt2
 - [ ] zero
 
-# GPOS
-- [ ] 実装
-- [ ] palt
-- [ ] vpal
-- [ ] kern
-- [ ] vkrn
-- [ ] halt
-- [ ] vhal
 
 ### Lookup パース
 - [ ] Type 1 Single Substitution: パース済み、展開可能

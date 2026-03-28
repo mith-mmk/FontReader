@@ -8,7 +8,7 @@ mod tests {
             AlternateSet, AlternateSubstitutionFormat1, ChainSubRule, ChainSubRuleSet,
             ChainingContextSubstitutionFormat1, ChainingContextSubstitutionFormat2,
             ChainingContextSubstitutionFormat3, ContextSubstitutionFormat1, LigatureSet,
-            LigatureSubstitutionFormat1, LigatureTable, LookupList, LookupResult,
+            LigatureSubstitutionFormat1, LigatureTable, Lookup, LookupList, LookupResult,
             LookupSubstitution, LookupType, MultipleSubstitutionFormat1, SequenceLookupRecords,
             SequenceRule, SequenceRuleSet, SequenceTable, SingleSubstitutionFormat1,
             SingleSubstitutionFormat2,
@@ -483,6 +483,240 @@ mod tests {
         LookupList::new(&mut reader, 0, buffer.len() as u32).unwrap()
     }
 
+    #[cfg(feature = "layout")]
+    fn coverage_table(glyph_ids: &[u16]) -> Vec<u8> {
+        let mut buffer = Vec::new();
+        push_u16(&mut buffer, 1);
+        push_u16(&mut buffer, glyph_ids.len() as u16);
+        for glyph_id in glyph_ids {
+            push_u16(&mut buffer, *glyph_id);
+        }
+        buffer
+    }
+
+    #[cfg(feature = "layout")]
+    fn build_gpos_pair_format1_subtable(left: u16, right: u16, x_advance: i16) -> Vec<u8> {
+        let coverage = coverage_table(&[left]);
+        let mut pair_set = Vec::new();
+        push_u16(&mut pair_set, 1);
+        push_u16(&mut pair_set, right);
+        push_u16(&mut pair_set, x_advance as u16);
+
+        let mut buffer = Vec::new();
+        push_u16(&mut buffer, 1);
+        push_u16(&mut buffer, 12);
+        push_u16(&mut buffer, 0x0004);
+        push_u16(&mut buffer, 0x0000);
+        push_u16(&mut buffer, 1);
+        push_u16(&mut buffer, (12 + coverage.len()) as u16);
+        buffer.extend_from_slice(&coverage);
+        buffer.extend_from_slice(&pair_set);
+        buffer
+    }
+
+    #[cfg(feature = "layout")]
+    fn class_def_format1(start_glyph_id: u16, class_values: &[u16]) -> Vec<u8> {
+        let mut buffer = Vec::new();
+        push_u16(&mut buffer, 1);
+        push_u16(&mut buffer, start_glyph_id);
+        push_u16(&mut buffer, class_values.len() as u16);
+        for class_value in class_values {
+            push_u16(&mut buffer, *class_value);
+        }
+        buffer
+    }
+
+    #[cfg(feature = "layout")]
+    fn build_gpos_pair_format2_subtable(left: u16, right: u16, x_advance: i16) -> Vec<u8> {
+        let coverage = coverage_table(&[left]);
+        let class_def1 = class_def_format1(left, &[1]);
+        let class_def2 = class_def_format1(right, &[1]);
+
+        let class1_count = 2u16;
+        let class2_count = 2u16;
+
+        let mut class_records = Vec::new();
+        for class1 in 0..class1_count {
+            for class2 in 0..class2_count {
+                let value = if class1 == 1 && class2 == 1 {
+                    x_advance as u16
+                } else {
+                    0
+                };
+                push_u16(&mut class_records, value);
+            }
+        }
+
+        let coverage_offset = 16u16 + class_records.len() as u16;
+        let class_def1_offset = coverage_offset + coverage.len() as u16;
+        let class_def2_offset = class_def1_offset + class_def1.len() as u16;
+
+        let mut buffer = Vec::new();
+        push_u16(&mut buffer, 2);
+        push_u16(&mut buffer, coverage_offset);
+        push_u16(&mut buffer, 0x0004);
+        push_u16(&mut buffer, 0x0000);
+        push_u16(&mut buffer, class_def1_offset);
+        push_u16(&mut buffer, class_def2_offset);
+        push_u16(&mut buffer, class1_count);
+        push_u16(&mut buffer, class2_count);
+        buffer.extend_from_slice(&class_records);
+        buffer.extend_from_slice(&coverage);
+        buffer.extend_from_slice(&class_def1);
+        buffer.extend_from_slice(&class_def2);
+        buffer
+    }
+
+    #[cfg(feature = "layout")]
+    fn build_gpos_table(feature_tag: [u8; 4], lookup_type: u16, subtable: Vec<u8>) -> Vec<u8> {
+        let mut script_list = Vec::new();
+        push_u16(&mut script_list, 1);
+        script_list.extend_from_slice(b"DFLT");
+        push_u16(&mut script_list, 8);
+        push_u16(&mut script_list, 4);
+        push_u16(&mut script_list, 0);
+        push_u16(&mut script_list, 0);
+        push_u16(&mut script_list, 0xFFFF);
+        push_u16(&mut script_list, 1);
+        push_u16(&mut script_list, 0);
+
+        let mut feature_list = Vec::new();
+        push_u16(&mut feature_list, 1);
+        feature_list.extend_from_slice(&feature_tag);
+        push_u16(&mut feature_list, 8);
+        push_u16(&mut feature_list, 0);
+        push_u16(&mut feature_list, 1);
+        push_u16(&mut feature_list, 0);
+
+        let mut lookup_list = Vec::new();
+        push_u16(&mut lookup_list, 1);
+        push_u16(&mut lookup_list, 4);
+        push_u16(&mut lookup_list, lookup_type);
+        push_u16(&mut lookup_list, 0);
+        push_u16(&mut lookup_list, 1);
+        push_u16(&mut lookup_list, 8);
+        lookup_list.extend_from_slice(&subtable);
+
+        let script_list_offset = 10u16;
+        let feature_list_offset = script_list_offset + script_list.len() as u16;
+        let lookup_list_offset = feature_list_offset + feature_list.len() as u16;
+
+        let mut buffer = Vec::new();
+        push_u16(&mut buffer, 1);
+        push_u16(&mut buffer, 0);
+        push_u16(&mut buffer, script_list_offset);
+        push_u16(&mut buffer, feature_list_offset);
+        push_u16(&mut buffer, lookup_list_offset);
+        buffer.extend_from_slice(&script_list);
+        buffer.extend_from_slice(&feature_list);
+        buffer.extend_from_slice(&lookup_list);
+        buffer
+    }
+
+    #[cfg(feature = "layout")]
+    fn parse_gpos(buffer: Vec<u8>) -> crate::opentype::extentions::gpos::GPOS {
+        let mut reader = BytesReader::new(&buffer);
+        crate::opentype::extentions::gpos::GPOS::new(&mut reader, 0, buffer.len() as u32).unwrap()
+    }
+
+    #[cfg(feature = "layout")]
+    fn build_gsub_table(feature_tag: [u8; 4], lookups: Vec<Vec<u8>>) -> Vec<u8> {
+        let mut script_list = Vec::new();
+        push_u16(&mut script_list, 1);
+        script_list.extend_from_slice(b"DFLT");
+        push_u16(&mut script_list, 8);
+        push_u16(&mut script_list, 4);
+        push_u16(&mut script_list, 0);
+        push_u16(&mut script_list, 0);
+        push_u16(&mut script_list, 0xFFFF);
+        push_u16(&mut script_list, 1);
+        push_u16(&mut script_list, 0);
+
+        let mut feature_list = Vec::new();
+        push_u16(&mut feature_list, 1);
+        feature_list.extend_from_slice(&feature_tag);
+        push_u16(&mut feature_list, 8);
+        push_u16(&mut feature_list, 0);
+        push_u16(&mut feature_list, lookups.len() as u16);
+        for lookup_index in 0..lookups.len() as u16 {
+            push_u16(&mut feature_list, lookup_index);
+        }
+
+        let lookup_list = build_lookup_list(lookups);
+        let script_list_offset = 10u16;
+        let feature_list_offset = script_list_offset + script_list.len() as u16;
+        let lookup_list_offset = feature_list_offset + feature_list.len() as u16;
+
+        let mut buffer = Vec::new();
+        push_u16(&mut buffer, 1);
+        push_u16(&mut buffer, 0);
+        push_u16(&mut buffer, script_list_offset);
+        push_u16(&mut buffer, feature_list_offset);
+        push_u16(&mut buffer, lookup_list_offset);
+        buffer.extend_from_slice(&script_list);
+        buffer.extend_from_slice(&feature_list);
+        buffer.extend_from_slice(&lookup_list);
+        buffer
+    }
+
+    #[cfg(feature = "layout")]
+    fn lookup_multiple_record(glyph_id: u16, substitute_glyph_ids: &[u16]) -> Vec<u8> {
+        let coverage = coverage_table(&[glyph_id]);
+        let mut sequence = Vec::new();
+        push_u16(&mut sequence, substitute_glyph_ids.len() as u16);
+        for substitute_glyph_id in substitute_glyph_ids {
+            push_u16(&mut sequence, *substitute_glyph_id);
+        }
+
+        let sequence_offset = 8u16;
+        let coverage_offset = sequence_offset + sequence.len() as u16;
+        let mut subtable = Vec::new();
+        push_u16(&mut subtable, 1);
+        push_u16(&mut subtable, coverage_offset);
+        push_u16(&mut subtable, 1);
+        push_u16(&mut subtable, sequence_offset);
+        subtable.extend_from_slice(&sequence);
+        subtable.extend_from_slice(&coverage);
+        build_lookup_record(LookupType::MultipleSubstitution as u16, subtable)
+    }
+
+    #[cfg(feature = "layout")]
+    fn lookup_ligature_record(
+        glyph_id: u16,
+        component_glyph_ids: &[u16],
+        ligature_glyph: u16,
+    ) -> Vec<u8> {
+        let coverage = coverage_table(&[glyph_id]);
+        let mut ligature_table = Vec::new();
+        push_u16(&mut ligature_table, ligature_glyph);
+        push_u16(&mut ligature_table, (component_glyph_ids.len() + 1) as u16);
+        for component_glyph_id in component_glyph_ids {
+            push_u16(&mut ligature_table, *component_glyph_id);
+        }
+
+        let mut ligature_set = Vec::new();
+        push_u16(&mut ligature_set, 1);
+        push_u16(&mut ligature_set, 4);
+        ligature_set.extend_from_slice(&ligature_table);
+
+        let ligature_set_offset = 8u16;
+        let coverage_offset = ligature_set_offset + ligature_set.len() as u16;
+        let mut subtable = Vec::new();
+        push_u16(&mut subtable, 1);
+        push_u16(&mut subtable, coverage_offset);
+        push_u16(&mut subtable, 1);
+        push_u16(&mut subtable, ligature_set_offset);
+        subtable.extend_from_slice(&ligature_set);
+        subtable.extend_from_slice(&coverage);
+        build_lookup_record(LookupType::LigatureSubstitution as u16, subtable)
+    }
+
+    #[cfg(feature = "layout")]
+    fn parse_gsub(buffer: Vec<u8>) -> crate::opentype::extentions::gsub::GSUB {
+        let mut reader = BytesReader::new(&buffer);
+        crate::opentype::extentions::gsub::GSUB::new(&mut reader, 0, buffer.len() as u32).unwrap()
+    }
+
     #[test]
     #[cfg(feature = "layout")]
     fn lookup_extension_and_reverse_chain_parse_and_resolve() {
@@ -532,6 +766,104 @@ mod tests {
             }
             _ => panic!("expected reverse chain substitution"),
         }
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn gpos_pair_adjustment_format1_parses_and_resolves() {
+        let gpos = parse_gpos(build_gpos_table(
+            *b"kern",
+            2,
+            build_gpos_pair_format1_subtable(10, 20, -50),
+        ));
+
+        let adjustment = gpos
+            .lookup_pair_adjustment(10, 20, false, None)
+            .expect("pair adjustment");
+        assert_eq!(adjustment.first.x_advance, -50);
+        assert_eq!(adjustment.second.x_advance, 0);
+        assert!(gpos.lookup_pair_adjustment(10, 21, false, None).is_none());
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn gpos_pair_adjustment_format2_parses_and_resolves() {
+        let gpos = parse_gpos(build_gpos_table(
+            *b"kern",
+            2,
+            build_gpos_pair_format2_subtable(30, 40, -80),
+        ));
+
+        let adjustment = gpos
+            .lookup_pair_adjustment(30, 40, false, None)
+            .expect("class pair adjustment");
+        assert_eq!(adjustment.first.x_advance, -80);
+        assert!(gpos.lookup_pair_adjustment(31, 40, false, None).is_none());
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn gsub_apply_lookup_once_supports_multiple_and_ligature_sequences() {
+        let multiple_lookup = Lookup {
+            lookup_type: LookupType::MultipleSubstitution as u16,
+            lookup_flag: 0,
+            subtables: vec![LookupSubstitution::Multiple(MultipleSubstitutionFormat1 {
+                subst_format: 1,
+                coverage: coverage_format1(&[10]),
+                sequence_count: 1,
+                sequence_tables: vec![SequenceTable {
+                    glyph_count: 2,
+                    substitute_glyph_ids: vec![20, 21],
+                }],
+            })],
+        };
+        let ligature_lookup = Lookup {
+            lookup_type: LookupType::LigatureSubstitution as u16,
+            lookup_flag: 0,
+            subtables: vec![LookupSubstitution::Ligature(LigatureSubstitutionFormat1 {
+                subst_format: 1,
+                coverage: coverage_format1(&[20]),
+                ligature_set_count: 1,
+                ligature_set: vec![LigatureSet {
+                    ligature_count: 1,
+                    ligature_table: vec![LigatureTable {
+                        ligature_glyph: 99,
+                        component_count: 2,
+                        component_glyph_ids: vec![21],
+                    }],
+                }],
+            })],
+        };
+
+        let mut glyphs = vec![(10usize, 0usize)];
+        assert!(crate::opentype::extentions::gsub::GSUB::apply_lookup_once(
+            &multiple_lookup,
+            &mut glyphs,
+        ));
+        assert_eq!(glyphs, vec![(20, 0), (21, 0)]);
+
+        assert!(crate::opentype::extentions::gsub::GSUB::apply_lookup_once(
+            &ligature_lookup,
+            &mut glyphs,
+        ));
+        assert_eq!(glyphs, vec![(99, 0)]);
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn gsub_apply_ccmp_sequence_supports_multiple_then_ligature() {
+        let gsub = parse_gsub(build_gsub_table(
+            *b"ccmp",
+            vec![
+                lookup_multiple_record(10, &[20, 21]),
+                lookup_ligature_record(20, &[21], 99),
+            ],
+        ));
+        let mut glyphs = vec![(10usize, 0usize)];
+
+        gsub.apply_ccmp_sequence(&mut glyphs);
+
+        assert_eq!(glyphs, vec![(99, 0)]);
     }
 
     #[test]
@@ -973,6 +1305,38 @@ mod tests {
 
     fn collection_font_path() -> std::path::PathBuf {
         test_fonts_dir().join("windows").join("msgothic.ttc")
+    }
+
+    #[cfg(feature = "layout")]
+    fn first_real_kern_pair(font: &crate::LoadedFont) -> Option<(char, char, i16)> {
+        let gpos = font.font().gpos.as_ref()?;
+        let cmap = font.font().cmap.as_ref()?;
+        let candidates = "AVWToYLT.,abcdefghijklmnopqrstuvwxyz";
+
+        for left in candidates.chars() {
+            let left_glyph = cmap.get_glyph_position(left as u32) as u16;
+            if left_glyph == 0 {
+                continue;
+            }
+            for right in candidates.chars() {
+                let right_glyph = cmap.get_glyph_position(right as u32) as u16;
+                if right_glyph == 0 {
+                    continue;
+                }
+                let Some(adjustment) =
+                    gpos.lookup_pair_adjustment(left_glyph, right_glyph, false, None)
+                else {
+                    continue;
+                };
+                let total_advance =
+                    adjustment.first.x_advance.saturating_add(adjustment.second.x_advance);
+                if total_advance != 0 {
+                    return Some((left, right, total_advance));
+                }
+            }
+        }
+
+        None
     }
 
     #[cfg(feature = "cff")]
@@ -1829,6 +2193,66 @@ mod tests {
         )
         .expect("glyph run");
         assert_eq!(run.glyphs.len(), 1);
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn measure_uses_real_gpos_kern_pair_when_layout_enabled() {
+        let font = crate::load_font_from_file(fira_sans_regular_path()).expect("load fira sans");
+        let (left, right, total_adjustment) =
+            first_real_kern_pair(&font).expect("expected real kern pair in Fira Sans");
+
+        let pair = format!("{left}{right}");
+        let left_width = font.measure(&left.to_string()).expect("measure left");
+        let right_width = font.measure(&right.to_string()).expect("measure right");
+        let pair_width = font.measure(&pair).expect("measure kern pair");
+        let observed_delta = pair_width - (left_width + right_width);
+
+        assert!(
+            (observed_delta - total_adjustment as f64).abs() <= 1.0,
+            "expected delta {total_adjustment}, got {observed_delta} for {pair:?}",
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn glyph_run_uses_real_gpos_kern_pair_when_layout_enabled() {
+        let font = crate::load_font_from_file(fira_sans_regular_path()).expect("load fira sans");
+        let (left, right, total_adjustment) =
+            first_real_kern_pair(&font).expect("expected real kern pair in Fira Sans");
+        let options = crate::FontOptions::new(&font).with_font_size(32.0);
+        let pair = format!("{left}{right}");
+
+        let left_run =
+            crate::text2commands(&left.to_string(), options).expect("left glyph run");
+        let right_run =
+            crate::text2commands(&right.to_string(), options).expect("right glyph run");
+        let pair_run = crate::text2commands(&pair, options).expect("pair glyph run");
+
+        assert_eq!(pair_run.glyphs.len(), 2);
+        let sum_single = left_run.glyphs[0].glyph.metrics.advance_x
+            + right_run.glyphs[0].glyph.metrics.advance_x;
+        let sum_pair = pair_run
+            .glyphs
+            .iter()
+            .map(|glyph| glyph.glyph.metrics.advance_x)
+            .sum::<f32>();
+        let hhea = font.font().hhea.as_ref().expect("hhea");
+        let default_line_height =
+            (hhea.get_accender() - hhea.get_descender() + hhea.get_line_gap()) as f32;
+        let scale_x = options.font_size / default_line_height.max(1.0);
+        let expected_delta = total_adjustment as f32 * scale_x;
+        let observed_delta = sum_pair - sum_single;
+
+        assert!(
+            (observed_delta - expected_delta).abs() <= 0.25,
+            "expected scaled delta {expected_delta}, got {observed_delta} for {pair:?}",
+        );
+        if expected_delta < 0.0 {
+            assert!(sum_pair < sum_single);
+        } else {
+            assert!(sum_pair > sum_single);
+        }
     }
 
     #[test]
