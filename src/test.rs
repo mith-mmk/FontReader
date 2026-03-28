@@ -1323,6 +1323,24 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "layout")]
+    fn gsub_apply_rtl_contextual_sequence_supports_rclt() {
+        let gsub = parse_gsub(build_gsub_table_with_feature_lookups(
+            *b"rclt",
+            &[0],
+            vec![
+                lookup_context_format3_record(&[coverage_table(&[10]), coverage_table(&[11])], 1, 1),
+                lookup_single_record(11, 144),
+            ],
+        ));
+        let mut glyphs = vec![(10usize, 0usize), (11usize, 1usize)];
+
+        gsub.apply_rtl_contextual_sequence(&mut glyphs, None);
+
+        assert_eq!(glyphs, vec![(10, 0), (144, 1)]);
+    }
+
+    #[test]
     #[cfg(not(target_arch = "wasm32"))]
     fn fontload_from_net_works() {
         let path = sample_font_path();
@@ -1768,6 +1786,60 @@ mod tests {
     }
 
     #[cfg(feature = "layout")]
+    fn rtl_contextual_font_paths() -> Vec<std::path::PathBuf> {
+        vec![
+            rtl_font_path(),
+            test_fonts_dir()
+                .join("Noto_Sans")
+                .join("static")
+                .join("NotoSans-Regular.ttf"),
+        ]
+    }
+
+    #[cfg(feature = "layout")]
+    fn collapse_ligatures_like_text_api(
+        gsub: &crate::opentype::extentions::gsub::GSUB,
+        glyphs: &[(usize, usize)],
+        locale: Option<&str>,
+        is_right_to_left: bool,
+    ) -> Vec<usize> {
+        const MAX_LIGATURE_COMPONENTS: usize = 8;
+
+        let glyph_ids: Vec<usize> = glyphs.iter().map(|glyph| glyph.0).collect();
+        let mut collapsed = Vec::new();
+        let mut index = 0;
+
+        while index < glyph_ids.len() {
+            let max_len = (glyph_ids.len() - index).min(MAX_LIGATURE_COMPONENTS);
+            let mut matched = None;
+            for len in (2..=max_len).rev() {
+                if is_right_to_left {
+                    if let Some(glyph_id) =
+                        gsub.lookup_rlig_sequence(&glyph_ids[index..index + len], locale)
+                    {
+                        matched = Some((glyph_id, len));
+                        break;
+                    }
+                }
+                if let Some(glyph_id) = gsub.lookup_liga_sequence(&glyph_ids[index..index + len]) {
+                    matched = Some((glyph_id, len));
+                    break;
+                }
+            }
+
+            if let Some((glyph_id, len)) = matched {
+                collapsed.push(glyph_id);
+                index += len;
+            } else {
+                collapsed.push(glyph_ids[index]);
+                index += 1;
+            }
+        }
+
+        collapsed
+    }
+
+    #[cfg(feature = "layout")]
     fn first_real_arabic_joining_pair(
         font: &crate::LoadedFont,
     ) -> Option<(String, Vec<usize>)> {
@@ -1837,6 +1909,79 @@ mod tests {
                 if let Some(ligature) = gsub.lookup_rlig_sequence(&joined, Some("ar")) {
                     return Some((format!("{left}{right}"), ligature));
                 }
+            }
+        }
+
+        None
+    }
+
+    #[cfg(feature = "layout")]
+    fn first_real_arabic_contextual_sequence_in_font(
+        font: &crate::LoadedFont,
+    ) -> Option<(String, Vec<usize>)> {
+        let gsub = font.font().gsub.as_ref()?;
+        let cmap = font.font().cmap.as_ref()?;
+        let candidates: Vec<char> = (0x0621u32..=0x064Au32)
+            .filter_map(char::from_u32)
+            .filter(|ch| cmap.get_glyph_position(*ch as u32) != 0)
+            .collect();
+
+        let try_sequence = |chars: &[char]| -> Option<(String, Vec<usize>)> {
+            let mut joined = chars
+                .iter()
+                .enumerate()
+                .map(|(index, ch)| (cmap.get_glyph_position(*ch as u32) as usize, index))
+                .collect::<Vec<_>>();
+            gsub.apply_joining_sequence(&mut joined, Some("ar"));
+            let baseline = joined.iter().map(|glyph| glyph.0).collect::<Vec<_>>();
+
+            let mut contextual = joined.clone();
+            gsub.apply_feature_sequence(&mut contextual, Some("ar"), &[*b"rclt", *b"calt"]);
+            let contextual_ids = contextual.iter().map(|glyph| glyph.0).collect::<Vec<_>>();
+            if contextual_ids == baseline || contextual_ids.len() != baseline.len() {
+                return None;
+            }
+
+            let final_ids = collapse_ligatures_like_text_api(gsub, &contextual, Some("ar"), true);
+            if final_ids == baseline {
+                return None;
+            }
+
+            Some((chars.iter().collect::<String>(), final_ids))
+        };
+
+        for left in candidates.iter().copied() {
+            for right in candidates.iter().copied() {
+                if let Some(found) = try_sequence(&[left, right]) {
+                    return Some(found);
+                }
+            }
+        }
+
+        for first in candidates.iter().copied() {
+            for second in candidates.iter().copied() {
+                for third in candidates.iter().copied() {
+                    if let Some(found) = try_sequence(&[first, second, third]) {
+                        return Some(found);
+                    }
+                }
+            }
+        }
+
+        None
+    }
+
+    #[cfg(feature = "layout")]
+    fn first_real_arabic_contextual_sequence() -> Option<(std::path::PathBuf, String, Vec<usize>)> {
+        for path in rtl_contextual_font_paths() {
+            if !path.exists() {
+                continue;
+            }
+            let Ok(font) = crate::load_font_from_file(&path) else {
+                continue;
+            };
+            if let Some((text, glyph_ids)) = first_real_arabic_contextual_sequence_in_font(&font) {
+                return Some((path, text, glyph_ids));
             }
         }
 
@@ -3075,6 +3220,68 @@ mod tests {
             .debug_shape_glyph_ids_with_direction(&text, Some("ar"), true)
             .expect("shape rtl glyph ids");
         assert_eq!(glyph_ids, vec![expected_ligature]);
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn rtl_shaping_uses_real_arabic_contextual_sequence() {
+        let Some((path, text, expected_glyph_ids)) = first_real_arabic_contextual_sequence() else {
+            return;
+        };
+        let font = crate::load_font_from_file(&path).expect("load rtl contextual font");
+
+        let glyph_ids = font
+            .font()
+            .debug_shape_glyph_ids_with_direction(&text, Some("ar"), true)
+            .expect("shape rtl contextual glyph ids");
+        assert_eq!(glyph_ids, expected_glyph_ids);
+
+        let run = crate::text2commands(
+            &text,
+            crate::FontOptions::new(&font)
+                .with_font_size(32.0)
+                .with_locale("ar")
+                .with_right_to_left(),
+        )
+        .expect("rtl arabic contextual glyph run");
+        assert_eq!(run.glyphs.len(), expected_glyph_ids.len());
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn font_family_text2commands_uses_real_arabic_contextual_sequence() {
+        let Some((path, text, expected_glyph_ids)) = first_real_arabic_contextual_sequence() else {
+            return;
+        };
+        let font = crate::load_font_from_file(&path).expect("load rtl contextual font");
+        let mut family = crate::FontFamily::new("RTL Contextual");
+        family.add_loaded_font(font);
+
+        let run = family
+            .text2commands(
+                &text,
+                family
+                    .options()
+                    .with_font_size(32.0)
+                    .with_locale("ar")
+                    .with_right_to_left(),
+            )
+            .expect("family rtl arabic contextual glyph run");
+        assert_eq!(run.glyphs.len(), expected_glyph_ids.len());
+
+        let glyph_ids = family
+            .resolve_loaded_font(
+                Some("RTL Contextual"),
+                None,
+                crate::FontWeight::default(),
+                crate::FontStyle::default(),
+                crate::FontStretch::default(),
+            )
+            .expect("resolved family font")
+            .font()
+            .debug_shape_glyph_ids_with_direction(&text, Some("ar"), true)
+            .expect("shape rtl contextual glyph ids");
+        assert_eq!(glyph_ids, expected_glyph_ids);
     }
 
     #[test]

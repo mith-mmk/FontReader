@@ -794,7 +794,7 @@ impl GSUB {
         glyphs: &mut Vec<(usize, usize)>,
         locale: Option<&str>,
     ) {
-        self.apply_feature_sequence(glyphs, locale, &[*b"rlig", *b"calt"]);
+        self.apply_feature_sequence(glyphs, locale, &[*b"rlig", *b"rclt", *b"calt"]);
     }
 
     // ccmp Glyph Composition / Decomposition
