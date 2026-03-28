@@ -153,13 +153,6 @@ impl NameTable {
             0
         };
         let key = (platform_id as u16, language_id);
-        #[cfg(debug_assertions)]
-        {
-            println!("locale: {}", locale);
-            println!("platform_id: {:?}", platform_id);
-            println!("language_id: {:?}", language_id);
-            println!("key: {:?}", key);
-        }
 
         match self.namelist.get(&key) {
             Some(names) => names.clone(),

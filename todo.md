@@ -142,9 +142,12 @@ _test_fonts/* がテスト用フォント
     - [ ] ccmp / context chaining などの shaping 拡張
 
 # opentype
-- [+] True TYpe
-- [+] cff
+- [x] True Type
+- [x] cff
 - [ ] cff2
+- [x] color true type
+- [+] sbix
+- [ ] svg  # svgパーサーがいる
 
 # GSUB
 

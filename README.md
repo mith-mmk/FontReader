@@ -20,7 +20,7 @@ Japanese: [README.ja.md](README.ja.md)
 - `sbix` glyphs are returned as `GlyphLayer::Raster`.
 - COLR/CPAL colors are carried in `GlyphPaint::Solid(0xAARRGGBB)` so they can be passed directly to `paintcore::path::draw_glyphs`.
 - SVG glyph layers currently return `ErrorKind::Unsupported`.
-- The legacy `font.text2command()` API only returns outline commands and does not carry per-layer paint. It is now deprecated. Use `fontloader::text2commands(..., FontOptions)`, `LoadedFont::text2glyph_run()`, or `FontFamily::text2glyph_run()` when you need color glyph data.
+- The legacy `font.text2command()` API is still deprecated, but it now keeps `sbix` bitmap payloads in `GlyphCommands::bitmap`. It still does not carry per-layer paint or full color-layer structure. Use `fontloader::text2commands(..., FontOptions)`, `LoadedFont::text2glyph_run()`, or `FontFamily::text2glyph_run()` when you need full color glyph data.
 
 ## Renderer Integration
 
@@ -33,13 +33,13 @@ When connecting `fontloader` to a renderer such as `paintcore::path::draw_glyphs
 - COLR/CPAL glyphs keep their per-layer colors in `GlyphPaint::Solid(...)`.
 - `sbix` glyphs are emitted as `GlyphLayer::Raster`.
 - `font.text2command()` and `font.text2commands()` return `Vec<GlyphCommands>` for legacy
-  outline workflows only. They do not preserve layer paint, raster glyph payloads, or color font
-  information.
+  workflows. They now preserve `sbix` bitmap payloads through `GlyphCommands::bitmap`, but they do
+  not preserve layer paint or full color font structure.
 
 In short:
 
 - Color-aware rendering: `GlyphRun`
-- Outline-only compatibility: `GlyphCommands`
+- Legacy compatibility: `GlyphCommands`
 
 ```rust
 use fontloader::{load_font_from_buffer, text2commands, FontOptions, GlyphLayer};

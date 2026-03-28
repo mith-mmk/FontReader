@@ -2,10 +2,15 @@
 
 // only check lookup Format1.1 , 4, 5, 6.1, 7
 
-use std::io::SeekFrom;
 use std::collections::HashSet;
+use std::io::SeekFrom;
 
-use crate::opentype::layouts::{feature::Feature, lookup::{Lookup, LookupResult}, script::ParsedScript, *};
+use crate::opentype::layouts::{
+    feature::Feature,
+    lookup::{Lookup, LookupResult},
+    script::ParsedScript,
+    *,
+};
 use bin_rs::reader::BinaryReader;
 
 #[derive(Debug, Clone)]
@@ -266,7 +271,8 @@ impl GSUB {
                         }
                         let lookup = &self.lookups.lookups[*lookup_index as usize];
                         for subtable in lookup.subtables.iter() {
-                            if let LookupResult::Ligature(records) = subtable.get_lookup(first_glyph)
+                            if let LookupResult::Ligature(records) =
+                                subtable.get_lookup(first_glyph)
                             {
                                 for record in records.iter() {
                                     let expected_len = record.component_count as usize;

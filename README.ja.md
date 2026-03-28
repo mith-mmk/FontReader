@@ -20,7 +20,7 @@ English: [README.md](README.md)
 - `sbix` は `GlyphLayer::Raster` として返します。
 - COLR/CPAL の色は `GlyphPaint::Solid(0xAARRGGBB)` に詰めて返すので、そのまま `paintcore::path::draw_glyphs` に渡せます。
 - SVG glyph は現状 `ErrorKind::Unsupported` を返します。
-- 既存の `font.text2command()` は輪郭コマンドだけを返す旧 API で、レイヤーごとの色は保持しません。いまは deprecated です。カラーグリフを扱う場合は `fontloader::text2commands(..., FontOptions)`、`LoadedFont::text2glyph_run()`、または `FontFamily::text2glyph_run()` を使ってください。
+- 既存の `font.text2command()` は deprecated の旧 API ですが、`sbix` については `GlyphCommands::bitmap` に bitmap payload を保持するようにしました。レイヤーごとの色や完全な color glyph 構造までは保持しません。カラーグリフを扱う場合は `fontloader::text2commands(..., FontOptions)`、`LoadedFont::text2glyph_run()`、または `FontFamily::text2glyph_run()` を使ってください。
 
 ## Renderer 連携仕様
 
@@ -32,13 +32,13 @@ English: [README.md](README.md)
 - `GlyphPaint::CurrentColor` は「レンダラに渡した既定色を使う」という意味です。
 - COLR/CPAL glyph はレイヤーごとの色を `GlyphPaint::Solid(...)` に保持します。
 - `sbix` glyph は `GlyphLayer::Raster` として返します。
-- `font.text2command()` / `font.text2commands()` が返す `Vec<GlyphCommands>` は旧来の輪郭互換 API です。
-  こちらはレイヤー色、raster glyph、color font 情報を保持しません。
+- `font.text2command()` / `font.text2commands()` が返す `Vec<GlyphCommands>` は旧来の互換 API です。
+  `GlyphCommands::bitmap` で `sbix` bitmap は保持しますが、レイヤー色や完全な color font 情報は保持しません。
 
 要点だけ言うと:
 
 - 色付き描画に使うのは `GlyphRun`
-- 輪郭だけ必要な互換用途は `GlyphCommands`
+- 互換用途に使うのは `GlyphCommands`
 
 ```rust
 use fontloader::{load_font_from_buffer, text2commands, FontOptions, GlyphLayer};

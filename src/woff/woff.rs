@@ -115,13 +115,7 @@ impl WOFF {
             table_record.orig_checksum = reader.read_u32()?;
             #[cfg(debug_assertions)]
             {
-                let tag_str = crate::util::u32_to_string(table_record.tag);
-                print!("tag: {} {:08X} ", tag_str, table_record.tag);
-                print!("offset: {:08X} ", table_record.offset);
-                print!("comp_length: {} ", table_record.comp_length);
-                print!("orig_length: {} ", table_record.orig_length);
-                print!("orig_checksum: {:08X} ", table_record.orig_checksum);
-                println!();
+                let _ = crate::util::u32_to_string(table_record.tag);
             }
             table_records.push(table_record);
         }
@@ -141,9 +135,6 @@ impl WOFF {
         } else {
             "".to_string()
         };
-        #[cfg(debug_assertions)]
-        println!("metadata: {}", metadata);
-
         // read private data
 
         reader.seek(std::io::SeekFrom::Start(header.priv_offset as u64))?;

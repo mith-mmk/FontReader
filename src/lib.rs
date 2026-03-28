@@ -3,7 +3,7 @@ pub mod fontreader;
 pub mod opentype;
 pub(crate) mod util;
 pub type Font = fontreader::Font;
-pub use fontreader::{GlyphCommands, PathCommand};
+pub use fontreader::{BitmapGlyphCommands, BitmapGlyphFormat, GlyphCommands, PathCommand};
 pub mod commands;
 #[deprecated(note = "use `fontloader::commands` instead")]
 pub use commands as commads;
@@ -142,11 +142,7 @@ impl FontFamily {
         self.add_face(descriptor, font)
     }
 
-    pub fn add_face(
-        &mut self,
-        descriptor: FontFaceDescriptor,
-        font: LoadedFont,
-    ) -> &LoadedFont {
+    pub fn add_face(&mut self, descriptor: FontFaceDescriptor, font: LoadedFont) -> &LoadedFont {
         self.faces.push(CachedFontFace { descriptor, font });
         &self.faces.last().expect("face inserted").font
     }
@@ -221,8 +217,14 @@ impl FontFamily {
         font_style: FontStyle,
         font_stretch: FontStretch,
     ) -> Option<&LoadedFont> {
-        self.find_best_face(family_name, font_name, font_weight, font_style, font_stretch)
-            .map(|face| &face.font)
+        self.find_best_face(
+            family_name,
+            font_name,
+            font_weight,
+            font_style,
+            font_stretch,
+        )
+        .map(|face| &face.font)
     }
 
     pub fn resolve_descriptor(
@@ -233,8 +235,14 @@ impl FontFamily {
         font_style: FontStyle,
         font_stretch: FontStretch,
     ) -> Option<&FontFaceDescriptor> {
-        self.find_best_face(family_name, font_name, font_weight, font_style, font_stretch)
-            .map(|face| &face.descriptor)
+        self.find_best_face(
+            family_name,
+            font_name,
+            font_weight,
+            font_style,
+            font_stretch,
+        )
+        .map(|face| &face.descriptor)
     }
 
     pub(crate) fn resolve_font_options(
@@ -291,7 +299,9 @@ impl FontFamily {
     }
 
     pub fn measure(&self, text: &str) -> Result<f64, Error> {
-        Ok(self.layout_text_with_fallback(text, self.options())?.max_line_width as f64)
+        Ok(self
+            .layout_text_with_fallback(text, self.options())?
+            .max_line_width as f64)
     }
 
     fn layout_text_with_fallback<'a>(
@@ -483,7 +493,10 @@ impl FontFamily {
                     return None;
                 }
 
-                Some((face_match_score(descriptor, font_weight, font_style, font_stretch), face))
+                Some((
+                    face_match_score(descriptor, font_weight, font_style, font_stretch),
+                    face,
+                ))
             })
             .min_by_key(|(score, _)| *score)
             .map(|(_, face)| face)
@@ -548,10 +561,7 @@ impl FontFamily {
             .collect();
 
         candidates.sort_by_key(|(group, score, index)| (*group, *score, *index));
-        candidates
-            .into_iter()
-            .map(|(_, _, index)| index)
-            .collect()
+        candidates.into_iter().map(|(_, _, index)| index).collect()
     }
 
     fn select_face_for_unit(
@@ -622,10 +632,7 @@ fn face_match_score(
     font_style: FontStyle,
     font_stretch: FontStretch,
 ) -> u32 {
-    let weight_delta = descriptor
-        .font_weight
-        .0
-        .abs_diff(font_weight.0) as u32;
+    let weight_delta = descriptor.font_weight.0.abs_diff(font_weight.0) as u32;
     let style_penalty = if descriptor.font_style == font_style {
         0
     } else {
@@ -879,7 +886,7 @@ fn raster_layer_to_svg_image(
 
     match &raster.source {
         RasterGlyphSource::Encoded(data) => {
-            let Some((mime, _, _)) = sniff_encoded_image(data) else {
+            let Some((mime, _, _)) = util::sniff_encoded_image_dimensions(data) else {
                 return Err(Error::new(
                     ErrorKind::Unsupported,
                     "encoded raster glyph format is not supported for SVG export",
@@ -906,7 +913,7 @@ fn raster_layer_to_svg_image(
 fn raster_layer_dimensions(raster: &RasterGlyphLayer) -> Result<Option<(f32, f32)>, Error> {
     let (source_width, source_height) = match &raster.source {
         RasterGlyphSource::Encoded(data) => {
-            let Some((_, width, height)) = sniff_encoded_image(data) else {
+            let Some((_, width, height)) = util::sniff_encoded_image_dimensions(data) else {
                 return Err(Error::new(
                     ErrorKind::Unsupported,
                     "encoded raster glyph format is not supported for SVG export",
@@ -924,50 +931,6 @@ fn raster_layer_dimensions(raster: &RasterGlyphLayer) -> Result<Option<(f32, f32
     }
 
     Ok(Some((width as f32, height as f32)))
-}
-
-fn sniff_encoded_image(data: &[u8]) -> Option<(&'static str, u32, u32)> {
-    if data.len() >= 24 && data.starts_with(&[0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a]) {
-        let width = u32::from_be_bytes([data[16], data[17], data[18], data[19]]);
-        let height = u32::from_be_bytes([data[20], data[21], data[22], data[23]]);
-        return Some(("image/png", width, height));
-    }
-
-    if data.len() >= 4 && data[0] == 0xff && data[1] == 0xd8 {
-        let mut offset = 2usize;
-        while offset + 9 < data.len() {
-            if data[offset] != 0xff {
-                offset += 1;
-                continue;
-            }
-            let marker = data[offset + 1];
-            offset += 2;
-            if marker == 0xd8 || marker == 0xd9 {
-                continue;
-            }
-            if offset + 1 >= data.len() {
-                break;
-            }
-            let segment_len = u16::from_be_bytes([data[offset], data[offset + 1]]) as usize;
-            if segment_len < 2 || offset + segment_len > data.len() {
-                break;
-            }
-            if matches!(
-                marker,
-                0xc0 | 0xc1 | 0xc2 | 0xc3 | 0xc5 | 0xc6 | 0xc7 | 0xc9 | 0xca | 0xcb | 0xcd | 0xce | 0xcf
-            ) {
-                if offset + 7 >= data.len() {
-                    break;
-                }
-                let height = u16::from_be_bytes([data[offset + 3], data[offset + 4]]) as u32;
-                let width = u16::from_be_bytes([data[offset + 5], data[offset + 6]]) as u32;
-                return Some(("image/jpeg", width, height));
-            }
-            offset += segment_len;
-        }
-    }
-
-    None
 }
 
 /// Reassembles a font file from offset-addressed chunks.
@@ -1120,7 +1083,8 @@ impl LoadedFont {
 
     /// Legacy outline-only API.
     ///
-    /// This returns `Vec<GlyphCommands>` and does not preserve per-layer paint or raster glyphs.
+    /// This returns `Vec<GlyphCommands>`, keeps `sbix` bitmap payloads in `GlyphCommands::bitmap`,
+    /// and does not preserve per-layer paint or full color-layer structure.
     #[deprecated(
         note = "use `LoadedFont::text2glyph_run()` or `fontloader::text2commands(text, FontOptions)` instead"
     )]
@@ -1130,7 +1094,7 @@ impl LoadedFont {
 
     /// Legacy outline-only API.
     ///
-    /// This is an alias of `LoadedFont::text2commands()` and does not preserve color glyph data.
+    /// This is an alias of `LoadedFont::text2commands()` and does not preserve full color glyph data.
     #[deprecated(
         note = "use `LoadedFont::text2glyph_run()` or `fontloader::text2commands(text, FontOptions)` instead"
     )]
@@ -1217,9 +1181,9 @@ fn fetch_http_font(url: &str) -> Result<Vec<u8>, Error> {
 
     let (host, port) = match authority.rsplit_once(':') {
         Some((host, port)) if !host.is_empty() && !port.is_empty() => {
-            let port = port.parse::<u16>().map_err(|_| {
-                Error::new(ErrorKind::InvalidInput, "invalid port in http URL")
-            })?;
+            let port = port
+                .parse::<u16>()
+                .map_err(|_| Error::new(ErrorKind::InvalidInput, "invalid port in http URL"))?;
             (host.to_string(), port)
         }
         _ => (authority.to_string(), 80),
@@ -1251,7 +1215,10 @@ fn fetch_http_font(url: &str) -> Result<Vec<u8>, Error> {
     if !(header.starts_with("HTTP/1.1 200") || header.starts_with("HTTP/1.0 200")) {
         return Err(Error::new(
             ErrorKind::InvalidData,
-            format!("unexpected http status: {}", header.lines().next().unwrap_or("")),
+            format!(
+                "unexpected http status: {}",
+                header.lines().next().unwrap_or("")
+            ),
         ));
     }
 

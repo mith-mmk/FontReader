@@ -9,8 +9,8 @@ mod tests {
             ChainingContextSubstitutionFormat1, ChainingContextSubstitutionFormat2,
             ChainingContextSubstitutionFormat3, ContextSubstitutionFormat1, LigatureSet,
             LigatureSubstitutionFormat1, LigatureTable, LookupList, LookupResult,
-            LookupSubstitution, LookupType, MultipleSubstitutionFormat1, SequenceRule,
-            SequenceRuleSet, SequenceTable, SequenceLookupRecords, SingleSubstitutionFormat1,
+            LookupSubstitution, LookupType, MultipleSubstitutionFormat1, SequenceLookupRecords,
+            SequenceRule, SequenceRuleSet, SequenceTable, SingleSubstitutionFormat1,
             SingleSubstitutionFormat2,
         },
     };
@@ -31,11 +31,13 @@ mod tests {
             range_count: ranges.len() as u16,
             range_records: ranges
                 .iter()
-                .map(|(start_glyph_id, end_glyph_id, start_coverage_index)| RangeRecord {
-                    start_glyph_id: *start_glyph_id,
-                    end_glyph_id: *end_glyph_id,
-                    start_coverage_index: *start_coverage_index,
-                })
+                .map(
+                    |(start_glyph_id, end_glyph_id, start_coverage_index)| RangeRecord {
+                        start_glyph_id: *start_glyph_id,
+                        end_glyph_id: *end_glyph_id,
+                        start_coverage_index: *start_coverage_index,
+                    },
+                )
                 .collect(),
         })
     }
@@ -309,8 +311,8 @@ mod tests {
     #[test]
     #[cfg(feature = "layout")]
     fn lookup_chaining_variants_expand_expected_payloads() {
-        let chaining = LookupSubstitution::ChainingContextSubstitution(
-            ChainingContextSubstitutionFormat1 {
+        let chaining =
+            LookupSubstitution::ChainingContextSubstitution(ChainingContextSubstitutionFormat1 {
                 subst_format: 1,
                 coverage: coverage_format1(&[80]),
                 chain_sub_rule_set_count: 1,
@@ -327,8 +329,7 @@ mod tests {
                         lookup_indexes: vec![7],
                     }],
                 }],
-            },
-        );
+            });
         match chaining.get_lookup(80) {
             LookupResult::Chaining(rules) => {
                 assert_eq!(rules.len(), 1);
@@ -354,8 +355,8 @@ mod tests {
             _ => panic!("unexpected lookup result"),
         }
 
-        let chaining3 = LookupSubstitution::ChainingContextSubstitution3(
-            ChainingContextSubstitutionFormat3 {
+        let chaining3 =
+            LookupSubstitution::ChainingContextSubstitution3(ChainingContextSubstitutionFormat3 {
                 format: 3,
                 backtrack_glyph_count: 1,
                 backtrack_coverages: vec![coverage_format1(&[100])],
@@ -367,8 +368,7 @@ mod tests {
                 seq_lookup_records: SequenceLookupRecords {
                     lookup_records: vec![],
                 },
-            },
-        );
+            });
         let (first, coverages) = chaining3.get_coverage();
         assert_eq!(first.contains(100), Some(0));
         let (backtrack, input, lookahead) = coverages.expect("coverage tuple");
@@ -494,7 +494,10 @@ mod tests {
         match &lookup_list.lookups[0].subtables[0] {
             LookupSubstitution::ExtensionSubstitution(extension) => {
                 assert_eq!(extension.subst_format, 1);
-                assert_eq!(extension.extension_lookup_type, LookupType::SingleSubstitution as u16);
+                assert_eq!(
+                    extension.extension_lookup_type,
+                    LookupType::SingleSubstitution as u16
+                );
                 assert_eq!(extension.extension_offset, 8);
                 match extension.subtable.as_ref() {
                     LookupSubstitution::Single(single) => {
@@ -611,10 +614,8 @@ mod tests {
         }
     }
 
+    use crate::opentype::requires::cmap::{self, CmapEncodings, CmapSubtable, EncodingRecord};
     use bin_rs::reader::BytesReader;
-    use crate::opentype::requires::cmap::{
-        self, CmapEncodings, CmapSubtable, EncodingRecord,
-    };
 
     fn push_u16(buffer: &mut Vec<u8>, value: u16) {
         buffer.extend_from_slice(&value.to_be_bytes());
@@ -698,7 +699,13 @@ mod tests {
         buffer
     }
 
-    fn format4_table(start_code: u16, end_code: u16, delta: i16, range_offset: u16, glyphs: &[u16]) -> Vec<u8> {
+    fn format4_table(
+        start_code: u16,
+        end_code: u16,
+        delta: i16,
+        range_offset: u16,
+        glyphs: &[u16],
+    ) -> Vec<u8> {
         let seg_count = 2u16;
         let seg_count_x2 = seg_count * 2;
         let search_range = 4u16;
@@ -977,6 +984,87 @@ mod tests {
         test_fonts_dir().join("NotoSansJP-Regular.otf")
     }
 
+    fn legacy_variation_selector_font_candidates() -> Vec<std::path::PathBuf> {
+        vec![
+            test_fonts_dir().join("windows").join("msgothic.ttc"),
+            test_fonts_dir().join("windows").join("msjh.ttc"),
+            test_fonts_dir().join("windows").join("msyh.ttc"),
+            test_fonts_dir().join("windows").join("YuGothR.ttc"),
+            test_fonts_dir().join("ZenMaruGothic-Regular.ttf"),
+        ]
+    }
+
+    fn first_real_sbix_font_path() -> Option<std::path::PathBuf> {
+        let preferred_dir = test_fonts_dir().join("sbix");
+        if let Ok(entries) = std::fs::read_dir(&preferred_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_file() {
+                    return Some(path);
+                }
+            }
+        }
+
+        let mut stack = vec![test_fonts_dir()];
+        while let Some(dir) = stack.pop() {
+            let Ok(entries) = std::fs::read_dir(dir) else {
+                continue;
+            };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    stack.push(path);
+                    continue;
+                }
+                let Some(ext) = path.extension().and_then(|ext| ext.to_str()) else {
+                    continue;
+                };
+                if !matches!(
+                    ext.to_ascii_lowercase().as_str(),
+                    "ttf" | "otf" | "ttc" | "woff" | "woff2"
+                ) {
+                    continue;
+                }
+                let Ok(bytes) = std::fs::read(&path) else {
+                    continue;
+                };
+                if bytes.windows(4).any(|window| window == b"sbix") {
+                    return Some(path);
+                }
+            }
+        }
+        None
+    }
+
+    fn first_truetype_variation_selector_font_path() -> Option<std::path::PathBuf> {
+        for path in legacy_variation_selector_font_candidates() {
+            if !path.exists() {
+                continue;
+            }
+            let Ok(Ok(font)) = std::panic::catch_unwind(|| crate::load_font_from_file(&path))
+            else {
+                continue;
+            };
+            if font.font().glyf.is_none() {
+                continue;
+            }
+            let Some(cmap) = font.font().cmap.as_ref() else {
+                continue;
+            };
+            let has_format14 = cmap.cmap_encodings.iter().any(|encoding| {
+                matches!(
+                    encoding.cmap_subtable.as_ref(),
+                    CmapSubtable::Format14(format14)
+                        if !format14.var_selector_records.is_empty()
+                )
+            });
+            if has_format14 {
+                return Some(path);
+            }
+        }
+        None
+    }
+
     fn real_variation_sequence(font: &crate::LoadedFont) -> (String, usize) {
         let cmap = font.font().cmap.as_ref().expect("cmap");
         let format14 = cmap
@@ -1032,8 +1120,7 @@ mod tests {
     fn load_font_from_source_buffer_works() {
         let path = sample_font_path();
         let bytes = std::fs::read(&path).expect("read font bytes");
-        let font =
-            crate::load_font(crate::FontSource::Buffer(&bytes)).expect("load source buffer");
+        let font = crate::load_font(crate::FontSource::Buffer(&bytes)).expect("load source buffer");
         assert!(font.font().get_font_count() >= 1);
     }
 
@@ -1077,7 +1164,9 @@ mod tests {
         assert_eq!(buffer.missing_ranges(), vec![(0, 2), (5, 10)]);
 
         buffer.append(0, &[9, 8]).expect("append front chunk");
-        buffer.append(5, &[7, 6, 5, 4, 3]).expect("append tail chunk");
+        buffer
+            .append(5, &[7, 6, 5, 4, 3])
+            .expect("append tail chunk");
         assert!(buffer.is_complete());
         assert!(buffer.missing_ranges().is_empty());
     }
@@ -1102,7 +1191,9 @@ mod tests {
 
         assert!(buffer.is_complete());
         let font = buffer.into_loaded_font().expect("load reconstructed woff2");
-        let svg = font.text2svg("A", 24.0, "px").expect("render reconstructed woff2");
+        let svg = font
+            .text2svg("A", 24.0, "px")
+            .expect("render reconstructed woff2");
         assert!(svg.contains("<svg"));
     }
 
@@ -1234,8 +1325,7 @@ mod tests {
     fn font_family_falls_back_to_cached_face_per_glyph() {
         let regular =
             crate::load_font_from_file(fira_sans_regular_path()).expect("load regular fira sans");
-        let emoji =
-            crate::load_font_from_file(segoe_emoji_font_path()).expect("load segoe emoji");
+        let emoji = crate::load_font_from_file(segoe_emoji_font_path()).expect("load segoe emoji");
 
         let mut family = crate::FontFamily::new("Fira Sans");
         family.add_loaded_font(regular);
@@ -1262,8 +1352,7 @@ mod tests {
     fn font_family_text2svg_uses_fallback_layers() {
         let regular =
             crate::load_font_from_file(fira_sans_regular_path()).expect("load regular fira sans");
-        let emoji =
-            crate::load_font_from_file(segoe_emoji_font_path()).expect("load segoe emoji");
+        let emoji = crate::load_font_from_file(segoe_emoji_font_path()).expect("load segoe emoji");
 
         let mut family = crate::FontFamily::new("Fira Sans");
         family.add_loaded_font(regular);
@@ -1324,6 +1413,48 @@ mod tests {
     }
 
     #[test]
+    fn text2command_supports_sbix_bitmap_glyphs() {
+        let path = first_real_sbix_font_path().expect("load real sbix font");
+        let bytes = std::fs::read(&path).expect("read sbix font");
+        let font = crate::load_font_from_buffer(&bytes).expect("load sbix font");
+        let commands = font.text2command("🥺").expect("text2command sbix");
+
+        assert_eq!(commands.len(), 1);
+        assert!(commands[0].commands.is_empty());
+        let bitmap = commands[0].bitmap.as_ref().expect("bitmap payload");
+        assert!(matches!(
+            bitmap.format,
+            crate::fontreader::BitmapGlyphFormat::Png | crate::fontreader::BitmapGlyphFormat::Jpeg
+        ));
+        assert!(!bitmap.data.is_empty());
+
+        let svg = font.text2svg("🥺", 32.0, "px").expect("svg from sbix");
+        assert!(svg.contains("<image"));
+        assert!(svg.contains("data:image/"));
+    }
+
+    #[test]
+    fn sniff_encoded_image_dimensions_supports_png_and_jpeg_headers() {
+        let png = vec![
+            0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, b'I', b'H', b'D', b'R', 0,
+            0, 0, 16, 0, 0, 0, 32,
+        ];
+        let jpeg = vec![
+            0xff, 0xd8, 0xff, 0xc0, 0x00, 0x11, 0x08, 0x00, 0x20, 0x00, 0x10, 0x03, 0x01, 0x11,
+            0x00, 0x02, 0x11, 0x00, 0x03, 0x11, 0x00, 0xff, 0xd9,
+        ];
+
+        assert_eq!(
+            crate::util::sniff_encoded_image_dimensions(&png),
+            Some(("image/png", 16, 32))
+        );
+        assert_eq!(
+            crate::util::sniff_encoded_image_dimensions(&jpeg),
+            Some(("image/jpeg", 16, 32))
+        );
+    }
+
+    #[test]
     fn glyph_run_from_truetype_outline_works() {
         let path = sample_font_path();
         let font = crate::load_font_from_file(&path).expect("load font");
@@ -1372,11 +1503,8 @@ mod tests {
     #[test]
     fn glyph_run_rejects_svg_glyphs() {
         let font = crate::load_font_from_file(svg_font_path()).expect("load svg font");
-        let err = crate::text2commands(
-            "😀",
-            crate::FontOptions::new(&font).with_font_size(32.0),
-        )
-        .expect_err("svg glyphs should be rejected for now");
+        let err = crate::text2commands("😀", crate::FontOptions::new(&font).with_font_size(32.0))
+            .expect_err("svg glyphs should be rejected for now");
 
         assert_eq!(err.kind(), std::io::ErrorKind::Unsupported);
     }
@@ -1500,7 +1628,10 @@ mod tests {
     fn vertical_html_path_is_enabled() {
         let path = sample_font_path();
         let font = crate::fontload_file(&path).expect("load font");
-        let html = font.font().get_html_vert("A", 24.0, "px").expect("html vert");
+        let html = font
+            .font()
+            .get_html_vert("A", 24.0, "px")
+            .expect("html vert");
         assert!(html.contains("writing-mode: vertical-rl"));
         assert!(html.contains("<svg"));
     }
@@ -1573,7 +1704,10 @@ mod tests {
         let font = crate::load_font_from_file(japanese_font_path()).expect("load uvs font");
         let (text, _) = real_variation_sequence(&font);
 
-        let html = font.font().get_html(&text, 32.0, "px").expect("html with uvs");
+        let html = font
+            .font()
+            .get_html(&text, 32.0, "px")
+            .expect("html with uvs");
         assert_eq!(html.matches("<svg").count(), 1);
 
         let html_with_stray = font
@@ -1581,6 +1715,51 @@ mod tests {
             .get_html(&format!("\u{FE0F}{text}"), 32.0, "px")
             .expect("html with stray selector");
         assert_eq!(html_with_stray.matches("<svg").count(), 1);
+    }
+
+    #[test]
+    #[cfg(feature = "cff")]
+    fn font_family_text2commands_keeps_real_variation_selector_cluster() {
+        let font = crate::load_font_from_file(japanese_font_path()).expect("load uvs font");
+        let (text, expected_glyph_id) = real_variation_sequence(&font);
+
+        let mut family = crate::FontFamily::new("Noto Sans JP");
+        family.add_loaded_font(font);
+        let run = family
+            .text2commands(&text, family.options().with_font_size(32.0))
+            .expect("family glyph run with uvs");
+
+        assert_eq!(run.glyphs.len(), 1);
+        let glyph_ids = family
+            .resolve_loaded_font(
+                Some("Noto Sans JP"),
+                None,
+                crate::FontWeight::default(),
+                crate::FontStyle::default(),
+                crate::FontStretch::default(),
+            )
+            .expect("resolved family font")
+            .font()
+            .debug_shape_glyph_ids(&text, None)
+            .expect("shape glyph ids");
+        assert_eq!(glyph_ids, vec![expected_glyph_id]);
+    }
+
+    #[test]
+    fn legacy_text2command_keeps_real_variation_selector_cluster_for_truetype() {
+        let Some(path) = first_truetype_variation_selector_font_path() else {
+            return;
+        };
+        let font = crate::load_font_from_file(path).expect("load truetype uvs font");
+        let (text, expected_glyph_id) = real_variation_sequence(&font);
+
+        let commands = font
+            .text2command(&text)
+            .expect("legacy text2command with uvs");
+
+        assert_eq!(commands.len(), 1);
+        assert_eq!(commands[0].glyph_id, expected_glyph_id);
+        assert!(!commands[0].commands.is_empty() || commands[0].bitmap.is_some());
     }
 
     #[test]
@@ -1748,7 +1927,8 @@ mod tests {
             }
         }
 
-        let (ch, horizontal, vertical) = found.expect("expected at least one vertical substitution");
+        let (ch, horizontal, vertical) =
+            found.expect("expected at least one vertical substitution");
         assert_ne!(horizontal, vertical, "vertical form should differ for {ch}");
     }
 }

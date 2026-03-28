@@ -21,7 +21,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let svg = loaded.text2svg(&text, 64.0, "px")?;
     let width = loaded.measure(&text)?;
 
-    let mut html = String::from("<html>\n<head>\n<meta charset=\"UTF-8\">\n<title>fontloader</title>\n</head>\n<body>\n");
+    let mut html = String::from(
+        "<html>\n<head>\n<meta charset=\"UTF-8\">\n<title>fontloader</title>\n</head>\n<body>\n",
+    );
     html.push_str(&format!("<p>measure: {:.2}px</p>\n", width));
     html.push_str(&format!("<p>glyphs: {}</p>\n", run.glyphs.len()));
     html.push_str("<ul>\n");

@@ -24,8 +24,7 @@ impl Coverage {
             Coverage::Format2(coverage) => {
                 let range_records: &Vec<RangeRecord> = &coverage.range_records;
                 let result = range_records.binary_search_by(|x| {
-                    if x.start_glyph_id <= glyph_id && glyph_id <= x.end_glyph_id
-                    {
+                    if x.start_glyph_id <= glyph_id && glyph_id <= x.end_glyph_id {
                         std::cmp::Ordering::Equal
                     } else if x.end_glyph_id < glyph_id {
                         std::cmp::Ordering::Less

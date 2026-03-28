@@ -44,8 +44,8 @@ impl Lookup {
     ) -> Result<Self, std::io::Error> {
         let mut subtables = Vec::new();
         let offset = lookup.offset;
-        let lookup_type = num_traits::FromPrimitive::from_u16(lookup.lookup_type)
-            .unwrap_or(LookupType::Unknown);
+        let lookup_type =
+            num_traits::FromPrimitive::from_u16(lookup.lookup_type).unwrap_or(LookupType::Unknown);
         for subtable_offset in lookup.subtable_offsets.iter() {
             let offset = offset + *subtable_offset as u64;
             subtables.push(LookupList::parse_subtable(reader, lookup_type, offset)?);
@@ -319,7 +319,8 @@ impl LookupList {
                 let ligature_glyph = reader.read_u16_be()?;
                 let component_count = reader.read_u16_be()?;
                 let mut component_glyph_ids = Vec::new();
-                for _ in 0..(component_count -1) { // ???
+                for _ in 0..(component_count - 1) {
+                    // ???
                     component_glyph_ids.push(reader.read_u16_be()?);
                 }
                 ligature_table.push(LigatureTable {
@@ -900,7 +901,7 @@ impl LookupSubstitution {
                     return Some((glyph_id as isize + single.delta_glyph_id as isize) as u16);
                 }
             }
-            LookupSubstitution::Single2(subtable) => {                
+            LookupSubstitution::Single2(subtable) => {
                 let coverage = &subtable.coverage;
                 if let Some(id) = coverage.contains(glyph_id as usize) {
                     return Some(subtable.substitute_glyph_ids[id as usize] as u16);
@@ -1003,9 +1004,7 @@ impl LookupSubstitution {
             Self::ChainingContextSubstitution3(_chaining3) => {
                 panic!("ChainingContextSubstitution3 is not implemented")
             }
-            Self::ExtensionSubstitution(extension) => {
-                extension.subtable.get_lookup(gliph_id)
-            }
+            Self::ExtensionSubstitution(extension) => extension.subtable.get_lookup(gliph_id),
             Self::ReverseChainSingle(reverse) => {
                 let coverage = &reverse.coverage;
                 if let Some(_) = coverage.contains(gliph_id) {
