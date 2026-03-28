@@ -15,7 +15,7 @@ _test_fonts/* がテスト用フォント
     - [+] sbixはRasterに収納 // 実装済み。手元の sbix フォントは未所持なので自動テストは未追加
     - [+] svgは忘れる（取りあえずエラー）
     - [*] FontOptionsに必要なオプション
-        - [*] FontFamiry, Font Name or Font // loaded Font 直渡しに加えて cache 済み FontFamily からの face 解決まで実装。fallback / Last Resort は未実装
+        - [*] FontFamiry, Font Name or Font // loaded Font 直渡しに加えて cache 済み FontFamily からの face 解決と glyph 単位 fallback まで実装。family chain / Last Resort は未実装
         - [+] font-size
         - [+] font-stretch
         - [+] font-style
@@ -84,6 +84,7 @@ _test_fonts/* がテスト用フォント
       - [x] cache 済み face から `font-stretch`
       - [x] cache 済み face から `font-style`
       - [ ] font-variant
+      - [*] cached faces 間の glyph fallback
       - [ ] family fallback chain
       - [ ] line-height を family default として保持
   - [x] `ChunkedFontBuffer` を使った face の取得途中状態を保持

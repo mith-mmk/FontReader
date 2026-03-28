@@ -1231,6 +1231,52 @@ mod tests {
     }
 
     #[test]
+    fn font_family_falls_back_to_cached_face_per_glyph() {
+        let regular =
+            crate::load_font_from_file(fira_sans_regular_path()).expect("load regular fira sans");
+        let emoji =
+            crate::load_font_from_file(segoe_emoji_font_path()).expect("load segoe emoji");
+
+        let mut family = crate::FontFamily::new("Fira Sans");
+        family.add_loaded_font(regular);
+        family.add_loaded_font(emoji);
+
+        let run = crate::text2commands(
+            "A🥺B",
+            crate::FontOptions::from_family(&family)
+                .with_font_family("Fira Sans")
+                .with_font_size(32.0),
+        )
+        .expect("render mixed fallback text");
+
+        assert_eq!(run.glyphs.len(), 3);
+        assert!(matches!(
+            run.glyphs[1].glyph.layers.first(),
+            Some(crate::GlyphLayer::Path(layer))
+                if !layer.commands.is_empty()
+                    && matches!(layer.paint, crate::GlyphPaint::Solid(_))
+        ));
+    }
+
+    #[test]
+    fn font_family_text2svg_uses_fallback_layers() {
+        let regular =
+            crate::load_font_from_file(fira_sans_regular_path()).expect("load regular fira sans");
+        let emoji =
+            crate::load_font_from_file(segoe_emoji_font_path()).expect("load segoe emoji");
+
+        let mut family = crate::FontFamily::new("Fira Sans");
+        family.add_loaded_font(regular);
+        family.add_loaded_font(emoji);
+
+        let svg = family
+            .text2svg("A🥺B", 32.0, "px")
+            .expect("render mixed fallback svg");
+        assert!(svg.starts_with("<svg"));
+        assert!(svg.contains("fill=\"#"));
+    }
+
+    #[test]
     fn fontload_from_woff_file_works() {
         let path = woff_font_path();
         let font = crate::fontload_file(&path).expect("load woff font");

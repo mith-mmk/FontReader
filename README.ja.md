@@ -14,7 +14,7 @@ English: [README.md](README.md)
 - `font_stretch`、`font_style`、`font_variant`、`font_weight` を `FontOptions` に保持できます。
 - `layout` feature 有効時は `FontOptions::with_locale("ja-JP")` で GSUB `locl` を要求できます。
 - `FontOptions::from_family(&family)` を使うと、キャッシュ済みの `FontFamily` から family/name/weight/style/stretch 条件で face を選べます。
-- ただし現状の `FontFamily` は cache ベースの選択のみで、fallback chain や Last Resort 自動選択は未実装です。
+- `FontFamily` は、cache 済み face 間で glyph ごとの fallback まで行うようになりました。family fallback chain や Last Resort 自動選択はまだ未実装です。
 - `FontFamily` は高レベル API として `text2svg()`, `text2commands()`, `text2glyph_run()`, `measure()`, `options()` を持つようになりました。
 - TrueType / CFF は `GlyphLayer::Path` として返します。
 - `sbix` は `GlyphLayer::Raster` として返します。
@@ -80,7 +80,7 @@ for glyph in &run.glyphs {
   `with_font_family(...)`, `with_font_name(...)`, `with_font_weight(...)`,
   `with_font_style(...)`, `with_font_stretch(...)` を組み合わせて face を解決します。
 - `family.options()` を使うと、その `FontFamily` にひも付いた `FontOptions` をそのまま作れます。
-- `family.text2svg(...)` と `family.measure(...)` は、default の face 解決で直接使えます。
+- `family.text2svg(...)`, `family.text2commands(...)`, `family.text2glyph_run(...)`, `family.measure(...)` は、同じ cached-face fallback 経路を使います。
 
 これは「並列取得して再構成する」ための層で、WOFF2 を真の lazy decode するものではありません。
 

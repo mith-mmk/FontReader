@@ -130,7 +130,7 @@ enum ResolvedTextUnit {
 }
 
 #[derive(Debug, Clone, Copy)]
-enum ParsedTextUnit {
+pub(crate) enum ParsedTextUnit {
     Glyph {
         ch: char,
         variation_selector: char,
@@ -770,7 +770,7 @@ impl Font {
         (0xfe00..=0xfe0f).contains(&(ch as u32)) || (0xE0100..=0xE01EF).contains(&(ch as u32))
     }
 
-    fn parse_text_units(&self, text: &str) -> Vec<ParsedTextUnit> {
+    fn parse_text_units(text: &str) -> Vec<ParsedTextUnit> {
         let chars: Vec<char> = text.chars().collect();
         let mut units = Vec::new();
         let mut index = 0;
@@ -809,6 +809,10 @@ impl Font {
         }
 
         units
+    }
+
+    pub(crate) fn parse_text_units_for_fallback(text: &str) -> Vec<ParsedTextUnit> {
+        Self::parse_text_units(text)
     }
 
     fn flush_shaped_glyphs(
@@ -868,7 +872,7 @@ impl Font {
         let mut output = Vec::new();
         let mut pending_glyphs = Vec::new();
 
-        for unit in self.parse_text_units(text) {
+        for unit in Self::parse_text_units(text) {
             match unit {
                 ParsedTextUnit::Newline => {
                     self.flush_shaped_glyphs(&mut output, &mut pending_glyphs);
@@ -901,6 +905,57 @@ impl Font {
 
         self.flush_shaped_glyphs(&mut output, &mut pending_glyphs);
         Ok(output)
+    }
+
+    pub(crate) fn supports_text_unit(
+        &self,
+        unit: ParsedTextUnit,
+        is_vert: bool,
+        locale: Option<&str>,
+    ) -> bool {
+        #[cfg(not(feature = "layout"))]
+        let _ = locale;
+
+        match unit {
+            ParsedTextUnit::Newline | ParsedTextUnit::Tab => true,
+            ParsedTextUnit::Glyph {
+                ch,
+                variation_selector,
+            } => {
+                let Ok(glyph_id) =
+                    self.resolve_glyph_id_with_uvs(ch, variation_selector, is_vert)
+                else {
+                    return false;
+                };
+
+                #[cfg(feature = "layout")]
+                let glyph_id = {
+                    let mut glyph_id = glyph_id;
+                    if let Some(locale) = locale {
+                        if let Some(gsub) = self.current_gsub() {
+                            glyph_id = gsub.lookup_locale(glyph_id, locale);
+                        }
+                    }
+                    glyph_id
+                };
+
+                #[cfg(not(feature = "layout"))]
+                let glyph_id = glyph_id;
+
+                if glyph_id == 0 {
+                    return false;
+                }
+
+                #[cfg(feature = "cff")]
+                if self.current_cff().is_some() {
+                    return true;
+                }
+
+                self.current_glyf()
+                    .and_then(|glyf| glyf.get_glyph(glyph_id))
+                    .is_some()
+            }
+        }
     }
 
     fn push_svg_html_unit(
@@ -1623,7 +1678,7 @@ impl Font {
         html += "</head>\n";
         html += "<body>\n";
         let mut svgs = Vec::new();
-        for unit in self.parse_text_units(string) {
+        for unit in Self::parse_text_units(string) {
             self.push_svg_html_unit(&mut svgs, unit, fontsize, fontunit, true)?;
         }
 
@@ -1644,7 +1699,7 @@ impl Font {
         html += "</head>\n";
         html += "<body>\n";
         let mut svgs = Vec::new();
-        for unit in self.parse_text_units(string) {
+        for unit in Self::parse_text_units(string) {
             self.push_svg_html_unit(&mut svgs, unit, fontsize, fontunit, false)?;
         }
         for svg in svgs {

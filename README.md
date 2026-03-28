@@ -14,7 +14,7 @@ Japanese: [README.ja.md](README.ja.md)
 - `font_stretch`, `font_style`, `font_variant`, and `font_weight` are part of `FontOptions`.
 - `FontOptions::with_locale("ja-JP")` can request GSUB `locl` substitutions when the `layout` feature is enabled.
 - `FontOptions::from_family(&family)` can resolve a cached `FontFamily` entry by family/name/weight/style/stretch.
-- `FontFamily` matching is currently cache-based. Fallback chains and Last Resort selection are not implemented yet.
+- `FontFamily` now performs per-glyph fallback across its cached faces. Family fallback chains and Last Resort selection are still not implemented.
 - `FontFamily` now exposes `text2svg()`, `text2commands()`, `text2glyph_run()`, `measure()`, and `options()` as the higher-level family entrypoint.
 - TrueType and CFF glyphs are returned as `GlyphLayer::Path`.
 - `sbix` glyphs are returned as `GlyphLayer::Raster`.
@@ -110,7 +110,7 @@ if buffer.is_complete() {
   `with_font_family(...)`, `with_font_name(...)`, `with_font_weight(...)`,
   `with_font_style(...)`, and `with_font_stretch(...)`.
 - For direct use, `family.options()` returns `FontOptions` already anchored to the family.
-- `family.text2svg(...)` and `family.measure(...)` use the best cached face for the family with default matching.
+- `family.text2svg(...)`, `family.text2commands(...)`, `family.text2glyph_run(...)`, and `family.measure(...)` now reuse the same cached-face fallback path.
 
 This is meant for parallel fetch / reassembly first. It is not a true lazy WOFF2 decoder.
 

@@ -380,6 +380,9 @@ impl<'a> FontOptions<'a> {
 }
 
 pub fn text2commands(text: &str, options: FontOptions<'_>) -> Result<GlyphRun, Error> {
+    if let Some(FontRef::Family(font_family)) = options.font {
+        return font_family.text2glyph_run(text, options);
+    }
     let font = options.resolve_font()?;
     font.text2glyph_run(text, &options)
 }

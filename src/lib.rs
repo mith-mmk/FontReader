@@ -16,10 +16,10 @@ pub use commands::{
 mod test;
 pub mod woff;
 
-
+use base64::{engine::general_purpose, Engine as _};
+use std::collections::HashMap;
 use std::io::Error;
 use std::io::ErrorKind;
-use std::collections::HashMap;
 #[cfg(not(target_arch = "wasm32"))]
 use std::io::Read;
 #[cfg(not(target_arch = "wasm32"))]
@@ -103,6 +103,11 @@ struct CachedFontFace {
 struct PendingFontFace {
     descriptor: FontFaceDescriptor,
     buffer: ChunkedFontBuffer,
+}
+
+struct FamilyLayoutResult {
+    run: GlyphRun,
+    max_line_width: f32,
 }
 
 pub struct FontFamily {
@@ -254,25 +259,10 @@ impl FontFamily {
         })
     }
 
-    fn resolve_default_loaded_font(&self) -> Result<&LoadedFont, Error> {
-        self.resolve_loaded_font(
-            Some(self.name()),
-            None,
-            FontWeight::default(),
-            FontStyle::default(),
-            FontStretch::default(),
-        )
-        .ok_or_else(|| {
-            Error::new(
-                ErrorKind::NotFound,
-                format!("no cached font face matched family={:?}", self.name()),
-            )
-        })
-    }
-
     pub fn text2svg(&self, text: &str, fontsize: f64, fontunit: &str) -> Result<String, Error> {
-        self.resolve_default_loaded_font()?
-            .text2svg(text, fontsize, fontunit)
+        let options = self.options().with_font_size(fontsize as f32);
+        let layout = self.layout_text_with_fallback(text, options)?;
+        glyph_run_to_svg(&layout.run, fontunit)
     }
 
     /// Builds a color-aware `GlyphRun` using this family's cache.
@@ -284,11 +274,11 @@ impl FontFamily {
         text: &str,
         mut options: FontOptions<'a>,
     ) -> Result<GlyphRun, Error> {
-        options.font = Some(FontRef::Family(self));
         if options.font_family.is_none() {
             options.font_family = Some(self.name());
         }
-        crate::commands::text2commands(text, options)
+        options.font = Some(FontRef::Family(self));
+        Ok(self.layout_text_with_fallback(text, options)?.run)
     }
 
     /// Convenience alias of `FontFamily::text2glyph_run()`.
@@ -301,7 +291,160 @@ impl FontFamily {
     }
 
     pub fn measure(&self, text: &str) -> Result<f64, Error> {
-        self.resolve_default_loaded_font()?.measure(text)
+        Ok(self.layout_text_with_fallback(text, self.options())?.max_line_width as f64)
+    }
+
+    fn layout_text_with_fallback<'a>(
+        &'a self,
+        text: &str,
+        mut options: FontOptions<'a>,
+    ) -> Result<FamilyLayoutResult, Error> {
+        if self.faces.is_empty() {
+            return Err(Error::new(
+                ErrorKind::NotFound,
+                format!("no cached font face matched family={:?}", self.name()),
+            ));
+        }
+
+        if !options.font_size.is_finite() || options.font_size <= 0.0 {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "font_size must be a positive finite value",
+            ));
+        }
+
+        options.font = Some(FontRef::Family(self));
+        if options.font_family.is_none() {
+            options.font_family = Some(self.name());
+        }
+
+        let line_height = options.line_height.unwrap_or(options.font_size);
+        if !line_height.is_finite() || line_height <= 0.0 {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "line_height must be a positive finite value",
+            ));
+        }
+
+        let candidate_indices = self.face_candidate_indices(
+            options.font_family,
+            options.font_name,
+            options.font_weight,
+            options.font_style,
+            options.font_stretch,
+        );
+        if candidate_indices.is_empty() {
+            return Err(Error::new(
+                ErrorKind::NotFound,
+                format!(
+                    "no cached font face matched family={:?} name={:?}",
+                    options.font_family, options.font_name
+                ),
+            ));
+        }
+
+        let mut glyphs = Vec::new();
+        let mut cursor_x = 0.0f32;
+        let mut cursor_y = 0.0f32;
+        let mut max_line_width = 0.0f32;
+        let mut pending_segment = String::new();
+        let mut pending_face = None;
+
+        for unit in fontreader::Font::parse_text_units_for_fallback(text) {
+            match unit {
+                fontreader::ParsedTextUnit::Newline => {
+                    self.flush_family_segment(
+                        &mut glyphs,
+                        &mut pending_segment,
+                        &mut pending_face,
+                        &mut cursor_x,
+                        cursor_y,
+                        options,
+                    )?;
+                    max_line_width = max_line_width.max(cursor_x);
+                    cursor_x = 0.0;
+                    cursor_y += line_height;
+                }
+                fontreader::ParsedTextUnit::Tab => {
+                    self.flush_family_segment(
+                        &mut glyphs,
+                        &mut pending_segment,
+                        &mut pending_face,
+                        &mut cursor_x,
+                        cursor_y,
+                        options,
+                    )?;
+                    cursor_x += line_height * 4.0;
+                }
+                fontreader::ParsedTextUnit::Glyph { .. } => {
+                    let face_index =
+                        self.select_face_for_unit(unit, &candidate_indices, options.locale);
+                    if pending_face != Some(face_index) {
+                        self.flush_family_segment(
+                            &mut glyphs,
+                            &mut pending_segment,
+                            &mut pending_face,
+                            &mut cursor_x,
+                            cursor_y,
+                            options,
+                        )?;
+                        pending_face = Some(face_index);
+                    }
+                    push_text_unit(&mut pending_segment, unit);
+                }
+            }
+        }
+
+        self.flush_family_segment(
+            &mut glyphs,
+            &mut pending_segment,
+            &mut pending_face,
+            &mut cursor_x,
+            cursor_y,
+            options,
+        )?;
+        max_line_width = max_line_width.max(cursor_x);
+
+        Ok(FamilyLayoutResult {
+            run: GlyphRun::new(glyphs),
+            max_line_width,
+        })
+    }
+
+    fn flush_family_segment<'a>(
+        &'a self,
+        glyphs: &mut Vec<PositionedGlyph>,
+        pending_segment: &mut String,
+        pending_face: &mut Option<usize>,
+        cursor_x: &mut f32,
+        cursor_y: f32,
+        options: FontOptions<'a>,
+    ) -> Result<(), Error> {
+        let Some(face_index) = *pending_face else {
+            pending_segment.clear();
+            return Ok(());
+        };
+        if pending_segment.is_empty() {
+            *pending_face = None;
+            return Ok(());
+        }
+
+        let face = &self.faces[face_index].font;
+        let mut segment_options = options;
+        segment_options.font = Some(FontRef::Loaded(face));
+
+        let mut segment_run = face.text2glyph_run(pending_segment, segment_options)?;
+        let segment_advance = glyph_run_advance_width(&segment_run);
+        for glyph in segment_run.glyphs.iter_mut() {
+            glyph.x += *cursor_x;
+            glyph.y += cursor_y;
+        }
+
+        glyphs.extend(segment_run.glyphs);
+        *cursor_x += segment_advance;
+        pending_segment.clear();
+        *pending_face = None;
+        Ok(())
     }
 
     fn find_best_face(
@@ -345,6 +488,113 @@ impl FontFamily {
             .min_by_key(|(score, _)| *score)
             .map(|(_, face)| face)
     }
+
+    fn face_candidate_indices(
+        &self,
+        family_name: Option<&str>,
+        font_name: Option<&str>,
+        font_weight: FontWeight,
+        font_style: FontStyle,
+        font_stretch: FontStretch,
+    ) -> Vec<usize> {
+        let requested_family = family_name.map(normalize_font_name);
+        let requested_name = font_name.map(normalize_font_name);
+        let owner_family = normalize_font_name(&self.name);
+
+        let mut candidates: Vec<(u8, u32, usize)> = self
+            .faces
+            .iter()
+            .enumerate()
+            .map(|(index, face)| {
+                let descriptor = &face.descriptor;
+                let descriptor_family = normalize_font_name(&descriptor.family_name);
+                let descriptor_name = descriptor.font_name.as_deref().map(normalize_font_name);
+                let group = if let Some(requested_name) = requested_name.as_deref() {
+                    if descriptor_name.as_deref() == Some(requested_name) {
+                        0
+                    } else if let Some(requested_family) = requested_family.as_deref() {
+                        if descriptor_family == requested_family {
+                            1
+                        } else if descriptor_family == owner_family {
+                            2
+                        } else {
+                            3
+                        }
+                    } else if descriptor_family == owner_family {
+                        1
+                    } else {
+                        2
+                    }
+                } else if let Some(requested_family) = requested_family.as_deref() {
+                    if descriptor_family == requested_family {
+                        0
+                    } else if descriptor_family == owner_family {
+                        1
+                    } else {
+                        2
+                    }
+                } else if descriptor_family == owner_family {
+                    0
+                } else {
+                    1
+                };
+
+                (
+                    group,
+                    face_match_score(descriptor, font_weight, font_style, font_stretch),
+                    index,
+                )
+            })
+            .collect();
+
+        candidates.sort_by_key(|(group, score, index)| (*group, *score, *index));
+        candidates
+            .into_iter()
+            .map(|(_, _, index)| index)
+            .collect()
+    }
+
+    fn select_face_for_unit(
+        &self,
+        unit: fontreader::ParsedTextUnit,
+        candidates: &[usize],
+        locale: Option<&str>,
+    ) -> usize {
+        for &index in candidates {
+            if self.faces[index]
+                .font
+                .font()
+                .supports_text_unit(unit, false, locale)
+            {
+                return index;
+            }
+        }
+
+        candidates[0]
+    }
+}
+
+fn push_text_unit(target: &mut String, unit: fontreader::ParsedTextUnit) {
+    match unit {
+        fontreader::ParsedTextUnit::Glyph {
+            ch,
+            variation_selector,
+        } => {
+            target.push(ch);
+            if variation_selector != '\0' {
+                target.push(variation_selector);
+            }
+        }
+        fontreader::ParsedTextUnit::Newline => target.push('\n'),
+        fontreader::ParsedTextUnit::Tab => target.push('\t'),
+    }
+}
+
+fn glyph_run_advance_width(run: &GlyphRun) -> f32 {
+    run.glyphs
+        .iter()
+        .map(|glyph| glyph.x + glyph.glyph.metrics.advance_x)
+        .fold(0.0, f32::max)
 }
 
 fn normalize_font_name(name: &str) -> String {
@@ -383,6 +633,341 @@ fn face_match_score(
     };
     let stretch_delta = ((descriptor.font_stretch.0 - font_stretch.0).abs() * 1000.0) as u32;
     style_penalty + weight_delta + stretch_delta
+}
+
+fn glyph_run_to_svg(run: &GlyphRun, fontunit: &str) -> Result<String, Error> {
+    let Some(bounds) = glyph_run_bounds(run)? else {
+        let size = format!("0{}", fontunit);
+        return Ok(format!(
+            "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{}\" height=\"{}\" viewBox=\"0 0 0 0\"></svg>",
+            size, size
+        ));
+    };
+
+    let view_width = (bounds.max_x - bounds.min_x).max(1.0);
+    let view_height = (bounds.max_y - bounds.min_y).max(1.0);
+    let mut svg = format!(
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{}{}\" height=\"{}{}\" viewBox=\"{} {} {} {}\">",
+        view_width, fontunit, view_height, fontunit, bounds.min_x, bounds.min_y, view_width, view_height
+    );
+
+    for glyph in &run.glyphs {
+        for layer in &glyph.glyph.layers {
+            match layer {
+                GlyphLayer::Path(path) => {
+                    let d = draw_commands_to_svg_path(
+                        &path.commands,
+                        glyph.x + path.offset_x,
+                        glyph.y + path.offset_y,
+                    );
+                    if d.is_empty() {
+                        continue;
+                    }
+                    svg += &format!(
+                        "<path d=\"{}\" {}{} />",
+                        d,
+                        paint_to_svg_attributes(path.paint),
+                        fill_rule_to_svg_attribute(path.fill_rule),
+                    );
+                }
+                GlyphLayer::Raster(raster) => {
+                    svg += &raster_layer_to_svg_image(raster, glyph.x, glyph.y)?;
+                }
+            }
+        }
+    }
+
+    svg += "</svg>";
+    Ok(svg)
+}
+
+fn glyph_run_bounds(run: &GlyphRun) -> Result<Option<GlyphBounds>, Error> {
+    let mut bounds = None;
+
+    for glyph in &run.glyphs {
+        let glyph_bounds = if let Some(bounds) = glyph.glyph.metrics.bounds {
+            Some(GlyphBounds {
+                min_x: bounds.min_x + glyph.x,
+                min_y: bounds.min_y + glyph.y,
+                max_x: bounds.max_x + glyph.x,
+                max_y: bounds.max_y + glyph.y,
+            })
+        } else {
+            glyph_layer_bounds(glyph)?
+        };
+
+        if let Some(glyph_bounds) = glyph_bounds {
+            extend_glyph_bounds(&mut bounds, glyph_bounds);
+        }
+    }
+
+    Ok(bounds)
+}
+
+fn glyph_layer_bounds(glyph: &PositionedGlyph) -> Result<Option<GlyphBounds>, Error> {
+    let mut bounds = None;
+
+    for layer in &glyph.glyph.layers {
+        match layer {
+            GlyphLayer::Path(path) => {
+                for command in &path.commands {
+                    match command {
+                        Command::MoveTo(x, y) | Command::Line(x, y) => extend_point(
+                            &mut bounds,
+                            glyph.x + path.offset_x + *x,
+                            glyph.y + path.offset_y + *y,
+                        ),
+                        Command::Bezier((cx, cy), (x, y)) => {
+                            extend_point(
+                                &mut bounds,
+                                glyph.x + path.offset_x + *cx,
+                                glyph.y + path.offset_y + *cy,
+                            );
+                            extend_point(
+                                &mut bounds,
+                                glyph.x + path.offset_x + *x,
+                                glyph.y + path.offset_y + *y,
+                            );
+                        }
+                        Command::CubicBezier((xa, ya), (xb, yb), (xc, yc)) => {
+                            extend_point(
+                                &mut bounds,
+                                glyph.x + path.offset_x + *xa,
+                                glyph.y + path.offset_y + *ya,
+                            );
+                            extend_point(
+                                &mut bounds,
+                                glyph.x + path.offset_x + *xb,
+                                glyph.y + path.offset_y + *yb,
+                            );
+                            extend_point(
+                                &mut bounds,
+                                glyph.x + path.offset_x + *xc,
+                                glyph.y + path.offset_y + *yc,
+                            );
+                        }
+                        Command::Close => {}
+                    }
+                }
+            }
+            GlyphLayer::Raster(raster) => {
+                if let Some((width, height)) = raster_layer_dimensions(raster)? {
+                    extend_point(
+                        &mut bounds,
+                        glyph.x + raster.offset_x,
+                        glyph.y + raster.offset_y,
+                    );
+                    extend_point(
+                        &mut bounds,
+                        glyph.x + raster.offset_x + width,
+                        glyph.y + raster.offset_y + height,
+                    );
+                }
+            }
+        }
+    }
+
+    Ok(bounds)
+}
+
+fn extend_glyph_bounds(bounds: &mut Option<GlyphBounds>, next: GlyphBounds) {
+    if let Some(bounds) = bounds.as_mut() {
+        bounds.min_x = bounds.min_x.min(next.min_x);
+        bounds.min_y = bounds.min_y.min(next.min_y);
+        bounds.max_x = bounds.max_x.max(next.max_x);
+        bounds.max_y = bounds.max_y.max(next.max_y);
+    } else {
+        *bounds = Some(next);
+    }
+}
+
+fn extend_point(bounds: &mut Option<GlyphBounds>, x: f32, y: f32) {
+    if let Some(bounds) = bounds.as_mut() {
+        bounds.min_x = bounds.min_x.min(x);
+        bounds.min_y = bounds.min_y.min(y);
+        bounds.max_x = bounds.max_x.max(x);
+        bounds.max_y = bounds.max_y.max(y);
+    } else {
+        *bounds = Some(GlyphBounds {
+            min_x: x,
+            min_y: y,
+            max_x: x,
+            max_y: y,
+        });
+    }
+}
+
+fn draw_commands_to_svg_path(commands: &[Command], origin_x: f32, origin_y: f32) -> String {
+    let mut d = String::new();
+    for command in commands {
+        match command {
+            Command::MoveTo(x, y) => d += &format!("M{} {} ", origin_x + *x, origin_y + *y),
+            Command::Line(x, y) => d += &format!("L{} {} ", origin_x + *x, origin_y + *y),
+            Command::Bezier((cx, cy), (x, y)) => {
+                d += &format!(
+                    "Q{} {} {} {} ",
+                    origin_x + *cx,
+                    origin_y + *cy,
+                    origin_x + *x,
+                    origin_y + *y
+                )
+            }
+            Command::CubicBezier((xa, ya), (xb, yb), (xc, yc)) => {
+                d += &format!(
+                    "C{} {} {} {} {} {} ",
+                    origin_x + *xa,
+                    origin_y + *ya,
+                    origin_x + *xb,
+                    origin_y + *yb,
+                    origin_x + *xc,
+                    origin_y + *yc
+                )
+            }
+            Command::Close => d += "Z ",
+        }
+    }
+    d.trim_end().to_string()
+}
+
+fn normalize_svg_color(color: u32) -> u32 {
+    if color <= 0x00ff_ffff {
+        0xff00_0000 | color
+    } else {
+        color
+    }
+}
+
+fn paint_to_svg_attributes(paint: GlyphPaint) -> String {
+    match paint {
+        GlyphPaint::CurrentColor => "fill=\"currentColor\"".to_string(),
+        GlyphPaint::Solid(color) => {
+            let color = normalize_svg_color(color);
+            let alpha = ((color >> 24) & 0xff) as u8;
+            let red = ((color >> 16) & 0xff) as u8;
+            let green = ((color >> 8) & 0xff) as u8;
+            let blue = (color & 0xff) as u8;
+            if alpha == 0xff {
+                format!("fill=\"#{:02x}{:02x}{:02x}\"", red, green, blue)
+            } else {
+                format!(
+                    "fill=\"#{:02x}{:02x}{:02x}\" fill-opacity=\"{}\"",
+                    red,
+                    green,
+                    blue,
+                    alpha as f32 / 255.0
+                )
+            }
+        }
+    }
+}
+
+fn fill_rule_to_svg_attribute(fill_rule: FillRule) -> &'static str {
+    match fill_rule {
+        FillRule::NonZero => "",
+        FillRule::EvenOdd => " fill-rule=\"evenodd\"",
+    }
+}
+
+fn raster_layer_to_svg_image(
+    raster: &RasterGlyphLayer,
+    glyph_x: f32,
+    glyph_y: f32,
+) -> Result<String, Error> {
+    let Some((width, height)) = raster_layer_dimensions(raster)? else {
+        return Ok(String::new());
+    };
+
+    match &raster.source {
+        RasterGlyphSource::Encoded(data) => {
+            let Some((mime, _, _)) = sniff_encoded_image(data) else {
+                return Err(Error::new(
+                    ErrorKind::Unsupported,
+                    "encoded raster glyph format is not supported for SVG export",
+                ));
+            };
+            let encoded = general_purpose::STANDARD.encode(data);
+            Ok(format!(
+                "<image x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" href=\"data:{};base64,{}\"/>",
+                glyph_x + raster.offset_x,
+                glyph_y + raster.offset_y,
+                width,
+                height,
+                mime,
+                encoded
+            ))
+        }
+        RasterGlyphSource::Rgba { .. } => Err(Error::new(
+            ErrorKind::Unsupported,
+            "RGBA raster glyph layers are not supported for SVG export yet",
+        )),
+    }
+}
+
+fn raster_layer_dimensions(raster: &RasterGlyphLayer) -> Result<Option<(f32, f32)>, Error> {
+    let (source_width, source_height) = match &raster.source {
+        RasterGlyphSource::Encoded(data) => {
+            let Some((_, width, height)) = sniff_encoded_image(data) else {
+                return Err(Error::new(
+                    ErrorKind::Unsupported,
+                    "encoded raster glyph format is not supported for SVG export",
+                ));
+            };
+            (width, height)
+        }
+        RasterGlyphSource::Rgba { width, height, .. } => (*width, *height),
+    };
+
+    let width = raster.width.unwrap_or(source_width);
+    let height = raster.height.unwrap_or(source_height);
+    if width == 0 || height == 0 {
+        return Ok(None);
+    }
+
+    Ok(Some((width as f32, height as f32)))
+}
+
+fn sniff_encoded_image(data: &[u8]) -> Option<(&'static str, u32, u32)> {
+    if data.len() >= 24 && data.starts_with(&[0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a]) {
+        let width = u32::from_be_bytes([data[16], data[17], data[18], data[19]]);
+        let height = u32::from_be_bytes([data[20], data[21], data[22], data[23]]);
+        return Some(("image/png", width, height));
+    }
+
+    if data.len() >= 4 && data[0] == 0xff && data[1] == 0xd8 {
+        let mut offset = 2usize;
+        while offset + 9 < data.len() {
+            if data[offset] != 0xff {
+                offset += 1;
+                continue;
+            }
+            let marker = data[offset + 1];
+            offset += 2;
+            if marker == 0xd8 || marker == 0xd9 {
+                continue;
+            }
+            if offset + 1 >= data.len() {
+                break;
+            }
+            let segment_len = u16::from_be_bytes([data[offset], data[offset + 1]]) as usize;
+            if segment_len < 2 || offset + segment_len > data.len() {
+                break;
+            }
+            if matches!(
+                marker,
+                0xc0 | 0xc1 | 0xc2 | 0xc3 | 0xc5 | 0xc6 | 0xc7 | 0xc9 | 0xca | 0xcb | 0xcd | 0xce | 0xcf
+            ) {
+                if offset + 7 >= data.len() {
+                    break;
+                }
+                let height = u16::from_be_bytes([data[offset + 3], data[offset + 4]]) as u32;
+                let width = u16::from_be_bytes([data[offset + 5], data[offset + 6]]) as u32;
+                return Some(("image/jpeg", width, height));
+            }
+            offset += segment_len;
+        }
+    }
+
+    None
 }
 
 /// Reassembles a font file from offset-addressed chunks.
