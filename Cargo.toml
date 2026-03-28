@@ -12,7 +12,7 @@ readme = "README.md"
 
 [features]
 default = ["cff"]
-full = ["encoding", "layout", "cff"]
+full = ["layout", "cff"]
 encoding = ["iconv"]
 layout = []
 cff = []

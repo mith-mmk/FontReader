@@ -1,26 +1,48 @@
 mod common;
 
-use common::{font_index, font_path, output_path, text_content};
-use fontloader::Font;
+use common::{font_path, output_path, text_content};
+use fontloader::{load_font_from_file, FontOptions, GlyphLayer};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
     let filename = font_path(&args);
     let output_file = output_path(&args, "./test/read.html");
     print!("{:?}, output filename:{:?}", filename, output_file);
-    let mut font = Font::get_font_from_file(&filename).unwrap();
-    let font_count = font.get_font_count();
-    if font_count > 0 {
-        let index = font_index(&args, 1).min(font_count.saturating_sub(1));
-        font.set_font(index).unwrap();
-    }
-
-    let string = font.get_info()?;
+    let loaded = load_font_from_file(&filename)?;
+    let string = loaded.font().get_info()?;
     println!("{}", string);
-    let string = text_content(&args, "./test/read.txt")?;
-    match font.get_html(&string, 64.0, "px") {
-        Ok(html) => std::fs::write(output_file, html)?,
-        Err(err) => eprintln!("render skipped: {}", err),
+    let text = text_content(&args, "./test/read.txt")?;
+    let run = loaded.text2glyph_run(
+        &text,
+        FontOptions::new(&loaded)
+            .with_font_size(64.0)
+            .with_line_height(72.0),
+    )?;
+    let svg = loaded.text2svg(&text, 64.0, "px")?;
+    let width = loaded.measure(&text)?;
+
+    let mut html = String::from("<html>\n<head>\n<meta charset=\"UTF-8\">\n<title>fontloader</title>\n</head>\n<body>\n");
+    html.push_str(&format!("<p>measure: {:.2}px</p>\n", width));
+    html.push_str(&format!("<p>glyphs: {}</p>\n", run.glyphs.len()));
+    html.push_str("<ul>\n");
+    for (index, glyph) in run.glyphs.iter().enumerate() {
+        html.push_str(&format!(
+            "<li>glyph {}: layers={} advance_x={:.2} advance_y={:.2}</li>\n",
+            index,
+            glyph.glyph.layers.len(),
+            glyph.glyph.metrics.advance_x,
+            glyph.glyph.metrics.advance_y
+        ));
+        for layer in &glyph.glyph.layers {
+            match layer {
+                GlyphLayer::Path(_) => html.push_str("<li>  path layer</li>\n"),
+                GlyphLayer::Raster(_) => html.push_str("<li>  raster layer</li>\n"),
+            }
+        }
     }
+    html.push_str("</ul>\n");
+    html.push_str(&svg);
+    html.push_str("\n</body>\n</html>\n");
+    std::fs::write(output_file, html)?;
     Ok(())
 }

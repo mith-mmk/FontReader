@@ -202,6 +202,10 @@ example は `examples/` 以下にあります。
 cargo run --example fontloader -- path/to/font.ttf
 ```
 
+`examples/fontloader.rs` は、現在の高レベル API である
+`load_font_from_file()`, `LoadedFont::text2glyph_run()`, `LoadedFont::text2svg()`,
+`LoadedFont::measure()` を使う example になっています。
+
 layout パースが必要な example:
 
 ```bash
@@ -218,6 +222,15 @@ feature をまとめて有効にする場合:
 
 ```bash
 cargo run --features full --example fontgsub -- path/to/font.otf
+```
+
+`full` は現在、実用寄りの機能セットである `layout + cff` を意味します。
+
+旧来の `encoding` feature は、古い name table の decode 互換向けとして分離したままです。
+Windows の MSVC では `iconv.lib` を要求することがあるため、必要な場合だけ明示的に有効化してください。
+
+```bash
+cargo run --features "full encoding" --example fontgsub -- path/to/font.otf
 ```
 
 フォントパスを省略すると、example によっては OS の既定フォントを使います。

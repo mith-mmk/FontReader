@@ -115,6 +115,9 @@ _test_fonts/* がテスト用フォント
     - [x] `fontload*` 系 alias
     - [x] `LoadedFont::text2command()` / `LoadedFont::text2commands()`
     - [x] `fontloader::commads`
+ - [+] `full` feature から `encoding` を分離
+    - [x] `full = ["layout", "cff"]`
+    - [x] `encoding` は古い name table 互換として明示 opt-in に維持
 
 # 合字対応
 - [ ] llaga

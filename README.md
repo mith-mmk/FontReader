@@ -204,6 +204,10 @@ Basic run:
 cargo run --example fontloader -- path/to/font.ttf
 ```
 
+`examples/fontloader.rs` now demonstrates the current high-level API:
+`load_font_from_file()`, `LoadedFont::text2glyph_run()`, `LoadedFont::text2svg()`, and
+`LoadedFont::measure()`.
+
 Examples that need layout parsing:
 
 ```bash
@@ -220,6 +224,16 @@ You can also combine features:
 
 ```bash
 cargo run --features full --example fontgsub -- path/to/font.otf
+```
+
+`full` now means the practical parser/shaping set: `layout + cff`.
+
+The legacy `encoding` feature is kept separate because it targets older name-table decoding paths
+and may require an external `iconv.lib` on Windows MSVC. Enable it explicitly only when you need
+that compatibility:
+
+```bash
+cargo run --features "full encoding" --example fontgsub -- path/to/font.otf
 ```
 
 If the font path is omitted, some examples try to use a platform default font.
