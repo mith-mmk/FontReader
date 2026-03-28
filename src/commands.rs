@@ -16,6 +16,29 @@ pub enum GlyphFlow {
     Vertical,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TextDirection {
+    LeftToRight,
+    RightToLeft,
+    TopToBottom,
+}
+
+impl TextDirection {
+    pub(crate) fn is_vertical(self) -> bool {
+        matches!(self, Self::TopToBottom)
+    }
+
+    pub(crate) fn is_right_to_left(self) -> bool {
+        matches!(self, Self::RightToLeft)
+    }
+}
+
+impl Default for TextDirection {
+    fn default() -> Self {
+        Self::LeftToRight
+    }
+}
+
 /// Font-level metrics. Keep this on the glyph so mixed fallback fonts can coexist in one run.
 #[derive(Debug, Clone, Copy)]
 pub struct FontMetrics {
@@ -260,6 +283,7 @@ pub struct FontOptions<'a> {
     pub font_family: Option<&'a str>,
     pub font_name: Option<&'a str>,
     pub locale: Option<&'a str>,
+    pub text_direction: TextDirection,
     pub font_size: f32,
     pub font_stretch: FontStretch,
     pub font_style: FontStyle,
@@ -287,6 +311,7 @@ impl<'a> FontOptions<'a> {
             font_family: None,
             font_name: None,
             locale: None,
+            text_direction: TextDirection::default(),
             font_size: 16.0,
             font_stretch: FontStretch::default(),
             font_style: FontStyle::default(),
@@ -354,6 +379,19 @@ impl<'a> FontOptions<'a> {
     pub fn with_locale(mut self, locale: &'a str) -> Self {
         self.locale = Some(locale);
         self
+    }
+
+    pub fn with_text_direction(mut self, text_direction: TextDirection) -> Self {
+        self.text_direction = text_direction;
+        self
+    }
+
+    pub fn with_vertical_flow(self) -> Self {
+        self.with_text_direction(TextDirection::TopToBottom)
+    }
+
+    pub fn with_right_to_left(self) -> Self {
+        self.with_text_direction(TextDirection::RightToLeft)
     }
 
     pub fn resolve_font(&self) -> Result<&'a crate::fontreader::Font, Error> {

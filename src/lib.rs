@@ -10,7 +10,7 @@ pub use commands as commads;
 pub use commands::{
     text2commands, Command, FillRule, FontMetrics, FontOptions, FontRef, FontStretch, FontStyle,
     FontVariant, FontWeight, Glyph, GlyphBounds, GlyphFlow, GlyphLayer, GlyphMetrics, GlyphPaint,
-    GlyphRun, PathGlyphLayer, PositionedGlyph, RasterGlyphLayer, RasterGlyphSource,
+    GlyphRun, PathGlyphLayer, PositionedGlyph, RasterGlyphLayer, RasterGlyphSource, TextDirection,
 };
 #[cfg(test)]
 mod test;
@@ -269,6 +269,18 @@ impl FontFamily {
 
     pub fn text2svg(&self, text: &str, fontsize: f64, fontunit: &str) -> Result<String, Error> {
         let options = self.options().with_font_size(fontsize as f32);
+        self.text2svg_with_options(text, fontunit, options)
+    }
+
+    pub fn text2svg_with_options<'a>(
+        &'a self,
+        text: &str,
+        fontunit: &str,
+        mut options: FontOptions<'a>,
+    ) -> Result<String, Error> {
+        if options.font_family.is_none() {
+            options.font_family = Some(self.name());
+        }
         let layout = self.layout_text_with_fallback(text, options)?;
         glyph_run_to_svg(&layout.run, fontunit)
     }
@@ -299,8 +311,19 @@ impl FontFamily {
     }
 
     pub fn measure(&self, text: &str) -> Result<f64, Error> {
+        self.measure_with_options(text, self.options())
+    }
+
+    pub fn measure_with_options<'a>(
+        &'a self,
+        text: &str,
+        mut options: FontOptions<'a>,
+    ) -> Result<f64, Error> {
+        if options.font_family.is_none() {
+            options.font_family = Some(self.name());
+        }
         Ok(self
-            .layout_text_with_fallback(text, self.options())?
+            .layout_text_with_fallback(text, options)?
             .max_line_width as f64)
     }
 
@@ -368,12 +391,21 @@ impl FontFamily {
                         &mut pending_segment,
                         &mut pending_face,
                         &mut cursor_x,
-                        cursor_y,
+                        &mut cursor_y,
                         options,
                     )?;
-                    max_line_width = max_line_width.max(cursor_x);
-                    cursor_x = 0.0;
-                    cursor_y += line_height;
+                    max_line_width =
+                        max_line_width.max(cursor_inline_extent(cursor_x, cursor_y, options.text_direction));
+                    match options.text_direction {
+                        TextDirection::LeftToRight | TextDirection::RightToLeft => {
+                            cursor_x = 0.0;
+                            cursor_y += line_height;
+                        }
+                        TextDirection::TopToBottom => {
+                            cursor_x -= line_height;
+                            cursor_y = 0.0;
+                        }
+                    }
                 }
                 fontreader::ParsedTextUnit::Tab => {
                     self.flush_family_segment(
@@ -381,21 +413,25 @@ impl FontFamily {
                         &mut pending_segment,
                         &mut pending_face,
                         &mut cursor_x,
-                        cursor_y,
+                        &mut cursor_y,
                         options,
                     )?;
-                    cursor_x += line_height * 4.0;
+                    match options.text_direction {
+                        TextDirection::LeftToRight => cursor_x += line_height * 4.0,
+                        TextDirection::RightToLeft => cursor_x -= line_height * 4.0,
+                        TextDirection::TopToBottom => cursor_y += line_height * 4.0,
+                    }
                 }
                 fontreader::ParsedTextUnit::Glyph { .. } => {
                     let face_index =
-                        self.select_face_for_unit(unit, &candidate_indices, options.locale);
+                        self.select_face_for_unit(unit, &candidate_indices, options);
                     if pending_face != Some(face_index) {
                         self.flush_family_segment(
                             &mut glyphs,
                             &mut pending_segment,
                             &mut pending_face,
                             &mut cursor_x,
-                            cursor_y,
+                            &mut cursor_y,
                             options,
                         )?;
                         pending_face = Some(face_index);
@@ -410,10 +446,14 @@ impl FontFamily {
             &mut pending_segment,
             &mut pending_face,
             &mut cursor_x,
-            cursor_y,
+            &mut cursor_y,
             options,
         )?;
-        max_line_width = max_line_width.max(cursor_x);
+        max_line_width = max_line_width.max(cursor_inline_extent(
+            cursor_x,
+            cursor_y,
+            options.text_direction,
+        ));
 
         Ok(FamilyLayoutResult {
             run: GlyphRun::new(glyphs),
@@ -427,7 +467,7 @@ impl FontFamily {
         pending_segment: &mut String,
         pending_face: &mut Option<usize>,
         cursor_x: &mut f32,
-        cursor_y: f32,
+        cursor_y: &mut f32,
         options: FontOptions<'a>,
     ) -> Result<(), Error> {
         let Some(face_index) = *pending_face else {
@@ -444,14 +484,16 @@ impl FontFamily {
         segment_options.font = Some(FontRef::Loaded(face));
 
         let mut segment_run = face.text2glyph_run(pending_segment, segment_options)?;
-        let segment_advance = glyph_run_advance_width(&segment_run);
+        let (segment_advance_x, segment_advance_y) =
+            glyph_run_cursor_delta(&segment_run, options.text_direction);
         for glyph in segment_run.glyphs.iter_mut() {
             glyph.x += *cursor_x;
-            glyph.y += cursor_y;
+            glyph.y += *cursor_y;
         }
 
         glyphs.extend(segment_run.glyphs);
-        *cursor_x += segment_advance;
+        *cursor_x += segment_advance_x;
+        *cursor_y += segment_advance_y;
         pending_segment.clear();
         *pending_face = None;
         Ok(())
@@ -568,13 +610,14 @@ impl FontFamily {
         &self,
         unit: fontreader::ParsedTextUnit,
         candidates: &[usize],
-        locale: Option<&str>,
+        options: FontOptions<'_>,
     ) -> usize {
+        let is_vertical = options.text_direction.is_vertical();
         for &index in candidates {
             if self.faces[index]
                 .font
                 .font()
-                .supports_text_unit(unit, false, locale)
+                .supports_text_unit(unit, is_vertical, options.locale)
             {
                 return index;
             }
@@ -600,11 +643,48 @@ fn push_text_unit(target: &mut String, unit: fontreader::ParsedTextUnit) {
     }
 }
 
-fn glyph_run_advance_width(run: &GlyphRun) -> f32 {
-    run.glyphs
-        .iter()
-        .map(|glyph| glyph.x + glyph.glyph.metrics.advance_x)
-        .fold(0.0, f32::max)
+fn glyph_run_cursor_delta(run: &GlyphRun, text_direction: TextDirection) -> (f32, f32) {
+    match text_direction {
+        TextDirection::LeftToRight => (
+            run.glyphs
+                .iter()
+                .map(|glyph| glyph.glyph.metrics.advance_x)
+                .sum(),
+            run.glyphs
+                .iter()
+                .map(|glyph| glyph.glyph.metrics.advance_y)
+                .sum(),
+        ),
+        TextDirection::RightToLeft => (
+            -run
+                .glyphs
+                .iter()
+                .map(|glyph| glyph.glyph.metrics.advance_x)
+                .sum::<f32>(),
+            run.glyphs
+                .iter()
+                .map(|glyph| glyph.glyph.metrics.advance_y)
+                .sum(),
+        ),
+        TextDirection::TopToBottom => (
+            run.glyphs
+                .iter()
+                .map(|glyph| glyph.glyph.metrics.advance_x)
+                .sum(),
+            run.glyphs
+                .iter()
+                .map(|glyph| glyph.glyph.metrics.advance_y)
+                .sum(),
+        ),
+    }
+}
+
+fn cursor_inline_extent(cursor_x: f32, cursor_y: f32, text_direction: TextDirection) -> f32 {
+    match text_direction {
+        TextDirection::LeftToRight => cursor_x.max(0.0),
+        TextDirection::RightToLeft => (-cursor_x).max(0.0),
+        TextDirection::TopToBottom => cursor_y.max(0.0),
+    }
 }
 
 fn normalize_font_name(name: &str) -> String {
@@ -1069,6 +1149,17 @@ impl LoadedFont {
         self.font.text2svg(text, fontsize, fontunit)
     }
 
+    pub fn text2svg_with_options<'a>(
+        &'a self,
+        text: &str,
+        fontunit: &str,
+        mut options: FontOptions<'a>,
+    ) -> Result<String, Error> {
+        options.font = Some(FontRef::Loaded(self));
+        let run = crate::commands::text2commands(text, options)?;
+        glyph_run_to_svg(&run, fontunit)
+    }
+
     /// Builds a color-aware `GlyphRun`.
     ///
     /// Use this when the caller needs per-layer paint, COLR/CPAL colors, or raster glyph layers.
@@ -1104,6 +1195,15 @@ impl LoadedFont {
 
     pub fn measure(&self, text: &str) -> Result<f64, Error> {
         self.font.measure(text)
+    }
+
+    pub fn measure_with_options<'a>(
+        &'a self,
+        text: &str,
+        mut options: FontOptions<'a>,
+    ) -> Result<f64, Error> {
+        options.font = Some(FontRef::Loaded(self));
+        self.font.measure_with_options(text, &options)
     }
 
     pub fn font(&self) -> &fontreader::Font {

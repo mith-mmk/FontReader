@@ -1078,12 +1078,13 @@ impl Font {
         units: &[ResolvedTextUnit],
         index: usize,
         locale: Option<&str>,
+        is_vertical: bool,
         scale_x: f32,
         scale_y: f32,
     ) -> GlyphPositionAdjustment {
         #[cfg(not(feature = "layout"))]
         {
-            let _ = (units, index, locale, scale_x, scale_y);
+            let _ = (units, index, locale, is_vertical, scale_x, scale_y);
             GlyphPositionAdjustment::default()
         }
 
@@ -1103,7 +1104,7 @@ impl Font {
                     if let Some(pair) = gpos.lookup_pair_adjustment(
                         previous.glyph_id as u16,
                         current.glyph_id as u16,
-                        false,
+                        is_vertical,
                         locale,
                     ) {
                         adjustment.placement_x += pair.second.x_placement as f32 * scale_x;
@@ -1118,7 +1119,7 @@ impl Font {
                 if let Some(pair) = gpos.lookup_pair_adjustment(
                     current.glyph_id as u16,
                     next.glyph_id as u16,
-                    false,
+                    is_vertical,
                     locale,
                 ) {
                     adjustment.placement_x += pair.first.x_placement as f32 * scale_x;
@@ -1150,6 +1151,8 @@ impl Font {
         let scale_y = options.font_size / default_line_height.max(1.0);
         let scale_x = scale_y * options.font_stretch.0.max(0.0);
         let line_height = options.line_height.unwrap_or(options.font_size);
+        let is_vertical = options.text_direction.is_vertical();
+        let is_right_to_left = options.text_direction.is_right_to_left();
         if !line_height.is_finite() || line_height <= 0.0 {
             return Err(Error::new(
                 ErrorKind::InvalidInput,
@@ -1161,19 +1164,30 @@ impl Font {
         let mut cursor_x = 0.0f32;
         let mut cursor_y = 0.0f32;
         let tab_advance = line_height;
-        let shaped_units = self.shape_text_units(text, false, options.locale)?;
+        let shaped_units = self.shape_text_units(text, is_vertical, options.locale)?;
 
         for (index, unit) in shaped_units.iter().enumerate() {
             match *unit {
                 ResolvedTextUnit::Newline => {
-                    cursor_x = 0.0;
-                    cursor_y += line_height;
+                    if is_vertical {
+                        cursor_x -= line_height;
+                        cursor_y = 0.0;
+                    } else {
+                        cursor_x = 0.0;
+                        cursor_y += line_height;
+                    }
                 }
                 ResolvedTextUnit::Tab => {
-                    cursor_x += tab_advance * 4.0;
+                    if is_vertical {
+                        cursor_y += tab_advance * 4.0;
+                    } else if is_right_to_left {
+                        cursor_x -= tab_advance * 4.0;
+                    } else {
+                        cursor_x += tab_advance * 4.0;
+                    }
                 }
                 ResolvedTextUnit::Glyph(resolved) => {
-                    let glyph_data = self.get_glyph_from_id_axis(resolved.glyph_id, false);
+                    let glyph_data = self.get_glyph_from_id_axis(resolved.glyph_id, is_vertical);
                     let open_type_glyph = glyph_data
                         .open_type_glyf
                         .as_ref()
@@ -1213,6 +1227,7 @@ impl Font {
                         &shaped_units,
                         index,
                         options.locale,
+                        is_vertical,
                         scale_x,
                         scale_y,
                     );
@@ -1220,17 +1235,23 @@ impl Font {
                     metrics.advance_y += adjustment.advance_y;
                     metrics.bounds = glyph_layers_bounds(&layers);
 
+                    let origin_x = if is_right_to_left && !is_vertical {
+                        cursor_x - metrics.advance_x + adjustment.placement_x
+                    } else {
+                        cursor_x + adjustment.placement_x
+                    };
+                    let origin_y = cursor_y + adjustment.placement_y;
                     let glyph = Glyph {
                         font: Some(font_metrics_from_layout(&open_type_glyph.layout, scale_y)),
                         metrics,
                         layers,
                     };
-                    glyphs.push(PositionedGlyph::new(
-                        glyph,
-                        cursor_x + adjustment.placement_x,
-                        cursor_y + adjustment.placement_y,
-                    ));
-                    cursor_x += metrics.advance_x;
+                    glyphs.push(PositionedGlyph::new(glyph, origin_x, origin_y));
+                    if is_right_to_left && !is_vertical {
+                        cursor_x -= metrics.advance_x;
+                    } else {
+                        cursor_x += metrics.advance_x;
+                    }
                     cursor_y += metrics.advance_y;
                 }
             }
@@ -1361,8 +1382,8 @@ impl Font {
                         .open_type_glyf
                         .as_ref()
                         .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "glyph is none"))?;
-                    let adjustment =
-                        self.pair_adjustment_for_index(&shaped_units, index, None, 1.0, 1.0);
+                    let adjustment = self
+                        .pair_adjustment_for_index(&shaped_units, index, None, false, 1.0, 1.0);
                     let origin_y = -(line_index as f64 * line_height) + adjustment.placement_y as f64;
                     let advance_width = match &open_type_glyph.layout {
                         FontLayout::Horizontal(layout) => layout.advance_width as f64,
@@ -1455,41 +1476,89 @@ impl Font {
     }
 
     pub fn measure(&self, text: &str) -> Result<f64, Error> {
+        self.measure_with_options(
+            text,
+            &crate::commands::FontOptions::from_font(self),
+        )
+    }
+
+    pub fn measure_with_options(
+        &self,
+        text: &str,
+        options: &crate::commands::FontOptions<'_>,
+    ) -> Result<f64, Error> {
         let mut cursor_x = 0.0;
+        let mut cursor_y = 0.0;
         let mut max_line_width: f64 = 0.0;
         let line_height = self.default_line_height()?;
         let tab_advance = line_height;
-        let shaped_units = self.shape_text_units(text, false, None)?;
+        let is_vertical = options.text_direction.is_vertical();
+        let is_right_to_left = options.text_direction.is_right_to_left();
+        let shaped_units = self.shape_text_units(text, is_vertical, options.locale)?;
 
         for (index, unit) in shaped_units.iter().enumerate() {
             match *unit {
                 ResolvedTextUnit::Newline => {
-                    max_line_width = max_line_width.max(cursor_x);
-                    cursor_x = 0.0;
+                    max_line_width = if is_vertical {
+                        max_line_width.max(cursor_y)
+                    } else if is_right_to_left {
+                        max_line_width.max(-cursor_x)
+                    } else {
+                        max_line_width.max(cursor_x)
+                    };
+                    if is_vertical {
+                        cursor_x -= line_height;
+                        cursor_y = 0.0;
+                    } else {
+                        cursor_x = 0.0;
+                    }
                 }
                 ResolvedTextUnit::Tab => {
-                    cursor_x += tab_advance * 4.0;
+                    if is_vertical {
+                        cursor_y += tab_advance * 4.0;
+                    } else if is_right_to_left {
+                        cursor_x -= tab_advance * 4.0;
+                    } else {
+                        cursor_x += tab_advance * 4.0;
+                    }
                 }
                 ResolvedTextUnit::Glyph(resolved) => {
-                    let glyph_data = self.get_glyph_from_id_axis(resolved.glyph_id, false);
+                    let glyph_data = self.get_glyph_from_id_axis(resolved.glyph_id, is_vertical);
                     let open_type_glyph = glyph_data
                         .open_type_glyf
                         .as_ref()
                         .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "glyph is none"))?;
 
-                    let adjustment =
-                        self.pair_adjustment_for_index(&shaped_units, index, None, 1.0, 1.0);
-                    let advance_width = match &open_type_glyph.layout {
-                        FontLayout::Horizontal(layout) => layout.advance_width as f64,
-                        FontLayout::Vertical(layout) => layout.advance_height as f64,
-                        FontLayout::Unknown => 0.0,
-                    } + adjustment.advance_x as f64;
-                    cursor_x += advance_width;
+                    let adjustment = self.pair_adjustment_for_index(
+                        &shaped_units,
+                        index,
+                        options.locale,
+                        is_vertical,
+                        1.0,
+                        1.0,
+                    );
+                    let (advance_x, advance_y) = match &open_type_glyph.layout {
+                        FontLayout::Horizontal(layout) => (layout.advance_width as f64, 0.0),
+                        FontLayout::Vertical(layout) => (0.0, layout.advance_height as f64),
+                        FontLayout::Unknown => (0.0, 0.0),
+                    };
+                    if is_right_to_left && !is_vertical {
+                        cursor_x -= advance_x + adjustment.advance_x as f64;
+                    } else {
+                        cursor_x += advance_x + adjustment.advance_x as f64;
+                    }
+                    cursor_y += advance_y + adjustment.advance_y as f64;
                 }
             }
         }
 
-        Ok(max_line_width.max(cursor_x))
+        Ok(if is_vertical {
+            max_line_width.max(cursor_y)
+        } else if is_right_to_left {
+            max_line_width.max(-cursor_x)
+        } else {
+            max_line_width.max(cursor_x)
+        })
     }
 
     pub fn text2svg(&self, text: &str, fontsize: f64, fontunit: &str) -> Result<String, Error> {

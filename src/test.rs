@@ -1307,6 +1307,10 @@ mod tests {
         test_fonts_dir().join("windows").join("msgothic.ttc")
     }
 
+    fn rtl_font_path() -> std::path::PathBuf {
+        test_fonts_dir().join("windows").join("arial.ttf")
+    }
+
     #[cfg(feature = "layout")]
     fn first_real_kern_pair(font: &crate::LoadedFont) -> Option<(char, char, i16)> {
         let gpos = font.font().gpos.as_ref()?;
@@ -1346,6 +1350,31 @@ mod tests {
 
     fn japanese_font_path() -> std::path::PathBuf {
         test_fonts_dir().join("NotoSansJP-Regular.otf")
+    }
+
+    #[cfg(feature = "layout")]
+    fn first_real_vertical_substitution(font: &crate::LoadedFont) -> Option<(char, u16, u16)> {
+        let gsub = font.font().gsub.as_ref()?;
+        let cmap = font.font().cmap.as_ref()?;
+
+        let candidates = [
+            '(', ')', '[', ']', '{', '}', '!', '?', ',', '.', ':', ';', '、', '。', '「', '」',
+            '（', '）', 'ー', '〜', '＜', '＞',
+        ];
+
+        for ch in candidates {
+            let glyph_id = cmap.get_glyph_position(ch as u32) as u16;
+            if glyph_id == 0 {
+                continue;
+            }
+
+            let vertical = gsub.lookup_vertical(glyph_id).unwrap_or(glyph_id);
+            if vertical != glyph_id {
+                return Some((ch, glyph_id, vertical));
+            }
+        }
+
+        None
     }
 
     fn legacy_variation_selector_font_candidates() -> Vec<std::path::PathBuf> {
@@ -2327,32 +2356,131 @@ mod tests {
     #[test]
     #[cfg(feature = "layout")]
     fn vertical_lookup_uses_real_font_data() {
-        let path = japanese_font_path();
-        let font = crate::fontload_file(&path).expect("load japanese font");
-        let gsub = font.font().gsub.as_ref().expect("gsub");
+        let font = crate::fontload_file(japanese_font_path()).expect("load japanese font");
+        let (ch, horizontal, vertical) =
+            first_real_vertical_substitution(&font).expect("expected at least one vertical substitution");
+        assert_ne!(horizontal, vertical, "vertical form should differ for {ch}");
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn glyph_run_uses_vertical_flow_and_positions_glyphs_vertically() {
+        let font = crate::load_font_from_file(japanese_font_path()).expect("load japanese font");
+        let (ch, horizontal, vertical) =
+            first_real_vertical_substitution(&font).expect("expected vertical substitution");
+        let text = format!("{ch}{ch}");
+        let options = crate::FontOptions::new(&font)
+            .with_font_size(32.0)
+            .with_vertical_flow();
+        let run = crate::text2commands(&text, options).expect("vertical glyph run");
+
+        assert_eq!(run.glyphs.len(), 2);
+        let first_font = run.glyphs[0].glyph.font.expect("font metrics");
+        assert_eq!(first_font.flow, crate::GlyphFlow::Vertical);
+        assert!(run.glyphs[0].glyph.metrics.advance_y > 0.0);
+        assert_ne!(horizontal, vertical);
+        assert!(run.glyphs[1].y > run.glyphs[0].y);
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn measure_with_vertical_flow_reports_positive_inline_extent() {
+        let font = crate::load_font_from_file(japanese_font_path()).expect("load japanese font");
+        let (ch, _, _) =
+            first_real_vertical_substitution(&font).expect("expected vertical substitution");
+        let text = format!("{ch}{ch}");
+        let options = crate::FontOptions::new(&font)
+            .with_font_size(32.0)
+            .with_vertical_flow();
+        let run = crate::text2commands(&text, options).expect("vertical glyph run");
+        let measure = font
+            .measure_with_options(&text, options)
+            .expect("measure vertical flow");
+
+        assert!(measure > 0.0);
+        let expected_min = run.glyphs[1].y as f64 + run.glyphs[1].glyph.metrics.advance_y as f64;
+        assert!(measure >= expected_min - 1.0);
+    }
+
+    #[test]
+    fn glyph_run_positions_hebrew_text_right_to_left() {
+        let font = crate::load_font_from_file(rtl_font_path()).expect("load rtl font");
+        let text = "אבג";
         let cmap = font.font().cmap.as_ref().expect("cmap");
-
-        let candidates = [
-            '(', ')', '[', ']', '{', '}', '!', '?', ',', '.', ':', ';', '、', '。', '「', '」',
-            '（', '）', 'ー', '〜', '＜', '＞',
-        ];
-        let mut found = None;
-
-        for ch in candidates.iter() {
-            let glyph_id = cmap.get_glyph_position(*ch as u32) as u16;
-            if glyph_id == 0 {
-                continue;
-            }
-
-            let vertical = gsub.lookup_vertical(glyph_id).unwrap_or(glyph_id);
-            if vertical != glyph_id {
-                found = Some((*ch, glyph_id, vertical));
-                break;
-            }
+        for ch in text.chars() {
+            assert_ne!(cmap.get_glyph_position(ch as u32), 0, "missing glyph for {ch}");
         }
 
-        let (ch, horizontal, vertical) =
-            found.expect("expected at least one vertical substitution");
-        assert_ne!(horizontal, vertical, "vertical form should differ for {ch}");
+        let ltr_options = crate::FontOptions::new(&font).with_font_size(32.0);
+        let rtl_options = crate::FontOptions::new(&font)
+            .with_font_size(32.0)
+            .with_right_to_left();
+        let ltr_run = crate::text2commands(text, ltr_options).expect("ltr glyph run");
+        let rtl_run = crate::text2commands(text, rtl_options).expect("rtl glyph run");
+
+        assert_eq!(rtl_run.glyphs.len(), 3);
+        assert_eq!(
+            rtl_run.glyphs[0].glyph.font.expect("font metrics").flow,
+            crate::GlyphFlow::Horizontal
+        );
+        assert!(rtl_run.glyphs[0].x > rtl_run.glyphs[1].x);
+        assert!(rtl_run.glyphs[1].x > rtl_run.glyphs[2].x);
+
+        let ltr_measure = font
+            .measure_with_options(text, ltr_options)
+            .expect("measure ltr");
+        let rtl_measure = font
+            .measure_with_options(text, rtl_options)
+            .expect("measure rtl");
+        assert!(rtl_measure > 0.0);
+        assert!((ltr_measure - rtl_measure).abs() <= 1.0);
+        assert!(ltr_run.glyphs[0].x < ltr_run.glyphs[1].x);
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn font_family_text2commands_supports_vertical_flow() {
+        let font = crate::load_font_from_file(japanese_font_path()).expect("load japanese font");
+        let (ch, _, _) =
+            first_real_vertical_substitution(&font).expect("expected vertical substitution");
+        let mut family = crate::FontFamily::new("Noto Sans JP");
+        family.add_loaded_font(font);
+
+        let run = family
+            .text2commands(
+                &format!("{ch}{ch}"),
+                family.options().with_font_size(32.0).with_vertical_flow(),
+            )
+            .expect("family vertical glyph run");
+
+        assert_eq!(run.glyphs.len(), 2);
+        assert_eq!(
+            run.glyphs[0].glyph.font.expect("font metrics").flow,
+            crate::GlyphFlow::Vertical
+        );
+        assert!(run.glyphs[1].y > run.glyphs[0].y);
+    }
+
+    #[test]
+    fn font_family_text2commands_supports_right_to_left() {
+        let font = crate::load_font_from_file(rtl_font_path()).expect("load rtl font");
+        let mut family = crate::FontFamily::new("Arial");
+        family.add_loaded_font(font);
+
+        let run = family
+            .text2commands(
+                "אבג",
+                family.options().with_font_size(32.0).with_right_to_left(),
+            )
+            .expect("family rtl glyph run");
+
+        assert_eq!(run.glyphs.len(), 3);
+        assert!(run.glyphs[0].x > run.glyphs[1].x);
+        assert!(run.glyphs[1].x > run.glyphs[2].x);
+
+        let measure = family
+            .measure_with_options("אבג", family.options().with_font_size(32.0).with_right_to_left())
+            .expect("family rtl measure");
+        assert!(measure > 0.0);
     }
 }

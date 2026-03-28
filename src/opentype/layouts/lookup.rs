@@ -1,3 +1,5 @@
+#![allow(dead_code, non_local_definitions)]
+
 use super::{classdef::ClassDef, *};
 use bin_rs::reader::BinaryReader;
 use num_derive::{FromPrimitive, ToPrimitive};
@@ -1001,9 +1003,8 @@ impl LookupSubstitution {
                     LookupResult::None
                 }
             }
-            Self::ChainingContextSubstitution3(_chaining3) => {
-                panic!("ChainingContextSubstitution3 is not implemented")
-            }
+            // Parsed but not expanded yet. Keep shaping alive by reporting no direct lookup hit.
+            Self::ChainingContextSubstitution3(_chaining3) => LookupResult::None,
             Self::ExtensionSubstitution(extension) => extension.subtable.get_lookup(gliph_id),
             Self::ReverseChainSingle(reverse) => {
                 let coverage = &reverse.coverage;

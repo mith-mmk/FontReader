@@ -12,6 +12,7 @@ Japanese: [README.ja.md](README.ja.md)
 - Pass a loaded font directly with `FontOptions::new(&font)`.
 - `font_size` and `line_height` are resolved in pixels.
 - `font_stretch`, `font_style`, `font_variant`, and `font_weight` are part of `FontOptions`.
+- `FontOptions::with_vertical_flow()` and `FontOptions::with_right_to_left()` control text direction.
 - `FontOptions::with_locale("ja-JP")` can request GSUB `locl` substitutions when the `layout` feature is enabled.
 - `FontOptions::from_family(&family)` can resolve a cached `FontFamily` entry by family/name/weight/style/stretch.
 - `FontFamily` now performs per-glyph fallback across its cached faces. Family fallback chains and Last Resort selection are still not implemented.
@@ -111,6 +112,7 @@ if buffer.is_complete() {
   `with_font_style(...)`, and `with_font_stretch(...)`.
 - For direct use, `family.options()` returns `FontOptions` already anchored to the family.
 - `family.text2svg(...)`, `family.text2commands(...)`, `family.text2glyph_run(...)`, and `family.measure(...)` now reuse the same cached-face fallback path.
+- Direction options such as `with_vertical_flow()` and `with_right_to_left()` work through the same family entrypoints.
 
 This is meant for parallel fetch / reassembly first. It is not a true lazy WOFF2 decoder.
 
@@ -171,6 +173,8 @@ The library now compiles for `wasm32-unknown-unknown`.
 - Partial: `lookup_ccmp()` exists but does not expand results yet
 - Implemented: `lookup_locale()` and `lookup_liga()`
 - Text APIs: `text2command()`, `text2commands()`, and `measure()` apply variation selectors and basic `locl` / `liga` / `dlig` shaping
+- Direction-aware APIs: `FontOptions::with_vertical_flow()` uses vertical metrics and GSUB vertical forms when available; `with_right_to_left()` reverses inline advance for RTL layout
+- Current limitation: RTL script-specific shaping such as Arabic joining is still not implemented
 - Not implemented: `lookup_width()`, `lookup_number()`
 
 ### Lookup parsing
@@ -185,7 +189,7 @@ The library now compiles for `wasm32-unknown-unknown`.
 - Type 6 Chaining Context Substitution:
   Format 1 is expandable
   Format 2 is only partially applied
-  Format 3 is parsed but not applied
+  Format 3 is parsed but not applied and is ignored instead of panicking
 - Type 7 Extension Substitution: parsed, not applied
 - Type 8 Reverse Chaining Contextual Single Substitution: parsed, not applied
 

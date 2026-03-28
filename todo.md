@@ -54,6 +54,10 @@ _test_fonts/* がテスト用フォント
     - [ ] 古ハングル
     - [ ] その他
 - [+] 縦書き
+    - [x] `FontOptions::with_vertical_flow()` で `text2commands` / `measure` / `FontFamily` を実フォント確認
+- [+] 右から左に書く言語
+    - [x] `FontOptions::with_right_to_left()` で Hebrew の RTL 配置を `text2commands` / `measure` / `FontFamily` で確認
+    - [ ] アラビア文字の joining など script 固有 shaping
 - loader
     - [x] font
     - [x] font collection
@@ -139,7 +143,10 @@ _test_fonts/* がテスト用フォント
 - [*] layout featureの拡張
     - [x] text2command / text2commands / measure で variation selector と基本合字(liga / dlig) を利用
     - [x] `FontOptions::with_locale()` から `locl` shaping を利用
-    - [ ] ccmp / context chaining などの shaping 拡張
+    - [x] `FontOptions::with_vertical_flow()` / `with_right_to_left()` を text API と `FontFamily` に反映
+    - [*] ccmp / context chaining などの shaping 拡張
+        - [x] `ccmp` の multiple / ligature / extension を text API shaping に反映
+        - [ ] context / chaining の適用拡張
 
 # opentype
 - [x] True Type
@@ -151,10 +158,13 @@ _test_fonts/* がテスト用フォント
 
 
 # GPOS
-- [ ] 実装
+- [*] 実装
+- [x] pair adjustment (Format 1 / 2)
+- [x] extension positioning (Type 9 経由の pair adjustment)
+- [x] text2command / text2commands / measure への `kern` 反映
 - [ ] palt
 - [ ] vpal
-- [ ] kern
+- [x] kern
 - [ ] vkrn
 - [ ] halt
 - [ ] vhal
@@ -163,9 +173,12 @@ _test_fonts/* がテスト用フォント
 
 - パース済み: `ScriptList`, `FeatureList`, `LookupList`
 - [+] 実装済み: 単一置換ベースの縦書き置換 `lookup_vertical()`
-- [ ] 部分実装: `lookup_ccmp()` は存在するが、結果展開は未実装
+- [*] 部分実装: `ccmp` sequence 適用は text API shaping で利用、`lookup_ccmp()` の個別 API は未整理
 - [+] 実装済み: `lookup_locale()`, `lookup_liga()`
-- [*] text API への反映: `text2command()`, `text2commands()`, `measure()` で variation selector と基本的な `locl` / `liga` / `dlig` を利用
+- [*] text API への反映: `text2command()`, `text2commands()`, `measure()` で variation selector と基本的な `locl` / `liga` / `dlig` / `ccmp` を利用
+    - [x] `TextDirection::TopToBottom` で縦メトリクスと縦書き置換を利用
+    - [x] `TextDirection::RightToLeft` で RTL の inline 進行方向を利用
+    - [ ] アラビア文字などの script 固有 shaping
 - [ ] 未実装: `lookup_width()`, `lookup_number()`
 - [ ] aalt
 - [ ] dlig
@@ -184,10 +197,10 @@ _test_fonts/* がテスト用フォント
 
 
 ### Lookup パース
-- [ ] Type 1 Single Substitution: パース済み、展開可能
-- [ ] Type 2 Multiple Substitution: パース済み、展開可能
+- [x] Type 1 Single Substitution: パース済み、展開可能
+- [x] Type 2 Multiple Substitution: パース済み、展開可能
 - [ ] Type 3 Alternate Substitution: パース済み、展開可能
-- [ ] Type 4 Ligature Substitution: パース済み、展開可能
+- [x] Type 4 Ligature Substitution: パース済み、展開可能
 - [ ] Type 5 Context Substitution:
     - [ ] Format 1 は展開可能
     - [ ] Format 2
@@ -195,8 +208,8 @@ _test_fonts/* がテスト用フォント
 - [ ] Type 6 Chaining Context Substitution:
     - [ ] Format 1 は展開可能
     - [ ] Format 2 は一部のみ適用
-    - [ ] Format 3 はパースのみで、適用は未実装
-- [ ] Type 7 Extension Substitution: パース済み、適用は未実装
+    - [ ] Format 3 はパースのみで、適用は未実装。未対応 lookup は panic せず無視
+- [*] Type 7 Extension Substitution: パース済み、single / multiple / ligature は適用可能
 - [ ] Type 8 Reverse Chaining Contextual Single Substitution: パース済み、適用は未実装
 
 ### GDEF

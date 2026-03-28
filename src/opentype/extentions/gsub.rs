@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 // GSUB -- Glyph Substitution Table
 
 // only check lookup Format1.1 , 4, 5, 6.1, 7

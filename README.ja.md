@@ -12,6 +12,7 @@ English: [README.md](README.md)
 - `FontOptions::new(&font)` でロード済みフォントをそのまま渡せます。
 - `font_size` と `line_height` は px として解釈されます。
 - `font_stretch`、`font_style`、`font_variant`、`font_weight` を `FontOptions` に保持できます。
+- `FontOptions::with_vertical_flow()` と `FontOptions::with_right_to_left()` で文字の進行方向を指定できます。
 - `layout` feature 有効時は `FontOptions::with_locale("ja-JP")` で GSUB `locl` を要求できます。
 - `FontOptions::from_family(&family)` を使うと、キャッシュ済みの `FontFamily` から family/name/weight/style/stretch 条件で face を選べます。
 - `FontFamily` は、cache 済み face 間で glyph ごとの fallback まで行うようになりました。family fallback chain や Last Resort 自動選択はまだ未実装です。
@@ -81,6 +82,7 @@ for glyph in &run.glyphs {
   `with_font_style(...)`, `with_font_stretch(...)` を組み合わせて face を解決します。
 - `family.options()` を使うと、その `FontFamily` にひも付いた `FontOptions` をそのまま作れます。
 - `family.text2svg(...)`, `family.text2commands(...)`, `family.text2glyph_run(...)`, `family.measure(...)` は、同じ cached-face fallback 経路を使います。
+- `with_vertical_flow()` や `with_right_to_left()` の方向指定も、そのまま `FontFamily` 経由で使えます。
 
 これは「並列取得して再構成する」ための層で、WOFF2 を真の lazy decode するものではありません。
 
@@ -169,6 +171,8 @@ if buffer.is_complete() {
 - 部分実装: `lookup_ccmp()` は存在するが、結果展開は未実装
 - 実装済み: `lookup_locale()`, `lookup_liga()`
 - text API: `text2command()`, `text2commands()`, `measure()` で variation selector と基本的な `locl` / `liga` / `dlig` shaping を利用
+- 方向指定 API: `FontOptions::with_vertical_flow()` で縦メトリクスと GSUB の縦書き置換を利用し、`with_right_to_left()` で RTL の inline 進行方向を利用
+- 現状の制限: RTL でもアラビア文字の joining など script 固有 shaping は未実装
 - 未実装: `lookup_width()`, `lookup_number()`
 
 ### Lookup パース
@@ -183,7 +187,7 @@ if buffer.is_complete() {
 - Type 6 Chaining Context Substitution:
   Format 1 は展開可能
   Format 2 は一部のみ適用
-  Format 3 はパースのみで、適用は未実装
+  Format 3 はパースのみで、適用は未実装。未対応でも panic せず無視します
 - Type 7 Extension Substitution: パース済み、適用は未実装
 - Type 8 Reverse Chaining Contextual Single Substitution: パース済み、適用は未実装
 
