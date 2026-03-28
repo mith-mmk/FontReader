@@ -855,6 +855,8 @@ impl Font {
         &self,
         output: &mut Vec<ResolvedTextUnit>,
         glyphs: &mut Vec<ResolvedGlyph>,
+        locale: Option<&str>,
+        is_right_to_left: bool,
     ) {
         if glyphs.is_empty() {
             return;
@@ -870,6 +872,9 @@ impl Font {
                 .map(|(source_index, glyph)| (glyph.glyph_id, source_index))
                 .collect::<Vec<_>>();
             gsub.apply_ccmp_sequence(&mut ccmp_glyphs);
+            if is_right_to_left {
+                gsub.apply_joining_sequence(&mut ccmp_glyphs, locale);
+            }
             let expanded_glyphs = ccmp_glyphs
                 .into_iter()
                 .map(|(glyph_id, source_index)| ResolvedGlyph {
@@ -916,10 +921,11 @@ impl Font {
         &self,
         text: &str,
         is_vert: bool,
+        is_right_to_left: bool,
         locale: Option<&str>,
     ) -> Result<Vec<ResolvedTextUnit>, Error> {
         #[cfg(not(feature = "layout"))]
-        let _ = locale;
+        let _ = (locale, is_right_to_left);
 
         let mut output = Vec::new();
         let mut pending_glyphs = Vec::new();
@@ -927,11 +933,21 @@ impl Font {
         for unit in Self::parse_text_units(text) {
             match unit {
                 ParsedTextUnit::Newline => {
-                    self.flush_shaped_glyphs(&mut output, &mut pending_glyphs);
+                    self.flush_shaped_glyphs(
+                        &mut output,
+                        &mut pending_glyphs,
+                        locale,
+                        is_right_to_left,
+                    );
                     output.push(ResolvedTextUnit::Newline);
                 }
                 ParsedTextUnit::Tab => {
-                    self.flush_shaped_glyphs(&mut output, &mut pending_glyphs);
+                    self.flush_shaped_glyphs(
+                        &mut output,
+                        &mut pending_glyphs,
+                        locale,
+                        is_right_to_left,
+                    );
                     output.push(ResolvedTextUnit::Tab);
                 }
                 ParsedTextUnit::Glyph {
@@ -955,7 +971,7 @@ impl Font {
             }
         }
 
-        self.flush_shaped_glyphs(&mut output, &mut pending_glyphs);
+        self.flush_shaped_glyphs(&mut output, &mut pending_glyphs, locale, is_right_to_left);
         Ok(output)
     }
 
@@ -1050,7 +1066,23 @@ impl Font {
         locale: Option<&str>,
     ) -> Result<Vec<usize>, Error> {
         let mut glyph_ids = Vec::new();
-        for unit in self.shape_text_units(text, false, locale)? {
+        for unit in self.shape_text_units(text, false, false, locale)? {
+            if let ResolvedTextUnit::Glyph(glyph) = unit {
+                glyph_ids.push(glyph.glyph_id);
+            }
+        }
+        Ok(glyph_ids)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn debug_shape_glyph_ids_with_direction(
+        &self,
+        text: &str,
+        locale: Option<&str>,
+        is_right_to_left: bool,
+    ) -> Result<Vec<usize>, Error> {
+        let mut glyph_ids = Vec::new();
+        for unit in self.shape_text_units(text, false, is_right_to_left, locale)? {
             if let ResolvedTextUnit::Glyph(glyph) = unit {
                 glyph_ids.push(glyph.glyph_id);
             }
@@ -1164,7 +1196,8 @@ impl Font {
         let mut cursor_x = 0.0f32;
         let mut cursor_y = 0.0f32;
         let tab_advance = line_height;
-        let shaped_units = self.shape_text_units(text, is_vertical, options.locale)?;
+        let shaped_units =
+            self.shape_text_units(text, is_vertical, is_right_to_left, options.locale)?;
 
         for (index, unit) in shaped_units.iter().enumerate() {
             match *unit {
@@ -1365,7 +1398,7 @@ impl Font {
         let mut line_index = 0usize;
         let line_height = self.default_line_height()?;
         let tab_advance = line_height;
-        let shaped_units = self.shape_text_units(text, false, None)?;
+        let shaped_units = self.shape_text_units(text, false, false, None)?;
 
         for (index, unit) in shaped_units.iter().enumerate() {
             match *unit {
@@ -1494,7 +1527,8 @@ impl Font {
         let tab_advance = line_height;
         let is_vertical = options.text_direction.is_vertical();
         let is_right_to_left = options.text_direction.is_right_to_left();
-        let shaped_units = self.shape_text_units(text, is_vertical, options.locale)?;
+        let shaped_units =
+            self.shape_text_units(text, is_vertical, is_right_to_left, options.locale)?;
 
         for (index, unit) in shaped_units.iter().enumerate() {
             match *unit {

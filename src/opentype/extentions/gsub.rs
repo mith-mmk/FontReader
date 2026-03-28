@@ -15,6 +15,44 @@ use crate::opentype::layouts::{
 };
 use bin_rs::reader::BinaryReader;
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) struct JoiningForms {
+    pub(crate) isolated: Option<usize>,
+    pub(crate) initial: Option<usize>,
+    pub(crate) medial: Option<usize>,
+    pub(crate) final_form: Option<usize>,
+}
+
+impl JoiningForms {
+    pub(crate) fn can_join_to_prev(self) -> bool {
+        self.final_form.is_some() || self.medial.is_some()
+    }
+
+    pub(crate) fn can_join_to_next(self) -> bool {
+        self.initial.is_some() || self.medial.is_some()
+    }
+
+    pub(crate) fn substitute(self, glyph_id: usize, join_prev: bool, join_next: bool) -> usize {
+        if join_prev && join_next {
+            if let Some(glyph_id) = self.medial {
+                return glyph_id;
+            }
+        }
+        if join_prev {
+            if let Some(glyph_id) = self.final_form {
+                return glyph_id;
+            }
+        }
+        if join_next {
+            if let Some(glyph_id) = self.initial {
+                return glyph_id;
+            }
+        }
+
+        self.isolated.unwrap_or(glyph_id)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct GSUB {
     pub(crate) major_version: u16,
@@ -390,6 +428,48 @@ impl GSUB {
             if !changed || iterations >= max_iterations {
                 break;
             }
+        }
+    }
+
+    pub(crate) fn lookup_joining_forms(
+        &self,
+        glyph_id: usize,
+        locale: Option<&str>,
+    ) -> JoiningForms {
+        JoiningForms {
+            isolated: self.lookup_single_feature(glyph_id, locale, &[*b"isol"]),
+            initial: self.lookup_single_feature(glyph_id, locale, &[*b"init"]),
+            medial: self.lookup_single_feature(glyph_id, locale, &[*b"medi"]),
+            final_form: self.lookup_single_feature(glyph_id, locale, &[*b"fina"]),
+        }
+    }
+
+    pub(crate) fn apply_joining_sequence(
+        &self,
+        glyphs: &mut Vec<(usize, usize)>,
+        locale: Option<&str>,
+    ) {
+        if glyphs.is_empty() {
+            return;
+        }
+
+        let forms: Vec<JoiningForms> = glyphs
+            .iter()
+            .map(|(glyph_id, _)| self.lookup_joining_forms(*glyph_id, locale))
+            .collect();
+
+        for index in 0..glyphs.len() {
+            let join_prev = if index > 0 {
+                forms[index - 1].can_join_to_next() && forms[index].can_join_to_prev()
+            } else {
+                false
+            };
+            let join_next = if index + 1 < glyphs.len() {
+                forms[index].can_join_to_next() && forms[index + 1].can_join_to_prev()
+            } else {
+                false
+            };
+            glyphs[index].0 = forms[index].substitute(glyphs[index].0, join_prev, join_next);
         }
     }
 

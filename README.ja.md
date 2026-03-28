@@ -170,9 +170,10 @@ if buffer.is_complete() {
 - 実装済み: 単一置換ベースの縦書き置換 `lookup_vertical()`
 - 部分実装: `lookup_ccmp()` は存在するが、結果展開は未実装
 - 実装済み: `lookup_locale()`, `lookup_liga()`
-- text API: `text2command()`, `text2commands()`, `measure()` で variation selector と基本的な `locl` / `liga` / `dlig` shaping を利用
+- text API: `text2command()`, `text2commands()`, `measure()` で variation selector と基本的な `locl` / `liga` / `dlig` / `ccmp` shaping を利用
 - 方向指定 API: `FontOptions::with_vertical_flow()` で縦メトリクスと GSUB の縦書き置換を利用し、`with_right_to_left()` で RTL の inline 進行方向を利用
-- 現状の制限: RTL でもアラビア文字の joining など script 固有 shaping は未実装
+- RTL shaping: GSUB の `isol` / `init` / `medi` / `fina` があるフォントでは、アラビア文字の joining form を適用
+- 現状の制限: `rlig` や context/chaining 依存の高度な RTL shaping は未実装
 - 未実装: `lookup_width()`, `lookup_number()`
 
 ### Lookup パース

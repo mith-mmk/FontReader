@@ -172,9 +172,10 @@ The library now compiles for `wasm32-unknown-unknown`.
 - Implemented: `lookup_vertical()` for single substitution based vertical forms
 - Partial: `lookup_ccmp()` exists but does not expand results yet
 - Implemented: `lookup_locale()` and `lookup_liga()`
-- Text APIs: `text2command()`, `text2commands()`, and `measure()` apply variation selectors and basic `locl` / `liga` / `dlig` shaping
+- Text APIs: `text2command()`, `text2commands()`, and `measure()` apply variation selectors and basic `locl` / `liga` / `dlig` / `ccmp` shaping
 - Direction-aware APIs: `FontOptions::with_vertical_flow()` uses vertical metrics and GSUB vertical forms when available; `with_right_to_left()` reverses inline advance for RTL layout
-- Current limitation: RTL script-specific shaping such as Arabic joining is still not implemented
+- RTL shaping: Arabic joining forms through GSUB `isol` / `init` / `medi` / `fina` are applied when those features exist
+- Current limitation: more advanced RTL shaping such as `rlig` or context/chaining-driven substitutions is still not implemented
 - Not implemented: `lookup_width()`, `lookup_number()`
 
 ### Lookup parsing
