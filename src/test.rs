@@ -2881,6 +2881,46 @@ mod tests {
     }
 
     #[test]
+    fn font_family_prefers_primary_font_for_plain_digits_over_sbix_fallback() {
+        let regular =
+            crate::load_font_from_file(fira_sans_regular_path()).expect("load regular fira sans");
+        let sbix = crate::load_font_from_file(twemoji_sbix_font_path()).expect("load twemoji sbix");
+
+        let mut family = crate::FontFamily::new("Fira Sans");
+        family.add_loaded_font(regular);
+        family.add_loaded_font(sbix);
+
+        let run = crate::text2commands(
+            "123",
+            crate::FontOptions::from_family(&family)
+                .with_font_family("Fira Sans")
+                .with_font_size(32.0),
+        )
+        .expect("render plain digits with fallback family");
+
+        assert_eq!(run.glyphs.len(), 3);
+        for glyph in &run.glyphs {
+            match glyph.glyph.layers.first() {
+                Some(crate::GlyphLayer::Path(layer)) => assert!(!layer.commands.is_empty()),
+                Some(crate::GlyphLayer::Raster(_)) => {
+                    panic!("plain digits should not fall back to sbix raster glyphs")
+                }
+                None => panic!("expected digit layer"),
+            }
+        }
+    }
+
+    #[test]
+    fn sbix_font_prefers_outline_for_plain_digit() {
+        let font = crate::load_font_from_file(twemoji_sbix_font_path()).expect("load twemoji sbix");
+
+        let plain_digit = font.text2command("1").expect("render plain digit");
+        assert_eq!(plain_digit.len(), 1);
+        assert!(plain_digit[0].bitmap.is_none());
+        assert!(!plain_digit[0].commands.is_empty());
+    }
+
+    #[test]
     fn fontload_from_woff_file_works() {
         let path = woff_font_path();
         let font = crate::fontload_file(&path).expect("load woff font");

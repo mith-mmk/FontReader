@@ -167,6 +167,7 @@ pub(crate) enum ParsedTextUnit {
 struct ResolvedGlyph {
     ch: char,
     glyph_id: usize,
+    prefer_color: bool,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -841,6 +842,29 @@ impl Font {
         (0xE0020..=0xE007E).contains(&(ch as u32)) || ch == '\u{E007F}'
     }
 
+    fn is_default_emoji_scalar(ch: char) -> bool {
+        matches!(ch as u32, 0x1F000..=0x1FAFF | 0x2600..=0x27BF)
+    }
+
+    fn text_prefers_color_glyph(text: &str) -> bool {
+        let mut saw_emoji_scalar = false;
+        for ch in text.chars() {
+            if Self::is_variation_selector(ch)
+                || Self::is_emoji_modifier(ch)
+                || Self::is_zero_width_joiner(ch)
+                || Self::is_keycap_mark(ch)
+                || Self::is_regional_indicator(ch)
+                || Self::is_tag_character(ch)
+            {
+                return true;
+            }
+            if Self::is_default_emoji_scalar(ch) {
+                saw_emoji_scalar = true;
+            }
+        }
+        saw_emoji_scalar
+    }
+
     fn extend_cluster_suffix(chars: &[char], index: &mut usize, text: &mut String) {
         while *index < chars.len() {
             let ch = chars[*index];
@@ -988,6 +1012,7 @@ impl Font {
                 .map(|(glyph_id, source_index)| ResolvedGlyph {
                     ch: glyphs[source_index].ch,
                     glyph_id,
+                    prefer_color: glyphs[source_index].prefer_color,
                 })
                 .collect::<Vec<_>>();
 
@@ -1018,6 +1043,7 @@ impl Font {
                     output.push(ResolvedTextUnit::Glyph(ResolvedGlyph {
                         ch: expanded_glyphs[index].ch,
                         glyph_id,
+                        prefer_color: expanded_glyphs[index].prefer_color,
                     }));
                     index += len;
                 } else {
@@ -1070,6 +1096,7 @@ impl Font {
                     output.push(ResolvedTextUnit::Tab);
                 }
                 ParsedTextUnit::Glyph { text, .. } => {
+                    let prefer_color = Self::text_prefers_color_glyph(&text);
                     for (ch, variation_selector) in Self::cluster_glyph_scalars(&text) {
                         let glyph_id =
                             self.resolve_glyph_id_with_uvs(ch, variation_selector, is_vert)?;
@@ -1083,7 +1110,11 @@ impl Font {
                         } else {
                             glyph_id
                         };
-                        pending_glyphs.push(ResolvedGlyph { ch, glyph_id });
+                        pending_glyphs.push(ResolvedGlyph {
+                            ch,
+                            glyph_id,
+                            prefer_color,
+                        });
                     }
                 }
             }
@@ -1266,6 +1297,27 @@ impl Font {
         }
     }
 
+    fn resolved_glyph_can_use_outline(
+        &self,
+        open_type_glyph: &OpenTypeGlyph,
+        glyph_id: usize,
+    ) -> bool {
+        if self
+            .current_colr()
+            .map(|colr| !colr.get_layer_record(glyph_id as u16).is_empty())
+            .unwrap_or(false)
+        {
+            return true;
+        }
+
+        #[cfg(feature = "cff")]
+        if self.current_cff().is_some() {
+            return true;
+        }
+
+        matches!(open_type_glyph.glyph, FontData::Glyph(_))
+    }
+
     fn pair_adjustment_for_index(
         &self,
         units: &[ResolvedTextUnit],
@@ -1392,17 +1444,30 @@ impl Font {
                         .as_ref()
                         .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "glyph is none"))?;
                     let glyph_id = glyph_data.glyph_id;
+                    let can_use_outline =
+                        self.resolved_glyph_can_use_outline(open_type_glyph, glyph_id);
 
                     let layers = if let Some(sbix) = self.current_sbix() {
                         if let Some(bitmap) =
                             sbix.get_raster_glyph(glyph_id as u32, options.font_size, "px")
                         {
-                            let mut raster = RasterGlyphLayer::from_encoded(bitmap.glyph_data);
-                            raster.offset_x = bitmap.offset_x * options.font_stretch.0.max(0.0);
-                            raster.offset_y = bitmap.offset_y;
-                            raster.width = bitmap.width;
-                            raster.height = bitmap.height;
-                            vec![GlyphLayer::Raster(raster)]
+                            if resolved.prefer_color || !can_use_outline {
+                                let mut raster = RasterGlyphLayer::from_encoded(bitmap.glyph_data);
+                                raster.offset_x =
+                                    bitmap.offset_x * options.font_stretch.0.max(0.0);
+                                raster.offset_y = bitmap.offset_y;
+                                raster.width = bitmap.width;
+                                raster.height = bitmap.height;
+                                vec![GlyphLayer::Raster(raster)]
+                            } else {
+                                self.build_outline_layers(
+                                    glyph_id,
+                                    open_type_glyph,
+                                    scale_x,
+                                    scale_y,
+                                    resolved.ch,
+                                )?
+                            }
                         } else {
                             self.build_outline_layers(
                                 glyph_id,
@@ -1625,6 +1690,8 @@ impl Font {
                         FontLayout::Unknown => 0.0,
                     } + adjustment.advance_x as f64;
                     let origin_x = cursor_x + adjustment.placement_x as f64;
+                    let can_use_outline =
+                        self.resolved_glyph_can_use_outline(open_type_glyph, glyph_data.glyph_id);
 
                     if let Some(sbix) = self.current_sbix() {
                         if let Some(bitmap) = sbix.get_raster_glyph(
@@ -1632,50 +1699,53 @@ impl Font {
                             line_height as f32,
                             "px",
                         ) {
-                            let format = if bitmap.graphic_type == u32::from_be_bytes(*b"png ") {
-                                BitmapGlyphFormat::Png
-                            } else if bitmap.graphic_type == u32::from_be_bytes(*b"jpg ") {
-                                BitmapGlyphFormat::Jpeg
-                            } else {
-                                return Err(Error::new(
-                                    std::io::ErrorKind::Unsupported,
-                                    "unsupported sbix image format",
-                                ));
-                            };
-                            let sniffed_dimensions =
-                                sniff_encoded_image_dimensions(&bitmap.glyph_data);
-                            result.push(GlyphCommands {
-                                ch: resolved.ch,
-                                glyph_id: glyph_data.glyph_id,
-                                origin_x,
-                                origin_y,
-                                advance_width,
-                                commands: Vec::new(),
-                                bitmap: Some(BitmapGlyphCommands {
-                                    offset_x: bitmap.offset_x as f64,
-                                    offset_y: bitmap.offset_y as f64,
-                                    width: bitmap
-                                        .width
-                                        .map(|width| width as f64)
-                                        .or_else(|| {
-                                            sniffed_dimensions
-                                                .map(|(_, width, _)| width as f64)
-                                        })
-                                        .unwrap_or(line_height),
-                                    height: bitmap
-                                        .height
-                                        .map(|height| height as f64)
-                                        .or_else(|| {
-                                            sniffed_dimensions
-                                                .map(|(_, _, height)| height as f64)
-                                        })
-                                        .unwrap_or(line_height),
-                                    format,
-                                    data: bitmap.glyph_data,
-                                }),
-                            });
-                            cursor_x += advance_width;
-                            continue;
+                            if resolved.prefer_color || !can_use_outline {
+                                let format =
+                                    if bitmap.graphic_type == u32::from_be_bytes(*b"png ") {
+                                        BitmapGlyphFormat::Png
+                                    } else if bitmap.graphic_type == u32::from_be_bytes(*b"jpg ") {
+                                        BitmapGlyphFormat::Jpeg
+                                    } else {
+                                        return Err(Error::new(
+                                            std::io::ErrorKind::Unsupported,
+                                            "unsupported sbix image format",
+                                        ));
+                                    };
+                                let sniffed_dimensions =
+                                    sniff_encoded_image_dimensions(&bitmap.glyph_data);
+                                result.push(GlyphCommands {
+                                    ch: resolved.ch,
+                                    glyph_id: glyph_data.glyph_id,
+                                    origin_x,
+                                    origin_y,
+                                    advance_width,
+                                    commands: Vec::new(),
+                                    bitmap: Some(BitmapGlyphCommands {
+                                        offset_x: bitmap.offset_x as f64,
+                                        offset_y: bitmap.offset_y as f64,
+                                        width: bitmap
+                                            .width
+                                            .map(|width| width as f64)
+                                            .or_else(|| {
+                                                sniffed_dimensions
+                                                    .map(|(_, width, _)| width as f64)
+                                            })
+                                            .unwrap_or(line_height),
+                                        height: bitmap
+                                            .height
+                                            .map(|height| height as f64)
+                                            .or_else(|| {
+                                                sniffed_dimensions
+                                                    .map(|(_, _, height)| height as f64)
+                                            })
+                                            .unwrap_or(line_height),
+                                        format,
+                                        data: bitmap.glyph_data,
+                                    }),
+                                });
+                                cursor_x += advance_width;
+                                continue;
+                            }
                         }
                     }
 
