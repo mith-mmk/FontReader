@@ -2811,6 +2811,39 @@ mod tests {
     }
 
     #[test]
+    fn fira_sans_svg_viewbox_keeps_padding_for_o() {
+        let path = fira_sans_black_path();
+        let font = crate::load_font_from_file(&path).expect("load Fira Sans Black");
+        let run = font
+            .text2glyph_run("O", crate::FontOptions::new(&font).with_font_size(64.0))
+            .expect("shape O");
+        let svg = font.text2svg("O", 64.0, "px").expect("svg O");
+
+        let view_box = svg
+            .split("viewBox=\"")
+            .nth(1)
+            .and_then(|rest| rest.split('"').next())
+            .expect("viewBox");
+        let values: Vec<f32> = view_box
+            .split_whitespace()
+            .map(|value| value.parse::<f32>().expect("numeric viewBox component"))
+            .collect();
+        assert_eq!(values.len(), 4);
+
+        let glyph = &run.glyphs[0];
+        let bounds = glyph.glyph.metrics.bounds.expect("glyph bounds");
+        let min_x = bounds.min_x + glyph.x;
+        let min_y = bounds.min_y + glyph.y;
+        let width = bounds.max_x - bounds.min_x;
+        let height = bounds.max_y - bounds.min_y;
+
+        assert!(values[0] < min_x, "viewBox should add left/right padding");
+        assert!(values[1] < min_y, "viewBox should add top/bottom padding");
+        assert!(values[2] > width, "viewBox width should exceed glyph bounds");
+        assert!(values[3] > height, "viewBox height should exceed glyph bounds");
+    }
+
+    #[test]
     fn fontload_from_woff2_buffer_works() {
         let path = woff2_font_path();
         let bytes = std::fs::read(&path).expect("read woff2 bytes");

@@ -746,11 +746,16 @@ fn glyph_run_to_svg(run: &GlyphRun, fontunit: &str) -> Result<String, Error> {
         ));
     };
 
-    let view_width = (bounds.max_x - bounds.min_x).max(1.0);
-    let view_height = (bounds.max_y - bounds.min_y).max(1.0);
+    const SVG_EXPORT_PADDING: f32 = 2.0;
+    let min_x = bounds.min_x - SVG_EXPORT_PADDING;
+    let min_y = bounds.min_y - SVG_EXPORT_PADDING;
+    let view_width = (bounds.max_x - bounds.min_x + SVG_EXPORT_PADDING * 2.0).max(1.0);
+    let view_height = (bounds.max_y - bounds.min_y + SVG_EXPORT_PADDING * 2.0).max(1.0);
+    let width = view_width.ceil();
+    let height = view_height.ceil();
     let mut svg = format!(
-        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{}{}\" height=\"{}{}\" viewBox=\"{} {} {} {}\">",
-        view_width, fontunit, view_height, fontunit, bounds.min_x, bounds.min_y, view_width, view_height
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{}{}\" height=\"{}{}\" viewBox=\"{} {} {} {}\" overflow=\"visible\">",
+        width, fontunit, height, fontunit, min_x, min_y, view_width, view_height
     );
 
     for glyph in &run.glyphs {

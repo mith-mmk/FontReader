@@ -1946,14 +1946,17 @@ impl Font {
             ));
         }
 
-        let view_width = (max_x - min_x).max(1.0);
-        let view_height = (max_y - min_y).max(1.0);
+        const SVG_EXPORT_PADDING: f64 = 2.0;
+        min_x -= SVG_EXPORT_PADDING;
+        min_y -= SVG_EXPORT_PADDING;
+        let view_width = (max_x - min_x + SVG_EXPORT_PADDING).max(1.0);
+        let view_height = (max_y - min_y + SVG_EXPORT_PADDING).max(1.0);
         let scale = fontsize / line_height.max(1.0);
-        let width = view_width * scale;
-        let height = view_height * scale;
+        let width = (view_width * scale).ceil();
+        let height = (view_height * scale).ceil();
 
         let mut svg = format!(
-            "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{}{}\" height=\"{}{}\" viewBox=\"{} {} {} {}\">",
+            "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{}{}\" height=\"{}{}\" viewBox=\"{} {} {} {}\" overflow=\"visible\">",
             width, fontunit, height, fontunit, min_x, min_y, view_width, view_height
         );
         for element in svg_elements {
