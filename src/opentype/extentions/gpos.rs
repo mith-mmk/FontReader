@@ -445,13 +445,71 @@ impl GPOS {
         locale: Option<&str>,
         feature_tags: &[[u8; 4]],
     ) -> Vec<&'a PositioningLookup> {
+        if locale.is_none() {
+            return self.collect_lookups_from_scripts(
+                self.scripts.scripts.iter().collect(),
+                locale,
+                feature_tags,
+            );
+        }
+
+        let (preferred_scripts, default_scripts, other_scripts) = self.partition_scripts(locale);
+        let mut result = Vec::new();
+        let mut seen_lookup_ptrs = HashSet::new();
+
+        for feature_tag in feature_tags {
+            let lookups = {
+                let preferred = self.collect_lookups_from_scripts(
+                    preferred_scripts.clone(),
+                    locale,
+                    std::slice::from_ref(feature_tag),
+                );
+                if !preferred.is_empty() {
+                    preferred
+                } else {
+                    let defaults = self.collect_lookups_from_scripts(
+                        default_scripts.clone(),
+                        locale,
+                        std::slice::from_ref(feature_tag),
+                    );
+                    if !defaults.is_empty() {
+                        defaults
+                    } else {
+                        self.collect_lookups_from_scripts(
+                            other_scripts.clone(),
+                            locale,
+                            std::slice::from_ref(feature_tag),
+                        )
+                    }
+                }
+            };
+
+            for lookup in lookups {
+                let ptr = lookup as *const PositioningLookup as usize;
+                if seen_lookup_ptrs.insert(ptr) {
+                    result.push(lookup);
+                }
+            }
+        }
+
+        result
+    }
+
+    fn collect_lookups_from_scripts<'a>(
+        &'a self,
+        scripts: Vec<&'a ParsedScript>,
+        locale: Option<&str>,
+        feature_tags: &[[u8; 4]],
+    ) -> Vec<&'a PositioningLookup> {
         let mut result = Vec::new();
         let mut seen_lookup_indices = HashSet::new();
 
-        for script in self.scripts.scripts.iter() {
+        for script in scripts {
             for language_system in self.get_language_systems(script, locale) {
-                for feature_index in language_system.language_system.feature_indexes.iter() {
-                    let feature = &self.features.features[*feature_index as usize];
+                for feature_index in
+                    Self::collect_language_system_feature_indices(&language_system.language_system)
+                {
+                    let feature = &self.features.features[feature_index as usize];
                     if !feature_tags
                         .iter()
                         .any(|tag| feature.feature_tag == u32::from_be_bytes(*tag))
@@ -472,6 +530,101 @@ impl GPOS {
         }
 
         result
+    }
+
+    fn partition_scripts<'a>(
+        &'a self,
+        locale: Option<&str>,
+    ) -> (Vec<&'a ParsedScript>, Vec<&'a ParsedScript>, Vec<&'a ParsedScript>) {
+        if locale.is_none() {
+            return (self.scripts.scripts.iter().collect(), Vec::new(), Vec::new());
+        }
+
+        let mut preferred = Vec::new();
+        let mut defaults = Vec::new();
+        let mut others = Vec::new();
+        let preferred_tags = locale
+            .map(Self::locale_to_script_tags)
+            .unwrap_or_default();
+
+        if let Some(locale) = locale {
+            for script_tag in Self::locale_to_script_tags(locale) {
+                if let Some(script) = self
+                    .scripts
+                    .scripts
+                    .iter()
+                    .find(|script| script.script_tag == script_tag)
+                {
+                    preferred.push(script);
+                }
+            }
+        }
+
+        for script in self.scripts.scripts.iter() {
+            if script.script_tag == u32::from_be_bytes(*b"DFLT") {
+                defaults.push(script);
+            } else if preferred_tags.contains(&script.script_tag) {
+                if !preferred.iter().any(|existing| existing.script_tag == script.script_tag) {
+                    preferred.push(script);
+                }
+            } else {
+                others.push(script);
+            }
+        }
+
+        (preferred, defaults, others)
+    }
+
+    fn locale_to_script_tags(locale: &str) -> Vec<u32> {
+        let locale = locale.trim();
+        if locale.is_empty() {
+            return Vec::new();
+        }
+
+        let primary = locale
+            .split(|c| c == '-' || c == '_')
+            .next()
+            .unwrap_or(locale)
+            .trim()
+            .to_ascii_lowercase();
+
+        match primary.as_str() {
+            "ar" | "ara" => vec![u32::from_be_bytes(*b"arab")],
+            "he" | "heb" => vec![u32::from_be_bytes(*b"hebr")],
+            "syr" | "syc" | "syrj" | "syrn" => vec![u32::from_be_bytes(*b"syrc")],
+            "ja" | "jp" | "jpn" => vec![
+                u32::from_be_bytes(*b"kana"),
+                u32::from_be_bytes(*b"hani"),
+            ],
+            "ko" | "kor" => vec![u32::from_be_bytes(*b"hang")],
+            "zh" | "zho" | "chi" => vec![u32::from_be_bytes(*b"hani")],
+            _ if primary.len() == 4 => {
+                let mut tag = [b' '; 4];
+                for (index, byte) in primary.bytes().take(4).enumerate() {
+                    tag[index] = byte;
+                }
+                vec![u32::from_be_bytes(tag)]
+            }
+            _ => Vec::new(),
+        }
+    }
+
+    fn collect_language_system_feature_indices(
+        language_system: &crate::opentype::layouts::LanguageSystem,
+    ) -> Vec<u16> {
+        let mut feature_indices = Vec::new();
+
+        if language_system.required_feature_index != 0xFFFF {
+            feature_indices.push(language_system.required_feature_index);
+        }
+
+        for feature_index in &language_system.feature_indexes {
+            if !feature_indices.contains(feature_index) {
+                feature_indices.push(*feature_index);
+            }
+        }
+
+        feature_indices
     }
 
     pub(crate) fn lookup_pair_adjustment(

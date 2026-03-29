@@ -573,34 +573,104 @@ mod tests {
     }
 
     #[cfg(feature = "layout")]
-    fn build_gpos_table(feature_tag: [u8; 4], lookup_type: u16, subtable: Vec<u8>) -> Vec<u8> {
+    fn build_script_list_with_default_lang_systems(
+        scripts: &[([u8; 4], u16, &[u16])],
+    ) -> Vec<u8> {
         let mut script_list = Vec::new();
-        push_u16(&mut script_list, 1);
-        script_list.extend_from_slice(b"DFLT");
-        push_u16(&mut script_list, 8);
-        push_u16(&mut script_list, 4);
-        push_u16(&mut script_list, 0);
-        push_u16(&mut script_list, 0);
-        push_u16(&mut script_list, 0xFFFF);
-        push_u16(&mut script_list, 1);
-        push_u16(&mut script_list, 0);
+        push_u16(&mut script_list, scripts.len() as u16);
 
+        let script_records_pos = script_list.len();
+        script_list.resize(script_list.len() + scripts.len() * 6, 0);
+
+        let mut script_offsets = Vec::new();
+        for (_, required_feature_index, feature_indices) in scripts {
+            script_offsets.push(script_list.len() as u16);
+            push_u16(&mut script_list, 4);
+            push_u16(&mut script_list, 0);
+            push_u16(&mut script_list, 0);
+            push_u16(&mut script_list, *required_feature_index);
+            push_u16(&mut script_list, feature_indices.len() as u16);
+            for feature_index in *feature_indices {
+                push_u16(&mut script_list, *feature_index);
+            }
+        }
+
+        for (index, (script_tag, _, _)) in scripts.iter().enumerate() {
+            let start = script_records_pos + index * 6;
+            script_list[start..start + 4].copy_from_slice(script_tag);
+            script_list[start + 4..start + 6].copy_from_slice(&script_offsets[index].to_be_bytes());
+        }
+
+        script_list
+    }
+
+    #[cfg(feature = "layout")]
+    fn build_feature_list_with_entries(features: &[([u8; 4], &[u16])]) -> Vec<u8> {
         let mut feature_list = Vec::new();
-        push_u16(&mut feature_list, 1);
-        feature_list.extend_from_slice(&feature_tag);
-        push_u16(&mut feature_list, 8);
-        push_u16(&mut feature_list, 0);
-        push_u16(&mut feature_list, 1);
-        push_u16(&mut feature_list, 0);
+        push_u16(&mut feature_list, features.len() as u16);
+
+        let feature_records_pos = feature_list.len();
+        feature_list.resize(feature_list.len() + features.len() * 6, 0);
+
+        let mut feature_offsets = Vec::new();
+        for (_, lookup_indices) in features {
+            feature_offsets.push(feature_list.len() as u16);
+            push_u16(&mut feature_list, 0);
+            push_u16(&mut feature_list, lookup_indices.len() as u16);
+            for lookup_index in *lookup_indices {
+                push_u16(&mut feature_list, *lookup_index);
+            }
+        }
+
+        for (index, (feature_tag, _)) in features.iter().enumerate() {
+            let start = feature_records_pos + index * 6;
+            feature_list[start..start + 4].copy_from_slice(feature_tag);
+            feature_list[start + 4..start + 6]
+                .copy_from_slice(&feature_offsets[index].to_be_bytes());
+        }
+
+        feature_list
+    }
+
+    #[cfg(feature = "layout")]
+    fn build_gpos_table(feature_tag: [u8; 4], lookup_type: u16, subtable: Vec<u8>) -> Vec<u8> {
+        build_gpos_table_with_scripted_features(
+            &[( *b"DFLT", 0xFFFF, &[0])],
+            &[(feature_tag, &[0])],
+            lookup_type,
+            vec![subtable],
+        )
+    }
+
+    #[cfg(feature = "layout")]
+    fn build_gpos_table_with_scripted_features(
+        scripts: &[([u8; 4], u16, &[u16])],
+        features: &[([u8; 4], &[u16])],
+        lookup_type: u16,
+        subtables: Vec<Vec<u8>>,
+    ) -> Vec<u8> {
+        let script_list = build_script_list_with_default_lang_systems(scripts);
+        let feature_list = build_feature_list_with_entries(features);
 
         let mut lookup_list = Vec::new();
-        push_u16(&mut lookup_list, 1);
-        push_u16(&mut lookup_list, 4);
-        push_u16(&mut lookup_list, lookup_type);
-        push_u16(&mut lookup_list, 0);
-        push_u16(&mut lookup_list, 1);
-        push_u16(&mut lookup_list, 8);
-        lookup_list.extend_from_slice(&subtable);
+        push_u16(&mut lookup_list, subtables.len() as u16);
+        let lookup_offsets_pos = lookup_list.len();
+        lookup_list.resize(lookup_list.len() + subtables.len() * 2, 0);
+
+        let mut lookup_offsets = Vec::new();
+        for subtable in subtables {
+            lookup_offsets.push(lookup_list.len() as u16);
+            push_u16(&mut lookup_list, lookup_type);
+            push_u16(&mut lookup_list, 0);
+            push_u16(&mut lookup_list, 1);
+            push_u16(&mut lookup_list, 8);
+            lookup_list.extend_from_slice(&subtable);
+        }
+
+        for (index, offset) in lookup_offsets.iter().enumerate() {
+            let start = lookup_offsets_pos + index * 2;
+            lookup_list[start..start + 2].copy_from_slice(&offset.to_be_bytes());
+        }
 
         let script_list_offset = 10u16;
         let feature_list_offset = script_list_offset + script_list.len() as u16;
@@ -657,6 +727,66 @@ mod tests {
             push_u16(&mut feature_list, *lookup_index);
         }
 
+        let lookup_list = build_lookup_list(lookups);
+        let script_list_offset = 10u16;
+        let feature_list_offset = script_list_offset + script_list.len() as u16;
+        let lookup_list_offset = feature_list_offset + feature_list.len() as u16;
+
+        let mut buffer = Vec::new();
+        push_u16(&mut buffer, 1);
+        push_u16(&mut buffer, 0);
+        push_u16(&mut buffer, script_list_offset);
+        push_u16(&mut buffer, feature_list_offset);
+        push_u16(&mut buffer, lookup_list_offset);
+        buffer.extend_from_slice(&script_list);
+        buffer.extend_from_slice(&feature_list);
+        buffer.extend_from_slice(&lookup_list);
+        buffer
+    }
+
+    #[cfg(feature = "layout")]
+    fn build_gsub_table_with_scripted_feature_lookups(
+        scripts: &[([u8; 4], &[u16])],
+        feature_tag: [u8; 4],
+        feature_lookup_indices: &[Vec<u16>],
+        lookups: Vec<Vec<u8>>,
+    ) -> Vec<u8> {
+        let scripts_with_required = scripts
+            .iter()
+            .map(|(script_tag, feature_indices)| (*script_tag, 0xFFFF, *feature_indices))
+            .collect::<Vec<_>>();
+        let features = feature_lookup_indices
+            .iter()
+            .map(|lookup_indices| (feature_tag, lookup_indices.as_slice()))
+            .collect::<Vec<_>>();
+        let script_list = build_script_list_with_default_lang_systems(&scripts_with_required);
+        let feature_list = build_feature_list_with_entries(&features);
+
+        let lookup_list = build_lookup_list(lookups);
+        let script_list_offset = 10u16;
+        let feature_list_offset = script_list_offset + script_list.len() as u16;
+        let lookup_list_offset = feature_list_offset + feature_list.len() as u16;
+
+        let mut buffer = Vec::new();
+        push_u16(&mut buffer, 1);
+        push_u16(&mut buffer, 0);
+        push_u16(&mut buffer, script_list_offset);
+        push_u16(&mut buffer, feature_list_offset);
+        push_u16(&mut buffer, lookup_list_offset);
+        buffer.extend_from_slice(&script_list);
+        buffer.extend_from_slice(&feature_list);
+        buffer.extend_from_slice(&lookup_list);
+        buffer
+    }
+
+    #[cfg(feature = "layout")]
+    fn build_gsub_table_with_scripted_features(
+        scripts: &[([u8; 4], u16, &[u16])],
+        features: &[([u8; 4], &[u16])],
+        lookups: Vec<Vec<u8>>,
+    ) -> Vec<u8> {
+        let script_list = build_script_list_with_default_lang_systems(scripts);
+        let feature_list = build_feature_list_with_entries(features);
         let lookup_list = build_lookup_list(lookups);
         let script_list_offset = 10u16;
         let feature_list_offset = script_list_offset + script_list.len() as u16;
@@ -1158,6 +1288,30 @@ mod tests {
 
     #[test]
     #[cfg(feature = "layout")]
+    fn gpos_locale_specific_script_and_required_feature_take_priority_over_dflt() {
+        let gpos = parse_gpos(build_gpos_table_with_scripted_features(
+            &[( *b"DFLT", 0xFFFF, &[0]), (*b"arab", 1, &[])],
+            &[( *b"kern", &[0]), (*b"kern", &[1])],
+            2,
+            vec![
+                build_gpos_pair_format1_subtable(10, 20, -10),
+                build_gpos_pair_format1_subtable(10, 20, -30),
+            ],
+        ));
+
+        let default_adjustment = gpos
+            .lookup_pair_adjustment(10, 20, false, Some("default"))
+            .expect("default pair adjustment");
+        assert_eq!(default_adjustment.first.x_advance, -10);
+
+        let arabic_adjustment = gpos
+            .lookup_pair_adjustment(10, 20, false, Some("ar"))
+            .expect("arabic pair adjustment");
+        assert_eq!(arabic_adjustment.first.x_advance, -30);
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
     fn gsub_apply_lookup_once_supports_multiple_and_ligature_sequences() {
         let multiple_lookup = Lookup {
             lookup_type: LookupType::MultipleSubstitution as u16,
@@ -1353,6 +1507,39 @@ mod tests {
         gsub.apply_rtl_contextual_sequence(&mut glyphs, None);
 
         assert_eq!(glyphs, vec![(220, 0)]);
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn gsub_locale_specific_script_lookups_take_priority_over_dflt() {
+        let gsub = parse_gsub(build_gsub_table_with_scripted_feature_lookups(
+            &[( *b"DFLT", &[0]), (*b"arab", &[1])],
+            *b"isol",
+            &[vec![0], vec![1]],
+            vec![lookup_single_record(10, 100), lookup_single_record(10, 200)],
+        ));
+
+        let default_forms = gsub.lookup_joining_forms(10, None);
+        assert_eq!(default_forms.isolated, Some(100));
+
+        let arabic_forms = gsub.lookup_joining_forms(10, Some("ar"));
+        assert_eq!(arabic_forms.isolated, Some(200));
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn gsub_required_feature_is_applied_for_locale_specific_script() {
+        let gsub = parse_gsub(build_gsub_table_with_scripted_features(
+            &[( *b"DFLT", 0xFFFF, &[0]), (*b"arab", 1, &[])],
+            &[( *b"isol", &[0]), (*b"isol", &[1])],
+            vec![lookup_single_record(10, 100), lookup_single_record(10, 200)],
+        ));
+
+        let default_forms = gsub.lookup_joining_forms(10, None);
+        assert_eq!(default_forms.isolated, Some(100));
+
+        let arabic_forms = gsub.lookup_joining_forms(10, Some("ar"));
+        assert_eq!(arabic_forms.isolated, Some(200));
     }
 
     #[test]

@@ -60,6 +60,7 @@ _test_fonts/* がテスト用フォント
     - [x] GSUB `isol` / `init` / `medi` / `fina` を使う Arabic joining を `text2commands` / `FontFamily` で確認
     - [x] GSUB `rlig` required ligature を `text2commands` / `FontFamily` で確認
     - [x] GSUB `rclt` / `calt` / `clig` を含む Arabic contextual shaping を `text2commands` / `FontFamily` で確認
+    - [x] locale に応じて script (`arab` / `hebr` / `syrc` など) を優先し、required feature を含めて GSUB lookup を選ぶ
     - [*] context/chaining 依存の script 固有 shaping
         - [x] GSUB Context Format 1 / 2 / 3 の適用器
         - [x] GSUB Chaining Context Format 1 / 2 / 3 の適用器
@@ -178,6 +179,7 @@ _test_fonts/* がテスト用フォント
 - [x] pair adjustment (Format 1 / 2)
 - [x] extension positioning (Type 9 経由の pair adjustment)
 - [x] text2command / text2commands / measure への `kern` 反映
+- [x] locale に応じて script を優先し、required feature を含めて `kern` lookup を選ぶ
 - [ ] palt
 - [ ] vpal
 - [x] kern
@@ -197,6 +199,7 @@ _test_fonts/* がテスト用フォント
     - [x] Arabic joining (`isol` / `init` / `medi` / `fina`)
     - [x] Arabic required ligature (`rlig`)
     - [x] Arabic contextual substitutions (`rclt` / `calt` / `clig`)
+    - [x] locale/script 優先 + required feature を含む lookup 選択
     - [*] context/chaining ベースの RTL shaping
         - [x] Context Format 1 / 2 / 3 の feature-sequence 適用
         - [x] Chaining Context Format 1 / 2 / 3 の feature-sequence 適用
@@ -261,10 +264,13 @@ _test_fonts/* がテスト用フォント
     - [x] CFF **MUST**
     - [ ] CFF2 **SHOUD**
     - [ ] VORG
-  - Extentions
-    - [ ] gdef
-    - [ ] gsub
-    - [ ] gpos
+  - Advanced Typographic Tables
+    - [+] GDEF
+    - [+] GSUB -> see lookup, coverage, classdef, language
+    - [+] GPOS -> see lookup, coverage, classdef, language
+    - [ ] BASE
+    - [ ] JSTF
+    - [ ] MATH
   - Bitmap
     - [ ] EBDT
     - [ ] EBLC
@@ -276,6 +282,8 @@ _test_fonts/* がテスト用フォント
     - [ ] CBLC
     - [x] `sbix` **MUST**
     - [ ] SVG **SHOULD**
+        - [x] getter
+        - [ ] svg divider
   - OTHERS
     - [ ] DSIG	Digital signature
     - [ ] 'hdmx'	Horizontal device metrics

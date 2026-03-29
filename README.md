@@ -177,6 +177,7 @@ The library now compiles for `wasm32-unknown-unknown`.
 - RTL shaping: Arabic joining forms through GSUB `isol` / `init` / `medi` / `fina` are applied when those features exist
 - RTL shaping: GSUB `rlig` required ligatures are also applied in RTL shaping when present
 - RTL shaping: contextual substitutions through GSUB `rclt` / `calt` / `clig` are also applied when the font exposes them
+- Locale-aware lookup collection now prefers matching script tables such as `arab`, `hebr`, and `syrc`, and it includes required features before falling back to `DFLT`
 - Partial context/chaining support: GSUB Context Format 1 / 2 / 3 and Chaining Context Format 1 / 2 / 3 are wired into the feature-sequence engine
 - Current limitation: many context/chaining cases are still only partially covered, especially broader script-specific RTL shaping
 - Not implemented: `lookup_width()`, `lookup_number()`

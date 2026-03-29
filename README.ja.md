@@ -175,6 +175,7 @@ if buffer.is_complete() {
 - RTL shaping: GSUB の `isol` / `init` / `medi` / `fina` があるフォントでは、アラビア文字の joining form を適用
 - RTL shaping: GSUB の `rlig` required ligature も、存在するフォントでは RTL shaping に反映
 - RTL shaping: フォントに存在する場合は GSUB `rclt` / `calt` / `clig` の contextual substitution / ligature も反映
+- locale に応じた lookup 収集では、`arab` / `hebr` / `syrc` など対応する script を `DFLT` より先に優先し、required feature も先に取り込みます
 - 部分実装: GSUB の Context Format 1 / 2 / 3 と Chaining Context Format 1 / 2 / 3 は、新しい feature-sequence 適用器経由で反映
 - 現状の制限: context/chaining は未実装のケースも多く、特により広い script 固有 RTL shaping は未完成
 - 未実装: `lookup_width()`, `lookup_number()`
