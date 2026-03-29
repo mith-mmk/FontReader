@@ -4,6 +4,10 @@ Rust library for loading OpenType, TrueType, TTC, WOFF, and partial WOFF2 font d
 
 Japanese: [README.ja.md](README.ja.md)
 
+Default features now include `layout`, so common GSUB/GPOS shaping such as emoji ligatures,
+variation selectors, vertical substitutions, and RTL shaping work in a normal build. Use
+`default-features = false` if you need a smaller parser without layout.
+
 ## GlyphRun API
 
 `src/commands.rs` now exposes `fontloader::text2commands(text, FontOptions)` for building a

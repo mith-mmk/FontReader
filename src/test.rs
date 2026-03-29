@@ -3047,6 +3047,68 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "layout")]
+    fn loaded_font_text2glyph_run_shapes_police_officer_female_emoji_when_supported() {
+        let sequence = "👮🏻‍♀️";
+
+        for path in emoji_ligature_font_candidates() {
+            if !path.exists() {
+                continue;
+            }
+            let font = crate::load_font_from_file(&path).expect("load emoji ligature font");
+            let Ok(run) = font.text2glyph_run(
+                sequence,
+                crate::FontOptions::from_font_ref(crate::FontRef::Loaded(&font))
+                    .with_font_size(32.0),
+            ) else {
+                continue;
+            };
+            if run.glyphs.len() == 1 {
+                assert!(!run.glyphs[0].glyph.layers.is_empty());
+                return;
+            }
+        }
+
+        panic!("expected at least one real font to shape 👮🏻‍♀️ as a single glyph");
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn font_family_fallback_keeps_police_officer_female_emoji_cluster_when_supported() {
+        let sequence = "👮🏻‍♀️";
+
+        for path in emoji_ligature_font_candidates() {
+            if !path.exists() {
+                continue;
+            }
+            let regular =
+                crate::load_font_from_file(fira_sans_regular_path()).expect("load regular fira sans");
+            let emoji = crate::load_font_from_file(&path).expect("load emoji font");
+
+            let mut family = crate::FontFamily::new("Fira Sans");
+            family.add_loaded_font(regular);
+            family.add_loaded_font(emoji);
+
+            let text = format!("A{}B", sequence);
+            let Ok(run) = crate::text2commands(
+                &text,
+                crate::FontOptions::from_family(&family)
+                    .with_font_family("Fira Sans")
+                    .with_font_size(32.0),
+            ) else {
+                continue;
+            };
+
+            if run.glyphs.len() == 3 {
+                assert!(!run.glyphs[1].glyph.layers.is_empty());
+                return;
+            }
+        }
+
+        panic!("expected at least one fallback family to keep 👮🏻‍♀️ as a single glyph cluster");
+    }
+
+    #[test]
     fn load_font_from_padded_woff2_buffer_uses_declared_length() {
         let path = twemoji_sbix_font_path();
         assert!(path.exists(), "missing Twemoji sbix fixture");
@@ -3060,6 +3122,124 @@ mod tests {
         assert!(!commands.is_empty());
         assert!(commands.iter().any(|glyph| glyph.bitmap.is_some()));
         assert!(bytes.len() > original_len);
+    }
+
+    #[test]
+    #[ignore]
+    fn investigate_police_officer_female_emoji_ligature() {
+        let sequence = "👮🏻‍♀️";
+
+        for path in emoji_ligature_font_candidates() {
+            if !path.exists() {
+                continue;
+            }
+            let font = crate::load_font_from_file(&path).expect("load candidate font");
+            let glyph_ids = font
+                .font()
+                .debug_shape_glyph_ids(sequence, None)
+                .expect("debug shape glyph ids");
+            let ccmp_applied = glyph_ids
+                .iter()
+                .copied()
+                .enumerate()
+                .map(|(index, glyph_id)| (glyph_id, index))
+                .collect::<Vec<_>>();
+            #[cfg(feature = "layout")]
+            let mut ccmp_applied = ccmp_applied;
+            #[cfg(feature = "layout")]
+            let liga = font.font().gsub.as_ref().and_then(|gsub| {
+                gsub.apply_ccmp_sequence(&mut ccmp_applied);
+                gsub.lookup_liga_sequence(
+                    &ccmp_applied
+                        .iter()
+                        .map(|(glyph_id, _)| *glyph_id)
+                        .collect::<Vec<_>>(),
+                )
+            });
+            #[cfg(feature = "layout")]
+            let rlig = font.font().gsub.as_ref().and_then(|gsub| {
+                gsub.lookup_rlig_sequence(
+                    &ccmp_applied
+                        .iter()
+                        .map(|(glyph_id, _)| *glyph_id)
+                        .collect::<Vec<_>>(),
+                    None,
+                )
+            });
+            #[cfg(not(feature = "layout"))]
+            let liga: Option<usize> = None;
+            #[cfg(not(feature = "layout"))]
+            let rlig: Option<usize> = None;
+            let run = font.text2glyph_run(
+                sequence,
+                crate::FontOptions::from_font_ref(crate::FontRef::Loaded(&font))
+                    .with_font_size(32.0),
+            );
+            let legacy = font.text2command(sequence);
+
+            println!("font: {}", path.display());
+            println!("  glyph_ids: {:?}", glyph_ids);
+            println!(
+                "  ccmp_glyph_ids: {:?}",
+                ccmp_applied
+                    .iter()
+                    .map(|(glyph_id, _)| *glyph_id)
+                    .collect::<Vec<_>>()
+            );
+            println!("  liga_lookup: {:?}", liga);
+            println!("  rlig_lookup: {:?}", rlig);
+            println!(
+                "  glyph_run: {}",
+                match &run {
+                    Ok(run) => format!(
+                        "ok glyphs={} layers0={}",
+                        run.glyphs.len(),
+                        run.glyphs
+                            .first()
+                            .map(|glyph| glyph.glyph.layers.len())
+                            .unwrap_or(0)
+                    ),
+                    Err(err) => format!("err {err}"),
+                }
+            );
+            println!(
+                "  legacy: {}",
+                match &legacy {
+                    Ok(commands) => format!(
+                        "ok glyphs={} first_bitmap={} first_cmds={}",
+                        commands.len(),
+                        commands
+                            .first()
+                            .and_then(|glyph| glyph.bitmap.as_ref())
+                            .is_some(),
+                        commands
+                            .first()
+                            .map(|glyph| glyph.commands.len())
+                            .unwrap_or(0)
+                    ),
+                    Err(err) => format!("err {err}"),
+                }
+            );
+
+            let regular =
+                crate::load_font_from_file(fira_sans_regular_path()).expect("load regular fira");
+            let mut family = crate::FontFamily::new("Fira Sans");
+            family.add_loaded_font(regular);
+            family.add_loaded_font(font);
+            let family_run = crate::text2commands(
+                &format!("A{}B", sequence),
+                crate::FontOptions::from_family(&family)
+                    .with_font_family("Fira Sans")
+                    .with_font_size(32.0),
+            );
+            println!(
+                "  family glyph_run: {}",
+                match family_run {
+                    Ok(run) => format!("ok glyphs={}", run.glyphs.len()),
+                    Err(err) => format!("err {err}"),
+                }
+            );
+        }
     }
 
     #[test]
