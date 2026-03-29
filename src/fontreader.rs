@@ -1651,7 +1651,7 @@ impl Font {
         commands
     }
 
-    pub fn text2commands(&self, text: &str) -> Result<Vec<GlyphCommands>, Error> {
+    pub(crate) fn text2commands(&self, text: &str) -> Result<Vec<GlyphCommands>, Error> {
         let mut result = Vec::new();
         let mut cursor_x = 0.0;
         let mut line_index = 0usize;
@@ -1793,7 +1793,8 @@ impl Font {
         Ok(result)
     }
 
-    pub fn text2command(&self, text: &str) -> Result<Vec<GlyphCommands>, Error> {
+    #[cfg(test)]
+    pub(crate) fn text2command(&self, text: &str) -> Result<Vec<GlyphCommands>, Error> {
         self.text2commands(text)
     }
 
@@ -1886,7 +1887,7 @@ impl Font {
         })
     }
 
-    pub fn text2svg(&self, text: &str, fontsize: f64, fontunit: &str) -> Result<String, Error> {
+    pub(crate) fn text2svg(&self, text: &str, fontsize: f64, fontunit: &str) -> Result<String, Error> {
         let glyphs = self.text2commands(text)?;
         let line_height = self.default_line_height()?;
         let mut svg_elements = Vec::new();

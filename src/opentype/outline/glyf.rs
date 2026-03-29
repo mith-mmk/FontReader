@@ -451,7 +451,7 @@ impl Glyph {
             } else {
                 // befor off curve
                 if next_on_curve {
-                    svg += &format!("T{} {}", next_x, y_max - next_y);
+                    svg += &format!("Q{} {} {} {}", x, y_max - y, next_x, y_max - next_y);
                 } else {
                     // next off curve
                     svg += &format!(
@@ -558,7 +558,9 @@ impl Glyph {
                     });
                 }
             } else if next_on_curve {
-                commands.push(PathCommand::LineTo {
+                commands.push(PathCommand::QuadTo {
+                    cx: x as f64,
+                    cy: (y_max - y) as f64,
                     x: next_x as f64,
                     y: (y_max - next_y) as f64,
                 });

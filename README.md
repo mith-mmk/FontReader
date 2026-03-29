@@ -27,26 +27,21 @@ variation selectors, vertical substitutions, and RTL shaping work in a normal bu
 - COLR/CPAL colors are carried in `GlyphPaint::Solid(0xAARRGGBB)` so they can be passed directly to `paintcore::path::draw_glyphs`.
 - SVG glyph layers currently return `ErrorKind::Unsupported`.
 - Legacy `Font::get_svg()` now slices shared SVG table documents down to the matching glyph payload instead of embedding every fragment in the record.
-- The legacy `font.text2command()` API is still deprecated, but it now keeps `sbix` bitmap payloads in `GlyphCommands::bitmap`. It still does not carry per-layer paint or full color-layer structure. Use `fontloader::text2commands(..., FontOptions)`, `LoadedFont::text2glyph_run()`, or `FontFamily::text2glyph_run()` when you need full color glyph data.
 
 ## Renderer Integration
 
 When connecting `fontloader` to a renderer such as `paintcore::path::draw_glyphs`, use the
-`GlyphRun` API rather than the legacy outline-only API.
+`GlyphRun` API.
 
 - Use `fontloader::text2commands(text, FontOptions)`, `LoadedFont::text2glyph_run()`, or `FontFamily::text2glyph_run()`.
 - `GlyphPaint::Solid(u32)` uses packed `0xAARRGGBB`.
 - `GlyphPaint::CurrentColor` means "use the default color passed into the renderer".
 - COLR/CPAL glyphs keep their per-layer colors in `GlyphPaint::Solid(...)`.
 - `sbix` glyphs are emitted as `GlyphLayer::Raster`.
-- `font.text2command()` and `font.text2commands()` return `Vec<GlyphCommands>` for legacy
-  workflows. They now preserve `sbix` bitmap payloads through `GlyphCommands::bitmap`, but they do
-  not preserve layer paint or full color font structure.
 
 In short:
 
 - Color-aware rendering: `GlyphRun`
-- Legacy compatibility: `GlyphCommands`
 
 ```rust
 use fontloader::{load_font_from_buffer, text2commands, FontOptions, GlyphLayer};

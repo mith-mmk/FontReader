@@ -14,6 +14,7 @@ mod tests {
             SingleSubstitutionFormat2,
         },
     };
+    use crate::opentype::outline::glyf::ParsedGlyph;
 
     #[cfg(feature = "layout")]
     fn coverage_format1(glyph_ids: &[u16]) -> Coverage {
@@ -2551,7 +2552,7 @@ mod tests {
                 continue;
             };
             for sequence in emoji_ligature_sequence_candidates() {
-                let Ok(commands) = font.text2command(sequence) else {
+                let Ok(commands) = font.font().text2command(sequence) else {
                     continue;
                 };
                 if commands.len() == 1
@@ -2659,6 +2660,46 @@ mod tests {
     }
 
     #[test]
+    fn truetype_consecutive_off_curve_points_stay_quadratic() {
+        let parsed = ParsedGlyph {
+            number_of_contours: 1,
+            x_min: 0,
+            y_min: 0,
+            x_max: 30,
+            y_max: 10,
+            offset: 0,
+            length: 0,
+            end_pts_of_contours: vec![3],
+            instructions: Vec::new(),
+            flags: vec![0, 0, 0, 0],
+            xs: vec![0, 10, 10, 10],
+            ys: vec![0, 10, 0, -10],
+            on_curves: vec![true, false, false, true],
+        };
+
+        let commands = crate::opentype::outline::glyf::Glyph::to_path_commands_parsed(
+            &parsed,
+            &crate::fontreader::FontLayout::Unknown,
+            0.0,
+            0.0,
+        );
+
+        assert!(matches!(commands[0], crate::PathCommand::MoveTo { .. }));
+        assert!(matches!(commands[1], crate::PathCommand::QuadTo { .. }));
+        assert!(matches!(commands[2], crate::PathCommand::QuadTo { .. }));
+        assert!(matches!(commands[3], crate::PathCommand::ClosePath));
+
+        let svg = crate::opentype::outline::glyf::Glyph::get_svg_path_parsed(
+            &parsed,
+            &crate::fontreader::FontLayout::Unknown,
+            0.0,
+            0.0,
+        );
+        assert_eq!(svg.matches('Q').count(), 2);
+        assert!(!svg.contains('T'));
+    }
+
+    #[test]
     fn fontload_from_collection_buffer_works() {
         let bytes = std::fs::read(collection_font_path()).expect("read collection bytes");
         let font = crate::fontload_buffer(&bytes).expect("load font collection from buffer");
@@ -2756,6 +2797,17 @@ mod tests {
         let font = crate::fontload_file(&path).expect("load woff2 from file");
         let svg = font.text2svg("A", 24.0, "px").expect("render woff2 text");
         assert!(svg.starts_with("<svg"));
+    }
+
+    #[test]
+    fn fira_sans_post_table_to_string_does_not_panic() {
+        let path = fira_sans_regular_path();
+        let font = crate::load_font_from_file(&path).expect("load Fira Sans");
+        let post = font.font().post.as_ref().expect("Fira Sans post table");
+        let dump = post.to_string();
+
+        assert!(dump.starts_with("post\n"));
+        assert!(dump.contains("Version"));
     }
 
     #[test]
@@ -3012,7 +3064,7 @@ mod tests {
     fn sbix_font_prefers_outline_for_plain_digit() {
         let font = crate::load_font_from_file(twemoji_sbix_font_path()).expect("load twemoji sbix");
 
-        let plain_digit = font.text2command("1").expect("render plain digit");
+        let plain_digit = font.font().text2command("1").expect("render plain digit");
         assert_eq!(plain_digit.len(), 1);
         assert!(plain_digit[0].bitmap.is_none());
         assert!(!plain_digit[0].commands.is_empty());
@@ -3050,7 +3102,7 @@ mod tests {
         let path = sample_font_path();
         let font = crate::fontload_file(&path).expect("load font");
 
-        let commands = font.text2command("A").expect("text2command");
+        let commands = font.font().text2command("A").expect("text2command");
         assert_eq!(commands.len(), 1);
         assert!(commands[0].advance_width > 0.0);
         assert!(!commands[0].commands.is_empty());
@@ -3070,7 +3122,7 @@ mod tests {
         let path = first_real_sbix_font_path().expect("load real sbix font");
         let bytes = std::fs::read(&path).expect("read sbix font");
         let font = crate::load_font_from_buffer(&bytes).expect("load sbix font");
-        let commands = font.text2command("🥺").expect("text2command sbix");
+        let commands = font.font().text2command("🥺").expect("text2command sbix");
 
         assert_eq!(commands.len(), 1);
         assert!(commands[0].commands.is_empty());
@@ -3122,7 +3174,7 @@ mod tests {
             .into_iter()
             .chain(["🥺", "😀", "👍", "❤️"].into_iter())
         {
-            let Ok(commands) = font.text2command(sequence) else {
+            let Ok(commands) = font.font().text2command(sequence) else {
                 continue;
             };
             if commands.iter().any(|glyph| glyph.bitmap.is_some()) {
@@ -3177,7 +3229,7 @@ mod tests {
             first_real_emoji_ligature_for_legacy().expect("find legacy emoji ligature fixture");
         let font = crate::load_font_from_file(path).expect("load emoji ligature font");
 
-        let commands = font.text2command(sequence).expect("legacy emoji ligature");
+        let commands = font.font().text2command(sequence).expect("legacy emoji ligature");
         assert_eq!(commands.len(), 1, "expected a single ligature glyph");
         assert!(commands[0].bitmap.is_some() || !commands[0].commands.is_empty());
     }
@@ -3279,7 +3331,7 @@ mod tests {
         bytes.extend_from_slice(&[0xde, 0xad, 0xbe, 0xef, 0, 1, 2, 3]);
 
         let font = crate::load_font_from_buffer(&bytes).expect("load padded woff2 buffer");
-        let commands = font.text2command("🥺").expect("render from padded woff2 buffer");
+        let commands = font.font().text2command("🥺").expect("render from padded woff2 buffer");
         assert!(!commands.is_empty());
         assert!(commands.iter().any(|glyph| glyph.bitmap.is_some()));
         assert!(bytes.len() > original_len);
@@ -3336,7 +3388,7 @@ mod tests {
                 crate::FontOptions::from_font_ref(crate::FontRef::Loaded(&font))
                     .with_font_size(32.0),
             );
-            let legacy = font.text2command(sequence);
+            let legacy = font.font().text2command(sequence);
 
             println!("font: {}", path.display());
             println!("  glyph_ids: {:?}", glyph_ids);
@@ -3484,7 +3536,7 @@ mod tests {
         let font = crate::load_font_from_file(fira_sans_black_path()).expect("load fira sans");
 
         for ch in ['i', 'j'] {
-            let commands = font.text2command(&ch.to_string()).expect("text2command");
+            let commands = font.font().text2command(&ch.to_string()).expect("text2command");
             assert_eq!(commands.len(), 1, "expected one glyph for {ch}");
             assert!(
                 !commands[0].commands.is_empty(),
@@ -3724,6 +3776,7 @@ mod tests {
         let (text, expected_glyph_id) = real_variation_sequence(&font);
 
         let commands = font
+            .font()
             .text2command(&text)
             .expect("legacy text2command with uvs");
 
@@ -3973,7 +4026,7 @@ mod tests {
             .lookup_liga_sequence(&glyph_ids)
             .expect("expected fi ligature in Fira Sans");
 
-        let commands = font.text2command("fi").expect("text2command");
+        let commands = font.font().text2command("fi").expect("text2command");
 
         assert_eq!(commands.len(), 1);
         assert_eq!(commands[0].glyph_id, ligature_glyph);

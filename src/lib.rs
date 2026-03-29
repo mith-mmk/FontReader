@@ -1162,7 +1162,11 @@ pub struct LoadedFont {
 
 impl LoadedFont {
     pub fn text2svg(&self, text: &str, fontsize: f64, fontunit: &str) -> Result<String, Error> {
-        self.font.text2svg(text, fontsize, fontunit)
+        self.text2svg_with_options(
+            text,
+            fontunit,
+            FontOptions::new(self).with_font_size(fontsize as f32),
+        )
     }
 
     pub fn text2svg_with_options<'a>(
@@ -1186,27 +1190,6 @@ impl LoadedFont {
     ) -> Result<GlyphRun, Error> {
         options.font = Some(FontRef::Loaded(self));
         crate::commands::text2commands(text, options)
-    }
-
-    /// Legacy outline-only API.
-    ///
-    /// This returns `Vec<GlyphCommands>`, keeps `sbix` bitmap payloads in `GlyphCommands::bitmap`,
-    /// and does not preserve per-layer paint or full color-layer structure.
-    #[deprecated(
-        note = "use `LoadedFont::text2glyph_run()` or `fontloader::text2commands(text, FontOptions)` instead"
-    )]
-    pub fn text2commands(&self, text: &str) -> Result<Vec<GlyphCommands>, Error> {
-        self.font.text2commands(text)
-    }
-
-    /// Legacy outline-only API.
-    ///
-    /// This is an alias of `LoadedFont::text2commands()` and does not preserve full color glyph data.
-    #[deprecated(
-        note = "use `LoadedFont::text2glyph_run()` or `fontloader::text2commands(text, FontOptions)` instead"
-    )]
-    pub fn text2command(&self, text: &str) -> Result<Vec<GlyphCommands>, Error> {
-        self.font.text2command(text)
     }
 
     pub fn measure(&self, text: &str) -> Result<f64, Error> {
