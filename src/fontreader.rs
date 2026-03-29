@@ -1946,7 +1946,7 @@ impl Font {
             ));
         }
 
-        const SVG_EXPORT_PADDING: f64 = 2.0;
+        const SVG_EXPORT_PADDING: f64 = 4.0;
         min_x -= SVG_EXPORT_PADDING;
         min_y -= SVG_EXPORT_PADDING;
         let view_width = (max_x - min_x + SVG_EXPORT_PADDING).max(1.0);

@@ -746,7 +746,7 @@ fn glyph_run_to_svg(run: &GlyphRun, fontunit: &str) -> Result<String, Error> {
         ));
     };
 
-    const SVG_EXPORT_PADDING: f32 = 2.0;
+    const SVG_EXPORT_PADDING: f32 = 4.0;
     let min_x = bounds.min_x - SVG_EXPORT_PADDING;
     let min_y = bounds.min_y - SVG_EXPORT_PADDING;
     let view_width = (bounds.max_x - bounds.min_x + SVG_EXPORT_PADDING * 2.0).max(1.0);
