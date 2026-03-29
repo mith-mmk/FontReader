@@ -2529,6 +2529,28 @@ mod tests {
         None
     }
 
+    fn first_real_emoji_ligature_for_legacy() -> Option<(std::path::PathBuf, &'static str)> {
+        for path in emoji_ligature_font_candidates() {
+            if !path.exists() {
+                continue;
+            }
+            let Ok(font) = crate::load_font_from_file(&path) else {
+                continue;
+            };
+            for sequence in emoji_ligature_sequence_candidates() {
+                let Ok(commands) = font.text2command(sequence) else {
+                    continue;
+                };
+                if commands.len() == 1
+                    && (commands[0].bitmap.is_some() || !commands[0].commands.is_empty())
+                {
+                    return Some((path, sequence));
+                }
+            }
+        }
+        None
+    }
+
     fn first_truetype_variation_selector_font_path() -> Option<std::path::PathBuf> {
         for path in legacy_variation_selector_font_candidates() {
             if !path.exists() {
@@ -2989,6 +3011,17 @@ mod tests {
     }
 
     #[test]
+    fn legacy_text2command_keeps_real_emoji_ligature_cluster() {
+        let (path, sequence) =
+            first_real_emoji_ligature_for_legacy().expect("find legacy emoji ligature fixture");
+        let font = crate::load_font_from_file(path).expect("load emoji ligature font");
+
+        let commands = font.text2command(sequence).expect("legacy emoji ligature");
+        assert_eq!(commands.len(), 1, "expected a single ligature glyph");
+        assert!(commands[0].bitmap.is_some() || !commands[0].commands.is_empty());
+    }
+
+    #[test]
     fn font_family_fallback_keeps_real_emoji_ligature_cluster() {
         let regular =
             crate::load_font_from_file(fira_sans_regular_path()).expect("load regular fira sans");
@@ -3011,6 +3044,22 @@ mod tests {
 
         assert_eq!(run.glyphs.len(), 3, "emoji ligature cluster should stay a single glyph");
         assert!(!run.glyphs[1].glyph.layers.is_empty());
+    }
+
+    #[test]
+    fn load_font_from_padded_woff2_buffer_uses_declared_length() {
+        let path = twemoji_sbix_font_path();
+        assert!(path.exists(), "missing Twemoji sbix fixture");
+
+        let mut bytes = std::fs::read(&path).expect("read woff2 font");
+        let original_len = bytes.len();
+        bytes.extend_from_slice(&[0xde, 0xad, 0xbe, 0xef, 0, 1, 2, 3]);
+
+        let font = crate::load_font_from_buffer(&bytes).expect("load padded woff2 buffer");
+        let commands = font.text2command("🥺").expect("render from padded woff2 buffer");
+        assert!(!commands.is_empty());
+        assert!(commands.iter().any(|glyph| glyph.bitmap.is_some()));
+        assert!(bytes.len() > original_len);
     }
 
     #[test]

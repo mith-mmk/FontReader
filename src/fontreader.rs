@@ -242,8 +242,19 @@ impl Font {
     pub fn get_font_from_buffer(fontdata: &[u8]) -> Result<Self, Error> {
         let mut reader = BytesReader::new(fontdata);
         let font_type = fontheader::get_font_type(&mut reader)?;
-        if let fontheader::FontHeaders::WOFF2(_) = font_type {
-            let mut input = fontdata;
+        if let fontheader::FontHeaders::WOFF2(header) = font_type {
+            let declared_length = header.length as usize;
+            if declared_length > fontdata.len() {
+                return Err(Error::new(
+                    ErrorKind::UnexpectedEof,
+                    format!(
+                        "WOFF2 buffer is shorter than declared length: {} < {}",
+                        fontdata.len(),
+                        declared_length
+                    ),
+                ));
+            }
+            let mut input = &fontdata[..declared_length];
             let ttf = woff2::decode::convert_woff2_to_ttf(&mut input).map_err(|err| {
                 Error::new(
                     ErrorKind::InvalidData,
@@ -1547,6 +1558,32 @@ impl Font {
         layers
     }
 
+    fn legacy_colr_commands(
+        &self,
+        glyph_id: usize,
+        layout: &FontLayout,
+        origin_x: f64,
+        origin_y: f64,
+    ) -> Vec<PathCommand> {
+        let (Some(colr), Some(glyf)) = (self.current_colr(), self.current_glyf()) else {
+            return Vec::new();
+        };
+
+        let mut commands = Vec::new();
+        for layer in colr.get_layer_record(glyph_id as u16) {
+            if glyf.get_glyph(layer.glyph_id as usize).is_none() {
+                continue;
+            }
+            commands.extend(glyf.to_path_commands(
+                layer.glyph_id as usize,
+                layout,
+                origin_x,
+                origin_y,
+            ));
+        }
+        commands
+    }
+
     pub fn text2commands(&self, text: &str) -> Result<Vec<GlyphCommands>, Error> {
         let mut result = Vec::new();
         let mut cursor_x = 0.0;
@@ -1632,15 +1669,23 @@ impl Font {
 
                     match &open_type_glyph.glyph {
                         FontData::Glyph(_) => {
-                            let glyf = self.current_glyf().ok_or_else(|| {
-                                Error::new(std::io::ErrorKind::Other, "glyf is none")
-                            })?;
-                            let commands = glyf.to_path_commands(
+                            let mut commands = self.legacy_colr_commands(
                                 glyph_data.glyph_id,
                                 &open_type_glyph.layout,
                                 origin_x,
                                 origin_y,
                             );
+                            if commands.is_empty() {
+                                let glyf = self.current_glyf().ok_or_else(|| {
+                                    Error::new(std::io::ErrorKind::Other, "glyf is none")
+                                })?;
+                                commands = glyf.to_path_commands(
+                                    glyph_data.glyph_id,
+                                    &open_type_glyph.layout,
+                                    origin_x,
+                                    origin_y,
+                                );
+                            }
                             result.push(GlyphCommands {
                                 ch: resolved.ch,
                                 glyph_id: glyph_data.glyph_id,
