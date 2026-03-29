@@ -1341,6 +1341,21 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "layout")]
+    fn gsub_apply_rtl_contextual_sequence_supports_clig() {
+        let gsub = parse_gsub(build_gsub_table_with_feature_lookups(
+            *b"clig",
+            &[0],
+            vec![lookup_ligature_record(20, &[21], 220)],
+        ));
+        let mut glyphs = vec![(20usize, 0usize), (21usize, 1usize)];
+
+        gsub.apply_rtl_contextual_sequence(&mut glyphs, None);
+
+        assert_eq!(glyphs, vec![(220, 0)]);
+    }
+
+    #[test]
     #[cfg(not(target_arch = "wasm32"))]
     fn fontload_from_net_works() {
         let path = sample_font_path();

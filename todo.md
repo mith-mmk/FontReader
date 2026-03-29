@@ -59,7 +59,7 @@ _test_fonts/* がテスト用フォント
     - [x] `FontOptions::with_right_to_left()` で Hebrew の RTL 配置を `text2commands` / `measure` / `FontFamily` で確認
     - [x] GSUB `isol` / `init` / `medi` / `fina` を使う Arabic joining を `text2commands` / `FontFamily` で確認
     - [x] GSUB `rlig` required ligature を `text2commands` / `FontFamily` で確認
-    - [x] GSUB `rclt` / `calt` を含む Arabic contextual shaping を `text2commands` / `FontFamily` で確認
+    - [x] GSUB `rclt` / `calt` / `clig` を含む Arabic contextual shaping を `text2commands` / `FontFamily` で確認
     - [*] context/chaining 依存の script 固有 shaping
         - [x] GSUB Context Format 1 / 2 / 3 の適用器
         - [x] GSUB Chaining Context Format 1 / 2 / 3 の適用器
@@ -158,7 +158,7 @@ _test_fonts/* がテスト用フォント
         - [x] `ccmp` の multiple / ligature / extension を text API shaping に反映
         - [x] RTL で `isol` / `init` / `medi` / `fina` を利用
         - [x] RTL で `rlig` を利用
-        - [x] RTL で `rclt` / `calt` を利用
+        - [x] RTL で `rclt` / `calt` / `clig` を利用
         - [*] context / chaining の適用拡張
             - [x] Context Format 1 / 2 / 3
             - [x] Chaining Context Format 1 / 2 / 3
@@ -196,7 +196,7 @@ _test_fonts/* がテスト用フォント
     - [x] `TextDirection::RightToLeft` で RTL の inline 進行方向を利用
     - [x] Arabic joining (`isol` / `init` / `medi` / `fina`)
     - [x] Arabic required ligature (`rlig`)
-    - [x] Arabic contextual substitutions (`rclt` / `calt`)
+    - [x] Arabic contextual substitutions (`rclt` / `calt` / `clig`)
     - [*] context/chaining ベースの RTL shaping
         - [x] Context Format 1 / 2 / 3 の feature-sequence 適用
         - [x] Chaining Context Format 1 / 2 / 3 の feature-sequence 適用
@@ -237,5 +237,54 @@ _test_fonts/* がテスト用フォント
 ### GDEF
 - [ ]パース済み: glyph class definition, attach list, ligature caret list, mark attach class definition, mark glyph sets definition
 - [] shaping 処理に統合
-  
+
+
+# Font table
+- [x] font table
+  - **MUST**
+  - [x] cmap
+  - [x] head
+  - [x] hhea
+  - [x] hmtx
+  - [x] name
+  - [x] OS/2
+  - [x] post
+  - **OPTIONS**
+    - [x] maxp
+    - [x] 'vhea'	Vertical Metrics header **MAST**
+    - [x] 'vmtx'	Vertical Metrics **MAST**
+    - [ ] cvt
+    - [ ] fpgm
+    - [x] glyf **MUST**
+    - [ ] prep
+    - [ ] gasp
+    - [x] CFF **MUST**
+    - [ ] CFF2 **SHOUD**
+    - [ ] VORG
+  - Extentions
+    - [ ] gdef
+    - [ ] gsub
+    - [ ] gpos
+  - Bitmap
+    - [ ] EBDT
+    - [ ] EBLC
+    - [ ] EBSC
+  - COLOR
+    - [x] COLR **MUST**
+    - [x] CPAL **MUST**
+    - [ ] CBDT
+    - [ ] CBLC
+    - [x] `sbix` **MUST**
+    - [ ] SVG **SHOULD**
+  - OTHERS
+    - [ ] DSIG	Digital signature
+    - [ ] 'hdmx'	Horizontal device metrics
+    - [ ] 'kern'	Kerning
+    - [ ] LTSH	Linear threshold data
+    - [ ] MERG	Merge
+    - [ ] 'meta'	Metadata
+    - [ ] STAT	Style attributes
+    - [ ] PCLT	PCL 5 data
+    - [ ] VDMX	Vertical device metrics
+
 # todo.mdの更新

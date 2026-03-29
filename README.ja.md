@@ -174,7 +174,7 @@ if buffer.is_complete() {
 - 方向指定 API: `FontOptions::with_vertical_flow()` で縦メトリクスと GSUB の縦書き置換を利用し、`with_right_to_left()` で RTL の inline 進行方向を利用
 - RTL shaping: GSUB の `isol` / `init` / `medi` / `fina` があるフォントでは、アラビア文字の joining form を適用
 - RTL shaping: GSUB の `rlig` required ligature も、存在するフォントでは RTL shaping に反映
-- RTL shaping: フォントに存在する場合は GSUB `rclt` / `calt` の contextual substitution も反映
+- RTL shaping: フォントに存在する場合は GSUB `rclt` / `calt` / `clig` の contextual substitution / ligature も反映
 - 部分実装: GSUB の Context Format 1 / 2 / 3 と Chaining Context Format 1 / 2 / 3 は、新しい feature-sequence 適用器経由で反映
 - 現状の制限: context/chaining は未実装のケースも多く、特により広い script 固有 RTL shaping は未完成
 - 未実装: `lookup_width()`, `lookup_number()`
