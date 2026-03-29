@@ -10,7 +10,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut font = Font::get_font_from_file(&filename)?;
     let font_count = font.get_font_count();
     if font_count > 0 {
-        let index = font_index(&args, font_count.saturating_sub(1)).min(font_count.saturating_sub(1));
+        let index =
+            font_index(&args, font_count.saturating_sub(1)).min(font_count.saturating_sub(1));
         font.set_font(index)?;
     }
 

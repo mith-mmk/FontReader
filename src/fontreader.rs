@@ -1,3 +1,4 @@
+use base64::{engine::general_purpose, Engine as _};
 use bin_rs::reader::{BinaryReader, BytesReader};
 use std::collections::HashMap;
 use std::io::{Error, ErrorKind, SeekFrom};
@@ -15,6 +16,8 @@ use crate::opentype::color::{colr, cpal};
 #[cfg(feature = "layout")]
 use crate::opentype::extentions::gdef;
 #[cfg(feature = "layout")]
+use crate::opentype::extentions::gpos;
+#[cfg(feature = "layout")]
 use crate::opentype::extentions::gsub;
 use crate::opentype::platforms::PlatformID;
 use crate::opentype::requires::cmap::CmapEncodings;
@@ -25,6 +28,7 @@ use crate::opentype::requires::vhea::VHEA;
 use crate::opentype::requires::vmtx::VerticalMetric;
 use crate::opentype::requires::*;
 use crate::opentype::{outline::*, OTFHeader};
+use crate::util::sniff_encoded_image_dimensions;
 
 #[cfg(debug_assertions)]
 use std::io::{BufWriter, Write};
@@ -38,6 +42,22 @@ pub enum PathCommand {
 }
 
 #[derive(Debug, Clone)]
+pub enum BitmapGlyphFormat {
+    Png,
+    Jpeg,
+}
+
+#[derive(Debug, Clone)]
+pub struct BitmapGlyphCommands {
+    pub offset_x: f64,
+    pub offset_y: f64,
+    pub width: f64,
+    pub height: f64,
+    pub format: BitmapGlyphFormat,
+    pub data: Vec<u8>,
+}
+
+#[derive(Debug, Clone)]
 pub struct GlyphCommands {
     pub ch: char,
     pub glyph_id: usize,
@@ -45,6 +65,7 @@ pub struct GlyphCommands {
     pub origin_y: f64,
     pub advance_width: f64,
     pub commands: Vec<PathCommand>,
+    pub bitmap: Option<BitmapGlyphCommands>,
 }
 
 #[derive(Debug, Clone)]
@@ -108,6 +129,8 @@ pub struct Font {
     #[cfg(feature = "layout")]
     pub(crate) gdef: Option<gdef::GDEF>,
     #[cfg(feature = "layout")]
+    pub(crate) gpos: Option<gpos::GPOS>,
+    #[cfg(feature = "layout")]
     pub(crate) gsub: Option<gsub::GSUB>,
     pub(crate) svg: Option<svg::SVG>,
     pub(crate) sbix: Option<sbix::SBIX>,
@@ -129,10 +152,30 @@ enum ResolvedTextUnit {
     Tab,
 }
 
+#[derive(Debug, Clone)]
+pub(crate) enum ParsedTextUnit {
+    Glyph {
+        text: String,
+        ch: char,
+        variation_selector: char,
+    },
+    Newline,
+    Tab,
+}
+
 #[derive(Debug, Clone, Copy)]
 struct ResolvedGlyph {
     ch: char,
     glyph_id: usize,
+    prefer_color: bool,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+struct GlyphPositionAdjustment {
+    placement_x: f32,
+    placement_y: f32,
+    advance_x: f32,
+    advance_y: f32,
 }
 
 impl Font {
@@ -156,6 +199,8 @@ impl Font {
             cpal: None,
             #[cfg(feature = "layout")]
             gdef: None,
+            #[cfg(feature = "layout")]
+            gpos: None,
             #[cfg(feature = "layout")]
             gsub: None,
             sbix: None,
@@ -198,8 +243,19 @@ impl Font {
     pub fn get_font_from_buffer(fontdata: &[u8]) -> Result<Self, Error> {
         let mut reader = BytesReader::new(fontdata);
         let font_type = fontheader::get_font_type(&mut reader)?;
-        if let fontheader::FontHeaders::WOFF2(_) = font_type {
-            let mut input = fontdata;
+        if let fontheader::FontHeaders::WOFF2(header) = font_type {
+            let declared_length = header.length as usize;
+            if declared_length > fontdata.len() {
+                return Err(Error::new(
+                    ErrorKind::UnexpectedEof,
+                    format!(
+                        "WOFF2 buffer is shorter than declared length: {} < {}",
+                        fontdata.len(),
+                        declared_length
+                    ),
+                ));
+            }
+            let mut input = &fontdata[..declared_length];
             let ttf = woff2::decode::convert_woff2_to_ttf(&mut input).map_err(|err| {
                 Error::new(
                     ErrorKind::InvalidData,
@@ -242,7 +298,7 @@ impl Font {
             self.vhea.as_ref()
         } else {
             self.more_fonts[self.current_font - 1].vhea.as_ref()
-        };       
+        };
 
         if let Some(vhea) = vhea {
             let v_metrix = self.get_v_metrix(id);
@@ -684,6 +740,15 @@ impl Font {
     }
 
     #[cfg(feature = "layout")]
+    fn current_gpos(&self) -> Option<&gpos::GPOS> {
+        if self.current_font == 0 {
+            self.gpos.as_ref()
+        } else {
+            self.more_fonts[self.current_font - 1].gpos.as_ref()
+        }
+    }
+
+    #[cfg(feature = "layout")]
     fn current_gsub(&self) -> Option<&gsub::GSUB> {
         if self.current_font == 0 {
             self.gsub.as_ref()
@@ -740,10 +805,15 @@ impl Font {
         {
             if is_vert {
                 if let Some(gsub) = self.current_gsub() {
-                    return Ok(gsub.lookup_vertical(glyph_id as u16).unwrap_or(glyph_id as u16) as usize);
+                    return Ok(gsub
+                        .lookup_vertical(glyph_id as u16)
+                        .unwrap_or(glyph_id as u16) as usize);
                 }
             }
         }
+
+        #[cfg(not(feature = "layout"))]
+        let _ = is_vert;
 
         Ok(glyph_id)
     }
@@ -752,11 +822,172 @@ impl Font {
         (0xfe00..=0xfe0f).contains(&(ch as u32)) || (0xE0100..=0xE01EF).contains(&(ch as u32))
     }
 
+    fn is_emoji_modifier(ch: char) -> bool {
+        (0x1F3FB..=0x1F3FF).contains(&(ch as u32))
+    }
+
+    fn is_zero_width_joiner(ch: char) -> bool {
+        ch == '\u{200D}'
+    }
+
+    fn is_keycap_mark(ch: char) -> bool {
+        ch == '\u{20E3}'
+    }
+
+    fn is_regional_indicator(ch: char) -> bool {
+        (0x1F1E6..=0x1F1FF).contains(&(ch as u32))
+    }
+
+    fn is_tag_character(ch: char) -> bool {
+        (0xE0020..=0xE007E).contains(&(ch as u32)) || ch == '\u{E007F}'
+    }
+
+    fn is_default_emoji_scalar(ch: char) -> bool {
+        matches!(ch as u32, 0x1F000..=0x1FAFF | 0x2600..=0x27BF)
+    }
+
+    fn text_prefers_color_glyph(text: &str) -> bool {
+        let mut saw_emoji_scalar = false;
+        for ch in text.chars() {
+            if Self::is_variation_selector(ch)
+                || Self::is_emoji_modifier(ch)
+                || Self::is_zero_width_joiner(ch)
+                || Self::is_keycap_mark(ch)
+                || Self::is_regional_indicator(ch)
+                || Self::is_tag_character(ch)
+            {
+                return true;
+            }
+            if Self::is_default_emoji_scalar(ch) {
+                saw_emoji_scalar = true;
+            }
+        }
+        saw_emoji_scalar
+    }
+
+    fn extend_cluster_suffix(chars: &[char], index: &mut usize, text: &mut String) {
+        while *index < chars.len() {
+            let ch = chars[*index];
+            if Self::is_variation_selector(ch)
+                || Self::is_emoji_modifier(ch)
+                || Self::is_keycap_mark(ch)
+                || Self::is_tag_character(ch)
+            {
+                text.push(ch);
+                *index += 1;
+            } else {
+                break;
+            }
+        }
+    }
+
+    fn cluster_glyph_scalars(text: &str) -> Vec<(char, char)> {
+        let chars: Vec<char> = text.chars().collect();
+        let mut glyphs = Vec::new();
+        let mut index = 0usize;
+
+        while index < chars.len() {
+            let ch = chars[index];
+            if Self::is_variation_selector(ch) {
+                index += 1;
+                continue;
+            }
+
+            let mut variation_selector = '\0';
+            if index + 1 < chars.len() && Self::is_variation_selector(chars[index + 1]) {
+                variation_selector = chars[index + 1];
+                index += 1;
+            }
+
+            glyphs.push((ch, variation_selector));
+            index += 1;
+        }
+
+        glyphs
+    }
+
+    fn parse_text_units(text: &str) -> Vec<ParsedTextUnit> {
+        let chars: Vec<char> = text.chars().collect();
+        let mut units = Vec::new();
+        let mut index = 0;
+
+        while index < chars.len() {
+            let ch = chars[index];
+            match ch {
+                '\r' => {
+                    index += 1;
+                }
+                '\n' => {
+                    units.push(ParsedTextUnit::Newline);
+                    index += 1;
+                }
+                '\t' => {
+                    units.push(ParsedTextUnit::Tab);
+                    index += 1;
+                }
+                _ if Self::is_variation_selector(ch) => {
+                    index += 1;
+                }
+                _ => {
+                    let mut text = String::new();
+                    text.push(ch);
+                    let mut variation_selector = '\0';
+                    if index + 1 < chars.len() && Self::is_variation_selector(chars[index + 1]) {
+                        variation_selector = chars[index + 1];
+                        text.push(variation_selector);
+                        index += 1;
+                    }
+
+                    index += 1;
+                    Self::extend_cluster_suffix(&chars, &mut index, &mut text);
+
+                    if Self::is_regional_indicator(ch)
+                        && index < chars.len()
+                        && Self::is_regional_indicator(chars[index])
+                    {
+                        text.push(chars[index]);
+                        index += 1;
+                        Self::extend_cluster_suffix(&chars, &mut index, &mut text);
+                    }
+
+                    while index < chars.len() && Self::is_zero_width_joiner(chars[index]) {
+                        text.push(chars[index]);
+                        index += 1;
+                        if index >= chars.len() {
+                            break;
+                        }
+                        text.push(chars[index]);
+                        index += 1;
+                        Self::extend_cluster_suffix(&chars, &mut index, &mut text);
+                    }
+
+                    units.push(ParsedTextUnit::Glyph {
+                        text,
+                        ch,
+                        variation_selector,
+                    });
+                }
+            }
+        }
+
+        units
+    }
+
+    pub(crate) fn parse_text_units_for_fallback(text: &str) -> Vec<ParsedTextUnit> {
+        Self::parse_text_units(text)
+    }
+
     fn flush_shaped_glyphs(
         &self,
         output: &mut Vec<ResolvedTextUnit>,
         glyphs: &mut Vec<ResolvedGlyph>,
+        locale: Option<&str>,
+        is_right_to_left: bool,
+        font_variant: crate::commands::FontVariant,
     ) {
+        #[cfg(not(feature = "layout"))]
+        let _ = (locale, is_right_to_left, font_variant);
+
         if glyphs.is_empty() {
             return;
         }
@@ -765,13 +996,43 @@ impl Font {
         if let Some(gsub) = self.current_gsub() {
             const MAX_LIGATURE_COMPONENTS: usize = 8;
 
-            let glyph_ids: Vec<usize> = glyphs.iter().map(|glyph| glyph.glyph_id).collect();
+            let mut ccmp_glyphs = glyphs
+                .iter()
+                .enumerate()
+                .map(|(source_index, glyph)| (glyph.glyph_id, source_index))
+                .collect::<Vec<_>>();
+            gsub.apply_ccmp_sequence(&mut ccmp_glyphs);
+            gsub.apply_variant_sequence(&mut ccmp_glyphs, locale, font_variant);
+            if is_right_to_left {
+                gsub.apply_joining_sequence(&mut ccmp_glyphs, locale);
+                gsub.apply_rtl_contextual_sequence(&mut ccmp_glyphs, locale);
+            }
+            let expanded_glyphs = ccmp_glyphs
+                .into_iter()
+                .map(|(glyph_id, source_index)| ResolvedGlyph {
+                    ch: glyphs[source_index].ch,
+                    glyph_id,
+                    prefer_color: glyphs[source_index].prefer_color,
+                })
+                .collect::<Vec<_>>();
+
+            let glyph_ids: Vec<usize> =
+                expanded_glyphs.iter().map(|glyph| glyph.glyph_id).collect();
             let mut index = 0;
-            while index < glyphs.len() {
-                let max_len = (glyphs.len() - index).min(MAX_LIGATURE_COMPONENTS);
+            while index < expanded_glyphs.len() {
+                let max_len = (expanded_glyphs.len() - index).min(MAX_LIGATURE_COMPONENTS);
                 let mut matched = None;
                 for len in (2..=max_len).rev() {
-                    if let Some(glyph_id) = gsub.lookup_liga_sequence(&glyph_ids[index..index + len])
+                    if is_right_to_left {
+                        if let Some(glyph_id) =
+                            gsub.lookup_rlig_sequence(&glyph_ids[index..index + len], locale)
+                        {
+                            matched = Some((glyph_id, len));
+                            break;
+                        }
+                    }
+                    if let Some(glyph_id) =
+                        gsub.lookup_liga_sequence(&glyph_ids[index..index + len])
                     {
                         matched = Some((glyph_id, len));
                         break;
@@ -780,12 +1041,13 @@ impl Font {
 
                 if let Some((glyph_id, len)) = matched {
                     output.push(ResolvedTextUnit::Glyph(ResolvedGlyph {
-                        ch: glyphs[index].ch,
+                        ch: expanded_glyphs[index].ch,
                         glyph_id,
+                        prefer_color: expanded_glyphs[index].prefer_color,
                     }));
                     index += len;
                 } else {
-                    output.push(ResolvedTextUnit::Glyph(glyphs[index]));
+                    output.push(ResolvedTextUnit::Glyph(expanded_glyphs[index]));
                     index += 1;
                 }
             }
@@ -797,58 +1059,323 @@ impl Font {
         glyphs.clear();
     }
 
-    fn shape_text_units(&self, text: &str, is_vert: bool) -> Result<Vec<ResolvedTextUnit>, Error> {
-        let chars: Vec<char> = text.chars().collect();
+    fn shape_text_units(
+        &self,
+        text: &str,
+        is_vert: bool,
+        is_right_to_left: bool,
+        locale: Option<&str>,
+        font_variant: crate::commands::FontVariant,
+    ) -> Result<Vec<ResolvedTextUnit>, Error> {
+        #[cfg(not(feature = "layout"))]
+        let _ = (locale, is_right_to_left, font_variant);
+
         let mut output = Vec::new();
         let mut pending_glyphs = Vec::new();
-        let mut index = 0;
 
-        while index < chars.len() {
-            let ch = chars[index];
-            match ch {
-                '\r' => {
-                    index += 1;
-                    continue;
-                }
-                '\n' => {
-                    self.flush_shaped_glyphs(&mut output, &mut pending_glyphs);
+        for unit in Self::parse_text_units(text) {
+            match unit {
+                ParsedTextUnit::Newline => {
+                    self.flush_shaped_glyphs(
+                        &mut output,
+                        &mut pending_glyphs,
+                        locale,
+                        is_right_to_left,
+                        font_variant,
+                    );
                     output.push(ResolvedTextUnit::Newline);
-                    index += 1;
-                    continue;
                 }
-                '\t' => {
-                    self.flush_shaped_glyphs(&mut output, &mut pending_glyphs);
+                ParsedTextUnit::Tab => {
+                    self.flush_shaped_glyphs(
+                        &mut output,
+                        &mut pending_glyphs,
+                        locale,
+                        is_right_to_left,
+                        font_variant,
+                    );
                     output.push(ResolvedTextUnit::Tab);
-                    index += 1;
-                    continue;
                 }
-                _ => {}
+                ParsedTextUnit::Glyph { text, .. } => {
+                    let prefer_color = Self::text_prefers_color_glyph(&text);
+                    for (ch, variation_selector) in Self::cluster_glyph_scalars(&text) {
+                        let glyph_id =
+                            self.resolve_glyph_id_with_uvs(ch, variation_selector, is_vert)?;
+                        #[cfg(feature = "layout")]
+                        let glyph_id = if let Some(locale) = locale {
+                            if let Some(gsub) = self.current_gsub() {
+                                gsub.lookup_locale(glyph_id, locale)
+                            } else {
+                                glyph_id
+                            }
+                        } else {
+                            glyph_id
+                        };
+                        pending_glyphs.push(ResolvedGlyph {
+                            ch,
+                            glyph_id,
+                            prefer_color,
+                        });
+                    }
+                }
             }
-
-            if Self::is_variation_selector(ch) {
-                index += 1;
-                continue;
-            }
-
-            let mut vs = '\0';
-            let mut consumed = 1;
-            if index + 1 < chars.len() && Self::is_variation_selector(chars[index + 1]) {
-                vs = chars[index + 1];
-                consumed = 2;
-            }
-
-            let glyph_id = self.resolve_glyph_id_with_uvs(ch, vs, is_vert)?;
-            pending_glyphs.push(ResolvedGlyph { ch, glyph_id });
-            index += consumed;
         }
 
-        self.flush_shaped_glyphs(&mut output, &mut pending_glyphs);
+        self.flush_shaped_glyphs(
+            &mut output,
+            &mut pending_glyphs,
+            locale,
+            is_right_to_left,
+            font_variant,
+        );
         Ok(output)
+    }
+
+    pub(crate) fn supports_text_unit(
+        &self,
+        unit: &ParsedTextUnit,
+        is_vert: bool,
+        locale: Option<&str>,
+    ) -> bool {
+        #[cfg(not(feature = "layout"))]
+        let _ = locale;
+
+        match unit {
+            ParsedTextUnit::Newline | ParsedTextUnit::Tab => true,
+            ParsedTextUnit::Glyph { text, .. } => {
+                let Ok(shaped_units) = self.shape_text_units(
+                    text,
+                    is_vert,
+                    false,
+                    locale,
+                    crate::commands::FontVariant::Normal,
+                ) else {
+                    return false;
+                };
+
+                if !shaped_units
+                    .iter()
+                    .any(|unit| matches!(unit, ResolvedTextUnit::Glyph(_)))
+                {
+                    return false;
+                }
+
+                shaped_units.into_iter().all(|unit| match unit {
+                    ResolvedTextUnit::Glyph(glyph) => {
+                        if glyph.glyph_id == 0 {
+                            return false;
+                        }
+
+                        #[cfg(feature = "cff")]
+                        if self.current_cff().is_some() {
+                            return true;
+                        }
+
+                        self.current_glyf()
+                            .and_then(|glyf| glyf.get_glyph(glyph.glyph_id))
+                            .is_some()
+                            || self.current_sbix()
+                                .and_then(|sbix| sbix.get_raster_glyph(glyph.glyph_id as u32, 16.0, "px"))
+                                .is_some()
+                            || self
+                                .current_svg_table()
+                                .map(|svg| svg.has_glyph(glyph.glyph_id as u32))
+                                .unwrap_or(false)
+                    }
+                    _ => true,
+                })
+            }
+        }
+    }
+
+    fn push_svg_html_unit(
+        &self,
+        svgs: &mut Vec<String>,
+        unit: ParsedTextUnit,
+        fontsize: f64,
+        fontunit: &str,
+        is_vert: bool,
+    ) -> Result<(), Error> {
+        match unit {
+            ParsedTextUnit::Newline => {
+                svgs.push("<br>".to_string());
+            }
+            ParsedTextUnit::Tab => {
+                svgs.push(
+                    "<span style=\"width: 4em; display: inline-block;\"></span>\n".to_string(),
+                );
+            }
+            ParsedTextUnit::Glyph {
+                text,
+                ch,
+                variation_selector,
+            } => {
+                let svg = if text.chars().count() > 2
+                    || text.contains('\u{200D}')
+                    || text.chars().filter(|ch| Self::is_regional_indicator(*ch)).count() > 1
+                {
+                    self.text2svg(&text, fontsize, fontunit)?
+                } else {
+                    self.get_svg_with_uvs_axis(ch, variation_selector, fontsize, fontunit, is_vert)?
+                };
+                svgs.push(svg);
+            }
+        }
+        Ok(())
+    }
+
+    #[cfg(test)]
+    pub(crate) fn debug_shape_glyph_ids(
+        &self,
+        text: &str,
+        locale: Option<&str>,
+    ) -> Result<Vec<usize>, Error> {
+        let mut glyph_ids = Vec::new();
+        for unit in self.shape_text_units(
+            text,
+            false,
+            false,
+            locale,
+            crate::commands::FontVariant::Normal,
+        )? {
+            if let ResolvedTextUnit::Glyph(glyph) = unit {
+                glyph_ids.push(glyph.glyph_id);
+            }
+        }
+        Ok(glyph_ids)
+    }
+
+    #[cfg(test)]
+    #[allow(dead_code)]
+    pub(crate) fn debug_shape_glyph_ids_with_direction(
+        &self,
+        text: &str,
+        locale: Option<&str>,
+        is_right_to_left: bool,
+    ) -> Result<Vec<usize>, Error> {
+        let mut glyph_ids = Vec::new();
+        for unit in self.shape_text_units(
+            text,
+            false,
+            is_right_to_left,
+            locale,
+            crate::commands::FontVariant::Normal,
+        )? {
+            if let ResolvedTextUnit::Glyph(glyph) = unit {
+                glyph_ids.push(glyph.glyph_id);
+            }
+        }
+        Ok(glyph_ids)
+    }
+
+    #[cfg(test)]
+    #[allow(dead_code)]
+    pub(crate) fn debug_shape_glyph_ids_with_variant(
+        &self,
+        text: &str,
+        locale: Option<&str>,
+        font_variant: crate::commands::FontVariant,
+    ) -> Result<Vec<usize>, Error> {
+        let mut glyph_ids = Vec::new();
+        for unit in self.shape_text_units(text, false, false, locale, font_variant)? {
+            if let ResolvedTextUnit::Glyph(glyph) = unit {
+                glyph_ids.push(glyph.glyph_id);
+            }
+        }
+        Ok(glyph_ids)
     }
 
     fn default_line_height(&self) -> Result<f64, Error> {
         let hhea = self.current_hhea()?;
         Ok((hhea.get_accender() - hhea.get_descender() + hhea.get_line_gap()) as f64)
+    }
+
+    #[allow(dead_code)]
+    fn glyph_unit_at(units: &[ResolvedTextUnit], index: usize) -> Option<ResolvedGlyph> {
+        match units.get(index) {
+            Some(ResolvedTextUnit::Glyph(glyph)) => Some(*glyph),
+            _ => None,
+        }
+    }
+
+    fn resolved_glyph_can_use_outline(
+        &self,
+        open_type_glyph: &OpenTypeGlyph,
+        glyph_id: usize,
+    ) -> bool {
+        if self
+            .current_colr()
+            .map(|colr| !colr.get_layer_record(glyph_id as u16).is_empty())
+            .unwrap_or(false)
+        {
+            return true;
+        }
+
+        #[cfg(feature = "cff")]
+        if self.current_cff().is_some() {
+            return true;
+        }
+
+        matches!(open_type_glyph.glyph, FontData::Glyph(_))
+    }
+
+    fn pair_adjustment_for_index(
+        &self,
+        units: &[ResolvedTextUnit],
+        index: usize,
+        locale: Option<&str>,
+        is_vertical: bool,
+        scale_x: f32,
+        scale_y: f32,
+    ) -> GlyphPositionAdjustment {
+        #[cfg(not(feature = "layout"))]
+        {
+            let _ = (units, index, locale, is_vertical, scale_x, scale_y);
+            GlyphPositionAdjustment::default()
+        }
+
+        #[cfg(feature = "layout")]
+        {
+            let Some(gpos) = self.current_gpos() else {
+                return GlyphPositionAdjustment::default();
+            };
+            let Some(current) = Self::glyph_unit_at(units, index) else {
+                return GlyphPositionAdjustment::default();
+            };
+
+            let mut adjustment = GlyphPositionAdjustment::default();
+
+            if index > 0 {
+                if let Some(previous) = Self::glyph_unit_at(units, index - 1) {
+                    if let Some(pair) = gpos.lookup_pair_adjustment(
+                        previous.glyph_id as u16,
+                        current.glyph_id as u16,
+                        is_vertical,
+                        locale,
+                    ) {
+                        adjustment.placement_x += pair.second.x_placement as f32 * scale_x;
+                        adjustment.placement_y += pair.second.y_placement as f32 * scale_y;
+                        adjustment.advance_x += pair.second.x_advance as f32 * scale_x;
+                        adjustment.advance_y += pair.second.y_advance as f32 * scale_y;
+                    }
+                }
+            }
+
+            if let Some(next) = Self::glyph_unit_at(units, index + 1) {
+                if let Some(pair) = gpos.lookup_pair_adjustment(
+                    current.glyph_id as u16,
+                    next.glyph_id as u16,
+                    is_vertical,
+                    locale,
+                ) {
+                    adjustment.placement_x += pair.first.x_placement as f32 * scale_x;
+                    adjustment.placement_y += pair.first.y_placement as f32 * scale_y;
+                    adjustment.advance_x += pair.first.x_advance as f32 * scale_x;
+                    adjustment.advance_y += pair.first.y_advance as f32 * scale_y;
+                }
+            }
+
+            adjustment
+        }
     }
 
     pub fn text2glyph_run(
@@ -869,6 +1396,8 @@ impl Font {
         let scale_y = options.font_size / default_line_height.max(1.0);
         let scale_x = scale_y * options.font_stretch.0.max(0.0);
         let line_height = options.line_height.unwrap_or(options.font_size);
+        let is_vertical = options.text_direction.is_vertical();
+        let is_right_to_left = options.text_direction.is_right_to_left();
         if !line_height.is_finite() || line_height <= 0.0 {
             return Err(Error::new(
                 ErrorKind::InvalidInput,
@@ -880,32 +1409,65 @@ impl Font {
         let mut cursor_x = 0.0f32;
         let mut cursor_y = 0.0f32;
         let tab_advance = line_height;
+        let shaped_units = self.shape_text_units(
+            text,
+            is_vertical,
+            is_right_to_left,
+            options.locale,
+            options.font_variant,
+        )?;
 
-        for unit in self.shape_text_units(text, false)? {
-            match unit {
+        for (index, unit) in shaped_units.iter().enumerate() {
+            match *unit {
                 ResolvedTextUnit::Newline => {
-                    cursor_x = 0.0;
-                    cursor_y += line_height;
+                    if is_vertical {
+                        cursor_x -= line_height;
+                        cursor_y = 0.0;
+                    } else {
+                        cursor_x = 0.0;
+                        cursor_y += line_height;
+                    }
                 }
                 ResolvedTextUnit::Tab => {
-                    cursor_x += tab_advance * 4.0;
+                    if is_vertical {
+                        cursor_y += tab_advance * 4.0;
+                    } else if is_right_to_left {
+                        cursor_x -= tab_advance * 4.0;
+                    } else {
+                        cursor_x += tab_advance * 4.0;
+                    }
                 }
                 ResolvedTextUnit::Glyph(resolved) => {
-                    let glyph_data = self.get_glyph_from_id_axis(resolved.glyph_id, false);
+                    let glyph_data = self.get_glyph_from_id_axis(resolved.glyph_id, is_vertical);
                     let open_type_glyph = glyph_data
                         .open_type_glyf
                         .as_ref()
                         .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "glyph is none"))?;
                     let glyph_id = glyph_data.glyph_id;
+                    let can_use_outline =
+                        self.resolved_glyph_can_use_outline(open_type_glyph, glyph_id);
 
                     let layers = if let Some(sbix) = self.current_sbix() {
                         if let Some(bitmap) =
                             sbix.get_raster_glyph(glyph_id as u32, options.font_size, "px")
                         {
-                            let mut raster = RasterGlyphLayer::from_encoded(bitmap.glyph_data);
-                            raster.offset_x = bitmap.offset_x * options.font_stretch.0.max(0.0);
-                            raster.offset_y = bitmap.offset_y;
-                            vec![GlyphLayer::Raster(raster)]
+                            if resolved.prefer_color || !can_use_outline {
+                                let mut raster = RasterGlyphLayer::from_encoded(bitmap.glyph_data);
+                                raster.offset_x =
+                                    bitmap.offset_x * options.font_stretch.0.max(0.0);
+                                raster.offset_y = bitmap.offset_y;
+                                raster.width = bitmap.width;
+                                raster.height = bitmap.height;
+                                vec![GlyphLayer::Raster(raster)]
+                            } else {
+                                self.build_outline_layers(
+                                    glyph_id,
+                                    open_type_glyph,
+                                    scale_x,
+                                    scale_y,
+                                    resolved.ch,
+                                )?
+                            }
                         } else {
                             self.build_outline_layers(
                                 glyph_id,
@@ -927,15 +1489,36 @@ impl Font {
 
                     let mut metrics =
                         glyph_metrics_from_layout(&open_type_glyph.layout, scale_x, scale_y);
+                    let adjustment = self.pair_adjustment_for_index(
+                        &shaped_units,
+                        index,
+                        options.locale,
+                        is_vertical,
+                        scale_x,
+                        scale_y,
+                    );
+                    metrics.advance_x += adjustment.advance_x;
+                    metrics.advance_y += adjustment.advance_y;
                     metrics.bounds = glyph_layers_bounds(&layers);
 
+                    let origin_x = if is_right_to_left && !is_vertical {
+                        cursor_x - metrics.advance_x + adjustment.placement_x
+                    } else {
+                        cursor_x + adjustment.placement_x
+                    };
+                    let origin_y = cursor_y + adjustment.placement_y;
                     let glyph = Glyph {
                         font: Some(font_metrics_from_layout(&open_type_glyph.layout, scale_y)),
                         metrics,
                         layers,
                     };
-                    glyphs.push(PositionedGlyph::new(glyph, cursor_x, cursor_y));
-                    cursor_x += metrics.advance_x;
+                    glyphs.push(PositionedGlyph::new(glyph, origin_x, origin_y));
+                    if is_right_to_left && !is_vertical {
+                        cursor_x -= metrics.advance_x;
+                    } else {
+                        cursor_x += metrics.advance_x;
+                    }
+                    cursor_y += metrics.advance_y;
                 }
             }
         }
@@ -962,7 +1545,8 @@ impl Font {
             ));
         }
 
-        let color_layers = self.build_colr_layers(glyph_id, &open_type_glyph.layout, scale_x, scale_y);
+        let color_layers =
+            self.build_colr_layers(glyph_id, &open_type_glyph.layout, scale_x, scale_y);
         if !color_layers.is_empty() {
             return Ok(color_layers);
         }
@@ -983,7 +1567,8 @@ impl Font {
                     .current_glyf()
                     .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "glyf is none"))?;
                 let commands = glyf.to_path_commands(glyph_id, &open_type_glyph.layout, 0.0, 0.0);
-                let commands = transform_glyf_commands(&commands, &open_type_glyph.layout, scale_x, scale_y);
+                let commands =
+                    transform_glyf_commands(&commands, &open_type_glyph.layout, scale_x, scale_y);
                 Ok(vec![GlyphLayer::Path(PathGlyphLayer::new(
                     commands,
                     GlyphPaint::CurrentColor,
@@ -1011,9 +1596,11 @@ impl Font {
         scale_x: f32,
         scale_y: f32,
     ) -> Vec<GlyphLayer> {
-        let (Some(colr), Some(cpal), Some(glyf)) =
-            (self.current_colr(), self.current_cpal(), self.current_glyf())
-        else {
+        let (Some(colr), Some(cpal), Some(glyf)) = (
+            self.current_colr(),
+            self.current_cpal(),
+            self.current_glyf(),
+        ) else {
             return Vec::new();
         };
 
@@ -1038,15 +1625,48 @@ impl Font {
         layers
     }
 
+    fn legacy_colr_commands(
+        &self,
+        glyph_id: usize,
+        layout: &FontLayout,
+        origin_x: f64,
+        origin_y: f64,
+    ) -> Vec<PathCommand> {
+        let (Some(colr), Some(glyf)) = (self.current_colr(), self.current_glyf()) else {
+            return Vec::new();
+        };
+
+        let mut commands = Vec::new();
+        for layer in colr.get_layer_record(glyph_id as u16) {
+            if glyf.get_glyph(layer.glyph_id as usize).is_none() {
+                continue;
+            }
+            commands.extend(glyf.to_path_commands(
+                layer.glyph_id as usize,
+                layout,
+                origin_x,
+                origin_y,
+            ));
+        }
+        commands
+    }
+
     pub fn text2commands(&self, text: &str) -> Result<Vec<GlyphCommands>, Error> {
         let mut result = Vec::new();
         let mut cursor_x = 0.0;
         let mut line_index = 0usize;
         let line_height = self.default_line_height()?;
         let tab_advance = line_height;
+        let shaped_units = self.shape_text_units(
+            text,
+            false,
+            false,
+            None,
+            crate::commands::FontVariant::Normal,
+        )?;
 
-        for unit in self.shape_text_units(text, false)? {
-            match unit {
+        for (index, unit) in shaped_units.iter().enumerate() {
+            match *unit {
                 ResolvedTextUnit::Newline => {
                     cursor_x = 0.0;
                     line_index += 1;
@@ -1060,38 +1680,109 @@ impl Font {
                         .open_type_glyf
                         .as_ref()
                         .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "glyph is none"))?;
-                    let origin_y = -(line_index as f64 * line_height);
+                    let adjustment =
+                        self.pair_adjustment_for_index(&shaped_units, index, None, false, 1.0, 1.0);
+                    let origin_y =
+                        -(line_index as f64 * line_height) + adjustment.placement_y as f64;
+                    let advance_width = match &open_type_glyph.layout {
+                        FontLayout::Horizontal(layout) => layout.advance_width as f64,
+                        FontLayout::Vertical(layout) => layout.advance_height as f64,
+                        FontLayout::Unknown => 0.0,
+                    } + adjustment.advance_x as f64;
+                    let origin_x = cursor_x + adjustment.placement_x as f64;
+                    let can_use_outline =
+                        self.resolved_glyph_can_use_outline(open_type_glyph, glyph_data.glyph_id);
+
+                    if let Some(sbix) = self.current_sbix() {
+                        if let Some(bitmap) = sbix.get_raster_glyph(
+                            glyph_data.glyph_id as u32,
+                            line_height as f32,
+                            "px",
+                        ) {
+                            if resolved.prefer_color || !can_use_outline {
+                                let format =
+                                    if bitmap.graphic_type == u32::from_be_bytes(*b"png ") {
+                                        BitmapGlyphFormat::Png
+                                    } else if bitmap.graphic_type == u32::from_be_bytes(*b"jpg ") {
+                                        BitmapGlyphFormat::Jpeg
+                                    } else {
+                                        return Err(Error::new(
+                                            std::io::ErrorKind::Unsupported,
+                                            "unsupported sbix image format",
+                                        ));
+                                    };
+                                let sniffed_dimensions =
+                                    sniff_encoded_image_dimensions(&bitmap.glyph_data);
+                                result.push(GlyphCommands {
+                                    ch: resolved.ch,
+                                    glyph_id: glyph_data.glyph_id,
+                                    origin_x,
+                                    origin_y,
+                                    advance_width,
+                                    commands: Vec::new(),
+                                    bitmap: Some(BitmapGlyphCommands {
+                                        offset_x: bitmap.offset_x as f64,
+                                        offset_y: bitmap.offset_y as f64,
+                                        width: bitmap
+                                            .width
+                                            .map(|width| width as f64)
+                                            .or_else(|| {
+                                                sniffed_dimensions
+                                                    .map(|(_, width, _)| width as f64)
+                                            })
+                                            .unwrap_or(line_height),
+                                        height: bitmap
+                                            .height
+                                            .map(|height| height as f64)
+                                            .or_else(|| {
+                                                sniffed_dimensions
+                                                    .map(|(_, _, height)| height as f64)
+                                            })
+                                            .unwrap_or(line_height),
+                                        format,
+                                        data: bitmap.glyph_data,
+                                    }),
+                                });
+                                cursor_x += advance_width;
+                                continue;
+                            }
+                        }
+                    }
 
                     match &open_type_glyph.glyph {
                         FontData::Glyph(_) => {
-                            let advance_width = match &open_type_glyph.layout {
-                                FontLayout::Horizontal(layout) => layout.advance_width as f64,
-                                FontLayout::Vertical(layout) => layout.advance_height as f64,
-                                FontLayout::Unknown => 0.0,
-                            };
-                            let glyf = self.current_glyf().ok_or_else(|| {
-                                Error::new(std::io::ErrorKind::Other, "glyf is none")
-                            })?;
-                            let commands = glyf.to_path_commands(
+                            let mut commands = self.legacy_colr_commands(
                                 glyph_data.glyph_id,
                                 &open_type_glyph.layout,
-                                cursor_x,
+                                origin_x,
                                 origin_y,
                             );
+                            if commands.is_empty() {
+                                let glyf = self.current_glyf().ok_or_else(|| {
+                                    Error::new(std::io::ErrorKind::Other, "glyf is none")
+                                })?;
+                                commands = glyf.to_path_commands(
+                                    glyph_data.glyph_id,
+                                    &open_type_glyph.layout,
+                                    origin_x,
+                                    origin_y,
+                                );
+                            }
                             result.push(GlyphCommands {
                                 ch: resolved.ch,
                                 glyph_id: glyph_data.glyph_id,
-                                origin_x: cursor_x,
+                                origin_x,
                                 origin_y,
                                 advance_width,
                                 commands,
+                                bitmap: None,
                             });
                             cursor_x += advance_width;
                         }
                         _ => {
                             return Err(Error::new(
                                 std::io::ErrorKind::Other,
-                                "text2commands supports glyf outlines only",
+                                "text2commands supports glyf outlines and sbix bitmap glyphs only",
                             ));
                         }
                     }
@@ -1107,44 +1798,98 @@ impl Font {
     }
 
     pub fn measure(&self, text: &str) -> Result<f64, Error> {
+        self.measure_with_options(text, &crate::commands::FontOptions::from_font(self))
+    }
+
+    pub fn measure_with_options(
+        &self,
+        text: &str,
+        options: &crate::commands::FontOptions<'_>,
+    ) -> Result<f64, Error> {
         let mut cursor_x = 0.0;
+        let mut cursor_y = 0.0;
         let mut max_line_width: f64 = 0.0;
         let line_height = self.default_line_height()?;
         let tab_advance = line_height;
+        let is_vertical = options.text_direction.is_vertical();
+        let is_right_to_left = options.text_direction.is_right_to_left();
+        let shaped_units = self.shape_text_units(
+            text,
+            is_vertical,
+            is_right_to_left,
+            options.locale,
+            options.font_variant,
+        )?;
 
-        for unit in self.shape_text_units(text, false)? {
-            match unit {
+        for (index, unit) in shaped_units.iter().enumerate() {
+            match *unit {
                 ResolvedTextUnit::Newline => {
-                    max_line_width = max_line_width.max(cursor_x);
-                    cursor_x = 0.0;
+                    max_line_width = if is_vertical {
+                        max_line_width.max(cursor_y)
+                    } else if is_right_to_left {
+                        max_line_width.max(-cursor_x)
+                    } else {
+                        max_line_width.max(cursor_x)
+                    };
+                    if is_vertical {
+                        cursor_x -= line_height;
+                        cursor_y = 0.0;
+                    } else {
+                        cursor_x = 0.0;
+                    }
                 }
                 ResolvedTextUnit::Tab => {
-                    cursor_x += tab_advance * 4.0;
+                    if is_vertical {
+                        cursor_y += tab_advance * 4.0;
+                    } else if is_right_to_left {
+                        cursor_x -= tab_advance * 4.0;
+                    } else {
+                        cursor_x += tab_advance * 4.0;
+                    }
                 }
                 ResolvedTextUnit::Glyph(resolved) => {
-                    let glyph_data = self.get_glyph_from_id_axis(resolved.glyph_id, false);
+                    let glyph_data = self.get_glyph_from_id_axis(resolved.glyph_id, is_vertical);
                     let open_type_glyph = glyph_data
                         .open_type_glyf
                         .as_ref()
                         .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "glyph is none"))?;
 
-                    let advance_width = match &open_type_glyph.layout {
-                        FontLayout::Horizontal(layout) => layout.advance_width as f64,
-                        FontLayout::Vertical(layout) => layout.advance_height as f64,
-                        FontLayout::Unknown => 0.0,
+                    let adjustment = self.pair_adjustment_for_index(
+                        &shaped_units,
+                        index,
+                        options.locale,
+                        is_vertical,
+                        1.0,
+                        1.0,
+                    );
+                    let (advance_x, advance_y) = match &open_type_glyph.layout {
+                        FontLayout::Horizontal(layout) => (layout.advance_width as f64, 0.0),
+                        FontLayout::Vertical(layout) => (0.0, layout.advance_height as f64),
+                        FontLayout::Unknown => (0.0, 0.0),
                     };
-                    cursor_x += advance_width;
+                    if is_right_to_left && !is_vertical {
+                        cursor_x -= advance_x + adjustment.advance_x as f64;
+                    } else {
+                        cursor_x += advance_x + adjustment.advance_x as f64;
+                    }
+                    cursor_y += advance_y + adjustment.advance_y as f64;
                 }
             }
         }
 
-        Ok(max_line_width.max(cursor_x))
+        Ok(if is_vertical {
+            max_line_width.max(cursor_y)
+        } else if is_right_to_left {
+            max_line_width.max(-cursor_x)
+        } else {
+            max_line_width.max(cursor_x)
+        })
     }
 
     pub fn text2svg(&self, text: &str, fontsize: f64, fontunit: &str) -> Result<String, Error> {
         let glyphs = self.text2commands(text)?;
         let line_height = self.default_line_height()?;
-        let mut d_list = Vec::new();
+        let mut svg_elements = Vec::new();
         let mut min_x = 0.0;
         let mut min_y = 0.0;
         let mut max_x = 0.0;
@@ -1153,24 +1898,43 @@ impl Font {
 
         for glyph in glyphs.iter() {
             let d = path_commands_to_svg_path(&glyph.commands);
-            if d.is_empty() {
-                continue;
+            if !d.is_empty() {
+                let (glyph_min_x, glyph_min_y, glyph_max_x, glyph_max_y) =
+                    path_command_bounds(&glyph.commands);
+                if !has_point {
+                    min_x = glyph_min_x;
+                    min_y = glyph_min_y;
+                    max_x = glyph_max_x;
+                    max_y = glyph_max_y;
+                    has_point = true;
+                } else {
+                    min_x = min_x.min(glyph_min_x);
+                    min_y = min_y.min(glyph_min_y);
+                    max_x = max_x.max(glyph_max_x);
+                    max_y = max_y.max(glyph_max_y);
+                }
+                svg_elements.push(format!("<path d=\"{}\" fill=\"currentColor\"/>", d));
             }
-            let (glyph_min_x, glyph_min_y, glyph_max_x, glyph_max_y) =
-                path_command_bounds(&glyph.commands);
-            if !has_point {
-                min_x = glyph_min_x;
-                min_y = glyph_min_y;
-                max_x = glyph_max_x;
-                max_y = glyph_max_y;
-                has_point = true;
-            } else {
-                min_x = min_x.min(glyph_min_x);
-                min_y = min_y.min(glyph_min_y);
-                max_x = max_x.max(glyph_max_x);
-                max_y = max_y.max(glyph_max_y);
+
+            if let Some(bitmap) = glyph.bitmap.as_ref() {
+                let glyph_min_x = glyph.origin_x + bitmap.offset_x;
+                let glyph_min_y = glyph.origin_y + bitmap.offset_y;
+                let glyph_max_x = glyph_min_x + bitmap.width;
+                let glyph_max_y = glyph_min_y + bitmap.height;
+                if !has_point {
+                    min_x = glyph_min_x;
+                    min_y = glyph_min_y;
+                    max_x = glyph_max_x;
+                    max_y = glyph_max_y;
+                    has_point = true;
+                } else {
+                    min_x = min_x.min(glyph_min_x);
+                    min_y = min_y.min(glyph_min_y);
+                    max_x = max_x.max(glyph_max_x);
+                    max_y = max_y.max(glyph_max_y);
+                }
+                svg_elements.push(bitmap_glyph_to_svg_image(glyph, bitmap));
             }
-            d_list.push(d);
         }
 
         if !has_point {
@@ -1191,8 +1955,8 @@ impl Font {
             "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{}{}\" height=\"{}{}\" viewBox=\"{} {} {} {}\">",
             width, fontunit, height, fontunit, min_x, min_y, view_width, view_height
         );
-        for d in d_list {
-            svg += &format!("<path d=\"{}\" fill=\"currentColor\"/>", d);
+        for element in svg_elements {
+            svg += &element;
         }
         svg += "</svg>";
         Ok(svg)
@@ -1221,6 +1985,88 @@ impl Font {
         };
         let platform_id = PlatformID::Windows;
         name_table.get_name(name_id, locale, platform_id)
+    }
+
+    pub(crate) fn face_family_name(&self) -> String {
+        let locale = "en-US".to_string();
+        self.get_name(NameID::TypographicFamilyName, &locale)
+            .ok()
+            .filter(|name| !name.trim().is_empty())
+            .or_else(|| {
+                self.get_name(NameID::FontFamilyName, &locale)
+                    .ok()
+                    .filter(|name| !name.trim().is_empty())
+            })
+            .unwrap_or_else(|| "Unknown Family".to_string())
+    }
+
+    pub(crate) fn face_full_name(&self) -> Option<String> {
+        let locale = "en-US".to_string();
+        self.get_name(NameID::FullFontName, &locale)
+            .ok()
+            .filter(|name| !name.trim().is_empty())
+            .or_else(|| {
+                self.get_name(NameID::PostScriptName, &locale)
+                    .ok()
+                    .filter(|name| !name.trim().is_empty())
+            })
+    }
+
+    pub(crate) fn face_weight_class(&self) -> u16 {
+        let os2 = if self.current_font == 0 {
+            self.os2.as_ref()
+        } else {
+            self.more_fonts[self.current_font - 1].os2.as_ref()
+        };
+        os2.map(|os2| os2.weight_class()).unwrap_or(400)
+    }
+
+    pub(crate) fn face_width_class(&self) -> u16 {
+        let os2 = if self.current_font == 0 {
+            self.os2.as_ref()
+        } else {
+            self.more_fonts[self.current_font - 1].os2.as_ref()
+        };
+        os2.map(|os2| os2.width_class()).unwrap_or(5)
+    }
+
+    pub(crate) fn face_is_italic(&self) -> bool {
+        let head_mac_style = if self.current_font == 0 {
+            self.head.as_ref().map(|head| head.mac_style)
+        } else {
+            self.more_fonts[self.current_font - 1]
+                .head
+                .as_ref()
+                .map(|head| head.mac_style)
+        }
+        .unwrap_or(0);
+        if head_mac_style & 0x0002 == 0x0002 {
+            return true;
+        }
+
+        let post_italic_angle = if self.current_font == 0 {
+            self.post.as_ref().map(|post| post.italic_angle)
+        } else {
+            self.more_fonts[self.current_font - 1]
+                .post
+                .as_ref()
+                .map(|post| post.italic_angle)
+        }
+        .unwrap_or(0);
+        if post_italic_angle != 0 {
+            return true;
+        }
+
+        let os2_selection = if self.current_font == 0 {
+            self.os2.as_ref().map(|os2| os2.selection_flags())
+        } else {
+            self.more_fonts[self.current_font - 1]
+                .os2
+                .as_ref()
+                .map(|os2| os2.selection_flags())
+        }
+        .unwrap_or(0);
+        os2_selection & 0x0001 == 0x0001
     }
 
     #[cfg(debug_assertions)]
@@ -1400,7 +2246,6 @@ impl Font {
         vhea.to_string()
     }
 
-
     #[cfg(debug_assertions)]
     #[cfg(feature = "layout")]
     pub fn get_gdef_raw(&self) -> String {
@@ -1432,7 +2277,12 @@ impl Font {
         gsub.to_string()
     }
 
-    pub fn get_html_vert(&self, string: &str, fontsize: f64, fontunit: &str) -> Result<String, Error> {
+    pub fn get_html_vert(
+        &self,
+        string: &str,
+        fontsize: f64,
+        fontunit: &str,
+    ) -> Result<String, Error> {
         let mut html = String::new();
         html += "<html>\n";
         html += "<head>\n";
@@ -1442,34 +2292,8 @@ impl Font {
         html += "</head>\n";
         html += "<body>\n";
         let mut svgs = Vec::new();
-        for (i, ch) in string.chars().enumerate() {
-            if ch == '\n' {
-                svgs.push("<br>".to_string());
-                continue;
-            }
-            if ch == '\r' {
-                continue;
-            }
-            if ch == '\t' {
-                svgs.push(
-                    "<span style=\"width: 4em; display: inline-block;\"></span>\n".to_string(),
-                );
-                continue;
-            }
-
-            // variation selector 0xE0100 - 0xE01EF
-            // https://www.unicode.org/reports/tr37/#VS
-            if ch as u32 >= 0xfe00 && ch as u32 <= 0xfe0f
-                || ch as u32 >= 0xE0100 && ch as u32 <= 0xE01EF
-            {
-                let ch0 = string.chars().nth(i - 1).unwrap();
-                let svg = self.get_svg_with_uvs_axis(ch0, ch, fontsize, fontunit, true)?;
-                svgs.pop();
-                svgs.push(svg);
-            } else {
-                let svg = self.get_svg_with_uvs_axis(ch, '\0', fontsize, fontunit, true)?;
-                svgs.push(svg);
-            }
+        for unit in Self::parse_text_units(string) {
+            self.push_svg_html_unit(&mut svgs, unit, fontsize, fontunit, true)?;
         }
 
         for svg in svgs {
@@ -1489,34 +2313,8 @@ impl Font {
         html += "</head>\n";
         html += "<body>\n";
         let mut svgs = Vec::new();
-        for (i, ch) in string.chars().enumerate() {
-            if ch == '\n' {
-                svgs.push("<br>".to_string());
-                continue;
-            }
-            if ch == '\r' {
-                continue;
-            }
-            if ch == '\t' {
-                svgs.push(
-                    "<span style=\"width: 4em; display: inline-block;\"></span>\n".to_string(),
-                );
-                continue;
-            }
-
-            // variation selector 0xE0100 - 0xE01EF
-            // https://www.unicode.org/reports/tr37/#VS
-            if ch as u32 >= 0xfe00 && ch as u32 <= 0xfe0f
-                || ch as u32 >= 0xE0100 && ch as u32 <= 0xE01EF
-            {
-                let ch0 = string.chars().nth(i - 1).unwrap();
-                let svg = self.get_svg_with_uvs(ch0, ch, fontsize, fontunit)?;
-                svgs.pop();
-                svgs.push(svg);
-            } else {
-                let svg = self.get_svg(ch, fontsize, fontunit)?;
-                svgs.push(svg);
-            }
+        for unit in Self::parse_text_units(string) {
+            self.push_svg_html_unit(&mut svgs, unit, fontsize, fontunit, false)?;
         }
         for svg in svgs {
             html += &svg;
@@ -1662,6 +2460,23 @@ fn path_command_bounds(commands: &[PathCommand]) -> (f64, f64, f64, f64) {
     (min_x, min_y, max_x, max_y)
 }
 
+fn bitmap_glyph_to_svg_image(glyph: &GlyphCommands, bitmap: &BitmapGlyphCommands) -> String {
+    let mime = match bitmap.format {
+        BitmapGlyphFormat::Png => "image/png",
+        BitmapGlyphFormat::Jpeg => "image/jpeg",
+    };
+    let encoded = general_purpose::STANDARD.encode(&bitmap.data);
+    format!(
+        "<image x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" href=\"data:{};base64,{}\"/>",
+        glyph.origin_x + bitmap.offset_x,
+        glyph.origin_y + bitmap.offset_y,
+        bitmap.width,
+        bitmap.height,
+        mime,
+        encoded
+    )
+}
+
 fn glyph_baseline_shift(layout: &FontLayout) -> f32 {
     match layout {
         FontLayout::Horizontal(layout) => (layout.accender + layout.line_gap) as f32,
@@ -1687,7 +2502,10 @@ fn transform_glyf_commands(
                 DrawCommand::Line(*x as f32 * scale_x, (*y - baseline_shift) as f32 * scale_y)
             }
             PathCommand::QuadTo { cx, cy, x, y } => DrawCommand::Bezier(
-                (*cx as f32 * scale_x, (*cy - baseline_shift) as f32 * scale_y),
+                (
+                    *cx as f32 * scale_x,
+                    (*cy - baseline_shift) as f32 * scale_y,
+                ),
                 (*x as f32 * scale_x, (*y - baseline_shift) as f32 * scale_y),
             ),
             PathCommand::ClosePath => DrawCommand::Close,
@@ -1705,10 +2523,9 @@ fn transform_cff_commands(
         .map(|command| match command {
             DrawCommand::MoveTo(x, y) => DrawCommand::MoveTo(*x * scale_x, *y * scale_y),
             DrawCommand::Line(x, y) => DrawCommand::Line(*x * scale_x, *y * scale_y),
-            DrawCommand::Bezier((cx, cy), (x, y)) => DrawCommand::Bezier(
-                (*cx * scale_x, *cy * scale_y),
-                (*x * scale_x, *y * scale_y),
-            ),
+            DrawCommand::Bezier((cx, cy), (x, y)) => {
+                DrawCommand::Bezier((*cx * scale_x, *cy * scale_y), (*x * scale_x, *y * scale_y))
+            }
             DrawCommand::CubicBezier((xa, ya), (xb, yb), (xc, yc)) => DrawCommand::CubicBezier(
                 (*xa * scale_x, *ya * scale_y),
                 (*xb * scale_x, *yb * scale_y),
@@ -1742,11 +2559,7 @@ fn font_metrics_from_layout(layout: &FontLayout, scale_y: f32) -> DrawFontMetric
     }
 }
 
-fn glyph_metrics_from_layout(
-    layout: &FontLayout,
-    scale_x: f32,
-    scale_y: f32,
-) -> DrawGlyphMetrics {
+fn glyph_metrics_from_layout(layout: &FontLayout, scale_x: f32, scale_y: f32) -> DrawGlyphMetrics {
     match layout {
         FontLayout::Horizontal(layout) => DrawGlyphMetrics {
             advance_x: layout.advance_width as f32 * scale_x,
@@ -1963,7 +2776,6 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Result<Font, Error> {
                         let cmap_encodings =
                             CmapEncodings::new(&mut reader, 0, table.data.len() as u32)?;
                         font.cmap = Some(cmap_encodings);
-                        println!("cmap");
                     }
                     b"head" => {
                         let mut reader = BytesReader::new(&table.data);
@@ -1986,8 +2798,6 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Result<Font, Error> {
                         font.maxp = Some(maxp);
                     }
                     b"hmtx" => {
-                        print!("hmtx");
-                        print!("{} ", table.data.len());
                         hmtx_table = Some(table);
                     }
                     b"name" => {
@@ -2033,6 +2843,12 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Result<Font, Error> {
                         font.cff = Some(cff.unwrap());
                     }
                     #[cfg(feature = "layout")]
+                    b"GPOS" => {
+                        let mut reader = BytesReader::new(&table.data);
+                        let gpos = gpos::GPOS::new(&mut reader, 0, table.data.len() as u32)?;
+                        font.gpos = Some(gpos);
+                    }
+                    #[cfg(feature = "layout")]
                     b"GSUB" => {
                         let mut reader = BytesReader::new(&table.data);
                         let gsub = gsub::GSUB::new(&mut reader, 0, table.data.len() as u32)?;
@@ -2052,9 +2868,7 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Result<Font, Error> {
                     b"vmtx" => {
                         vmtx_table = Some(table);
                     }
-                    _ => {
-                        debug_assert!(true, "Unknown table tag")
-                    }
+                    _ => {}
                 }
             }
             let mut reader = BytesReader::new(&hmtx_table.as_ref().unwrap().data);
@@ -2098,7 +2912,7 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Result<Font, Error> {
             if let Some(sbix_table) = sbix_table {
                 let mut reader = BytesReader::new(&sbix_table.data);
                 let num_glyphs = font.maxp.as_ref().unwrap().num_glyphs as u32;
-                let sbix = sbix::SBIX::new(&mut reader, 0, num_glyphs)?;
+                let sbix = sbix::SBIX::new(&mut reader, 0, sbix_table.data.len() as u32, num_glyphs)?;
                 font.sbix = Some(sbix);
             }
             #[cfg(debug_assertions)]
@@ -2126,15 +2940,6 @@ fn from_opentype<R: BinaryReader>(file: &mut R, header: &OTFHeader) -> Result<Fo
 
     for record in records.iter() {
         let tag: [u8; 4] = record.table_tag.to_be_bytes();
-        #[cfg(debug_assertions)]
-        {
-            for i in 0..4 {
-                let ch = tag[i] as char;
-                print!("{}", ch);
-            }
-            println!("{:?}", tag);
-        }
-
         match &tag {
             b"cmap" => {
                 let cmap_encodings = CmapEncodings::new(file, record.offset, record.length)?;
@@ -2212,6 +3017,11 @@ fn from_opentype<R: BinaryReader>(file: &mut R, header: &OTFHeader) -> Result<Fo
                 font.cff = Some(cff.unwrap());
             }
             #[cfg(feature = "layout")]
+            b"GPOS" => {
+                let gpos = gpos::GPOS::new(file, record.offset, record.length)?;
+                font.gpos = Some(gpos);
+            }
+            #[cfg(feature = "layout")]
             b"GSUB" => {
                 let gsub = gsub::GSUB::new(file, record.offset, record.length)?;
                 font.gsub = Some(gsub);
@@ -2261,7 +3071,7 @@ fn from_opentype<R: BinaryReader>(file: &mut R, header: &OTFHeader) -> Result<Fo
         let offset = font.vmtx_pos.as_ref().unwrap().offset;
         let length = font.vmtx_pos.as_ref().unwrap().length;
         let vmtx = vmtx::VMTX::new(file, offset, length, number_of_vmetrics, num_glyphs)?;
-        font.vmtx = Some(vmtx);    
+        font.vmtx = Some(vmtx);
     }
 
     if let Some(offset) = font.loca_pos.as_ref() {
@@ -2276,7 +3086,7 @@ fn from_opentype<R: BinaryReader>(file: &mut R, header: &OTFHeader) -> Result<Fo
         font.glyf = Some(glyf);
     }
     if let Some(offset) = font.sbix_pos.as_ref() {
-        let sbix = sbix::SBIX::new(file, offset.offset, num_glyphs as u32)?;
+        let sbix = sbix::SBIX::new(file, offset.offset, offset.length, num_glyphs as u32)?;
         font.sbix = Some(sbix);
     }
 

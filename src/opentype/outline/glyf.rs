@@ -317,7 +317,7 @@ impl Glyph {
                 let descender = if layout.descender < 0 {
                     layout.descender
                 } else {
-                    - layout.descender
+                    -layout.descender
                 };
                 let x_max = layout.accender - descender;
                 let y_max = layout.advance_height - layout.tsb;
@@ -356,6 +356,7 @@ impl Glyph {
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn get_svg_path(&self, layout: &FontLayout) -> String {
         let parsed = self.parse();
         Self::get_svg_path_parsed(&parsed, layout, 0.0, 0.0)
@@ -822,7 +823,8 @@ impl GLYF {
                 transform.dy = transform.dy.round();
             }
 
-            let component_commands = self.to_path_commands_recursive(component_index, layout, depth + 1);
+            let component_commands =
+                self.to_path_commands_recursive(component_index, layout, depth + 1);
             commands.extend(transform_path_commands(
                 &component_commands,
                 y_max,

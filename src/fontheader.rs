@@ -1,6 +1,9 @@
 use crate::woff::woff::WOFFHeader;
 use crate::{opentype::OTFHeader, opentype::TTCHeader, util::u32_to_string};
-use bin_rs::{reader::{BinaryReader, BytesReader}, Endian};
+use bin_rs::{
+    reader::{BinaryReader, BytesReader},
+    Endian,
+};
 use std::path::PathBuf;
 
 // pub type F2DOT14 = i16;

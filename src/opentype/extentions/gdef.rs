@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::opentype::layouts::*;
 use bin_rs::reader::BinaryReader;
 use std::io::SeekFrom;

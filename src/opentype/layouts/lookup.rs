@@ -1,3 +1,5 @@
+#![allow(dead_code, non_local_definitions)]
+
 use super::{classdef::ClassDef, *};
 use bin_rs::reader::BinaryReader;
 use num_derive::{FromPrimitive, ToPrimitive};
@@ -44,8 +46,8 @@ impl Lookup {
     ) -> Result<Self, std::io::Error> {
         let mut subtables = Vec::new();
         let offset = lookup.offset;
-        let lookup_type = num_traits::FromPrimitive::from_u16(lookup.lookup_type)
-            .unwrap_or(LookupType::Unknown);
+        let lookup_type =
+            num_traits::FromPrimitive::from_u16(lookup.lookup_type).unwrap_or(LookupType::Unknown);
         for subtable_offset in lookup.subtable_offsets.iter() {
             let offset = offset + *subtable_offset as u64;
             subtables.push(LookupList::parse_subtable(reader, lookup_type, offset)?);
@@ -319,7 +321,8 @@ impl LookupList {
                 let ligature_glyph = reader.read_u16_be()?;
                 let component_count = reader.read_u16_be()?;
                 let mut component_glyph_ids = Vec::new();
-                for _ in 0..(component_count -1) { // ???
+                for _ in 0..(component_count - 1) {
+                    // ???
                     component_glyph_ids.push(reader.read_u16_be()?);
                 }
                 ligature_table.push(LigatureTable {
@@ -492,6 +495,86 @@ impl LookupList {
         })
     }
 
+    fn get_chained_class_seq_rule_set<R: BinaryReader>(
+        reader: &mut R,
+        offset: u64,
+    ) -> Result<ChaineClassSequenceRuleSet, std::io::Error> {
+        reader.seek(SeekFrom::Start(offset as u64))?;
+        let chain_sub_class_set_count = reader.read_u16_be()?;
+        let mut chained_rule_offsets = Vec::new();
+        for _ in 0..chain_sub_class_set_count {
+            chained_rule_offsets.push(reader.read_u16_be()?);
+        }
+
+        let mut chained_class_seq_rules = Vec::new();
+        for chained_rule_offset in chained_rule_offsets.iter() {
+            if *chained_rule_offset == 0 {
+                chained_class_seq_rules.push(ChaineClassSequenceRule {
+                    backtrack_glyph_count: 0,
+                    backtrack_sequences: Vec::new(),
+                    input_glyph_count: 0,
+                    input_sequences: Vec::new(),
+                    lookahead_glyph_count: 0,
+                    lookahead_class_ids: Vec::new(),
+                    seq_lookup_records: SequenceLookupRecords {
+                        lookup_records: Vec::new(),
+                    },
+                });
+                continue;
+            }
+            let chained_rule =
+                Self::get_chained_class_seq_rule(reader, offset + *chained_rule_offset as u64)?;
+            chained_class_seq_rules.push(chained_rule);
+        }
+
+        Ok(ChaineClassSequenceRuleSet {
+            chain_sub_class_set_count,
+            chained_class_seq_rules,
+        })
+    }
+
+    fn get_chained_class_seq_rule<R: BinaryReader>(
+        reader: &mut R,
+        offset: u64,
+    ) -> Result<ChaineClassSequenceRule, std::io::Error> {
+        reader.seek(SeekFrom::Start(offset as u64))?;
+        let backtrack_glyph_count = reader.read_u16_be()?;
+        let mut backtrack_sequences = Vec::new();
+        for _ in 0..backtrack_glyph_count {
+            backtrack_sequences.push(reader.read_u16_be()?);
+        }
+        let input_glyph_count = reader.read_u16_be()?;
+        let mut input_sequences = Vec::new();
+        for _ in 0..input_glyph_count.saturating_sub(1) {
+            input_sequences.push(reader.read_u16_be()?);
+        }
+        let lookahead_glyph_count = reader.read_u16_be()?;
+        let mut lookahead_class_ids = Vec::new();
+        for _ in 0..lookahead_glyph_count {
+            lookahead_class_ids.push(reader.read_u16_be()?);
+        }
+        let seq_lookup_count = reader.read_u16_be()?;
+        let mut lookup_records = Vec::new();
+        for _ in 0..seq_lookup_count {
+            let sequence_index = reader.read_u16_be()?;
+            let lookup_list_index = reader.read_u16_be()?;
+            lookup_records.push(LookupRecord {
+                sequence_index,
+                lookup_list_index,
+            });
+        }
+
+        Ok(ChaineClassSequenceRule {
+            backtrack_glyph_count,
+            backtrack_sequences,
+            input_glyph_count,
+            input_sequences,
+            lookahead_glyph_count,
+            lookahead_class_ids,
+            seq_lookup_records: SequenceLookupRecords { lookup_records },
+        })
+    }
+
     fn get_seq_rule_set<R: BinaryReader>(
         reader: &mut R,
         offset: u64,
@@ -647,19 +730,76 @@ impl LookupList {
             }
             2 => {
                 let coverage_offset = reader.read_u16_be()?;
-                let class_range_count = reader.read_u16_be()?;
-                let mut class_range_records = Vec::new();
-                for _ in 0..class_range_count {
-                    let start_glyph_id = reader.read_u16_be()?;
-                    let end_glyph_id = reader.read_u16_be()?;
-                    let class = reader.read_u16_be()?;
-                    class_range_records.push(ClassRangeRecord {
-                        start_glyph_id,
-                        end_glyph_id,
-                        class,
-                    });
+                let backtrack_class_def_offset = reader.read_u16_be()?;
+                let input_class_def_offset = reader.read_u16_be()?;
+                let lookahead_class_def_offset = reader.read_u16_be()?;
+                let chain_sub_class_set_count = reader.read_u16_be()?;
+                let mut chain_sub_class_set_offsets = Vec::new();
+                for _ in 0..chain_sub_class_set_count {
+                    chain_sub_class_set_offsets.push(reader.read_u16_be()?);
                 }
                 let coverage = Self::get_coverage(reader, offset + coverage_offset as u64)?;
+                let backtrack_class_def = if backtrack_class_def_offset != 0 {
+                    Some(Self::get_class_def(
+                        reader,
+                        offset + backtrack_class_def_offset as u64,
+                    )?)
+                } else {
+                    None
+                };
+                let input_class_def = if input_class_def_offset != 0 {
+                    Some(Self::get_class_def(
+                        reader,
+                        offset + input_class_def_offset as u64,
+                    )?)
+                } else {
+                    None
+                };
+                let lookahead_class_def = if lookahead_class_def_offset != 0 {
+                    Some(Self::get_class_def(
+                        reader,
+                        offset + lookahead_class_def_offset as u64,
+                    )?)
+                } else {
+                    None
+                };
+                let mut chain_sub_class_sets = Vec::new();
+                for chain_sub_class_set_offset in chain_sub_class_set_offsets.iter() {
+                    if *chain_sub_class_set_offset == 0 {
+                        chain_sub_class_sets.push(ChaineClassSequenceRuleSet {
+                            chain_sub_class_set_count: 0,
+                            chained_class_seq_rules: Vec::new(),
+                        });
+                        continue;
+                    }
+                    chain_sub_class_sets.push(Self::get_chained_class_seq_rule_set(
+                        reader,
+                        offset + *chain_sub_class_set_offset as u64,
+                    )?);
+                }
+                let (class_range_count, class_range_records) = if let Some(class_def) =
+                    &input_class_def
+                {
+                    match class_def {
+                        ClassDef::Format1(class_def) => {
+                            let mut records = Vec::new();
+                            for (index, class) in class_def.class_value_array.iter().enumerate() {
+                                let glyph_id = class_def.start_glyph_id + index as u16;
+                                records.push(ClassRangeRecord {
+                                    start_glyph_id: glyph_id,
+                                    end_glyph_id: glyph_id,
+                                    class: *class,
+                                });
+                            }
+                            (records.len() as u16, records)
+                        }
+                        ClassDef::Format2(class_def) => {
+                            (class_def.range_count, class_def.range_records.clone())
+                        }
+                    }
+                } else {
+                    (0, Vec::new())
+                };
 
                 Ok(LookupSubstitution::ChainingContextSubstitution2(
                     ChainingContextSubstitutionFormat2 {
@@ -667,6 +807,11 @@ impl LookupList {
                         class_range_count,
                         class_range_records,
                         coverage,
+                        backtrack_class_def,
+                        input_class_def,
+                        lookahead_class_def,
+                        chain_sub_class_set_count,
+                        chain_sub_class_sets,
                     },
                 ))
             }
@@ -900,7 +1045,7 @@ impl LookupSubstitution {
                     return Some((glyph_id as isize + single.delta_glyph_id as isize) as u16);
                 }
             }
-            LookupSubstitution::Single2(subtable) => {                
+            LookupSubstitution::Single2(subtable) => {
                 let coverage = &subtable.coverage;
                 if let Some(id) = coverage.contains(glyph_id as usize) {
                     return Some(subtable.substitute_glyph_ids[id as usize] as u16);
@@ -1000,12 +1145,9 @@ impl LookupSubstitution {
                     LookupResult::None
                 }
             }
-            Self::ChainingContextSubstitution3(_chaining3) => {
-                panic!("ChainingContextSubstitution3 is not implemented")
-            }
-            Self::ExtensionSubstitution(extension) => {
-                extension.subtable.get_lookup(gliph_id)
-            }
+            // Parsed but not expanded yet. Keep shaping alive by reporting no direct lookup hit.
+            Self::ChainingContextSubstitution3(_chaining3) => LookupResult::None,
+            Self::ExtensionSubstitution(extension) => extension.subtable.get_lookup(gliph_id),
             Self::ReverseChainSingle(reverse) => {
                 let coverage = &reverse.coverage;
                 if let Some(_) = coverage.contains(gliph_id) {
@@ -1145,8 +1287,7 @@ pub(crate) struct ChaineClassSequenceRule {
     pub(crate) input_sequences: Vec<u16>,
     pub(crate) lookahead_glyph_count: u16,
     pub(crate) lookahead_class_ids: Vec<u16>,
-    pub(crate) lookup_count: u16,
-    pub(crate) lookup_indexes: Vec<u16>,
+    pub(crate) seq_lookup_records: SequenceLookupRecords,
 }
 
 #[derive(Debug, Clone)]
@@ -1192,6 +1333,11 @@ pub(crate) struct ChainingContextSubstitutionFormat2 {
     pub(crate) class_range_count: u16,
     pub(crate) class_range_records: Vec<ClassRangeRecord>,
     pub(crate) coverage: Coverage,
+    pub(crate) backtrack_class_def: Option<ClassDef>,
+    pub(crate) input_class_def: Option<ClassDef>,
+    pub(crate) lookahead_class_def: Option<ClassDef>,
+    pub(crate) chain_sub_class_set_count: u16,
+    pub(crate) chain_sub_class_sets: Vec<ChaineClassSequenceRuleSet>,
 }
 
 // Lookup Type 6: Chaining Contextual Substitution Subtable Format 3

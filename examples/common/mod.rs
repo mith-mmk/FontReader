@@ -95,7 +95,7 @@ pub fn text_content(args: &[String], default_file: &str) -> Result<String, std::
         return Ok(text);
     }
 
-    let text_file = value_for(args, &["-t", "--text-file"])
-        .unwrap_or_else(|| default_file.to_string());
+    let text_file =
+        value_for(args, &["-t", "--text-file"]).unwrap_or_else(|| default_file.to_string());
     std::fs::read_to_string(text_file)
 }

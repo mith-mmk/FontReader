@@ -9,6 +9,26 @@ pub(crate) enum ClassDef {
 }
 
 impl ClassDef {
+    pub(crate) fn get_class(&self, glyph_id: u16) -> u16 {
+        match self {
+            ClassDef::Format1(class_def) => {
+                let start = class_def.start_glyph_id;
+                let end = start.saturating_add(class_def.glyph_count.saturating_sub(1));
+                if glyph_id < start || glyph_id > end {
+                    return 0;
+                }
+                let index = (glyph_id - start) as usize;
+                class_def.class_value_array.get(index).copied().unwrap_or(0)
+            }
+            ClassDef::Format2(class_def) => class_def
+                .range_records
+                .iter()
+                .find(|record| record.start_glyph_id <= glyph_id && glyph_id <= record.end_glyph_id)
+                .map(|record| record.class)
+                .unwrap_or(0),
+        }
+    }
+
     pub(crate) fn new<R: BinaryReader>(
         reader: &mut R,
         offset: u64,

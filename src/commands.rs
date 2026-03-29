@@ -16,6 +16,29 @@ pub enum GlyphFlow {
     Vertical,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TextDirection {
+    LeftToRight,
+    RightToLeft,
+    TopToBottom,
+}
+
+impl TextDirection {
+    pub(crate) fn is_vertical(self) -> bool {
+        matches!(self, Self::TopToBottom)
+    }
+
+    pub(crate) fn is_right_to_left(self) -> bool {
+        matches!(self, Self::RightToLeft)
+    }
+}
+
+impl Default for TextDirection {
+    fn default() -> Self {
+        Self::LeftToRight
+    }
+}
+
 /// Font-level metrics. Keep this on the glyph so mixed fallback fonts can coexist in one run.
 #[derive(Debug, Clone, Copy)]
 pub struct FontMetrics {
@@ -218,11 +241,34 @@ impl Default for FontStyle {
 pub enum FontVariant {
     Normal,
     SmallCaps,
+    Jis78,
+    Jis90,
+    TraditionalForms,
+    NlcKanjiForms,
 }
 
 impl Default for FontVariant {
     fn default() -> Self {
         Self::Normal
+    }
+}
+
+impl FontVariant {
+    #[cfg_attr(not(feature = "layout"), allow(dead_code))]
+    pub(crate) fn gsub_feature_tags(self) -> &'static [[u8; 4]] {
+        const EMPTY: &[[u8; 4]] = &[];
+        const JP78: &[[u8; 4]] = &[*b"jp78"];
+        const JP90: &[[u8; 4]] = &[*b"jp90"];
+        const TRAD: &[[u8; 4]] = &[*b"trad"];
+        const NLCK: &[[u8; 4]] = &[*b"nlck"];
+
+        match self {
+            Self::Normal | Self::SmallCaps => EMPTY,
+            Self::Jis78 => JP78,
+            Self::Jis90 => JP90,
+            Self::TraditionalForms => TRAD,
+            Self::NlcKanjiForms => NLCK,
+        }
     }
 }
 
@@ -251,15 +297,7 @@ impl Default for FontWeight {
 pub enum FontRef<'a> {
     Loaded(&'a crate::LoadedFont),
     Parsed(&'a crate::fontreader::Font),
-}
-
-impl<'a> FontRef<'a> {
-    pub fn as_font(self) -> &'a crate::fontreader::Font {
-        match self {
-            Self::Loaded(font) => font.font(),
-            Self::Parsed(font) => font,
-        }
-    }
+    Family(&'a crate::FontFamily),
 }
 
 #[derive(Clone, Copy)]
@@ -267,6 +305,8 @@ pub struct FontOptions<'a> {
     pub font: Option<FontRef<'a>>,
     pub font_family: Option<&'a str>,
     pub font_name: Option<&'a str>,
+    pub locale: Option<&'a str>,
+    pub text_direction: TextDirection,
     pub font_size: f32,
     pub font_stretch: FontStretch,
     pub font_style: FontStyle,
@@ -280,6 +320,10 @@ impl<'a> FontOptions<'a> {
         Self::from_font_ref(FontRef::Loaded(font))
     }
 
+    pub fn from_family(font_family: &'a crate::FontFamily) -> Self {
+        Self::from_font_ref(FontRef::Family(font_family))
+    }
+
     pub fn from_font(font: &'a crate::fontreader::Font) -> Self {
         Self::from_font_ref(FontRef::Parsed(font))
     }
@@ -289,6 +333,8 @@ impl<'a> FontOptions<'a> {
             font: Some(font),
             font_family: None,
             font_name: None,
+            locale: None,
+            text_direction: TextDirection::default(),
             font_size: 16.0,
             font_stretch: FontStretch::default(),
             font_style: FontStyle::default(),
@@ -308,6 +354,11 @@ impl<'a> FontOptions<'a> {
         self
     }
 
+    pub fn with_family(mut self, font_family: &'a crate::FontFamily) -> Self {
+        self.font = Some(FontRef::Family(font_family));
+        self
+    }
+
     pub fn with_font_size(mut self, font_size: f32) -> Self {
         self.font_size = font_size;
         self
@@ -315,6 +366,26 @@ impl<'a> FontOptions<'a> {
 
     pub fn with_line_height(mut self, line_height: f32) -> Self {
         self.line_height = Some(line_height);
+        self
+    }
+
+    pub fn with_font_stretch(mut self, font_stretch: FontStretch) -> Self {
+        self.font_stretch = font_stretch;
+        self
+    }
+
+    pub fn with_font_style(mut self, font_style: FontStyle) -> Self {
+        self.font_style = font_style;
+        self
+    }
+
+    pub fn with_font_variant(mut self, font_variant: FontVariant) -> Self {
+        self.font_variant = font_variant;
+        self
+    }
+
+    pub fn with_font_weight(mut self, font_weight: FontWeight) -> Self {
+        self.font_weight = font_weight;
         self
     }
 
@@ -328,9 +399,31 @@ impl<'a> FontOptions<'a> {
         self
     }
 
+    pub fn with_locale(mut self, locale: &'a str) -> Self {
+        self.locale = Some(locale);
+        self
+    }
+
+    pub fn with_text_direction(mut self, text_direction: TextDirection) -> Self {
+        self.text_direction = text_direction;
+        self
+    }
+
+    pub fn with_vertical_flow(self) -> Self {
+        self.with_text_direction(TextDirection::TopToBottom)
+    }
+
+    pub fn with_right_to_left(self) -> Self {
+        self.with_text_direction(TextDirection::RightToLeft)
+    }
+
     pub fn resolve_font(&self) -> Result<&'a crate::fontreader::Font, Error> {
         if let Some(font) = self.font {
-            return Ok(font.as_font());
+            return match font {
+                FontRef::Loaded(font) => Ok(font.font()),
+                FontRef::Parsed(font) => Ok(font),
+                FontRef::Family(font_family) => Ok(font_family.resolve_font_options(self)?.font()),
+            };
         }
 
         if self.font_name.is_some() || self.font_family.is_some() {
@@ -348,6 +441,9 @@ impl<'a> FontOptions<'a> {
 }
 
 pub fn text2commands(text: &str, options: FontOptions<'_>) -> Result<GlyphRun, Error> {
+    if let Some(FontRef::Family(font_family)) = options.font {
+        return font_family.text2glyph_run(text, options);
+    }
     let font = options.resolve_font()?;
     font.text2glyph_run(text, &options)
 }

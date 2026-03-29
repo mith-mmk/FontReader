@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 #[derive(Debug, Clone)]
 pub(crate) struct ConditionTable {
     pub(crate) format: u16,
