@@ -152,9 +152,13 @@ enum ResolvedTextUnit {
     Tab,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub(crate) enum ParsedTextUnit {
-    Glyph { ch: char, variation_selector: char },
+    Glyph {
+        text: String,
+        ch: char,
+        variation_selector: char,
+    },
     Newline,
     Tab,
 }
@@ -806,6 +810,67 @@ impl Font {
         (0xfe00..=0xfe0f).contains(&(ch as u32)) || (0xE0100..=0xE01EF).contains(&(ch as u32))
     }
 
+    fn is_emoji_modifier(ch: char) -> bool {
+        (0x1F3FB..=0x1F3FF).contains(&(ch as u32))
+    }
+
+    fn is_zero_width_joiner(ch: char) -> bool {
+        ch == '\u{200D}'
+    }
+
+    fn is_keycap_mark(ch: char) -> bool {
+        ch == '\u{20E3}'
+    }
+
+    fn is_regional_indicator(ch: char) -> bool {
+        (0x1F1E6..=0x1F1FF).contains(&(ch as u32))
+    }
+
+    fn is_tag_character(ch: char) -> bool {
+        (0xE0020..=0xE007E).contains(&(ch as u32)) || ch == '\u{E007F}'
+    }
+
+    fn extend_cluster_suffix(chars: &[char], index: &mut usize, text: &mut String) {
+        while *index < chars.len() {
+            let ch = chars[*index];
+            if Self::is_variation_selector(ch)
+                || Self::is_emoji_modifier(ch)
+                || Self::is_keycap_mark(ch)
+                || Self::is_tag_character(ch)
+            {
+                text.push(ch);
+                *index += 1;
+            } else {
+                break;
+            }
+        }
+    }
+
+    fn cluster_glyph_scalars(text: &str) -> Vec<(char, char)> {
+        let chars: Vec<char> = text.chars().collect();
+        let mut glyphs = Vec::new();
+        let mut index = 0usize;
+
+        while index < chars.len() {
+            let ch = chars[index];
+            if Self::is_variation_selector(ch) {
+                index += 1;
+                continue;
+            }
+
+            let mut variation_selector = '\0';
+            if index + 1 < chars.len() && Self::is_variation_selector(chars[index + 1]) {
+                variation_selector = chars[index + 1];
+                index += 1;
+            }
+
+            glyphs.push((ch, variation_selector));
+            index += 1;
+        }
+
+        glyphs
+    }
+
     fn parse_text_units(text: &str) -> Vec<ParsedTextUnit> {
         let chars: Vec<char> = text.chars().collect();
         let mut units = Vec::new();
@@ -829,17 +894,43 @@ impl Font {
                     index += 1;
                 }
                 _ => {
+                    let mut text = String::new();
+                    text.push(ch);
                     let mut variation_selector = '\0';
-                    let mut consumed = 1;
                     if index + 1 < chars.len() && Self::is_variation_selector(chars[index + 1]) {
                         variation_selector = chars[index + 1];
-                        consumed = 2;
+                        text.push(variation_selector);
+                        index += 1;
                     }
+
+                    index += 1;
+                    Self::extend_cluster_suffix(&chars, &mut index, &mut text);
+
+                    if Self::is_regional_indicator(ch)
+                        && index < chars.len()
+                        && Self::is_regional_indicator(chars[index])
+                    {
+                        text.push(chars[index]);
+                        index += 1;
+                        Self::extend_cluster_suffix(&chars, &mut index, &mut text);
+                    }
+
+                    while index < chars.len() && Self::is_zero_width_joiner(chars[index]) {
+                        text.push(chars[index]);
+                        index += 1;
+                        if index >= chars.len() {
+                            break;
+                        }
+                        text.push(chars[index]);
+                        index += 1;
+                        Self::extend_cluster_suffix(&chars, &mut index, &mut text);
+                    }
+
                     units.push(ParsedTextUnit::Glyph {
+                        text,
                         ch,
                         variation_selector,
                     });
-                    index += consumed;
                 }
             }
         }
@@ -967,23 +1058,22 @@ impl Font {
                     );
                     output.push(ResolvedTextUnit::Tab);
                 }
-                ParsedTextUnit::Glyph {
-                    ch,
-                    variation_selector,
-                } => {
-                    let glyph_id =
-                        self.resolve_glyph_id_with_uvs(ch, variation_selector, is_vert)?;
-                    #[cfg(feature = "layout")]
-                    let glyph_id = if let Some(locale) = locale {
-                        if let Some(gsub) = self.current_gsub() {
-                            gsub.lookup_locale(glyph_id, locale)
+                ParsedTextUnit::Glyph { text, .. } => {
+                    for (ch, variation_selector) in Self::cluster_glyph_scalars(&text) {
+                        let glyph_id =
+                            self.resolve_glyph_id_with_uvs(ch, variation_selector, is_vert)?;
+                        #[cfg(feature = "layout")]
+                        let glyph_id = if let Some(locale) = locale {
+                            if let Some(gsub) = self.current_gsub() {
+                                gsub.lookup_locale(glyph_id, locale)
+                            } else {
+                                glyph_id
+                            }
                         } else {
                             glyph_id
-                        }
-                    } else {
-                        glyph_id
-                    };
-                    pending_glyphs.push(ResolvedGlyph { ch, glyph_id });
+                        };
+                        pending_glyphs.push(ResolvedGlyph { ch, glyph_id });
+                    }
                 }
             }
         }
@@ -1000,7 +1090,7 @@ impl Font {
 
     pub(crate) fn supports_text_unit(
         &self,
-        unit: ParsedTextUnit,
+        unit: &ParsedTextUnit,
         is_vert: bool,
         locale: Option<&str>,
     ) -> bool {
@@ -1009,41 +1099,48 @@ impl Font {
 
         match unit {
             ParsedTextUnit::Newline | ParsedTextUnit::Tab => true,
-            ParsedTextUnit::Glyph {
-                ch,
-                variation_selector,
-            } => {
-                let Ok(glyph_id) = self.resolve_glyph_id_with_uvs(ch, variation_selector, is_vert)
-                else {
+            ParsedTextUnit::Glyph { text, .. } => {
+                let Ok(shaped_units) = self.shape_text_units(
+                    text,
+                    is_vert,
+                    false,
+                    locale,
+                    crate::commands::FontVariant::Normal,
+                ) else {
                     return false;
                 };
 
-                #[cfg(feature = "layout")]
-                let glyph_id = {
-                    let mut glyph_id = glyph_id;
-                    if let Some(locale) = locale {
-                        if let Some(gsub) = self.current_gsub() {
-                            glyph_id = gsub.lookup_locale(glyph_id, locale);
+                if !shaped_units
+                    .iter()
+                    .any(|unit| matches!(unit, ResolvedTextUnit::Glyph(_)))
+                {
+                    return false;
+                }
+
+                shaped_units.into_iter().all(|unit| match unit {
+                    ResolvedTextUnit::Glyph(glyph) => {
+                        if glyph.glyph_id == 0 {
+                            return false;
                         }
+
+                        #[cfg(feature = "cff")]
+                        if self.current_cff().is_some() {
+                            return true;
+                        }
+
+                        self.current_glyf()
+                            .and_then(|glyf| glyf.get_glyph(glyph.glyph_id))
+                            .is_some()
+                            || self.current_sbix()
+                                .and_then(|sbix| sbix.get_raster_glyph(glyph.glyph_id as u32, 16.0, "px"))
+                                .is_some()
+                            || self
+                                .current_svg_table()
+                                .map(|svg| svg.has_glyph(glyph.glyph_id as u32))
+                                .unwrap_or(false)
                     }
-                    glyph_id
-                };
-
-                #[cfg(not(feature = "layout"))]
-                let glyph_id = glyph_id;
-
-                if glyph_id == 0 {
-                    return false;
-                }
-
-                #[cfg(feature = "cff")]
-                if self.current_cff().is_some() {
-                    return true;
-                }
-
-                self.current_glyf()
-                    .and_then(|glyf| glyf.get_glyph(glyph_id))
-                    .is_some()
+                    _ => true,
+                })
             }
         }
     }
@@ -1066,16 +1163,18 @@ impl Font {
                 );
             }
             ParsedTextUnit::Glyph {
+                text,
                 ch,
                 variation_selector,
             } => {
-                let svg = self.get_svg_with_uvs_axis(
-                    ch,
-                    variation_selector,
-                    fontsize,
-                    fontunit,
-                    is_vert,
-                )?;
+                let svg = if text.chars().count() > 2
+                    || text.contains('\u{200D}')
+                    || text.chars().filter(|ch| Self::is_regional_indicator(*ch)).count() > 1
+                {
+                    self.text2svg(&text, fontsize, fontunit)?
+                } else {
+                    self.get_svg_with_uvs_axis(ch, variation_selector, fontsize, fontunit, is_vert)?
+                };
                 svgs.push(svg);
             }
         }
@@ -2686,7 +2785,7 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Result<Font, Error> {
             if let Some(sbix_table) = sbix_table {
                 let mut reader = BytesReader::new(&sbix_table.data);
                 let num_glyphs = font.maxp.as_ref().unwrap().num_glyphs as u32;
-                let sbix = sbix::SBIX::new(&mut reader, 0, num_glyphs)?;
+                let sbix = sbix::SBIX::new(&mut reader, 0, sbix_table.data.len() as u32, num_glyphs)?;
                 font.sbix = Some(sbix);
             }
             #[cfg(debug_assertions)]
@@ -2860,7 +2959,7 @@ fn from_opentype<R: BinaryReader>(file: &mut R, header: &OTFHeader) -> Result<Fo
         font.glyf = Some(glyf);
     }
     if let Some(offset) = font.sbix_pos.as_ref() {
-        let sbix = sbix::SBIX::new(file, offset.offset, num_glyphs as u32)?;
+        let sbix = sbix::SBIX::new(file, offset.offset, offset.length, num_glyphs as u32)?;
         font.sbix = Some(sbix);
     }
 

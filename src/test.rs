@@ -2093,6 +2093,16 @@ mod tests {
         test_fonts_dir().join("windows").join("seguiemj.ttf")
     }
 
+    fn noto_color_emoji_font_path() -> std::path::PathBuf {
+        test_fonts_dir().join("NotoColorEmoji-Regular.ttf")
+    }
+
+    fn twemoji_sbix_font_path() -> std::path::PathBuf {
+        test_fonts_dir()
+            .join("sbix")
+            .join("TwemojiMozilla-sbix.woff2")
+    }
+
     fn collection_font_path() -> std::path::PathBuf {
         test_fonts_dir().join("windows").join("msgothic.ttc")
     }
@@ -2471,6 +2481,48 @@ mod tests {
                 };
                 if bytes.windows(4).any(|window| window == b"sbix") {
                     return Some(path);
+                }
+            }
+        }
+        None
+    }
+
+    fn emoji_ligature_font_candidates() -> Vec<std::path::PathBuf> {
+        vec![
+            noto_color_emoji_font_path(),
+            segoe_emoji_font_path(),
+            twemoji_sbix_font_path(),
+        ]
+    }
+
+    fn emoji_ligature_sequence_candidates() -> [&'static str; 7] {
+        ["👩‍💻", "👨‍👩‍👧‍👦", "🏳️‍🌈", "❤️", "🇯🇵", "1️⃣", "👩🏽‍💻"]
+    }
+
+    fn first_real_emoji_ligature() -> Option<(std::path::PathBuf, &'static str)> {
+        for path in emoji_ligature_font_candidates() {
+            if !path.exists() {
+                continue;
+            }
+            let Ok(font) = crate::load_font_from_file(&path) else {
+                continue;
+            };
+            for sequence in emoji_ligature_sequence_candidates() {
+                let Ok(glyph_ids) = font.font().debug_shape_glyph_ids(sequence, None) else {
+                    continue;
+                }; 
+                if glyph_ids.len() != 1 || glyph_ids[0] == 0 {
+                    continue;
+                }
+                let Ok(run) = font.text2glyph_run(
+                    sequence,
+                    crate::FontOptions::from_font_ref(crate::FontRef::Loaded(&font))
+                        .with_font_size(32.0),
+                ) else {
+                    continue;
+                };
+                if run.glyphs.len() == 1 && !run.glyphs[0].glyph.layers.is_empty() {
+                    return Some((path, sequence));
                 }
             }
         }
@@ -2872,6 +2924,93 @@ mod tests {
         let svg = font.text2svg("🥺", 32.0, "px").expect("svg from sbix");
         assert!(svg.contains("<image"));
         assert!(svg.contains("data:image/"));
+    }
+
+    #[test]
+    fn twemoji_sbix_woff2_loads_without_oob_and_renders_bitmap() {
+        let path = twemoji_sbix_font_path();
+        assert!(path.exists(), "missing Twemoji sbix fixture");
+
+        let bytes = std::fs::read(&path).expect("read Twemoji sbix font");
+        let font = crate::load_font_from_buffer(&bytes).expect("load Twemoji sbix font");
+
+        let mut rendered = None;
+        for sequence in emoji_ligature_sequence_candidates()
+            .into_iter()
+            .chain(["🥺", "😀", "👍", "❤️"].into_iter())
+        {
+            let Ok(commands) = font.text2command(sequence) else {
+                continue;
+            };
+            if commands.iter().any(|glyph| glyph.bitmap.is_some()) {
+                rendered = Some((sequence, commands));
+                break;
+            }
+        }
+
+        let (sequence, commands) = rendered.expect("render any bitmap glyph from Twemoji sbix");
+        assert!(!commands.is_empty());
+        assert!(commands.iter().any(|glyph| glyph.bitmap.is_some()));
+
+        let svg = font.text2svg(sequence, 32.0, "px").expect("svg from Twemoji sbix");
+        assert!(svg.contains("data:image/"));
+    }
+
+    #[test]
+    fn parse_text_units_for_fallback_keeps_emoji_clusters_together() {
+        for text in ["👩‍💻", "👨‍👩‍👧‍👦", "🇯🇵", "1️⃣"] {
+            let units = crate::fontreader::Font::parse_text_units_for_fallback(text);
+            assert_eq!(units.len(), 1, "cluster should stay whole for {text:?}");
+            match &units[0] {
+                crate::fontreader::ParsedTextUnit::Glyph { text: parsed, .. } => {
+                    assert_eq!(parsed, text);
+                }
+                _ => panic!("expected glyph unit for {text:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn loaded_font_text2glyph_run_keeps_real_emoji_ligature_cluster() {
+        let (path, sequence) =
+            first_real_emoji_ligature().expect("find real emoji ligature fixture");
+        let font = crate::load_font_from_file(path).expect("load emoji ligature font");
+
+        let run = font
+            .text2glyph_run(
+                sequence,
+                crate::FontOptions::from_font_ref(crate::FontRef::Loaded(&font))
+                    .with_font_size(32.0),
+            )
+            .expect("shape emoji ligature");
+
+        assert_eq!(run.glyphs.len(), 1, "expected a single ligature glyph");
+        assert!(!run.glyphs[0].glyph.layers.is_empty());
+    }
+
+    #[test]
+    fn font_family_fallback_keeps_real_emoji_ligature_cluster() {
+        let regular =
+            crate::load_font_from_file(fira_sans_regular_path()).expect("load regular fira sans");
+        let (path, sequence) =
+            first_real_emoji_ligature().expect("find real emoji ligature fixture");
+        let emoji = crate::load_font_from_file(path).expect("load emoji ligature font");
+
+        let mut family = crate::FontFamily::new("Fira Sans");
+        family.add_loaded_font(regular);
+        family.add_loaded_font(emoji);
+
+        let text = format!("A{}B", sequence);
+        let run = crate::text2commands(
+            &text,
+            crate::FontOptions::from_family(&family)
+                .with_font_family("Fira Sans")
+                .with_font_size(32.0),
+        )
+        .expect("render mixed fallback ligature text");
+
+        assert_eq!(run.glyphs.len(), 3, "emoji ligature cluster should stay a single glyph");
+        assert!(!run.glyphs[1].glyph.layers.is_empty());
     }
 
     #[test]

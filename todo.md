@@ -139,11 +139,13 @@ _test_fonts/* がテスト用フォント
     - [x] `isol` / `init` / `medi` / `fina`
     - [x] `rlig`
     - [ ] context / chaining
+    - [ ] 書き順の引き渡し
 - [ ] 日本語
 - [ ] チベット語
 - [ ] 古ハングル
-- [ ] 異字体セレクタ1
-- [ ] 異字体セレクタ2
+- [ ] 異字体セレクタ1 **確認中**
+- [ ] 異字体セレクタ2 **確認中**
+- [ ] 絵文字
 # format
 - [+] woff2対応
 - [+] CID-keyed CFF / FDSelect

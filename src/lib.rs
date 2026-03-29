@@ -426,7 +426,8 @@ impl FontFamily {
                     }
                 }
                 fontreader::ParsedTextUnit::Glyph { .. } => {
-                    let face_index = self.select_face_for_unit(unit, &candidate_indices, options);
+                    let face_index =
+                        self.select_face_for_unit(&unit, &candidate_indices, options);
                     if pending_face != Some(face_index) {
                         self.flush_family_segment(
                             &mut glyphs,
@@ -438,7 +439,7 @@ impl FontFamily {
                         )?;
                         pending_face = Some(face_index);
                     }
-                    push_text_unit(&mut pending_segment, unit);
+                    push_text_unit(&mut pending_segment, &unit);
                 }
             }
         }
@@ -610,7 +611,7 @@ impl FontFamily {
 
     fn select_face_for_unit(
         &self,
-        unit: fontreader::ParsedTextUnit,
+        unit: &fontreader::ParsedTextUnit,
         candidates: &[usize],
         options: FontOptions<'_>,
     ) -> usize {
@@ -629,17 +630,11 @@ impl FontFamily {
     }
 }
 
-fn push_text_unit(target: &mut String, unit: fontreader::ParsedTextUnit) {
+fn push_text_unit(target: &mut String, unit: &fontreader::ParsedTextUnit) {
     match unit {
         fontreader::ParsedTextUnit::Glyph {
-            ch,
-            variation_selector,
-        } => {
-            target.push(ch);
-            if variation_selector != '\0' {
-                target.push(variation_selector);
-            }
-        }
+            text, ..
+        } => target.push_str(text),
         fontreader::ParsedTextUnit::Newline => target.push('\n'),
         fontreader::ParsedTextUnit::Tab => target.push('\t'),
     }

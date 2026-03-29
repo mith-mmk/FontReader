@@ -36,12 +36,48 @@ pub(crate) struct RasterGlyphData {
 }
 
 impl SBIX {
+    fn resolve_raster_glyph_in_strike(
+        strike: &Strike,
+        gid: usize,
+        scale: f32,
+        depth: usize,
+    ) -> Option<RasterGlyphData> {
+        if depth > strike.glyph_data.len() {
+            return None;
+        }
+
+        let glyph_data = strike.glyph_data.get(gid)?.as_ref()?;
+        if glyph_data.graphic_type == u32::from_be_bytes(*b"dupe") {
+            if glyph_data.glyph_data.len() < 2 {
+                return None;
+            }
+            let target_gid =
+                u16::from_be_bytes([glyph_data.glyph_data[0], glyph_data.glyph_data[1]]) as usize;
+            if target_gid == gid {
+                return None;
+            }
+            let mut raster = Self::resolve_raster_glyph_in_strike(strike, target_gid, scale, depth + 1)?;
+            raster.offset_x = glyph_data.original_offset_x as f32 * scale;
+            raster.offset_y = glyph_data.original_offset_y as f32 * scale;
+            return Some(raster);
+        }
+
+        Some(RasterGlyphData {
+            offset_x: glyph_data.original_offset_x as f32 * scale,
+            offset_y: glyph_data.original_offset_y as f32 * scale,
+            graphic_type: glyph_data.graphic_type,
+            glyph_data: glyph_data.glyph_data.clone(),
+        })
+    }
+
     pub(crate) fn new<R: BinaryReader>(
         reader: &mut R,
         offset: u32,
+        length: u32,
         num_glyphs: u32,
     ) -> Result<Self, std::io::Error> {
         let offset = offset as u64;
+        let length = length as u64;
         reader.seek(SeekFrom::Start(offset))?;
         let version = reader.read_u16_be()?;
         let flags = reader.read_u16_be()?;
@@ -52,8 +88,33 @@ impl SBIX {
             let strike_offset = reader.read_u32_be()?;
             strike_offsets.push(strike_offset as u64);
         }
-        for strike_offset in strike_offsets.iter() {
-            strikes.push(Strike::new(reader, *strike_offset + offset, num_glyphs)?);
+        for (index, strike_offset) in strike_offsets.iter().enumerate() {
+            if *strike_offset as u64 >= length {
+                continue;
+            }
+            let next_offset = strike_offsets
+                .get(index + 1)
+                .copied()
+                .unwrap_or(length) as u64;
+            if next_offset <= *strike_offset || next_offset > length {
+                continue;
+            }
+
+            if let Ok(strike) = Strike::new(
+                reader,
+                *strike_offset + offset,
+                (next_offset - *strike_offset) as usize,
+                num_glyphs,
+            ) {
+                strikes.push(strike);
+            }
+        }
+
+        if num_strikes > 0 && strikes.is_empty() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "sbix table does not contain any valid strikes",
+            ));
         }
 
         Ok(Self {
@@ -118,8 +179,6 @@ impl SBIX {
         fontunit: &str,
     ) -> Option<RasterGlyphData> {
         let strike = self.select_strike(font_size, fontunit)?;
-        let glyph_data = strike.glyph_data.get(gid as usize)?.as_ref()?;
-
         let requested_ppem = if fontunit == "pt" {
             font_size * 96.0 / 72.0
         } else {
@@ -130,13 +189,7 @@ impl SBIX {
         } else {
             requested_ppem / strike.ppem as f32
         };
-
-        Some(RasterGlyphData {
-            offset_x: glyph_data.original_offset_x as f32 * scale,
-            offset_y: glyph_data.original_offset_y as f32 * scale,
-            graphic_type: glyph_data.graphic_type,
-            glyph_data: glyph_data.glyph_data.clone(),
-        })
+        Self::resolve_raster_glyph_in_strike(strike, gid as usize, scale, 0)
     }
 
     pub(crate) fn get_svg(
@@ -148,8 +201,7 @@ impl SBIX {
         _: f64,
         _: f64,
     ) -> Option<String> {
-        let strike = self.select_strike(fontsize as f32, fontunit)?;
-        let glyph_data = strike.glyph_data.get(gid as usize)?.as_ref()?;
+        let glyph_data = self.get_raster_glyph(gid, fontsize as f32, fontunit)?;
         let width = format!("{}{}", fontsize, fontunit);
         let height = width.clone();
         let binary = &glyph_data.glyph_data;
@@ -184,8 +236,21 @@ impl Strike {
     pub(crate) fn new<R: BinaryReader>(
         reader: &mut R,
         offset: u64,
+        strike_length: usize,
         num_glyphs: u32,
     ) -> Result<Self, std::io::Error> {
+        let min_length = 4usize
+            .checked_add((num_glyphs as usize + 1).saturating_mul(4))
+            .ok_or_else(|| {
+                std::io::Error::new(std::io::ErrorKind::InvalidData, "sbix strike size overflow")
+            })?;
+        if strike_length < min_length {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "sbix strike is smaller than its glyph offset array",
+            ));
+        }
+
         reader.seek(SeekFrom::Start(offset))?;
         let ppem = reader.read_u16_be()?;
         let ppi = reader.read_u16_be()?;
@@ -195,16 +260,39 @@ impl Strike {
             glyph_data_offsets.push(glyph_data_offset as usize);
         }
 
+        let glyph_data_start = 4 + (num_glyphs as usize + 1) * 4;
+        if glyph_data_offsets
+            .iter()
+            .any(|glyph_data_offset| *glyph_data_offset < glyph_data_start || *glyph_data_offset > strike_length)
+        {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "sbix glyph offset is outside of the strike",
+            ));
+        }
+        if glyph_data_offsets.windows(2).any(|window| window[0] > window[1]) {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "sbix glyph offsets are not sorted",
+            ));
+        }
+
         let mut glyph_data = Vec::new();
         for i in 0..glyph_data_offsets.len() - 1 {
             let length = glyph_data_offsets[i + 1] as isize - glyph_data_offsets[i] as isize;
-            // println!("i: {} {} {} {}", i, length, glyph_data_offsets[i + 1], glyph_data_offsets[i]);
             if length == 0 {
                 glyph_data.push(None);
                 continue;
             }
+            if length < 8 {
+                glyph_data.push(None);
+                continue;
+            }
             let glyph_offset = offset + glyph_data_offsets[i] as u64;
-            glyph_data.push(Some(GlyphData::new(reader, glyph_offset, length as usize)?));
+            match GlyphData::new(reader, glyph_offset, length as usize) {
+                Ok(glyph) => glyph_data.push(Some(glyph)),
+                Err(_) => glyph_data.push(None),
+            }
         }
 
         Ok(Self {
