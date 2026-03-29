@@ -73,17 +73,16 @@ impl FontFaceDescriptor {
         self
     }
 
-    pub fn from_loaded_font(font: &LoadedFont) -> Self {
-        let font_ref = font.font();
-        let family_name = font_ref.face_family_name();
-        let font_name = font_ref.face_full_name();
-        let font_weight = FontWeight(font_ref.face_weight_class());
-        let font_style = if font_ref.face_is_italic() {
+    pub fn from_font(font: &fontreader::Font) -> Self {
+        let family_name = font.face_family_name();
+        let font_name = font.face_full_name();
+        let font_weight = FontWeight(font.face_weight_class());
+        let font_style = if font.face_is_italic() {
             FontStyle::Italic
         } else {
             FontStyle::Normal
         };
-        let font_stretch = FontStretch(width_class_to_stretch(font_ref.face_width_class()));
+        let font_stretch = FontStretch(width_class_to_stretch(font.face_width_class()));
 
         Self {
             family_name,
@@ -92,6 +91,10 @@ impl FontFaceDescriptor {
             font_style,
             font_stretch,
         }
+    }
+
+    pub fn from_loaded_font(font: &LoadedFont) -> Self {
+        Self::from_font(font.font())
     }
 }
 
@@ -138,8 +141,24 @@ impl FontFamily {
     }
 
     pub fn add_loaded_font(&mut self, font: LoadedFont) -> &LoadedFont {
-        let descriptor = FontFaceDescriptor::from_loaded_font(&font);
-        self.add_face(descriptor, font)
+        let face_count = font.font().get_font_count();
+        let current_face = font.font().get_font_number();
+        let start_index = self.faces.len();
+
+        for face_index in 0..face_count {
+            let mut face_font = font.clone();
+            face_font
+                .font
+                .set_font(face_index)
+                .expect("collection face index must be in range");
+            let descriptor = FontFaceDescriptor::from_font(face_font.font());
+            self.faces.push(CachedFontFace {
+                descriptor,
+                font: face_font,
+            });
+        }
+
+        &self.faces[start_index + current_face].font
     }
 
     pub fn add_face(&mut self, descriptor: FontFaceDescriptor, font: LoadedFont) -> &LoadedFont {
@@ -1136,6 +1155,7 @@ impl ChunkedFontBuffer {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct LoadedFont {
     font: fontreader::Font,
 }

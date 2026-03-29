@@ -2107,6 +2107,10 @@ mod tests {
         test_fonts_dir().join("windows").join("msgothic.ttc")
     }
 
+    fn yu_gothic_regular_collection_path() -> std::path::PathBuf {
+        test_fonts_dir().join("windows").join("YuGothR.ttc")
+    }
+
     fn rtl_font_path() -> std::path::PathBuf {
         test_fonts_dir().join("windows").join("arial.ttf")
     }
@@ -2650,6 +2654,47 @@ mod tests {
         let bytes = std::fs::read(collection_font_path()).expect("read collection bytes");
         let font = crate::fontload_buffer(&bytes).expect("load font collection from buffer");
         assert!(font.font().get_font_count() > 1);
+    }
+
+    #[test]
+    fn font_family_add_loaded_font_expands_collection_faces() {
+        let path = yu_gothic_regular_collection_path();
+        if !path.exists() {
+            return;
+        }
+
+        let font = crate::load_font_from_file(&path).expect("load Yu Gothic TTC");
+        let face_count = font.font().get_font_count();
+        assert!(face_count > 1, "expected TTC with multiple faces");
+
+        let mut family = crate::FontFamily::new("Yu Gothic");
+        family.add_loaded_font(font);
+
+        assert_eq!(family.cached_faces_len(), face_count);
+    }
+
+    #[test]
+    fn font_family_resolves_yu_gothic_face_from_collection() {
+        let path = yu_gothic_regular_collection_path();
+        if !path.exists() {
+            return;
+        }
+
+        let font = crate::load_font_from_file(&path).expect("load Yu Gothic TTC");
+        let mut family = crate::FontFamily::new("Yu Gothic");
+        family.add_loaded_font(font);
+
+        let descriptor = family
+            .resolve_descriptor(
+                Some("Yu Gothic"),
+                None,
+                crate::FontWeight::NORMAL,
+                crate::FontStyle::Normal,
+                crate::FontStretch::default(),
+            )
+            .expect("resolve Yu Gothic face");
+
+        assert_eq!(descriptor.family_name, "Yu Gothic");
     }
 
     #[test]
