@@ -2111,6 +2111,15 @@ mod tests {
         test_fonts_dir().join("windows").join("YuGothR.ttc")
     }
 
+    #[cfg(feature = "layout")]
+    fn yu_gothic_font() -> Option<crate::LoadedFont> {
+        let path = yu_gothic_regular_collection_path();
+        if !path.exists() {
+            return None;
+        }
+        crate::load_font_from_file(&path).ok()
+    }
+
     fn rtl_font_path() -> std::path::PathBuf {
         test_fonts_dir().join("windows").join("arial.ttf")
     }
@@ -2695,6 +2704,50 @@ mod tests {
             .expect("resolve Yu Gothic face");
 
         assert_eq!(descriptor.family_name, "Yu Gothic");
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn yu_gothic_does_not_replace_masu_with_square_masu_by_default() {
+        let Some(font) = yu_gothic_font() else {
+            return;
+        };
+
+        let glyph_ids = font
+            .font()
+            .debug_shape_glyph_ids("ます", Some("ja-JP"))
+            .expect("shape Yu Gothic glyph ids");
+        assert_eq!(glyph_ids.len(), 2, "default shaping should keep ます as two glyphs");
+
+        let cmap = font.font().cmap.as_ref().expect("Yu Gothic cmap");
+        let square_masu = cmap.get_glyph_position('〼' as u32) as usize;
+        assert_ne!(glyph_ids[0], square_masu, "must not substitute to 〼 by default");
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn yu_gothic_masu_ligature_is_discretionary_not_default() {
+        let Some(font) = yu_gothic_font() else {
+            return;
+        };
+        let Some(gsub) = font.font().gsub.as_ref() else {
+            return;
+        };
+        let cmap = font.font().cmap.as_ref().expect("Yu Gothic cmap");
+
+        let glyph_ids = vec![
+            cmap.get_glyph_position('ま' as u32) as usize,
+            cmap.get_glyph_position('す' as u32) as usize,
+        ];
+        let square_masu = cmap.get_glyph_position('〼' as u32) as usize;
+
+        let default_liga = gsub.lookup_liga_sequence(&glyph_ids);
+        assert_ne!(default_liga, Some(square_masu));
+
+        let dlig = gsub.lookup_discretionary_liga_sequence(&glyph_ids);
+        if let Some(discretionary) = dlig {
+            assert_eq!(discretionary, square_masu);
+        }
     }
 
     #[test]
