@@ -356,6 +356,30 @@ impl Glyph {
         }
     }
 
+    fn build_contours(parsed: &ParsedGlyph) -> Vec<Vec<(i16, i16, bool)>> {
+        let mut contours = Vec::new();
+        let mut contour_start = 0usize;
+        let mut x = 0i16;
+        let mut y = 0i16;
+
+        for &contour_end in &parsed.end_pts_of_contours {
+            let mut contour = Vec::new();
+            for index in contour_start..=contour_end {
+                x += parsed.xs[index];
+                y += parsed.ys[index];
+                contour.push((x, y, parsed.on_curves[index]));
+            }
+            contours.push(contour);
+            contour_start = contour_end + 1;
+        }
+
+        contours
+    }
+
+    fn midpoint(a: (i16, i16), b: (i16, i16)) -> (i16, i16) {
+        ((a.0 + b.0) / 2, (a.1 + b.1) / 2)
+    }
+
     #[allow(dead_code)]
     pub(crate) fn get_svg_path(&self, layout: &FontLayout) -> String {
         let parsed = self.parse();
@@ -389,87 +413,58 @@ impl Glyph {
             svg += " -->\n";
         }
         svg += "<path d=\"";
-        let mut pos = 0;
-        let mut befor_on_curve = false;
-        let mut path_start = true;
-        let mut x = sx as i16;
-        let mut y = sy as i16;
-        let mut start_x = sx as i16;
-        let mut start_y = sy as i16;
-
-        for i in 0..parsed.flags.len() {
-            x += parsed.xs[i];
-            y += parsed.ys[i];
-            let on_curve = parsed.on_curves[i];
-            let next_x;
-            let next_y;
-            if parsed.end_pts_of_contours[pos] == i || i == parsed.flags.len() - 1 {
-                next_x = start_x;
-                next_y = start_y;
-            } else {
-                next_x = x + parsed.xs[i + 1];
-                next_y = y + parsed.ys[i + 1];
+        for contour in Self::build_contours(parsed) {
+            if contour.is_empty() {
+                continue;
             }
-            let next_on_curve = if i + 1 < parsed.on_curves.len() {
-                parsed.on_curves[i + 1]
+
+            let first = contour[0];
+            let last = contour[contour.len() - 1];
+            let start = if first.2 {
+                (first.0, first.1)
+            } else if last.2 {
+                (last.0, last.1)
             } else {
-                true
+                Self::midpoint((last.0, last.1), (first.0, first.1))
             };
-            if path_start {
-                if on_curve {
-                    start_x = x;
-                    start_y = y;
-                } else {
-                    start_x = (x + next_x) / 2;
-                    start_y = (y + next_y) / 2;
-                }
-                if i != 0 {
-                    svg += "Z ";
-                }
 
-                svg += &format!("M{} {}", start_x, y_max - start_y);
-                path_start = false;
-            } else if on_curve {
-                if befor_on_curve {
-                    svg += &format!("L{} {}", x, y_max - y);
-                } else {
-                    // Q px py x y or T x y was writed
-                }
-            } else if befor_on_curve {
-                if next_on_curve {
-                    svg += &format!("Q{} {} {} {}", x, y_max - y, next_x, y_max - next_y);
-                } else {
-                    // next off curve
+            svg += &format!(
+                "M{} {} ",
+                start.0 + sx as i16,
+                y_max - (start.1 + sy as i16)
+            );
+
+            let mut index = if first.2 { 1 } else { 0 };
+            while index < contour.len() {
+                let point = contour[index];
+                if point.2 {
                     svg += &format!(
-                        "Q{} {} {} {}",
-                        x,
-                        y_max - y,
-                        (x + next_x) / 2,
-                        y_max - (y + next_y) / 2
+                        "L{} {} ",
+                        point.0 + sx as i16,
+                        y_max - (point.1 + sy as i16)
                     );
-                }
-            } else {
-                // befor off curve
-                if next_on_curve {
-                    svg += &format!("T{} {}", next_x, y_max - next_y);
+                    index += 1;
                 } else {
-                    // next off curve
+                    let next = contour[(index + 1) % contour.len()];
+                    let end = if next.2 {
+                        index += 2;
+                        (next.0, next.1)
+                    } else {
+                        index += 1;
+                        Self::midpoint((point.0, point.1), (next.0, next.1))
+                    };
                     svg += &format!(
-                        "Q{} {} {} {}",
-                        x,
-                        y_max - y,
-                        (x + next_x) / 2,
-                        y_max - (y + next_y) / 2
+                        "Q{} {} {} {} ",
+                        point.0 + sx as i16,
+                        y_max - (point.1 + sy as i16),
+                        end.0 + sx as i16,
+                        y_max - (end.1 + sy as i16)
                     );
                 }
             }
-            if i >= parsed.end_pts_of_contours[pos] {
-                pos += 1;
-                path_start = true;
-            }
-            befor_on_curve = on_curve;
+            svg += "Z ";
         }
-        svg += "Z\"/>";
+        svg += "\"/>";
         svg
     }
 
@@ -491,92 +486,52 @@ impl Glyph {
         };
 
         let mut commands = Vec::new();
-        let mut pos = 0;
-        let mut befor_on_curve = false;
-        let mut path_start = true;
-        let mut x = sx as i16;
-        let mut y = sy as i16;
-        let mut start_x = sx as i16;
-        let mut start_y = sy as i16;
-
-        for i in 0..parsed.flags.len() {
-            x += parsed.xs[i];
-            y += parsed.ys[i];
-            let on_curve = parsed.on_curves[i];
-            let next_x;
-            let next_y;
-            if parsed.end_pts_of_contours[pos] == i || i == parsed.flags.len() - 1 {
-                next_x = start_x;
-                next_y = start_y;
-            } else {
-                next_x = x + parsed.xs[i + 1];
-                next_y = y + parsed.ys[i + 1];
+        for contour in Self::build_contours(parsed) {
+            if contour.is_empty() {
+                continue;
             }
-            let next_on_curve = if i + 1 < parsed.on_curves.len() {
-                parsed.on_curves[i + 1]
+
+            let first = contour[0];
+            let last = contour[contour.len() - 1];
+            let start = if first.2 {
+                (first.0, first.1)
+            } else if last.2 {
+                (last.0, last.1)
             } else {
-                true
+                Self::midpoint((last.0, last.1), (first.0, first.1))
             };
-            if path_start {
-                if on_curve {
-                    start_x = x;
-                    start_y = y;
-                } else {
-                    start_x = (x + next_x) / 2;
-                    start_y = (y + next_y) / 2;
-                }
-                if i != 0 {
-                    commands.push(PathCommand::ClosePath);
-                }
 
-                commands.push(PathCommand::MoveTo {
-                    x: start_x as f64,
-                    y: (y_max - start_y) as f64,
-                });
-                path_start = false;
-            } else if on_curve {
-                if befor_on_curve {
+            commands.push(PathCommand::MoveTo {
+                x: (start.0 + sx as i16) as f64,
+                y: (y_max - (start.1 + sy as i16)) as f64,
+            });
+
+            let mut index = if first.2 { 1 } else { 0 };
+            while index < contour.len() {
+                let point = contour[index];
+                if point.2 {
                     commands.push(PathCommand::LineTo {
-                        x: x as f64,
-                        y: (y_max - y) as f64,
+                        x: (point.0 + sx as i16) as f64,
+                        y: (y_max - (point.1 + sy as i16)) as f64,
                     });
-                }
-            } else if befor_on_curve {
-                if next_on_curve {
-                    commands.push(PathCommand::QuadTo {
-                        cx: x as f64,
-                        cy: (y_max - y) as f64,
-                        x: next_x as f64,
-                        y: (y_max - next_y) as f64,
-                    });
+                    index += 1;
                 } else {
+                    let next = contour[(index + 1) % contour.len()];
+                    let end = if next.2 {
+                        index += 2;
+                        (next.0, next.1)
+                    } else {
+                        index += 1;
+                        Self::midpoint((point.0, point.1), (next.0, next.1))
+                    };
                     commands.push(PathCommand::QuadTo {
-                        cx: x as f64,
-                        cy: (y_max - y) as f64,
-                        x: ((x + next_x) / 2) as f64,
-                        y: (y_max - ((y + next_y) / 2)) as f64,
+                        cx: (point.0 + sx as i16) as f64,
+                        cy: (y_max - (point.1 + sy as i16)) as f64,
+                        x: (end.0 + sx as i16) as f64,
+                        y: (y_max - (end.1 + sy as i16)) as f64,
                     });
                 }
-            } else if next_on_curve {
-                commands.push(PathCommand::LineTo {
-                    x: next_x as f64,
-                    y: (y_max - next_y) as f64,
-                });
-            } else {
-                commands.push(PathCommand::QuadTo {
-                    cx: x as f64,
-                    cy: (y_max - y) as f64,
-                    x: ((x + next_x) / 2) as f64,
-                    y: (y_max - ((y + next_y) / 2)) as f64,
-                });
             }
-            if i >= parsed.end_pts_of_contours[pos] {
-                pos += 1;
-                path_start = true;
-            }
-            befor_on_curve = on_curve;
-        }
-        if !commands.is_empty() {
             commands.push(PathCommand::ClosePath);
         }
         commands

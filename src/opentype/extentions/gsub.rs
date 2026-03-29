@@ -1092,13 +1092,21 @@ impl GSUB {
         self.lookup_liga_sequence(&[griph_ids]).unwrap_or(griph_ids)
     }
 
+    pub(crate) fn lookup_standard_liga_sequence(&self, glyph_ids: &[usize]) -> Option<usize> {
+        self.lookup_ligature_feature(glyph_ids, None, &[*b"liga"])
+    }
+
+    pub(crate) fn lookup_discretionary_liga_sequence(&self, glyph_ids: &[usize]) -> Option<usize> {
+        self.lookup_ligature_feature(glyph_ids, None, &[*b"dlig"])
+    }
+
     // rlig
     pub fn lookup_rlig_sequence(&self, glyph_ids: &[usize], locale: Option<&str>) -> Option<usize> {
         self.lookup_ligature_feature(glyph_ids, locale, &[*b"rlig"])
     }
 
     pub fn lookup_liga_sequence(&self, griph_ids: &[usize]) -> Option<usize> {
-        self.lookup_ligature_feature(griph_ids, None, &[*b"liga", *b"dlig"])
+        self.lookup_standard_liga_sequence(griph_ids)
     }
 
     // hwid, fwid, qwid, twid, pkna

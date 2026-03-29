@@ -1651,7 +1651,7 @@ impl Font {
         commands
     }
 
-    pub fn text2commands(&self, text: &str) -> Result<Vec<GlyphCommands>, Error> {
+    pub(crate) fn text2commands(&self, text: &str) -> Result<Vec<GlyphCommands>, Error> {
         let mut result = Vec::new();
         let mut cursor_x = 0.0;
         let mut line_index = 0usize;
@@ -1793,7 +1793,8 @@ impl Font {
         Ok(result)
     }
 
-    pub fn text2command(&self, text: &str) -> Result<Vec<GlyphCommands>, Error> {
+    #[cfg(test)]
+    pub(crate) fn text2command(&self, text: &str) -> Result<Vec<GlyphCommands>, Error> {
         self.text2commands(text)
     }
 
@@ -1886,7 +1887,7 @@ impl Font {
         })
     }
 
-    pub fn text2svg(&self, text: &str, fontsize: f64, fontunit: &str) -> Result<String, Error> {
+    pub(crate) fn text2svg(&self, text: &str, fontsize: f64, fontunit: &str) -> Result<String, Error> {
         let glyphs = self.text2commands(text)?;
         let line_height = self.default_line_height()?;
         let mut svg_elements = Vec::new();
@@ -1945,14 +1946,17 @@ impl Font {
             ));
         }
 
-        let view_width = (max_x - min_x).max(1.0);
-        let view_height = (max_y - min_y).max(1.0);
+        const SVG_EXPORT_PADDING: f64 = 4.0;
+        min_x -= SVG_EXPORT_PADDING;
+        min_y -= SVG_EXPORT_PADDING;
+        let view_width = (max_x - min_x + SVG_EXPORT_PADDING).max(1.0);
+        let view_height = (max_y - min_y + SVG_EXPORT_PADDING).max(1.0);
         let scale = fontsize / line_height.max(1.0);
-        let width = view_width * scale;
-        let height = view_height * scale;
+        let width = (view_width * scale).ceil();
+        let height = (view_height * scale).ceil();
 
         let mut svg = format!(
-            "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{}{}\" height=\"{}{}\" viewBox=\"{} {} {} {}\">",
+            "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{}{}\" height=\"{}{}\" viewBox=\"{} {} {} {}\" overflow=\"visible\">",
             width, fontunit, height, fontunit, min_x, min_y, view_width, view_height
         );
         for element in svg_elements {

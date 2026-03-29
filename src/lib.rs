@@ -73,17 +73,16 @@ impl FontFaceDescriptor {
         self
     }
 
-    pub fn from_loaded_font(font: &LoadedFont) -> Self {
-        let font_ref = font.font();
-        let family_name = font_ref.face_family_name();
-        let font_name = font_ref.face_full_name();
-        let font_weight = FontWeight(font_ref.face_weight_class());
-        let font_style = if font_ref.face_is_italic() {
+    pub fn from_font(font: &fontreader::Font) -> Self {
+        let family_name = font.face_family_name();
+        let font_name = font.face_full_name();
+        let font_weight = FontWeight(font.face_weight_class());
+        let font_style = if font.face_is_italic() {
             FontStyle::Italic
         } else {
             FontStyle::Normal
         };
-        let font_stretch = FontStretch(width_class_to_stretch(font_ref.face_width_class()));
+        let font_stretch = FontStretch(width_class_to_stretch(font.face_width_class()));
 
         Self {
             family_name,
@@ -92,6 +91,10 @@ impl FontFaceDescriptor {
             font_style,
             font_stretch,
         }
+    }
+
+    pub fn from_loaded_font(font: &LoadedFont) -> Self {
+        Self::from_font(font.font())
     }
 }
 
@@ -138,8 +141,24 @@ impl FontFamily {
     }
 
     pub fn add_loaded_font(&mut self, font: LoadedFont) -> &LoadedFont {
-        let descriptor = FontFaceDescriptor::from_loaded_font(&font);
-        self.add_face(descriptor, font)
+        let face_count = font.font().get_font_count();
+        let current_face = font.font().get_font_number();
+        let start_index = self.faces.len();
+
+        for face_index in 0..face_count {
+            let mut face_font = font.clone();
+            face_font
+                .font
+                .set_font(face_index)
+                .expect("collection face index must be in range");
+            let descriptor = FontFaceDescriptor::from_font(face_font.font());
+            self.faces.push(CachedFontFace {
+                descriptor,
+                font: face_font,
+            });
+        }
+
+        &self.faces[start_index + current_face].font
     }
 
     pub fn add_face(&mut self, descriptor: FontFaceDescriptor, font: LoadedFont) -> &LoadedFont {
@@ -727,11 +746,16 @@ fn glyph_run_to_svg(run: &GlyphRun, fontunit: &str) -> Result<String, Error> {
         ));
     };
 
-    let view_width = (bounds.max_x - bounds.min_x).max(1.0);
-    let view_height = (bounds.max_y - bounds.min_y).max(1.0);
+    const SVG_EXPORT_PADDING: f32 = 4.0;
+    let min_x = bounds.min_x - SVG_EXPORT_PADDING;
+    let min_y = bounds.min_y - SVG_EXPORT_PADDING;
+    let view_width = (bounds.max_x - bounds.min_x + SVG_EXPORT_PADDING * 2.0).max(1.0);
+    let view_height = (bounds.max_y - bounds.min_y + SVG_EXPORT_PADDING * 2.0).max(1.0);
+    let width = view_width.ceil();
+    let height = view_height.ceil();
     let mut svg = format!(
-        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{}{}\" height=\"{}{}\" viewBox=\"{} {} {} {}\">",
-        view_width, fontunit, view_height, fontunit, bounds.min_x, bounds.min_y, view_width, view_height
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{}{}\" height=\"{}{}\" viewBox=\"{} {} {} {}\" overflow=\"visible\">",
+        width, fontunit, height, fontunit, min_x, min_y, view_width, view_height
     );
 
     for glyph in &run.glyphs {
@@ -1136,13 +1160,18 @@ impl ChunkedFontBuffer {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct LoadedFont {
     font: fontreader::Font,
 }
 
 impl LoadedFont {
     pub fn text2svg(&self, text: &str, fontsize: f64, fontunit: &str) -> Result<String, Error> {
-        self.font.text2svg(text, fontsize, fontunit)
+        self.text2svg_with_options(
+            text,
+            fontunit,
+            FontOptions::new(self).with_font_size(fontsize as f32),
+        )
     }
 
     pub fn text2svg_with_options<'a>(
@@ -1166,27 +1195,6 @@ impl LoadedFont {
     ) -> Result<GlyphRun, Error> {
         options.font = Some(FontRef::Loaded(self));
         crate::commands::text2commands(text, options)
-    }
-
-    /// Legacy outline-only API.
-    ///
-    /// This returns `Vec<GlyphCommands>`, keeps `sbix` bitmap payloads in `GlyphCommands::bitmap`,
-    /// and does not preserve per-layer paint or full color-layer structure.
-    #[deprecated(
-        note = "use `LoadedFont::text2glyph_run()` or `fontloader::text2commands(text, FontOptions)` instead"
-    )]
-    pub fn text2commands(&self, text: &str) -> Result<Vec<GlyphCommands>, Error> {
-        self.font.text2commands(text)
-    }
-
-    /// Legacy outline-only API.
-    ///
-    /// This is an alias of `LoadedFont::text2commands()` and does not preserve full color glyph data.
-    #[deprecated(
-        note = "use `LoadedFont::text2glyph_run()` or `fontloader::text2commands(text, FontOptions)` instead"
-    )]
-    pub fn text2command(&self, text: &str) -> Result<Vec<GlyphCommands>, Error> {
-        self.font.text2command(text)
     }
 
     pub fn measure(&self, text: &str) -> Result<f64, Error> {
