@@ -87,19 +87,8 @@ impl SVG {
         if svg_document.is_none() {
             return None;
         }
-        let wrapped_svg = svg_document.unwrap();
-        let svg = if wrapped_svg[0] == 0x1f && wrapped_svg[1] == 0x8b && wrapped_svg[2] == 0x08 {
-            let decompress = decompress_to_vec_zlib(&wrapped_svg).unwrap();
-            String::from_utf8(decompress.to_vec()).unwrap()
-        } else {
-            String::from_utf8(wrapped_svg.to_vec()).unwrap()
-        };
-
-        // 頭の "<svg" を探す
-        let svgs = svg.split("<svg").collect::<Vec<&str>>();
-        if svgs.len() < 2 {
-            return None;
-        }
+        let svg = decode_svg_document(svg_document.unwrap())?;
+        let payload = extract_svg_payload_for_gid(&svg, gid as u16)?;
         let mut string = format!(
             "<svg width=\"{}{}\" height=\"{}{}\" ",
             fonsize, fontunit, fonsize, fontunit
@@ -107,7 +96,7 @@ impl SVG {
         match layout {
             FontLayout::Horizontal(layout) => {
                 string += &format!(
-                    " viewbox=\"{} {} {} {}\"",
+                    " viewBox=\"{} {} {} {}\"",
                     0,
                     -layout.accender,
                     layout.advance_width,
@@ -116,7 +105,7 @@ impl SVG {
             }
             FontLayout::Vertical(layout) => {
                 string += &format!(
-                    " viewbox=\"{} {} {} {}\"",
+                    " viewBox=\"{} {} {} {}\"",
                     0,
                     -layout.accender,
                     layout.advance_height,
@@ -125,11 +114,227 @@ impl SVG {
             }
             _ => {}
         }
-        for i in 1..svgs.len() {
-            string += &svgs[i];
-        }
+        string.push('>');
+        string += &payload;
+        string += "</svg>";
         Some(string)
     }
+}
+
+fn decode_svg_document(document: &[u8]) -> Option<String> {
+    if document.len() >= 3 && document[0] == 0x1f && document[1] == 0x8b && document[2] == 0x08 {
+        let decompress = decompress_to_vec_zlib(document).ok()?;
+        String::from_utf8(decompress).ok()
+    } else {
+        String::from_utf8(document.to_vec()).ok()
+    }
+}
+
+fn extract_svg_payload_for_gid(document: &str, gid: u16) -> Option<String> {
+    let (root_inner, defs_blocks) = if let Some(inner) = extract_root_inner(document) {
+        (inner, collect_tag_blocks(inner, "defs"))
+    } else {
+        ("", Vec::new())
+    };
+
+    if let Some(payload) = extract_payload_from_svg_fragments(root_inner, gid, &defs_blocks) {
+        return Some(payload);
+    }
+
+    if let Some(payload) = extract_payload_from_tagged_elements(root_inner, gid, &defs_blocks) {
+        return Some(payload);
+    }
+
+    if let Some(inner) = extract_root_inner(document) {
+        return Some(inner.to_string());
+    }
+
+    extract_payload_from_svg_fragments(document, gid, &[])
+        .or_else(|| extract_payload_from_tagged_elements(document, gid, &[]))
+}
+
+fn extract_payload_from_svg_fragments(
+    source: &str,
+    gid: u16,
+    defs_blocks: &[&str],
+) -> Option<String> {
+    let fragments = collect_tag_blocks(source, "svg");
+    if fragments.is_empty() {
+        return None;
+    }
+
+    let selected = fragments
+        .iter()
+        .find(|fragment| fragment_matches_glyph_id(fragment, gid))
+        .copied()
+        .or_else(|| {
+            if fragments.len() == 1 {
+                fragments.first().copied()
+            } else {
+                None
+            }
+        })?;
+
+    let fragment_inner = extract_root_inner(selected).unwrap_or(selected);
+    Some(combine_defs_and_payload(defs_blocks, fragment_inner))
+}
+
+fn extract_payload_from_tagged_elements(
+    source: &str,
+    gid: u16,
+    defs_blocks: &[&str],
+) -> Option<String> {
+    let elements = collect_glyph_tagged_elements(source, gid);
+    if elements.is_empty() {
+        return None;
+    }
+
+    let mut payload = String::new();
+    for defs in defs_blocks {
+        payload += defs;
+    }
+    for element in elements {
+        payload += element;
+    }
+    Some(payload)
+}
+
+fn combine_defs_and_payload(defs_blocks: &[&str], payload: &str) -> String {
+    let mut combined = String::new();
+    for defs in defs_blocks {
+        combined += defs;
+    }
+    combined += payload;
+    combined
+}
+
+fn extract_root_inner(document: &str) -> Option<&str> {
+    let root_start = document.find("<svg")?;
+    let start_tag_end = document[root_start..].find('>')? + root_start;
+    let root_end = document.rfind("</svg>")?;
+    if root_end <= start_tag_end {
+        return None;
+    }
+    Some(&document[start_tag_end + 1..root_end])
+}
+
+fn collect_tag_blocks<'a>(source: &'a str, tag: &str) -> Vec<&'a str> {
+    let mut blocks = Vec::new();
+    let open_pattern = format!("<{}", tag);
+    let mut cursor = 0usize;
+
+    while let Some(relative_start) = source[cursor..].find(&open_pattern) {
+        let start = cursor + relative_start;
+        let Some(end) = find_balanced_tag_end(source, start, tag) else {
+            break;
+        };
+        blocks.push(&source[start..end]);
+        cursor = end;
+    }
+
+    blocks
+}
+
+fn find_balanced_tag_end(source: &str, start: usize, tag: &str) -> Option<usize> {
+    let open_end = source[start..].find('>')? + start;
+    if source[..=open_end].ends_with("/>") {
+        return Some(open_end + 1);
+    }
+
+    let open_pattern = format!("<{}", tag);
+    let close_pattern = format!("</{}", tag);
+    let mut depth = 1usize;
+    let mut cursor = open_end + 1;
+
+    while cursor < source.len() {
+        let next_open = source[cursor..]
+            .find(&open_pattern)
+            .map(|offset| cursor + offset);
+        let next_close = source[cursor..]
+            .find(&close_pattern)
+            .map(|offset| cursor + offset);
+
+        match (next_open, next_close) {
+            (None, Some(close_start)) | (Some(_), Some(close_start))
+                if next_open
+                    .map(|open_start| close_start < open_start)
+                    .unwrap_or(true) =>
+            {
+                let close_end = source[close_start..].find('>')? + close_start + 1;
+                depth = depth.saturating_sub(1);
+                if depth == 0 {
+                    return Some(close_end);
+                }
+                cursor = close_end;
+            }
+            (Some(open_start), _) => {
+                let nested_open_end = source[open_start..].find('>')? + open_start;
+                if !source[..=nested_open_end].ends_with("/>") {
+                    depth += 1;
+                }
+                cursor = nested_open_end + 1;
+            }
+            (None, Some(close_start)) => {
+                let close_end = source[close_start..].find('>')? + close_start + 1;
+                depth = depth.saturating_sub(1);
+                if depth == 0 {
+                    return Some(close_end);
+                }
+                cursor = close_end;
+            }
+            (None, None) => break,
+        }
+    }
+
+    None
+}
+
+fn fragment_matches_glyph_id(fragment: &str, gid: u16) -> bool {
+    let lower = fragment.to_ascii_lowercase();
+    let marker = format!("glyph{}", gid);
+    let gid_marker = format!("id=\"{}\"", gid);
+    lower.contains(&marker) || lower.contains(&gid_marker)
+}
+
+fn collect_glyph_tagged_elements<'a>(source: &'a str, gid: u16) -> Vec<&'a str> {
+    let lower = source.to_ascii_lowercase();
+    let markers = [format!("glyph{}", gid), format!("id=\"{}\"", gid)];
+    let mut elements = Vec::new();
+
+    for marker in markers {
+        let mut cursor = 0usize;
+        while let Some(relative_pos) = lower[cursor..].find(&marker) {
+            let pos = cursor + relative_pos;
+            let Some(start) = source[..pos].rfind('<') else {
+                cursor = pos + marker.len();
+                continue;
+            };
+            if source[start..].starts_with("</") {
+                cursor = pos + marker.len();
+                continue;
+            }
+
+            let tag_name_end = source[start + 1..]
+                .find(|ch: char| ch.is_whitespace() || ch == '>' || ch == '/')
+                .map(|offset| start + 1 + offset);
+            let Some(tag_name_end) = tag_name_end else {
+                cursor = pos + marker.len();
+                continue;
+            };
+            let tag = &source[start + 1..tag_name_end];
+            let Some(end) = find_balanced_tag_end(source, start, tag) else {
+                cursor = pos + marker.len();
+                continue;
+            };
+            let candidate = &source[start..end];
+            if !elements.iter().any(|existing| *existing == candidate) {
+                elements.push(candidate);
+            }
+            cursor = end;
+        }
+    }
+
+    elements
 }
 
 #[derive(Debug, Clone)]
@@ -183,5 +388,44 @@ impl SVGDocumetRecord {
             svg_document_length,
             svg_document: None,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn svg_payload_extracts_only_matching_nested_fragment() {
+        let document = concat!(
+            "<svg xmlns=\"http://www.w3.org/2000/svg\">",
+            "<defs><linearGradient id=\"grad\"/></defs>",
+            "<svg id=\"glyph1\"><path id=\"glyph1-path\" d=\"M0 0\"/></svg>",
+            "<svg id=\"glyph2\"><path id=\"glyph2-path\" d=\"M1 1\"/></svg>",
+            "</svg>"
+        );
+
+        let payload = extract_svg_payload_for_gid(document, 2).expect("svg payload");
+
+        assert!(payload.contains("linearGradient"));
+        assert!(payload.contains("glyph2-path"));
+        assert!(!payload.contains("glyph1-path"));
+    }
+
+    #[test]
+    fn svg_payload_extracts_matching_group_from_shared_document() {
+        let document = concat!(
+            "<svg xmlns=\"http://www.w3.org/2000/svg\">",
+            "<defs><clipPath id=\"clip\"/></defs>",
+            "<g id=\"glyph3\"><path id=\"glyph3-shape\" d=\"M0 0\"/></g>",
+            "<g id=\"glyph4\"><path id=\"glyph4-shape\" d=\"M1 1\"/></g>",
+            "</svg>"
+        );
+
+        let payload = extract_svg_payload_for_gid(document, 4).expect("svg payload");
+
+        assert!(payload.contains("clipPath"));
+        assert!(payload.contains("glyph4-shape"));
+        assert!(!payload.contains("glyph3-shape"));
     }
 }

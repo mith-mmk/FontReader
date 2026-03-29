@@ -12,6 +12,7 @@ Japanese: [README.ja.md](README.ja.md)
 - Pass a loaded font directly with `FontOptions::new(&font)`.
 - `font_size` and `line_height` are resolved in pixels.
 - `font_stretch`, `font_style`, `font_variant`, and `font_weight` are part of `FontOptions`.
+- `font_variant` now supports `Jis78`, `Jis90`, `TraditionalForms`, and `NlcKanjiForms` via GSUB `jp78` / `jp90` / `trad` / `nlck` when the `layout` feature is enabled.
 - `FontOptions::with_vertical_flow()` and `FontOptions::with_right_to_left()` control text direction.
 - `FontOptions::with_locale("ja-JP")` can request GSUB `locl` substitutions when the `layout` feature is enabled.
 - `FontOptions::from_family(&family)` can resolve a cached `FontFamily` entry by family/name/weight/style/stretch.
@@ -21,6 +22,7 @@ Japanese: [README.ja.md](README.ja.md)
 - `sbix` glyphs are returned as `GlyphLayer::Raster`.
 - COLR/CPAL colors are carried in `GlyphPaint::Solid(0xAARRGGBB)` so they can be passed directly to `paintcore::path::draw_glyphs`.
 - SVG glyph layers currently return `ErrorKind::Unsupported`.
+- Legacy `Font::get_svg()` now slices shared SVG table documents down to the matching glyph payload instead of embedding every fragment in the record.
 - The legacy `font.text2command()` API is still deprecated, but it now keeps `sbix` bitmap payloads in `GlyphCommands::bitmap`. It still does not carry per-layer paint or full color-layer structure. Use `fontloader::text2commands(..., FontOptions)`, `LoadedFont::text2glyph_run()`, or `FontFamily::text2glyph_run()` when you need full color glyph data.
 
 ## Renderer Integration
@@ -178,8 +180,10 @@ The library now compiles for `wasm32-unknown-unknown`.
 - RTL shaping: GSUB `rlig` required ligatures are also applied in RTL shaping when present
 - RTL shaping: contextual substitutions through GSUB `rclt` / `calt` / `clig` are also applied when the font exposes them
 - Locale-aware lookup collection now prefers matching script tables such as `arab`, `hebr`, and `syrc`, and it includes required features before falling back to `DFLT`
+- Language-system selection now also uses full locale subtags such as `ur-Arab-PK`, so script-specific and language-specific lookups can override the script default when the font provides them
+- Japanese variant forms through GSUB `jp78` / `jp90` / `trad` / `nlck` can be requested from `FontOptions::font_variant`
 - Partial context/chaining support: GSUB Context Format 1 / 2 / 3 and Chaining Context Format 1 / 2 / 3 are wired into the feature-sequence engine
-- Current limitation: many context/chaining cases are still only partially covered, especially broader script-specific RTL shaping
+- Current limitation: many context/chaining cases are still only partially covered, especially broader script-specific chaining behavior beyond the currently wired locale/script selection
 - Not implemented: `lookup_width()`, `lookup_number()`
 
 ### Lookup parsing

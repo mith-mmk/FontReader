@@ -777,7 +777,8 @@ impl LookupList {
                         offset + *chain_sub_class_set_offset as u64,
                     )?);
                 }
-                let (class_range_count, class_range_records) = if let Some(class_def) = &input_class_def
+                let (class_range_count, class_range_records) = if let Some(class_def) =
+                    &input_class_def
                 {
                     match class_def {
                         ClassDef::Format1(class_def) => {

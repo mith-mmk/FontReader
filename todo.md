@@ -64,7 +64,9 @@ _test_fonts/* がテスト用フォント
     - [*] context/chaining 依存の script 固有 shaping
         - [x] GSUB Context Format 1 / 2 / 3 の適用器
         - [x] GSUB Chaining Context Format 1 / 2 / 3 の適用器
-        - [ ] script 固有の chaining / language-specific lookup 拡張
+        - [*] script 固有の chaining / language-specific lookup 拡張
+            - [x] locale 全体 (`ur-Arab-PK` など) を見て language-specific lookup を選択
+            - [ ] script ごとの実フォント chaining coverage をさらに拡張
 - loader
     - [x] font
     - [x] font collection
@@ -146,7 +148,7 @@ _test_fonts/* がテスト用フォント
 - [+] woff2対応
 - [+] CID-keyed CFF / FDSelect
 - [ ] 境界条件をチェックしpanic!を回避
-- [ ] svg svgのサイズが巨大なので文字毎にsvgを切り出す
+- [x] svg svgのサイズが巨大なので文字毎にsvgを切り出す
 # Layout 対応状況
 
 `layout` feature は一部のみ実装されています。
@@ -163,7 +165,9 @@ _test_fonts/* がテスト用フォント
         - [*] context / chaining の適用拡張
             - [x] Context Format 1 / 2 / 3
             - [x] Chaining Context Format 1 / 2 / 3
-            - [ ] script 固有の chaining / language-specific lookup 拡張
+            - [*] script 固有の chaining / language-specific lookup 拡張
+                - [x] locale 全体を見た language-specific lookup 選択
+                - [ ] 実フォント coverage の拡張
 
 # opentype
 - [x] True Type
@@ -196,6 +200,9 @@ _test_fonts/* がテスト用フォント
 - [*] text API への反映: `text2command()`, `text2commands()`, `measure()` で variation selector と基本的な `locl` / `liga` / `dlig` / `ccmp` を利用
     - [x] `TextDirection::TopToBottom` で縦メトリクスと縦書き置換を利用
     - [x] `TextDirection::RightToLeft` で RTL の inline 進行方向を利用
+    - [*] `FontVariant` から日本語 variant form を要求
+        - [x] `jp78` を実フォント確認
+        - [*] `jp90` / `trad` / `nlck` は API 実装済みだが実フォント確認は未完
     - [x] Arabic joining (`isol` / `init` / `medi` / `fina`)
     - [x] Arabic required ligature (`rlig`)
     - [x] Arabic contextual substitutions (`rclt` / `calt` / `clig`)
@@ -203,19 +210,21 @@ _test_fonts/* がテスト用フォント
     - [*] context/chaining ベースの RTL shaping
         - [x] Context Format 1 / 2 / 3 の feature-sequence 適用
         - [x] Chaining Context Format 1 / 2 / 3 の feature-sequence 適用
-        - [ ] script 固有の chaining / language-specific lookup 拡張
+        - [*] script 固有の chaining / language-specific lookup 拡張
+            - [x] full locale subtag から language system を選択
+            - [ ] 実フォントの script 固有 chaining を追加
 - [ ] 未実装: `lookup_width()`, `lookup_number()`
 - [ ] aalt
 - [ ] dlig
 - [ ] expt
 - [ ] fwid
 - [ ] hwid
-- [ ] jp78
-- [ ] jp90
+- [*] jp78
+- [*] jp90
 - [ ] llga
-- [ ] nlck
+- [*] nlck
 - [ ] pwid
-- [ ] trad
+- [*] trad
 - [ ] vert
 - [ ] vrt2
 - [ ] zero
@@ -283,7 +292,7 @@ _test_fonts/* がテスト用フォント
     - [x] `sbix` **MUST**
     - [ ] SVG **SHOULD**
         - [x] getter
-        - [ ] svg divider
+        - [x] svg divider
   - OTHERS
     - [ ] DSIG	Digital signature
     - [ ] 'hdmx'	Horizontal device metrics

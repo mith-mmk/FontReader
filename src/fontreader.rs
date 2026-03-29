@@ -857,7 +857,11 @@ impl Font {
         glyphs: &mut Vec<ResolvedGlyph>,
         locale: Option<&str>,
         is_right_to_left: bool,
+        font_variant: crate::commands::FontVariant,
     ) {
+        #[cfg(not(feature = "layout"))]
+        let _ = (locale, is_right_to_left, font_variant);
+
         if glyphs.is_empty() {
             return;
         }
@@ -872,6 +876,7 @@ impl Font {
                 .map(|(source_index, glyph)| (glyph.glyph_id, source_index))
                 .collect::<Vec<_>>();
             gsub.apply_ccmp_sequence(&mut ccmp_glyphs);
+            gsub.apply_variant_sequence(&mut ccmp_glyphs, locale, font_variant);
             if is_right_to_left {
                 gsub.apply_joining_sequence(&mut ccmp_glyphs, locale);
                 gsub.apply_rtl_contextual_sequence(&mut ccmp_glyphs, locale);
@@ -899,7 +904,8 @@ impl Font {
                             break;
                         }
                     }
-                    if let Some(glyph_id) = gsub.lookup_liga_sequence(&glyph_ids[index..index + len])
+                    if let Some(glyph_id) =
+                        gsub.lookup_liga_sequence(&glyph_ids[index..index + len])
                     {
                         matched = Some((glyph_id, len));
                         break;
@@ -931,9 +937,10 @@ impl Font {
         is_vert: bool,
         is_right_to_left: bool,
         locale: Option<&str>,
+        font_variant: crate::commands::FontVariant,
     ) -> Result<Vec<ResolvedTextUnit>, Error> {
         #[cfg(not(feature = "layout"))]
-        let _ = (locale, is_right_to_left);
+        let _ = (locale, is_right_to_left, font_variant);
 
         let mut output = Vec::new();
         let mut pending_glyphs = Vec::new();
@@ -946,6 +953,7 @@ impl Font {
                         &mut pending_glyphs,
                         locale,
                         is_right_to_left,
+                        font_variant,
                     );
                     output.push(ResolvedTextUnit::Newline);
                 }
@@ -955,6 +963,7 @@ impl Font {
                         &mut pending_glyphs,
                         locale,
                         is_right_to_left,
+                        font_variant,
                     );
                     output.push(ResolvedTextUnit::Tab);
                 }
@@ -979,7 +988,13 @@ impl Font {
             }
         }
 
-        self.flush_shaped_glyphs(&mut output, &mut pending_glyphs, locale, is_right_to_left);
+        self.flush_shaped_glyphs(
+            &mut output,
+            &mut pending_glyphs,
+            locale,
+            is_right_to_left,
+            font_variant,
+        );
         Ok(output)
     }
 
@@ -1074,7 +1089,13 @@ impl Font {
         locale: Option<&str>,
     ) -> Result<Vec<usize>, Error> {
         let mut glyph_ids = Vec::new();
-        for unit in self.shape_text_units(text, false, false, locale)? {
+        for unit in self.shape_text_units(
+            text,
+            false,
+            false,
+            locale,
+            crate::commands::FontVariant::Normal,
+        )? {
             if let ResolvedTextUnit::Glyph(glyph) = unit {
                 glyph_ids.push(glyph.glyph_id);
             }
@@ -1083,6 +1104,7 @@ impl Font {
     }
 
     #[cfg(test)]
+    #[allow(dead_code)]
     pub(crate) fn debug_shape_glyph_ids_with_direction(
         &self,
         text: &str,
@@ -1090,7 +1112,30 @@ impl Font {
         is_right_to_left: bool,
     ) -> Result<Vec<usize>, Error> {
         let mut glyph_ids = Vec::new();
-        for unit in self.shape_text_units(text, false, is_right_to_left, locale)? {
+        for unit in self.shape_text_units(
+            text,
+            false,
+            is_right_to_left,
+            locale,
+            crate::commands::FontVariant::Normal,
+        )? {
+            if let ResolvedTextUnit::Glyph(glyph) = unit {
+                glyph_ids.push(glyph.glyph_id);
+            }
+        }
+        Ok(glyph_ids)
+    }
+
+    #[cfg(test)]
+    #[allow(dead_code)]
+    pub(crate) fn debug_shape_glyph_ids_with_variant(
+        &self,
+        text: &str,
+        locale: Option<&str>,
+        font_variant: crate::commands::FontVariant,
+    ) -> Result<Vec<usize>, Error> {
+        let mut glyph_ids = Vec::new();
+        for unit in self.shape_text_units(text, false, false, locale, font_variant)? {
             if let ResolvedTextUnit::Glyph(glyph) = unit {
                 glyph_ids.push(glyph.glyph_id);
             }
@@ -1103,10 +1148,8 @@ impl Font {
         Ok((hhea.get_accender() - hhea.get_descender() + hhea.get_line_gap()) as f64)
     }
 
-    fn glyph_unit_at(
-        units: &[ResolvedTextUnit],
-        index: usize,
-    ) -> Option<ResolvedGlyph> {
+    #[allow(dead_code)]
+    fn glyph_unit_at(units: &[ResolvedTextUnit], index: usize) -> Option<ResolvedGlyph> {
         match units.get(index) {
             Some(ResolvedTextUnit::Glyph(glyph)) => Some(*glyph),
             _ => None,
@@ -1204,8 +1247,13 @@ impl Font {
         let mut cursor_x = 0.0f32;
         let mut cursor_y = 0.0f32;
         let tab_advance = line_height;
-        let shaped_units =
-            self.shape_text_units(text, is_vertical, is_right_to_left, options.locale)?;
+        let shaped_units = self.shape_text_units(
+            text,
+            is_vertical,
+            is_right_to_left,
+            options.locale,
+            options.font_variant,
+        )?;
 
         for (index, unit) in shaped_units.iter().enumerate() {
             match *unit {
@@ -1406,7 +1454,13 @@ impl Font {
         let mut line_index = 0usize;
         let line_height = self.default_line_height()?;
         let tab_advance = line_height;
-        let shaped_units = self.shape_text_units(text, false, false, None)?;
+        let shaped_units = self.shape_text_units(
+            text,
+            false,
+            false,
+            None,
+            crate::commands::FontVariant::Normal,
+        )?;
 
         for (index, unit) in shaped_units.iter().enumerate() {
             match *unit {
@@ -1423,9 +1477,10 @@ impl Font {
                         .open_type_glyf
                         .as_ref()
                         .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "glyph is none"))?;
-                    let adjustment = self
-                        .pair_adjustment_for_index(&shaped_units, index, None, false, 1.0, 1.0);
-                    let origin_y = -(line_index as f64 * line_height) + adjustment.placement_y as f64;
+                    let adjustment =
+                        self.pair_adjustment_for_index(&shaped_units, index, None, false, 1.0, 1.0);
+                    let origin_y =
+                        -(line_index as f64 * line_height) + adjustment.placement_y as f64;
                     let advance_width = match &open_type_glyph.layout {
                         FontLayout::Horizontal(layout) => layout.advance_width as f64,
                         FontLayout::Vertical(layout) => layout.advance_height as f64,
@@ -1517,10 +1572,7 @@ impl Font {
     }
 
     pub fn measure(&self, text: &str) -> Result<f64, Error> {
-        self.measure_with_options(
-            text,
-            &crate::commands::FontOptions::from_font(self),
-        )
+        self.measure_with_options(text, &crate::commands::FontOptions::from_font(self))
     }
 
     pub fn measure_with_options(
@@ -1535,8 +1587,13 @@ impl Font {
         let tab_advance = line_height;
         let is_vertical = options.text_direction.is_vertical();
         let is_right_to_left = options.text_direction.is_right_to_left();
-        let shaped_units =
-            self.shape_text_units(text, is_vertical, is_right_to_left, options.locale)?;
+        let shaped_units = self.shape_text_units(
+            text,
+            is_vertical,
+            is_right_to_left,
+            options.locale,
+            options.font_variant,
+        )?;
 
         for (index, unit) in shaped_units.iter().enumerate() {
             match *unit {

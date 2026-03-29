@@ -241,11 +241,34 @@ impl Default for FontStyle {
 pub enum FontVariant {
     Normal,
     SmallCaps,
+    Jis78,
+    Jis90,
+    TraditionalForms,
+    NlcKanjiForms,
 }
 
 impl Default for FontVariant {
     fn default() -> Self {
         Self::Normal
+    }
+}
+
+impl FontVariant {
+    #[cfg_attr(not(feature = "layout"), allow(dead_code))]
+    pub(crate) fn gsub_feature_tags(self) -> &'static [[u8; 4]] {
+        const EMPTY: &[[u8; 4]] = &[];
+        const JP78: &[[u8; 4]] = &[*b"jp78"];
+        const JP90: &[[u8; 4]] = &[*b"jp90"];
+        const TRAD: &[[u8; 4]] = &[*b"trad"];
+        const NLCK: &[[u8; 4]] = &[*b"nlck"];
+
+        match self {
+            Self::Normal | Self::SmallCaps => EMPTY,
+            Self::Jis78 => JP78,
+            Self::Jis90 => JP90,
+            Self::TraditionalForms => TRAD,
+            Self::NlcKanjiForms => NLCK,
+        }
     }
 }
 

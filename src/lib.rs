@@ -394,8 +394,11 @@ impl FontFamily {
                         &mut cursor_y,
                         options,
                     )?;
-                    max_line_width =
-                        max_line_width.max(cursor_inline_extent(cursor_x, cursor_y, options.text_direction));
+                    max_line_width = max_line_width.max(cursor_inline_extent(
+                        cursor_x,
+                        cursor_y,
+                        options.text_direction,
+                    ));
                     match options.text_direction {
                         TextDirection::LeftToRight | TextDirection::RightToLeft => {
                             cursor_x = 0.0;
@@ -423,8 +426,7 @@ impl FontFamily {
                     }
                 }
                 fontreader::ParsedTextUnit::Glyph { .. } => {
-                    let face_index =
-                        self.select_face_for_unit(unit, &candidate_indices, options);
+                    let face_index = self.select_face_for_unit(unit, &candidate_indices, options);
                     if pending_face != Some(face_index) {
                         self.flush_family_segment(
                             &mut glyphs,
@@ -656,8 +658,7 @@ fn glyph_run_cursor_delta(run: &GlyphRun, text_direction: TextDirection) -> (f32
                 .sum(),
         ),
         TextDirection::RightToLeft => (
-            -run
-                .glyphs
+            -run.glyphs
                 .iter()
                 .map(|glyph| glyph.glyph.metrics.advance_x)
                 .sum::<f32>(),

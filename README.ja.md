@@ -12,6 +12,7 @@ English: [README.md](README.md)
 - `FontOptions::new(&font)` でロード済みフォントをそのまま渡せます。
 - `font_size` と `line_height` は px として解釈されます。
 - `font_stretch`、`font_style`、`font_variant`、`font_weight` を `FontOptions` に保持できます。
+- `font_variant` は、`layout` feature 有効時に GSUB `jp78` / `jp90` / `trad` / `nlck` を使う `Jis78` / `Jis90` / `TraditionalForms` / `NlcKanjiForms` にも対応します。
 - `FontOptions::with_vertical_flow()` と `FontOptions::with_right_to_left()` で文字の進行方向を指定できます。
 - `layout` feature 有効時は `FontOptions::with_locale("ja-JP")` で GSUB `locl` を要求できます。
 - `FontOptions::from_family(&family)` を使うと、キャッシュ済みの `FontFamily` から family/name/weight/style/stretch 条件で face を選べます。
@@ -21,6 +22,7 @@ English: [README.md](README.md)
 - `sbix` は `GlyphLayer::Raster` として返します。
 - COLR/CPAL の色は `GlyphPaint::Solid(0xAARRGGBB)` に詰めて返すので、そのまま `paintcore::path::draw_glyphs` に渡せます。
 - SVG glyph は現状 `ErrorKind::Unsupported` を返します。
+- 旧来の `Font::get_svg()` は、shared な SVG table document から対象 glyph の payload だけを切り出して返すようになりました。
 - 既存の `font.text2command()` は deprecated の旧 API ですが、`sbix` については `GlyphCommands::bitmap` に bitmap payload を保持するようにしました。レイヤーごとの色や完全な color glyph 構造までは保持しません。カラーグリフを扱う場合は `fontloader::text2commands(..., FontOptions)`、`LoadedFont::text2glyph_run()`、または `FontFamily::text2glyph_run()` を使ってください。
 
 ## Renderer 連携仕様
@@ -176,8 +178,10 @@ if buffer.is_complete() {
 - RTL shaping: GSUB の `rlig` required ligature も、存在するフォントでは RTL shaping に反映
 - RTL shaping: フォントに存在する場合は GSUB `rclt` / `calt` / `clig` の contextual substitution / ligature も反映
 - locale に応じた lookup 収集では、`arab` / `hebr` / `syrc` など対応する script を `DFLT` より先に優先し、required feature も先に取り込みます
+- language system の選択も `ur-Arab-PK` のような locale 全体を見て行うようになり、script default より言語固有の lookup を優先できます
+- `FontOptions::font_variant` から GSUB `jp78` / `jp90` / `trad` / `nlck` の日本語 variant form を要求できます
 - 部分実装: GSUB の Context Format 1 / 2 / 3 と Chaining Context Format 1 / 2 / 3 は、新しい feature-sequence 適用器経由で反映
-- 現状の制限: context/chaining は未実装のケースも多く、特により広い script 固有 RTL shaping は未完成
+- 現状の制限: context/chaining は未実装のケースも多く、特に locale/script 選択の先にあるより広い script 固有 chaining はまだ未完成
 - 未実装: `lookup_width()`, `lookup_number()`
 
 ### Lookup パース

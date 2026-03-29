@@ -4,10 +4,8 @@ use std::collections::HashSet;
 use std::io::SeekFrom;
 
 use crate::opentype::layouts::{
-    classdef::ClassDef,
-    coverage::Coverage,
-    script::ParsedScript,
-    FeatureList, FeatureVariationList, ScriptList,
+    classdef::ClassDef, coverage::Coverage, script::ParsedScript, FeatureList,
+    FeatureVariationList, ScriptList,
 };
 use bin_rs::reader::BinaryReader;
 
@@ -31,10 +29,7 @@ impl ValueRecord {
         self.y_advance = self.y_advance.saturating_add(other.y_advance);
     }
 
-    fn parse<R: BinaryReader>(
-        reader: &mut R,
-        value_format: u16,
-    ) -> Result<Self, std::io::Error> {
+    fn parse<R: BinaryReader>(reader: &mut R, value_format: u16) -> Result<Self, std::io::Error> {
         let mut value = Self::default();
 
         if value_format & 0x0001 != 0 {
@@ -50,7 +45,9 @@ impl ValueRecord {
             value.y_advance = reader.read_i16_be()?;
         }
 
-        for flag in [0x0010u16, 0x0020, 0x0040, 0x0080, 0x0100, 0x0200, 0x0400, 0x0800] {
+        for flag in [
+            0x0010u16, 0x0020, 0x0040, 0x0080, 0x0100, 0x0200, 0x0400, 0x0800,
+        ] {
             if value_format & flag != 0 {
                 let _ = reader.read_u16_be()?;
             }
@@ -350,42 +347,88 @@ impl GPOS {
         let _pos_format = reader.read_u16_be()?;
         let extension_lookup_type = reader.read_u16_be()?;
         let extension_offset = reader.read_u32_be()?;
-        Ok(PositioningSubtable::Extension(Box::new(Self::parse_subtable(
-            reader,
-            extension_lookup_type,
-            offset + extension_offset as u64,
-        )?)))
+        Ok(PositioningSubtable::Extension(Box::new(
+            Self::parse_subtable(
+                reader,
+                extension_lookup_type,
+                offset + extension_offset as u64,
+            )?,
+        )))
     }
 
-    fn locale_to_language_system_tag(locale: &str) -> Option<u32> {
+    fn locale_subtags(locale: &str) -> Vec<String> {
         let locale = locale.trim();
         if locale.is_empty() {
-            return None;
+            return Vec::new();
         }
 
-        let primary = locale
+        locale
             .split(['-', '_'])
-            .next()
-            .unwrap_or(locale)
-            .trim();
-        if primary.is_empty() {
-            return None;
+            .map(str::trim)
+            .filter(|subtag| !subtag.is_empty())
+            .map(|subtag| subtag.to_ascii_lowercase())
+            .collect()
+    }
+
+    fn push_language_system_tag(tags: &mut Vec<u32>, tag: [u8; 4]) {
+        let tag = u32::from_be_bytes(tag);
+        if !tags.contains(&tag) {
+            tags.push(tag);
+        }
+    }
+
+    fn locale_to_language_system_tags(locale: &str) -> Vec<u32> {
+        let subtags = Self::locale_subtags(locale);
+        if subtags.is_empty() {
+            return Vec::new();
         }
 
-        let lower = primary.to_ascii_lowercase();
-        let tag = match lower.as_str() {
-            "default" => [0, 0, 0, 0],
-            "ja" | "jp" | "jpn" => *b"JAN ",
-            _ => {
-                let mut tag = [b' '; 4];
-                for (i, ch) in primary.chars().take(4).enumerate() {
-                    tag[i] = ch.to_ascii_uppercase() as u8;
-                }
-                tag
+        let mut tags = Vec::new();
+        match subtags[0].as_str() {
+            "default" => Self::push_language_system_tag(&mut tags, [0, 0, 0, 0]),
+            "ja" | "jp" | "jpn" => Self::push_language_system_tag(&mut tags, *b"JAN "),
+            "ar" | "ara" => Self::push_language_system_tag(&mut tags, *b"ARA "),
+            "fa" | "fas" | "per" => Self::push_language_system_tag(&mut tags, *b"FAR "),
+            "ur" | "urd" => Self::push_language_system_tag(&mut tags, *b"URD "),
+            "sd" | "snd" => Self::push_language_system_tag(&mut tags, *b"SND "),
+            "he" | "heb" => {
+                Self::push_language_system_tag(&mut tags, *b"IWR ");
+                Self::push_language_system_tag(&mut tags, *b"HEB ");
             }
-        };
+            "syr" => Self::push_language_system_tag(&mut tags, *b"SYR "),
+            "syrj" => Self::push_language_system_tag(&mut tags, *b"SYRJ"),
+            "syrn" => Self::push_language_system_tag(&mut tags, *b"SYRN"),
+            _ => {}
+        }
 
-        Some(u32::from_be_bytes(tag))
+        for subtag in &subtags {
+            match subtag.as_str() {
+                "jp" => Self::push_language_system_tag(&mut tags, *b"JAN "),
+                "arab" | "ar" | "ara" => Self::push_language_system_tag(&mut tags, *b"ARA "),
+                "urd" | "ur" => Self::push_language_system_tag(&mut tags, *b"URD "),
+                "far" | "fa" | "fas" | "per" => Self::push_language_system_tag(&mut tags, *b"FAR "),
+                "snd" | "sd" => Self::push_language_system_tag(&mut tags, *b"SND "),
+                "heb" | "he" => {
+                    Self::push_language_system_tag(&mut tags, *b"IWR ");
+                    Self::push_language_system_tag(&mut tags, *b"HEB ");
+                }
+                "syrc" | "syr" => Self::push_language_system_tag(&mut tags, *b"SYR "),
+                "syrj" => Self::push_language_system_tag(&mut tags, *b"SYRJ"),
+                "syrn" => Self::push_language_system_tag(&mut tags, *b"SYRN"),
+                _ if (subtag.len() == 3 || subtag.len() == 4)
+                    && subtag.bytes().all(|byte| byte.is_ascii_alphabetic()) =>
+                {
+                    let mut tag = [b' '; 4];
+                    for (i, ch) in subtag.chars().take(4).enumerate() {
+                        tag[i] = ch.to_ascii_uppercase() as u8;
+                    }
+                    Self::push_language_system_tag(&mut tags, tag);
+                }
+                _ => {}
+            }
+        }
+
+        tags
     }
 
     fn get_language_systems<'a>(
@@ -396,13 +439,19 @@ impl GPOS {
         let mut systems = Vec::new();
 
         if let Some(locale) = locale {
-            if let Some(tag) = Self::locale_to_language_system_tag(locale) {
+            for tag in Self::locale_to_language_system_tags(locale) {
                 if let Some(language_system) = script
                     .language_systems
                     .iter()
                     .find(|record| record.language_system_tag == tag)
                 {
-                    systems.push(language_system);
+                    if !systems.iter().any(
+                        |existing: &&crate::opentype::layouts::LanguageSystemRecord| {
+                            existing.language_system_tag == language_system.language_system_tag
+                        },
+                    ) {
+                        systems.push(language_system);
+                    }
                 }
             }
 
@@ -535,17 +584,23 @@ impl GPOS {
     fn partition_scripts<'a>(
         &'a self,
         locale: Option<&str>,
-    ) -> (Vec<&'a ParsedScript>, Vec<&'a ParsedScript>, Vec<&'a ParsedScript>) {
+    ) -> (
+        Vec<&'a ParsedScript>,
+        Vec<&'a ParsedScript>,
+        Vec<&'a ParsedScript>,
+    ) {
         if locale.is_none() {
-            return (self.scripts.scripts.iter().collect(), Vec::new(), Vec::new());
+            return (
+                self.scripts.scripts.iter().collect(),
+                Vec::new(),
+                Vec::new(),
+            );
         }
 
         let mut preferred = Vec::new();
         let mut defaults = Vec::new();
         let mut others = Vec::new();
-        let preferred_tags = locale
-            .map(Self::locale_to_script_tags)
-            .unwrap_or_default();
+        let preferred_tags = locale.map(Self::locale_to_script_tags).unwrap_or_default();
 
         if let Some(locale) = locale {
             for script_tag in Self::locale_to_script_tags(locale) {
@@ -564,7 +619,10 @@ impl GPOS {
             if script.script_tag == u32::from_be_bytes(*b"DFLT") {
                 defaults.push(script);
             } else if preferred_tags.contains(&script.script_tag) {
-                if !preferred.iter().any(|existing| existing.script_tag == script.script_tag) {
+                if !preferred
+                    .iter()
+                    .any(|existing| existing.script_tag == script.script_tag)
+                {
                     preferred.push(script);
                 }
             } else {
@@ -576,37 +634,39 @@ impl GPOS {
     }
 
     fn locale_to_script_tags(locale: &str) -> Vec<u32> {
-        let locale = locale.trim();
-        if locale.is_empty() {
+        let subtags = Self::locale_subtags(locale);
+        if subtags.is_empty() {
             return Vec::new();
         }
 
-        let primary = locale
-            .split(|c| c == '-' || c == '_')
-            .next()
-            .unwrap_or(locale)
-            .trim()
-            .to_ascii_lowercase();
-
-        match primary.as_str() {
-            "ar" | "ara" => vec![u32::from_be_bytes(*b"arab")],
-            "he" | "heb" => vec![u32::from_be_bytes(*b"hebr")],
-            "syr" | "syc" | "syrj" | "syrn" => vec![u32::from_be_bytes(*b"syrc")],
-            "ja" | "jp" | "jpn" => vec![
-                u32::from_be_bytes(*b"kana"),
-                u32::from_be_bytes(*b"hani"),
-            ],
-            "ko" | "kor" => vec![u32::from_be_bytes(*b"hang")],
-            "zh" | "zho" | "chi" => vec![u32::from_be_bytes(*b"hani")],
-            _ if primary.len() == 4 => {
-                let mut tag = [b' '; 4];
-                for (index, byte) in primary.bytes().take(4).enumerate() {
-                    tag[index] = byte;
-                }
-                vec![u32::from_be_bytes(tag)]
+        let mut tags = Vec::new();
+        let mut push_tag = |tag: [u8; 4]| {
+            let tag = u32::from_be_bytes(tag);
+            if !tags.contains(&tag) {
+                tags.push(tag);
             }
-            _ => Vec::new(),
+        };
+
+        for subtag in &subtags {
+            match subtag.as_str() {
+                "arab" | "ar" | "ara" | "urd" | "fas" | "per" | "snd" => push_tag(*b"arab"),
+                "hebr" | "he" | "heb" => push_tag(*b"hebr"),
+                "syrc" | "syr" | "syc" | "syrj" | "syrn" => push_tag(*b"syrc"),
+                "kana" | "ja" | "jp" | "jpn" => push_tag(*b"kana"),
+                "hani" | "zh" | "zho" | "chi" => push_tag(*b"hani"),
+                "hang" | "ko" | "kor" => push_tag(*b"hang"),
+                _ if subtag.len() == 4 && subtag.bytes().all(|byte| byte.is_ascii_alphabetic()) => {
+                    let mut tag = [b' '; 4];
+                    for (index, byte) in subtag.bytes().take(4).enumerate() {
+                        tag[index] = byte;
+                    }
+                    push_tag(tag);
+                }
+                _ => {}
+            }
         }
+
+        tags
     }
 
     fn collect_language_system_feature_indices(

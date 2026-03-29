@@ -573,9 +573,69 @@ mod tests {
     }
 
     #[cfg(feature = "layout")]
-    fn build_script_list_with_default_lang_systems(
-        scripts: &[([u8; 4], u16, &[u16])],
+    fn build_script_list_with_language_systems(
+        scripts: &[([u8; 4], &[(u32, u16, &[u16])])],
     ) -> Vec<u8> {
+        let mut script_list = Vec::new();
+        push_u16(&mut script_list, scripts.len() as u16);
+
+        let script_records_pos = script_list.len();
+        script_list.resize(script_list.len() + scripts.len() * 6, 0);
+
+        let mut script_offsets = Vec::new();
+        for (_, language_systems) in scripts {
+            let script_start = script_list.len();
+            script_offsets.push(script_start as u16);
+
+            let default_index = language_systems.iter().position(|(tag, _, _)| *tag == 0);
+            let non_default_count = language_systems.len() - usize::from(default_index.is_some());
+
+            push_u16(&mut script_list, 0);
+            push_u16(&mut script_list, non_default_count as u16);
+
+            let language_records_pos = script_list.len();
+            script_list.resize(script_list.len() + non_default_count * 6, 0);
+
+            let mut default_offset = 0u16;
+            let mut non_default_offsets = Vec::new();
+
+            for (tag, required_feature_index, feature_indices) in *language_systems {
+                let offset = (script_list.len() - script_start) as u16;
+                push_u16(&mut script_list, 0);
+                push_u16(&mut script_list, *required_feature_index);
+                push_u16(&mut script_list, feature_indices.len() as u16);
+                for feature_index in *feature_indices {
+                    push_u16(&mut script_list, *feature_index);
+                }
+
+                if *tag == 0 {
+                    default_offset = offset;
+                } else {
+                    non_default_offsets.push((*tag, offset));
+                }
+            }
+
+            script_list[script_start..script_start + 2]
+                .copy_from_slice(&default_offset.to_be_bytes());
+
+            for (index, (tag, offset)) in non_default_offsets.iter().enumerate() {
+                let start = language_records_pos + index * 6;
+                script_list[start..start + 4].copy_from_slice(&tag.to_be_bytes());
+                script_list[start + 4..start + 6].copy_from_slice(&offset.to_be_bytes());
+            }
+        }
+
+        for (index, (script_tag, _)) in scripts.iter().enumerate() {
+            let start = script_records_pos + index * 6;
+            script_list[start..start + 4].copy_from_slice(script_tag);
+            script_list[start + 4..start + 6].copy_from_slice(&script_offsets[index].to_be_bytes());
+        }
+
+        script_list
+    }
+
+    #[cfg(feature = "layout")]
+    fn build_script_list_with_default_lang_systems(scripts: &[([u8; 4], u16, &[u16])]) -> Vec<u8> {
         let mut script_list = Vec::new();
         push_u16(&mut script_list, scripts.len() as u16);
 
@@ -635,7 +695,7 @@ mod tests {
     #[cfg(feature = "layout")]
     fn build_gpos_table(feature_tag: [u8; 4], lookup_type: u16, subtable: Vec<u8>) -> Vec<u8> {
         build_gpos_table_with_scripted_features(
-            &[( *b"DFLT", 0xFFFF, &[0])],
+            &[(*b"DFLT", 0xFFFF, &[0])],
             &[(feature_tag, &[0])],
             lookup_type,
             vec![subtable],
@@ -1057,9 +1117,11 @@ mod tests {
         lookup_list_index: u16,
     ) -> Vec<u8> {
         let coverage = coverage_table(&[coverage_glyph_id]);
-        let backtrack_class_def = class_def_format1_table(coverage_glyph_id - 1, &[backtrack_classes[0]]);
+        let backtrack_class_def =
+            class_def_format1_table(coverage_glyph_id - 1, &[backtrack_classes[0]]);
         let input_class_def = class_def_format1_table(coverage_glyph_id, &[1, input_classes[0]]);
-        let lookahead_class_def = class_def_format1_table(coverage_glyph_id + 2, &[lookahead_classes[0]]);
+        let lookahead_class_def =
+            class_def_format1_table(coverage_glyph_id + 2, &[lookahead_classes[0]]);
 
         let mut rule = Vec::new();
         push_u16(&mut rule, backtrack_classes.len() as u16);
@@ -1290,8 +1352,8 @@ mod tests {
     #[cfg(feature = "layout")]
     fn gpos_locale_specific_script_and_required_feature_take_priority_over_dflt() {
         let gpos = parse_gpos(build_gpos_table_with_scripted_features(
-            &[( *b"DFLT", 0xFFFF, &[0]), (*b"arab", 1, &[])],
-            &[( *b"kern", &[0]), (*b"kern", &[1])],
+            &[(*b"DFLT", 0xFFFF, &[0]), (*b"arab", 1, &[])],
+            &[(*b"kern", &[0]), (*b"kern", &[1])],
             2,
             vec![
                 build_gpos_pair_format1_subtable(10, 20, -10),
@@ -1382,7 +1444,11 @@ mod tests {
             *b"calt",
             &[0],
             vec![
-                lookup_context_format3_record(&[coverage_table(&[10]), coverage_table(&[11])], 1, 1),
+                lookup_context_format3_record(
+                    &[coverage_table(&[10]), coverage_table(&[11])],
+                    1,
+                    1,
+                ),
                 lookup_single_record(11, 77),
             ],
         ));
@@ -1469,7 +1535,12 @@ mod tests {
                 lookup_single_record(21, 123),
             ],
         ));
-        let mut glyphs = vec![(19usize, 0usize), (20usize, 1usize), (21usize, 2usize), (22usize, 3usize)];
+        let mut glyphs = vec![
+            (19usize, 0usize),
+            (20usize, 1usize),
+            (21usize, 2usize),
+            (22usize, 3usize),
+        ];
 
         gsub.apply_feature_sequence(&mut glyphs, None, &[*b"calt"]);
 
@@ -1483,7 +1554,11 @@ mod tests {
             *b"rclt",
             &[0],
             vec![
-                lookup_context_format3_record(&[coverage_table(&[10]), coverage_table(&[11])], 1, 1),
+                lookup_context_format3_record(
+                    &[coverage_table(&[10]), coverage_table(&[11])],
+                    1,
+                    1,
+                ),
                 lookup_single_record(11, 144),
             ],
         ));
@@ -1513,7 +1588,7 @@ mod tests {
     #[cfg(feature = "layout")]
     fn gsub_locale_specific_script_lookups_take_priority_over_dflt() {
         let gsub = parse_gsub(build_gsub_table_with_scripted_feature_lookups(
-            &[( *b"DFLT", &[0]), (*b"arab", &[1])],
+            &[(*b"DFLT", &[0]), (*b"arab", &[1])],
             *b"isol",
             &[vec![0], vec![1]],
             vec![lookup_single_record(10, 100), lookup_single_record(10, 200)],
@@ -1530,8 +1605,8 @@ mod tests {
     #[cfg(feature = "layout")]
     fn gsub_required_feature_is_applied_for_locale_specific_script() {
         let gsub = parse_gsub(build_gsub_table_with_scripted_features(
-            &[( *b"DFLT", 0xFFFF, &[0]), (*b"arab", 1, &[])],
-            &[( *b"isol", &[0]), (*b"isol", &[1])],
+            &[(*b"DFLT", 0xFFFF, &[0]), (*b"arab", 1, &[])],
+            &[(*b"isol", &[0]), (*b"isol", &[1])],
             vec![lookup_single_record(10, 100), lookup_single_record(10, 200)],
         ));
 
@@ -1540,6 +1615,45 @@ mod tests {
 
         let arabic_forms = gsub.lookup_joining_forms(10, Some("ar"));
         assert_eq!(arabic_forms.isolated, Some(200));
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn gsub_language_specific_lookup_uses_full_locale_subtags() {
+        let script_list = build_script_list_with_language_systems(&[(
+            *b"arab",
+            &[
+                (0u32, 0xFFFF, &[0][..]),
+                (u32::from_be_bytes(*b"URD "), 0xFFFF, &[1][..]),
+            ],
+        )]);
+        let feature_list = build_feature_list_with_entries(&[(*b"isol", &[0]), (*b"isol", &[1])]);
+        let lookup_list = build_lookup_list(vec![
+            lookup_single_record(10, 100),
+            lookup_single_record(10, 300),
+        ]);
+
+        let script_list_offset = 10u16;
+        let feature_list_offset = script_list_offset + script_list.len() as u16;
+        let lookup_list_offset = feature_list_offset + feature_list.len() as u16;
+
+        let mut buffer = Vec::new();
+        push_u16(&mut buffer, 1);
+        push_u16(&mut buffer, 0);
+        push_u16(&mut buffer, script_list_offset);
+        push_u16(&mut buffer, feature_list_offset);
+        push_u16(&mut buffer, lookup_list_offset);
+        buffer.extend_from_slice(&script_list);
+        buffer.extend_from_slice(&feature_list);
+        buffer.extend_from_slice(&lookup_list);
+
+        let gsub = parse_gsub(buffer);
+
+        let default_forms = gsub.lookup_joining_forms(10, Some("ar"));
+        assert_eq!(default_forms.isolated, Some(100));
+
+        let urdu_forms = gsub.lookup_joining_forms(10, Some("ur-Arab-PK"));
+        assert_eq!(urdu_forms.isolated, Some(300));
     }
 
     #[test]
@@ -2042,9 +2156,7 @@ mod tests {
     }
 
     #[cfg(feature = "layout")]
-    fn first_real_arabic_joining_pair(
-        font: &crate::LoadedFont,
-    ) -> Option<(String, Vec<usize>)> {
+    fn first_real_arabic_joining_pair(font: &crate::LoadedFont) -> Option<(String, Vec<usize>)> {
         let gsub = font.font().gsub.as_ref()?;
         let cmap = font.font().cmap.as_ref()?;
         let candidates: Vec<char> = (0x0621u32..=0x064Au32)
@@ -2211,8 +2323,10 @@ mod tests {
                 else {
                     continue;
                 };
-                let total_advance =
-                    adjustment.first.x_advance.saturating_add(adjustment.second.x_advance);
+                let total_advance = adjustment
+                    .first
+                    .x_advance
+                    .saturating_add(adjustment.second.x_advance);
                 if total_advance != 0 {
                     return Some((left, right, total_advance));
                 }
@@ -2229,6 +2343,61 @@ mod tests {
 
     fn japanese_font_path() -> std::path::PathBuf {
         test_fonts_dir().join("NotoSansJP-Regular.otf")
+    }
+
+    #[cfg(feature = "layout")]
+    fn japanese_layout_font_paths() -> Vec<std::path::PathBuf> {
+        vec![
+            japanese_font_path(),
+            test_fonts_dir().join("NotoSansCJK-Regular.ttc"),
+            test_fonts_dir().join("windows").join("msgothic.ttc"),
+            test_fonts_dir().join("windows").join("YuGothR.ttc"),
+        ]
+    }
+
+    #[cfg(feature = "layout")]
+    fn first_real_variant_substitution(
+        font_variant: crate::FontVariant,
+    ) -> Option<(std::path::PathBuf, char, usize, usize)> {
+        for path in japanese_layout_font_paths() {
+            if !path.exists() {
+                continue;
+            }
+
+            let Ok(font) = crate::load_font_from_file(&path) else {
+                continue;
+            };
+            let Some(cmap) = font.font().cmap.as_ref() else {
+                continue;
+            };
+            let Some(gsub) = font.font().gsub.as_ref() else {
+                continue;
+            };
+
+            for codepoint in 0x20u32..=0xFFFF {
+                let Some(ch) = char::from_u32(codepoint) else {
+                    continue;
+                };
+                if ch.is_control() {
+                    continue;
+                }
+
+                let glyph_id = cmap.get_glyph_position(codepoint) as usize;
+                if glyph_id == 0 {
+                    continue;
+                }
+
+                let mut variant_glyphs = vec![(glyph_id, 0usize)];
+                gsub.apply_variant_sequence(&mut variant_glyphs, Some("ja-JP"), font_variant);
+                if let Some((variant_glyph_id, _)) = variant_glyphs.first().copied() {
+                    if variant_glyph_id != glyph_id {
+                        return Some((path, ch, glyph_id, variant_glyph_id));
+                    }
+                }
+            }
+        }
+
+        None
     }
 
     #[cfg(feature = "layout")]
@@ -3105,6 +3274,74 @@ mod tests {
 
     #[test]
     #[cfg(feature = "layout")]
+    fn text_api_uses_real_jp78_variant_when_requested() {
+        let Some((path, ch, glyph_id, variant_glyph_id)) =
+            first_real_variant_substitution(crate::FontVariant::Jis78)
+        else {
+            return;
+        };
+        let font = crate::load_font_from_file(&path).expect("load japanese variant font");
+
+        let default_ids = font
+            .font()
+            .debug_shape_glyph_ids_with_variant(
+                &ch.to_string(),
+                Some("ja-JP"),
+                crate::FontVariant::Normal,
+            )
+            .expect("default glyph ids");
+        assert_eq!(default_ids, vec![glyph_id]);
+
+        let variant_ids = font
+            .font()
+            .debug_shape_glyph_ids_with_variant(
+                &ch.to_string(),
+                Some("ja-JP"),
+                crate::FontVariant::Jis78,
+            )
+            .expect("jp78 glyph ids");
+        assert_eq!(variant_ids, vec![variant_glyph_id]);
+        assert_ne!(glyph_id, variant_glyph_id);
+
+        let run = crate::text2commands(
+            &ch.to_string(),
+            crate::FontOptions::new(&font)
+                .with_font_size(32.0)
+                .with_locale("ja-JP")
+                .with_font_variant(crate::FontVariant::Jis78),
+        )
+        .expect("jp78 glyph run");
+        assert_eq!(run.glyphs.len(), 1);
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn font_family_text2commands_uses_real_jp78_variant_when_requested() {
+        let Some((path, ch, _, _variant_glyph_id)) =
+            first_real_variant_substitution(crate::FontVariant::Jis78)
+        else {
+            return;
+        };
+        let font = crate::load_font_from_file(&path).expect("load japanese variant font");
+        let mut family = crate::FontFamily::new("JIS Variant");
+        family.add_loaded_font(font);
+
+        let run = family
+            .text2commands(
+                &ch.to_string(),
+                family
+                    .options()
+                    .with_font_size(32.0)
+                    .with_locale("ja-JP")
+                    .with_font_variant(crate::FontVariant::Jis78),
+            )
+            .expect("family jp78 glyph run");
+        assert_eq!(run.glyphs.len(), 1);
+        assert!(run.glyphs[0].glyph.metrics.advance_x > 0.0);
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
     fn measure_uses_real_gpos_kern_pair_when_layout_enabled() {
         let font = crate::load_font_from_file(fira_sans_regular_path()).expect("load fira sans");
         let (left, right, total_adjustment) =
@@ -3131,10 +3368,8 @@ mod tests {
         let options = crate::FontOptions::new(&font).with_font_size(32.0);
         let pair = format!("{left}{right}");
 
-        let left_run =
-            crate::text2commands(&left.to_string(), options).expect("left glyph run");
-        let right_run =
-            crate::text2commands(&right.to_string(), options).expect("right glyph run");
+        let left_run = crate::text2commands(&left.to_string(), options).expect("left glyph run");
+        let right_run = crate::text2commands(&right.to_string(), options).expect("right glyph run");
         let pair_run = crate::text2commands(&pair, options).expect("pair glyph run");
 
         assert_eq!(pair_run.glyphs.len(), 2);
@@ -3236,8 +3471,8 @@ mod tests {
     #[cfg(feature = "layout")]
     fn vertical_lookup_uses_real_font_data() {
         let font = crate::fontload_file(japanese_font_path()).expect("load japanese font");
-        let (ch, horizontal, vertical) =
-            first_real_vertical_substitution(&font).expect("expected at least one vertical substitution");
+        let (ch, horizontal, vertical) = first_real_vertical_substitution(&font)
+            .expect("expected at least one vertical substitution");
         assert_ne!(horizontal, vertical, "vertical form should differ for {ch}");
     }
 
@@ -3287,7 +3522,11 @@ mod tests {
         let text = "אבג";
         let cmap = font.font().cmap.as_ref().expect("cmap");
         for ch in text.chars() {
-            assert_ne!(cmap.get_glyph_position(ch as u32), 0, "missing glyph for {ch}");
+            assert_ne!(
+                cmap.get_glyph_position(ch as u32),
+                0,
+                "missing glyph for {ch}"
+            );
         }
 
         let ltr_options = crate::FontOptions::new(&font).with_font_size(32.0);
@@ -3528,7 +3767,10 @@ mod tests {
         assert!(run.glyphs[1].x > run.glyphs[2].x);
 
         let measure = family
-            .measure_with_options("אבג", family.options().with_font_size(32.0).with_right_to_left())
+            .measure_with_options(
+                "אבג",
+                family.options().with_font_size(32.0).with_right_to_left(),
+            )
             .expect("family rtl measure");
         assert!(measure > 0.0);
     }

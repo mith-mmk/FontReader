@@ -248,17 +248,23 @@ impl GSUB {
     fn partition_scripts<'a>(
         &'a self,
         locale: Option<&str>,
-    ) -> (Vec<&'a ParsedScript>, Vec<&'a ParsedScript>, Vec<&'a ParsedScript>) {
+    ) -> (
+        Vec<&'a ParsedScript>,
+        Vec<&'a ParsedScript>,
+        Vec<&'a ParsedScript>,
+    ) {
         if locale.is_none() {
-            return (self.scripts.scripts.iter().collect(), Vec::new(), Vec::new());
+            return (
+                self.scripts.scripts.iter().collect(),
+                Vec::new(),
+                Vec::new(),
+            );
         }
 
         let mut preferred = Vec::new();
         let mut defaults = Vec::new();
         let mut others = Vec::new();
-        let preferred_tags = locale
-            .map(Self::locale_to_script_tags)
-            .unwrap_or_default();
+        let preferred_tags = locale.map(Self::locale_to_script_tags).unwrap_or_default();
 
         if let Some(locale) = locale {
             for script_tag in Self::locale_to_script_tags(locale) {
@@ -277,7 +283,10 @@ impl GSUB {
             if script.script_tag == u32::from_be_bytes(*b"DFLT") {
                 defaults.push(script);
             } else if preferred_tags.contains(&script.script_tag) {
-                if !preferred.iter().any(|existing| existing.script_tag == script.script_tag) {
+                if !preferred
+                    .iter()
+                    .any(|existing| existing.script_tag == script.script_tag)
+                {
                     preferred.push(script);
                 }
             } else {
@@ -288,69 +297,115 @@ impl GSUB {
         (preferred, defaults, others)
     }
 
-    fn locale_to_language_system_tag(locale: &str) -> Option<u32> {
-        let locale = locale.trim();
-        if locale.is_empty() {
-            return None;
-        }
-
-        let primary = locale
-            .split(|c| c == '-' || c == '_')
-            .next()
-            .unwrap_or(locale)
-            .trim();
-        if primary.is_empty() {
-            return None;
-        }
-
-        let lower = primary.to_ascii_lowercase();
-        let tag = match lower.as_str() {
-            "default" => [0, 0, 0, 0],
-            "ja" | "jp" | "jpn" => *b"JAN ",
-            _ => {
-                let mut tag = [b' '; 4];
-                for (i, ch) in primary.chars().take(4).enumerate() {
-                    tag[i] = ch.to_ascii_uppercase() as u8;
-                }
-                tag
-            }
-        };
-
-        Some(u32::from_be_bytes(tag))
-    }
-
-    fn locale_to_script_tags(locale: &str) -> Vec<u32> {
+    fn locale_subtags(locale: &str) -> Vec<String> {
         let locale = locale.trim();
         if locale.is_empty() {
             return Vec::new();
         }
 
-        let primary = locale
+        locale
             .split(|c| c == '-' || c == '_')
-            .next()
-            .unwrap_or(locale)
-            .trim()
-            .to_ascii_lowercase();
+            .map(str::trim)
+            .filter(|subtag| !subtag.is_empty())
+            .map(|subtag| subtag.to_ascii_lowercase())
+            .collect()
+    }
 
-        match primary.as_str() {
-            "ar" | "ara" => vec![u32::from_be_bytes(*b"arab")],
-            "he" | "heb" => vec![u32::from_be_bytes(*b"hebr")],
-            "syr" | "syc" | "syrj" | "syrn" => vec![u32::from_be_bytes(*b"syrc")],
-            "ja" | "jp" | "jpn" => vec![
-                u32::from_be_bytes(*b"kana"),
-                u32::from_be_bytes(*b"hani"),
-            ],
-            "ko" | "kor" => vec![u32::from_be_bytes(*b"hang")],
-            "zh" | "zho" | "chi" => vec![u32::from_be_bytes(*b"hani")],
-            _ if primary.len() == 4 => {
-                let mut tag = [b' '; 4];
-                for (index, byte) in primary.bytes().take(4).enumerate() {
-                    tag[index] = byte;
-                }
-                vec![u32::from_be_bytes(tag)]
-            }
-            _ => Vec::new(),
+    fn push_language_system_tag(tags: &mut Vec<u32>, tag: [u8; 4]) {
+        let tag = u32::from_be_bytes(tag);
+        if !tags.contains(&tag) {
+            tags.push(tag);
         }
+    }
+
+    fn locale_to_language_system_tags(locale: &str) -> Vec<u32> {
+        let subtags = Self::locale_subtags(locale);
+        if subtags.is_empty() {
+            return Vec::new();
+        }
+
+        let mut tags = Vec::new();
+        match subtags[0].as_str() {
+            "default" => Self::push_language_system_tag(&mut tags, [0, 0, 0, 0]),
+            "ja" | "jp" | "jpn" => Self::push_language_system_tag(&mut tags, *b"JAN "),
+            "ar" | "ara" => Self::push_language_system_tag(&mut tags, *b"ARA "),
+            "fa" | "fas" | "per" => Self::push_language_system_tag(&mut tags, *b"FAR "),
+            "ur" | "urd" => Self::push_language_system_tag(&mut tags, *b"URD "),
+            "sd" | "snd" => Self::push_language_system_tag(&mut tags, *b"SND "),
+            "he" | "heb" => {
+                Self::push_language_system_tag(&mut tags, *b"IWR ");
+                Self::push_language_system_tag(&mut tags, *b"HEB ");
+            }
+            "syr" => Self::push_language_system_tag(&mut tags, *b"SYR "),
+            "syrj" => Self::push_language_system_tag(&mut tags, *b"SYRJ"),
+            "syrn" => Self::push_language_system_tag(&mut tags, *b"SYRN"),
+            _ => {}
+        }
+
+        for subtag in &subtags {
+            match subtag.as_str() {
+                "jp" => Self::push_language_system_tag(&mut tags, *b"JAN "),
+                "arab" | "ar" | "ara" => Self::push_language_system_tag(&mut tags, *b"ARA "),
+                "urd" | "ur" => Self::push_language_system_tag(&mut tags, *b"URD "),
+                "far" | "fa" | "fas" | "per" => Self::push_language_system_tag(&mut tags, *b"FAR "),
+                "snd" | "sd" => Self::push_language_system_tag(&mut tags, *b"SND "),
+                "heb" | "he" => {
+                    Self::push_language_system_tag(&mut tags, *b"IWR ");
+                    Self::push_language_system_tag(&mut tags, *b"HEB ");
+                }
+                "syrc" | "syr" => Self::push_language_system_tag(&mut tags, *b"SYR "),
+                "syrj" => Self::push_language_system_tag(&mut tags, *b"SYRJ"),
+                "syrn" => Self::push_language_system_tag(&mut tags, *b"SYRN"),
+                _ if (subtag.len() == 3 || subtag.len() == 4)
+                    && subtag.bytes().all(|byte| byte.is_ascii_alphabetic()) =>
+                {
+                    let mut tag = [b' '; 4];
+                    for (i, ch) in subtag.chars().take(4).enumerate() {
+                        tag[i] = ch.to_ascii_uppercase() as u8;
+                    }
+                    Self::push_language_system_tag(&mut tags, tag);
+                }
+                _ => {}
+            }
+        }
+
+        tags
+    }
+
+    fn locale_to_script_tags(locale: &str) -> Vec<u32> {
+        let subtags = Self::locale_subtags(locale);
+        if subtags.is_empty() {
+            return Vec::new();
+        }
+
+        let mut tags = Vec::new();
+        let mut push_tag = |tag: [u8; 4]| {
+            let tag = u32::from_be_bytes(tag);
+            if !tags.contains(&tag) {
+                tags.push(tag);
+            }
+        };
+
+        for subtag in &subtags {
+            match subtag.as_str() {
+                "arab" | "ar" | "ara" | "urd" | "fas" | "per" | "snd" => push_tag(*b"arab"),
+                "hebr" | "he" | "heb" => push_tag(*b"hebr"),
+                "syrc" | "syr" | "syc" | "syrj" | "syrn" => push_tag(*b"syrc"),
+                "kana" | "ja" | "jp" | "jpn" => push_tag(*b"kana"),
+                "hani" | "zh" | "zho" | "chi" => push_tag(*b"hani"),
+                "hang" | "ko" | "kor" => push_tag(*b"hang"),
+                _ if subtag.len() == 4 && subtag.bytes().all(|byte| byte.is_ascii_alphabetic()) => {
+                    let mut tag = [b' '; 4];
+                    for (index, byte) in subtag.bytes().take(4).enumerate() {
+                        tag[index] = byte;
+                    }
+                    push_tag(tag);
+                }
+                _ => {}
+            }
+        }
+
+        tags
     }
 
     fn get_language_systems<'a>(
@@ -361,13 +416,19 @@ impl GSUB {
         let mut systems = Vec::new();
 
         if let Some(locale) = locale {
-            if let Some(tag) = Self::locale_to_language_system_tag(locale) {
+            for tag in Self::locale_to_language_system_tags(locale) {
                 if let Some(language_system) = script
                     .language_systems
                     .iter()
                     .find(|record| record.language_system_tag == tag)
                 {
-                    systems.push(language_system);
+                    if !systems.iter().any(
+                        |existing: &&crate::opentype::layouts::LanguageSystemRecord| {
+                            existing.language_system_tag == language_system.language_system_tag
+                        },
+                    ) {
+                        systems.push(language_system);
+                    }
                 }
             }
 
@@ -528,7 +589,9 @@ impl GSUB {
                             .component_glyph_ids
                             .iter()
                             .map(|glyph_id| *glyph_id as usize)
-                            .eq(glyphs[index + 1..index + expected_len].iter().map(|item| item.0))
+                            .eq(glyphs[index + 1..index + expected_len]
+                                .iter()
+                                .map(|item| item.0))
                         {
                             glyphs.splice(
                                 index..index + expected_len,
@@ -539,7 +602,9 @@ impl GSUB {
                     }
                 }
             }
-            crate::opentype::layouts::lookup::LookupSubstitution::ExtensionSubstitution(extension) => {
+            crate::opentype::layouts::lookup::LookupSubstitution::ExtensionSubstitution(
+                extension,
+            ) => {
                 return Self::apply_subtable_at(&extension.subtable, glyphs, index);
             }
             _ => {}
@@ -557,9 +622,10 @@ impl GSUB {
             return false;
         }
 
-        coverages.iter().enumerate().all(|(offset, coverage)| {
-            coverage.contains(glyphs[start + offset].0).is_some()
-        })
+        coverages
+            .iter()
+            .enumerate()
+            .all(|(offset, coverage)| coverage.contains(glyphs[start + offset].0).is_some())
     }
 
     fn matches_backtrack_coverages(
@@ -571,9 +637,10 @@ impl GSUB {
             return false;
         }
 
-        coverages.iter().enumerate().all(|(offset, coverage)| {
-            coverage.contains(glyphs[start - 1 - offset].0).is_some()
-        })
+        coverages
+            .iter()
+            .enumerate()
+            .all(|(offset, coverage)| coverage.contains(glyphs[start - 1 - offset].0).is_some())
     }
 
     fn matches_lookahead_coverages(
@@ -585,9 +652,10 @@ impl GSUB {
             return false;
         }
 
-        coverages.iter().enumerate().all(|(offset, coverage)| {
-            coverage.contains(glyphs[start + offset].0).is_some()
-        })
+        coverages
+            .iter()
+            .enumerate()
+            .all(|(offset, coverage)| coverage.contains(glyphs[start + offset].0).is_some())
     }
 
     fn apply_lookup_index_at(
@@ -653,11 +721,13 @@ impl GSUB {
                     if index + rule.input_sequence.len() >= glyphs.len() + 1 {
                         continue;
                     }
-                    let matches = rule
-                        .input_sequence
-                        .iter()
-                        .enumerate()
-                        .all(|(offset, expected)| glyphs[index + 1 + offset].0 == *expected as usize);
+                    let matches =
+                        rule.input_sequence
+                            .iter()
+                            .enumerate()
+                            .all(|(offset, expected)| {
+                                glyphs[index + 1 + offset].0 == *expected as usize
+                            });
                     if !matches {
                         continue;
                     }
@@ -687,9 +757,16 @@ impl GSUB {
                     if index + rule.input_sequences.len() >= glyphs.len() + 1 {
                         continue;
                     }
-                    let matches = rule.input_sequences.iter().enumerate().all(|(offset, expected)| {
-                        context.class_def.get_class(glyphs[index + 1 + offset].0 as u16) == *expected
-                    });
+                    let matches =
+                        rule.input_sequences
+                            .iter()
+                            .enumerate()
+                            .all(|(offset, expected)| {
+                                context
+                                    .class_def
+                                    .get_class(glyphs[index + 1 + offset].0 as u16)
+                                    == *expected
+                            });
                     if !matches {
                         continue;
                     }
@@ -719,27 +796,33 @@ impl GSUB {
                     if rule.backtrack_glyph_ids.len() > index {
                         continue;
                     }
-                    if index + rule.input_glyph_ids.len() + rule.lookahead_glyph_ids.len() >= glyphs.len() + 1 {
+                    if index + rule.input_glyph_ids.len() + rule.lookahead_glyph_ids.len()
+                        >= glyphs.len() + 1
+                    {
                         continue;
                     }
-                    let backtrack_matches = rule
-                        .backtrack_glyph_ids
-                        .iter()
-                        .enumerate()
-                        .all(|(offset, expected)| glyphs[index - 1 - offset].0 == *expected as usize);
-                    let input_matches = rule
-                        .input_glyph_ids
-                        .iter()
-                        .enumerate()
-                        .all(|(offset, expected)| glyphs[index + 1 + offset].0 == *expected as usize);
-                    let lookahead_matches = rule
-                        .lookahead_glyph_ids
-                        .iter()
-                        .enumerate()
-                        .all(|(offset, expected)| {
-                            glyphs[index + 1 + rule.input_glyph_ids.len() + offset].0
-                                == *expected as usize
-                        });
+                    let backtrack_matches =
+                        rule.backtrack_glyph_ids
+                            .iter()
+                            .enumerate()
+                            .all(|(offset, expected)| {
+                                glyphs[index - 1 - offset].0 == *expected as usize
+                            });
+                    let input_matches =
+                        rule.input_glyph_ids
+                            .iter()
+                            .enumerate()
+                            .all(|(offset, expected)| {
+                                glyphs[index + 1 + offset].0 == *expected as usize
+                            });
+                    let lookahead_matches =
+                        rule.lookahead_glyph_ids
+                            .iter()
+                            .enumerate()
+                            .all(|(offset, expected)| {
+                                glyphs[index + 1 + rule.input_glyph_ids.len() + offset].0
+                                    == *expected as usize
+                            });
                     if !(backtrack_matches && input_matches && lookahead_matches) {
                         continue;
                     }
@@ -774,34 +857,47 @@ impl GSUB {
                     if rule.backtrack_sequences.len() > index {
                         continue;
                     }
-                    if index + rule.input_sequences.len() + rule.lookahead_class_ids.len() >= glyphs.len() + 1 {
+                    if index + rule.input_sequences.len() + rule.lookahead_class_ids.len()
+                        >= glyphs.len() + 1
+                    {
                         continue;
                     }
 
                     let backtrack_matches = if let Some(backtrack_class_def) =
                         chaining.backtrack_class_def.as_ref()
                     {
-                        rule.backtrack_sequences.iter().enumerate().all(|(offset, expected)| {
-                            backtrack_class_def.get_class(glyphs[index - 1 - offset].0 as u16)
-                                == *expected
-                        })
+                        rule.backtrack_sequences
+                            .iter()
+                            .enumerate()
+                            .all(|(offset, expected)| {
+                                backtrack_class_def.get_class(glyphs[index - 1 - offset].0 as u16)
+                                    == *expected
+                            })
                     } else {
                         rule.backtrack_sequences.is_empty()
                     };
-                    let input_matches = rule.input_sequences.iter().enumerate().all(|(offset, expected)| {
-                        input_class_def.get_class(glyphs[index + 1 + offset].0 as u16) == *expected
-                    });
-                    let lookahead_matches = if let Some(lookahead_class_def) =
-                        chaining.lookahead_class_def.as_ref()
-                    {
-                        rule.lookahead_class_ids.iter().enumerate().all(|(offset, expected)| {
-                            lookahead_class_def.get_class(
-                                glyphs[index + 1 + rule.input_sequences.len() + offset].0 as u16,
-                            ) == *expected
-                        })
-                    } else {
-                        rule.lookahead_class_ids.is_empty()
-                    };
+                    let input_matches =
+                        rule.input_sequences
+                            .iter()
+                            .enumerate()
+                            .all(|(offset, expected)| {
+                                input_class_def.get_class(glyphs[index + 1 + offset].0 as u16)
+                                    == *expected
+                            });
+                    let lookahead_matches =
+                        if let Some(lookahead_class_def) = chaining.lookahead_class_def.as_ref() {
+                            rule.lookahead_class_ids
+                                .iter()
+                                .enumerate()
+                                .all(|(offset, expected)| {
+                                    lookahead_class_def.get_class(
+                                        glyphs[index + 1 + rule.input_sequences.len() + offset].0
+                                            as u16,
+                                    ) == *expected
+                                })
+                        } else {
+                            rule.lookahead_class_ids.is_empty()
+                        };
 
                     if !(backtrack_matches && input_matches && lookahead_matches) {
                         continue;
@@ -816,7 +912,8 @@ impl GSUB {
             crate::opentype::layouts::lookup::LookupSubstitution::ChainingContextSubstitution3(
                 chaining,
             ) => {
-                if !Self::matches_backtrack_coverages(&chaining.backtrack_coverages, glyphs, index) {
+                if !Self::matches_backtrack_coverages(&chaining.backtrack_coverages, glyphs, index)
+                {
                     return false;
                 }
                 if !Self::matches_input_coverages(&chaining.input_coverages, glyphs, index) {
@@ -831,9 +928,9 @@ impl GSUB {
                 }
                 self.apply_sequence_lookup_records(&chaining.seq_lookup_records, glyphs, index)
             }
-            crate::opentype::layouts::lookup::LookupSubstitution::ExtensionSubstitution(extension) => {
-                self.apply_subtable_at_with_tables(&extension.subtable, glyphs, index)
-            }
+            crate::opentype::layouts::lookup::LookupSubstitution::ExtensionSubstitution(
+                extension,
+            ) => self.apply_subtable_at_with_tables(&extension.subtable, glyphs, index),
             _ => Self::apply_subtable_at(subtable, glyphs, index),
         }
     }
@@ -950,6 +1047,19 @@ impl GSUB {
         self.apply_feature_sequence(glyphs, locale, &[*b"rlig", *b"rclt", *b"calt", *b"clig"]);
     }
 
+    pub(crate) fn apply_variant_sequence(
+        &self,
+        glyphs: &mut Vec<(usize, usize)>,
+        locale: Option<&str>,
+        font_variant: crate::commands::FontVariant,
+    ) {
+        let feature_tags = font_variant.gsub_feature_tags();
+        if feature_tags.is_empty() {
+            return;
+        }
+        self.apply_feature_sequence(glyphs, locale, feature_tags);
+    }
+
     // ccmp Glyph Composition / Decomposition
     pub fn lookup_ccmp(&self, _glyph_id: usize) -> Option<Vec<u16>> {
         let script = self.get_script(b"DFLT")?;
@@ -983,11 +1093,7 @@ impl GSUB {
     }
 
     // rlig
-    pub fn lookup_rlig_sequence(
-        &self,
-        glyph_ids: &[usize],
-        locale: Option<&str>,
-    ) -> Option<usize> {
+    pub fn lookup_rlig_sequence(&self, glyph_ids: &[usize], locale: Option<&str>) -> Option<usize> {
         self.lookup_ligature_feature(glyph_ids, locale, &[*b"rlig"])
     }
 
