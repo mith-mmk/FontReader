@@ -2949,6 +2949,29 @@ mod tests {
     }
 
     #[test]
+    fn glyph_run_sbix_bitmap_keeps_display_size() {
+        let path = first_real_sbix_font_path().expect("load real sbix font");
+        let bytes = std::fs::read(&path).expect("read sbix font");
+        let font = crate::load_font_from_buffer(&bytes).expect("load sbix font");
+        let run = font
+            .text2glyph_run(
+                "🥺",
+                crate::FontOptions::from_font_ref(crate::FontRef::Loaded(&font))
+                    .with_font_size(32.0),
+            )
+            .expect("glyph run sbix");
+
+        assert_eq!(run.glyphs.len(), 1);
+        match run.glyphs[0].glyph.layers.first() {
+            Some(crate::GlyphLayer::Raster(layer)) => {
+                assert!(layer.width.unwrap_or(0) > 0);
+                assert!(layer.height.unwrap_or(0) > 0);
+            }
+            _ => panic!("expected raster glyph layer"),
+        }
+    }
+
+    #[test]
     fn twemoji_sbix_woff2_loads_without_oob_and_renders_bitmap() {
         let path = twemoji_sbix_font_path();
         assert!(path.exists(), "missing Twemoji sbix fixture");

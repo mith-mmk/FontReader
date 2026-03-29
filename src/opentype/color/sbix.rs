@@ -4,6 +4,7 @@ use std::io::SeekFrom;
 
 use base64::{engine::general_purpose, Engine as _};
 use bin_rs::reader::BinaryReader;
+use crate::util::sniff_encoded_image_dimensions;
 
 #[derive(Debug, Clone)]
 pub(crate) struct SBIX {
@@ -31,6 +32,8 @@ pub(crate) struct GlyphData {
 pub(crate) struct RasterGlyphData {
     pub(crate) offset_x: f32,
     pub(crate) offset_y: f32,
+    pub(crate) width: Option<u32>,
+    pub(crate) height: Option<u32>,
     pub(crate) graphic_type: u32,
     pub(crate) glyph_data: Vec<u8>,
 }
@@ -62,9 +65,19 @@ impl SBIX {
             return Some(raster);
         }
 
+        let (width, height) = sniff_encoded_image_dimensions(&glyph_data.glyph_data)
+            .map(|(_, width, height)| {
+                let width = ((width as f32) * scale).round().max(1.0) as u32;
+                let height = ((height as f32) * scale).round().max(1.0) as u32;
+                (width, height)
+            })
+            .map_or((None, None), |(width, height)| (Some(width), Some(height)));
+
         Some(RasterGlyphData {
             offset_x: glyph_data.original_offset_x as f32 * scale,
             offset_y: glyph_data.original_offset_y as f32 * scale,
+            width,
+            height,
             graphic_type: glyph_data.graphic_type,
             glyph_data: glyph_data.glyph_data.clone(),
         })
@@ -202,8 +215,14 @@ impl SBIX {
         _: f64,
     ) -> Option<String> {
         let glyph_data = self.get_raster_glyph(gid, fontsize as f32, fontunit)?;
-        let width = format!("{}{}", fontsize, fontunit);
-        let height = width.clone();
+        let width = glyph_data
+            .width
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| format!("{}{}", fontsize, fontunit));
+        let height = glyph_data
+            .height
+            .map(|value| value.to_string())
+            .unwrap_or_else(|| width.clone());
         let binary = &glyph_data.glyph_data;
         let bytes = u32::to_be_bytes(glyph_data.graphic_type);
         let mut base64 = general_purpose::STANDARD.encode(binary);

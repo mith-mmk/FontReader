@@ -1400,6 +1400,8 @@ impl Font {
                             let mut raster = RasterGlyphLayer::from_encoded(bitmap.glyph_data);
                             raster.offset_x = bitmap.offset_x * options.font_stretch.0.max(0.0);
                             raster.offset_y = bitmap.offset_y;
+                            raster.width = bitmap.width;
+                            raster.height = bitmap.height;
                             vec![GlyphLayer::Raster(raster)]
                         } else {
                             self.build_outline_layers(
@@ -1652,11 +1654,21 @@ impl Font {
                                 bitmap: Some(BitmapGlyphCommands {
                                     offset_x: bitmap.offset_x as f64,
                                     offset_y: bitmap.offset_y as f64,
-                                    width: sniffed_dimensions
-                                        .map(|(_, width, _)| width as f64)
+                                    width: bitmap
+                                        .width
+                                        .map(|width| width as f64)
+                                        .or_else(|| {
+                                            sniffed_dimensions
+                                                .map(|(_, width, _)| width as f64)
+                                        })
                                         .unwrap_or(line_height),
-                                    height: sniffed_dimensions
-                                        .map(|(_, _, height)| height as f64)
+                                    height: bitmap
+                                        .height
+                                        .map(|height| height as f64)
+                                        .or_else(|| {
+                                            sniffed_dimensions
+                                                .map(|(_, _, height)| height as f64)
+                                        })
                                         .unwrap_or(line_height),
                                     format,
                                     data: bitmap.glyph_data,
