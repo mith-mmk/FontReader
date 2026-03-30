@@ -7,7 +7,71 @@ _test_fonts/* がテスト用フォント
 - [-] 実装遅延
 - [ ] 未処理、未確認タスク
 
-# 最優先
+# APIの大幅破壊的変更
+
+　現在FontReaderのAPIに、責務が混在しています。
+これを「使いやすい公開API」として再設計する。
+
+　これに伴いバージョンをを0.0.4から0.0.10にアップデート
+
+## 要件
+
+### 1. レイヤ分離
+- FontFile（ファイル / TTC管理）
+- FontFace（1フォント単位）
+  - metadata
+  - to_stringはdumpに変更
+- FontEngine（shaping / rendering）
+  - text2glyph_run
+  - text2svg
+  - text2commands
+  - shaping
+  - gsub/gpos
+
+これに伴い lib.rsなどに置いてあるコードを
+  - fontface.rs
+  - fontengine.rs
+に分散させる
+
+### 2. API方針
+- フォーマット差（TTF/OTF/WOFF）を外に出さない( すべて metadata関数で取得)
+  - 必要な以外はpub(crate)にする
+- Optionやunwrapを公開APIに出さない
+- NameIDなど低レイヤは隠蔽
+- 低レイヤの情報は features=raw に移動
+
+### 3. 必須API
+- face.family()
+- face.full_name()
+- face.weight()
+- face.is_italic()
+
+- engine.shape(text)
+- engine.measure(text)
+- engine.render_svg(text)
+
+## 4. 制約
+- 既存の内部構造はなるべく流用
+- ゼロコピーを維持
+- backward compatibilityは不要
+
+## 5. 出力形式
+- 最終的なRustコード（struct + impl）
+- 変更理由の説明
+- API設計の意図
+
+## 対象コード
+- lib.rs
+- fontheader.rs
+- fontreader.rs
+- util.rs
+- リファクタリングの影響が出るコード 
+
+## examples
+- 蒸気変更に対応できるように新規examplesを作成する
+- 旧examplesも対応できるようにする(ただしfeatures=rawに分離)
+
+# リファクタリング後のタスク
 - [+] web assemblyでもコンパイル出来るようにする
 - [+] fontをbufferからloadする機能
 - [*] commands.rsを利用し、pub fn text2commands(&text, FontOptions) -> Result<GlyphRun, Error>を実装
