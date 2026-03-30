@@ -10,6 +10,7 @@
 ```
 - `todo.md`でタスク管理
 - `issue.md`でイシュー管理
+- `readme`と書いた場合はreadme.ja.mdが正本でread.mdが英語版である
 
 # APIの大幅破壊的変更
 
@@ -77,6 +78,15 @@
 - [x] 旧examplesも対応できるようにする(ただしfeatures=rawに分離)
 
 # リファクタリング後のタスク
+- [ ] dead codeの削除隔離(woff2.rsなど)
+- [ ] examplesのテスト コードの修正ですむか --features rawがいるかいないか判定 `readme`にも反映 パス、ファイル名をハードコーディングしている部分は、引数に変える
+- [ ] readmeの整理。説明が技術資料すぎるので、APIとsample中心んしいてわかりやすく書き直す。 今の細かい仕様はdoc/の下に移動
+- [ ] github workflows(CI/CD)の作成 exampleのbuild(Windows x86/arm, Linux x64/arm, Mac x64/arm) タグがpushされたら起動
+- [ ] FontFamilyのフォールバック/GPOS/GDEF/GSUB適応順序の整理
+- [ ] アラビア語フォントの対応 LTR RTLの責務は分離して持たせる
+- [ ] スクリプト文字対応
+- [ ] cff2対応を進める
+
 - [+] web assemblyでもコンパイル出来るようにする
 - [+] fontをbufferからloadする機能
 - [*] commands.rsを利用し、pub fn text2commands(&text, FontOptions) -> Result<GlyphRun, Error>を実装
@@ -376,3 +386,35 @@
     - [ ] VDMX	Vertical device metrics
 
 # todo.mdの更新
+
+# 追加バックログ
+
+## メンテナンス / 整理
+- [ ] dead codeの削除または隔離（`src/woff/woff2.rs` など）
+- [ ] `FontFamily` のフォールバック / GPOS / GDEF / GSUB の適用順序を整理
+
+## examples / ドキュメント
+- [ ] examplesのテスト
+  - [ ] 修正だけで済むか確認
+  - [ ] `--features raw` が必要か不要かを example ごとに判定
+  - [ ] 判定結果を `README.md` / `README.ja.md` に反映
+  - [ ] パス、ファイル名をハードコードしている箇所を引数化
+- [ ] READMEの整理
+  - [ ] APIとsample中心に書き直す
+  - [ ] 今の技術資料寄りの細かい仕様は `doc/` 配下へ移動
+
+## CI / CD
+- [ ] GitHub Workflows を作成
+  - [ ] examplesのbuildを含める
+  - [ ] 対象: Windows x86 / arm
+  - [ ] 対象: Linux x64 / arm
+  - [ ] 対象: Mac x64 / arm
+  - [ ] tag push時に起動
+
+## shaping / script
+- [ ] アラビア語フォントの対応を進める
+  - [ ] LTR / RTL の責務を分離して持たせる
+- [ ] スクリプト文字対応
+
+## format
+- [ ] CFF2対応を進める

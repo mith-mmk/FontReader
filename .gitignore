@@ -5,3 +5,4 @@ _test*
 .test*
 .DS_Store
 /binary
+/test/**
