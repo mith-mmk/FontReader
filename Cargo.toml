@@ -13,6 +13,7 @@ readme = "README.md"
 [features]
 default = ["cff", "layout"]
 full = ["layout", "cff"]
+raw = []
 encoding = ["iconv"]
 layout = []
 cff = []
@@ -30,3 +31,71 @@ woff2 = { package = "woff2-no-std", version = "0.3.2" }
 # for name table and PlatformID is 1 
 iconv = {version = "0.1", optional = true}
 base64 = "0.21.4"
+
+[[example]]
+name = "api_overview"
+path = "examples/api_overview.rs"
+
+[[example]]
+name = "fontcmaps"
+path = "examples/fontcmaps.rs"
+required-features = ["raw"]
+
+[[example]]
+name = "fontcolor"
+path = "examples/fontcolor.rs"
+required-features = ["raw"]
+
+[[example]]
+name = "fontgkana"
+path = "examples/fontgkana.rs"
+required-features = ["raw"]
+
+[[example]]
+name = "fontgsub"
+path = "examples/fontgsub.rs"
+required-features = ["raw"]
+
+[[example]]
+name = "fontheader"
+path = "examples/fontheader.rs"
+required-features = ["raw"]
+
+[[example]]
+name = "fontload"
+path = "examples/fontload.rs"
+required-features = ["raw"]
+
+[[example]]
+name = "fontloader"
+path = "examples/fontloader.rs"
+
+[[example]]
+name = "fontname"
+path = "examples/fontname.rs"
+required-features = ["raw"]
+
+[[example]]
+name = "fontsbix"
+path = "examples/fontsbix.rs"
+required-features = ["raw"]
+
+[[example]]
+name = "fontsvg"
+path = "examples/fontsvg.rs"
+required-features = ["raw"]
+
+[[example]]
+name = "fonttest"
+path = "examples/fonttest.rs"
+required-features = ["raw"]
+
+[[example]]
+name = "fonttype"
+path = "examples/fonttype.rs"
+required-features = ["raw"]
+
+[[example]]
+name = "tategaki"
+path = "examples/tategaki.rs"
+required-features = ["raw"]

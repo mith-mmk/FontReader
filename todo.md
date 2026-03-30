@@ -1,11 +1,15 @@
 # todo
-_test* が作業用フォルダ
-_test_fonts/* がテスト用フォント
+- _test* が作業用フォルダ
+- _test_fonts/* がテスト用フォント
+```
 - [+] 実装済み
 - [x] 動作確認済み
 - [*] 実装済みだが動作に不具合あり
 - [-] 実装遅延
 - [ ] 未処理、未確認タスク
+```
+- `todo.md`でタスク管理
+- `issue.md`でイシュー管理
 
 # APIの大幅破壊的変更
 
@@ -17,38 +21,39 @@ _test_fonts/* がテスト用フォント
 ## 要件
 
 ### 1. レイヤ分離
-- FontFile（ファイル / TTC管理）
-- FontFace（1フォント単位）
-  - metadata
-  - to_stringはdumpに変更
-- FontEngine（shaping / rendering）
-  - text2glyph_run
-  - text2svg
-  - text2commands
-  - shaping
-  - gsub/gpos
+- [x] FontFile（ファイル / TTC管理）
+- [x] FontFace（1フォント単位）
+  - [x] metadata
+  - [x] to_stringはdumpに変更
+- [x] FontEngine（shaping / rendering）
+  - [x] text2glyph_run
+  - [x] text2svg
+  - [x] text2commands
+  - [x] shaping
+  - [x] gsub/gpos
 
 これに伴い lib.rsなどに置いてあるコードを
-  - fontface.rs
-  - fontengine.rs
+  - [x] fontface.rs
+  - [x] fontengine.rs
+  - [x] fontfile.rs
 に分散させる
 
 ### 2. API方針
-- フォーマット差（TTF/OTF/WOFF）を外に出さない( すべて metadata関数で取得)
-  - 必要な以外はpub(crate)にする
-- Optionやunwrapを公開APIに出さない
-- NameIDなど低レイヤは隠蔽
-- 低レイヤの情報は features=raw に移動
+- [x] フォーマット差（TTF/OTF/WOFF）を外に出さない( すべて metadata関数で取得)
+  - [x] 必要な以外はpub(crate)にする
+- [x] Optionやunwrapを公開APIに出さない
+- [x] NameIDなど低レイヤは隠蔽
+- [x] 低レイヤの情報は features=raw に移動
 
 ### 3. 必須API
-- face.family()
-- face.full_name()
-- face.weight()
-- face.is_italic()
+- [x] face.family()
+- [x] face.full_name()
+- [x] face.weight()
+- [x] face.is_italic()
 
-- engine.shape(text)
-- engine.measure(text)
-- engine.render_svg(text)
+- [x] engine.shape(text)
+- [x] engine.measure(text)
+- [x] engine.render_svg(text)
 
 ## 4. 制約
 - 既存の内部構造はなるべく流用
@@ -68,8 +73,8 @@ _test_fonts/* がテスト用フォント
 - リファクタリングの影響が出るコード 
 
 ## examples
-- 蒸気変更に対応できるように新規examplesを作成する
-- 旧examplesも対応できるようにする(ただしfeatures=rawに分離)
+- [x] 新API変更に対応できるように新規examplesを作成する
+- [x] 旧examplesも対応できるようにする(ただしfeatures=rawに分離)
 
 # リファクタリング後のタスク
 - [+] web assemblyでもコンパイル出来るようにする

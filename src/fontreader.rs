@@ -1799,7 +1799,7 @@ impl Font {
     }
 
     pub fn measure(&self, text: &str) -> Result<f64, Error> {
-        self.measure_with_options(text, &crate::commands::FontOptions::from_font(self))
+        self.measure_with_options(text, &crate::commands::FontOptions::from_parsed(self))
     }
 
     pub fn measure_with_options(

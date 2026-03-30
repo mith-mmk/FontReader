@@ -295,7 +295,8 @@ impl Default for FontWeight {
 
 #[derive(Clone, Copy)]
 pub enum FontRef<'a> {
-    Loaded(&'a crate::LoadedFont),
+    Loaded(&'a crate::FontFace),
+    #[cfg(feature = "raw")]
     Parsed(&'a crate::fontreader::Font),
     Family(&'a crate::FontFamily),
 }
@@ -316,7 +317,7 @@ pub struct FontOptions<'a> {
 }
 
 impl<'a> FontOptions<'a> {
-    pub fn new(font: &'a crate::LoadedFont) -> Self {
+    pub fn new(font: &'a crate::FontFace) -> Self {
         Self::from_font_ref(FontRef::Loaded(font))
     }
 
@@ -324,8 +325,33 @@ impl<'a> FontOptions<'a> {
         Self::from_font_ref(FontRef::Family(font_family))
     }
 
+    #[cfg(feature = "raw")]
     pub fn from_font(font: &'a crate::fontreader::Font) -> Self {
-        Self::from_font_ref(FontRef::Parsed(font))
+        Self::from_parsed(font)
+    }
+
+    pub(crate) fn from_parsed(font: &'a crate::fontreader::Font) -> Self {
+        let _ = font;
+        #[cfg(feature = "raw")]
+        {
+            Self::from_font_ref(FontRef::Parsed(font))
+        }
+        #[cfg(not(feature = "raw"))]
+        {
+            Self {
+                font: None,
+                font_family: None,
+                font_name: None,
+                locale: None,
+                text_direction: TextDirection::default(),
+                font_size: 16.0,
+                font_stretch: FontStretch::default(),
+                font_style: FontStyle::default(),
+                font_variant: FontVariant::default(),
+                font_weight: FontWeight::default(),
+                line_height: None,
+            }
+        }
     }
 
     pub fn from_font_ref(font: FontRef<'a>) -> Self {
@@ -344,11 +370,16 @@ impl<'a> FontOptions<'a> {
         }
     }
 
-    pub fn with_loaded_font(mut self, font: &'a crate::LoadedFont) -> Self {
+    pub fn with_loaded_font(mut self, font: &'a crate::FontFace) -> Self {
         self.font = Some(FontRef::Loaded(font));
         self
     }
 
+    pub fn with_face(self, font: &'a crate::FontFace) -> Self {
+        self.with_loaded_font(font)
+    }
+
+    #[cfg(feature = "raw")]
     pub fn with_font(mut self, font: &'a crate::fontreader::Font) -> Self {
         self.font = Some(FontRef::Parsed(font));
         self
@@ -421,6 +452,7 @@ impl<'a> FontOptions<'a> {
         if let Some(font) = self.font {
             return match font {
                 FontRef::Loaded(font) => Ok(font.font()),
+                #[cfg(feature = "raw")]
                 FontRef::Parsed(font) => Ok(font),
                 FontRef::Family(font_family) => Ok(font_family.resolve_font_options(self)?.font()),
             };
