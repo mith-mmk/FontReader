@@ -1,252 +1,192 @@
-# Fontloader for rust
+# Fontloader for Rust
 
-Rust library for loading OpenType, TrueType, TTC, WOFF, and partial WOFF2 font data.
+Fontloader is a Rust library for loading fonts and turning text into shaped glyph runs or SVG.
 
 Japanese: [README.ja.md](README.ja.md)
 
-Default features now include `layout`, so common GSUB/GPOS shaping such as emoji ligatures,
-variation selectors, vertical substitutions, and RTL shaping work in a normal build. Use
-`default-features = false` if you need a smaller parser without layout.
+## What This Crate Exposes
 
-## GlyphRun API
+- `FontFile`
+  - Owns a font file or collection entry point
+  - Lets you choose a face from TTC / collection data
+- `FontFace`
+  - Represents one face
+  - Exposes simple metadata such as `family()`, `full_name()`, `weight()`, `is_italic()`
+- `FontEngine`
+  - Shapes text and renders output
+  - Exposes `shape(text)`, `measure(text)`, and `render_svg(text)`
+- `FontFamily`
+  - Cache layer for multiple faces with face selection and per-glyph fallback
 
-`src/commands.rs` now exposes `fontloader::text2commands(text, FontOptions)` for building a
-`GlyphRun`.
+The low-level parser API is still available behind `features = ["raw"]`.
 
-- Pass a loaded font directly with `FontOptions::new(&font)`.
-- `font_size` and `line_height` are resolved in pixels.
-- `font_stretch`, `font_style`, `font_variant`, and `font_weight` are part of `FontOptions`.
-- `font_variant` now supports `Jis78`, `Jis90`, `TraditionalForms`, and `NlcKanjiForms` via GSUB `jp78` / `jp90` / `trad` / `nlck` when the `layout` feature is enabled.
-- `FontOptions::with_vertical_flow()` and `FontOptions::with_right_to_left()` control text direction.
-- `FontOptions::with_locale("ja-JP")` can request GSUB `locl` substitutions when the `layout` feature is enabled.
-- `FontOptions::from_family(&family)` can resolve a cached `FontFamily` entry by family/name/weight/style/stretch.
-- `FontFamily` now performs per-glyph fallback across its cached faces. Family fallback chains and Last Resort selection are still not implemented.
-- `FontFamily` now exposes `text2svg()`, `text2commands()`, `text2glyph_run()`, `measure()`, and `options()` as the higher-level family entrypoint.
-- TrueType and CFF glyphs are returned as `GlyphLayer::Path`.
-- `sbix` glyphs are returned as `GlyphLayer::Raster`.
-- COLR/CPAL colors are carried in `GlyphPaint::Solid(0xAARRGGBB)` so they can be passed directly to `paintcore::path::draw_glyphs`.
-- SVG glyph layers currently return `ErrorKind::Unsupported`.
-- Legacy `Font::get_svg()` now slices shared SVG table documents down to the matching glyph payload instead of embedding every fragment in the record.
+## Supported Formats
 
-## Renderer Integration
+- TrueType
+- OpenType / CFF
+- TTC
+- WOFF
+- WOFF2
 
-When connecting `fontloader` to a renderer such as `paintcore::path::draw_glyphs`, use the
-`GlyphRun` API.
+Default features include `layout` and `cff`.
 
-- Use `fontloader::text2commands(text, FontOptions)`, `LoadedFont::text2glyph_run()`, or `FontFamily::text2glyph_run()`.
-- `GlyphPaint::Solid(u32)` uses packed `0xAARRGGBB`.
-- `GlyphPaint::CurrentColor` means "use the default color passed into the renderer".
-- COLR/CPAL glyphs keep their per-layer colors in `GlyphPaint::Solid(...)`.
-- `sbix` glyphs are emitted as `GlyphLayer::Raster`.
-
-In short:
-
-- Color-aware rendering: `GlyphRun`
+## Quick Start
 
 ```rust
-use fontloader::{load_font_from_buffer, text2commands, FontOptions, GlyphLayer};
+use fontloader::FontFile;
 
-let bytes = std::fs::read("fonts/ZenMaruGothic-Regular.ttf")?;
-let font = load_font_from_buffer(&bytes)?;
-let run = text2commands(
-    "Hello\nWorld",
-    FontOptions::new(&font)
-        .with_font_size(32.0)
-        .with_line_height(40.0),
-)?;
+let file = FontFile::from_file("fonts/YourFont.ttf")?;
+let face = file.current_face()?;
+let engine = face
+    .engine()
+    .with_font_size(32.0)
+    .with_line_height(40.0)
+    .with_svg_unit("px");
 
-for glyph in &run.glyphs {
-    for layer in &glyph.glyph.layers {
-        match layer {
-            GlyphLayer::Path(path) => {
-                println!("path commands: {}", path.commands.len());
-            }
-            GlyphLayer::Raster(_) => {
-                println!("bitmap glyph");
-            }
-        }
-    }
-}
+let run = engine.shape("Hello")?;
+let width = engine.measure("Hello")?;
+let svg = engine.render_svg("Hello")?;
+
+println!("{}", face.family());
+println!("{}", width);
+println!("{}", svg);
+println!("{}", run.glyphs.len());
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-`load_font`, `load_font_from_file`, and `load_font_from_buffer` are the preferred loader APIs.
-The old `fontload*` aliases remain for compatibility but are deprecated.
+## Loading Fonts
 
-## Chunked font loading
+```rust
+use fontloader::{load_font_from_buffer, FontFile};
 
-For parallel or range-based downloads, use `ChunkedFontBuffer` to rebuild a complete font buffer
-before decoding it.
+let bytes = std::fs::read("fonts/YourFont.ttf")?;
 
-- This is especially useful for WOFF2 delivery split into multiple byte ranges.
-- The current WOFF2 path still requires the complete byte stream before decode.
-- `append(offset, bytes)` accepts chunks in any order.
-- `missing_ranges()` reports which byte ranges still need to be fetched.
-- `into_loaded_font()` and `load_font()` hand the reconstructed bytes to the existing loader.
+let face = load_font_from_buffer(&bytes)?;
+let file = FontFile::from_buffer(&bytes)?;
+assert!(file.face_count() >= 1);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+For TTC or collections:
+
+```rust
+use fontloader::FontFile;
+
+let file = FontFile::from_file("fonts/YourCollection.ttc")?;
+let face0 = file.face(0)?;
+let face1 = file.face(1)?;
+
+println!("{}", face0.full_name());
+println!("{}", face1.full_name());
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+## FontFamily Cache
+
+`FontFamily` is the high-level cache and fallback layer.
+
+```rust
+use fontloader::{FontFamily, FontFile, FontWeight};
+
+let regular = FontFile::from_file("fonts/FiraSans-Regular.ttf")?.current_face()?;
+let bold = FontFile::from_file("fonts/FiraSans-Bold.ttf")?.current_face()?;
+
+let mut family = FontFamily::new("Fira Sans");
+family.add_font_face(regular);
+family.add_font_face(bold);
+
+let run = family.text2glyph_run(
+    "Hello",
+    family.options().with_font_weight(FontWeight::BOLD),
+)?;
+
+assert!(!run.glyphs.is_empty());
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+## Chunked WOFF2 / Range Loading
 
 ```rust
 use fontloader::ChunkedFontBuffer;
 
 let mut buffer = ChunkedFontBuffer::new(total_size)?;
-buffer.append(1024, chunk_b)?;
-buffer.append(0, chunk_a)?;
+buffer.append(0, first_chunk)?;
+buffer.append(second_offset, second_chunk)?;
 
 if buffer.is_complete() {
-    let font = buffer.into_loaded_font()?;
-    let width = font.measure("Hello")?;
+    let face = buffer.into_font_face()?;
+    let width = face.measure("Hello")?;
     assert!(width > 0.0);
 }
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-## FontFamily cache
+## Examples
 
-`FontFamily` sits on top of loaded fonts and `ChunkedFontBuffer`.
+Examples share a small common CLI.
 
-- Register a fully loaded face with `add_loaded_font()` or `add_face(...)`.
-- Register an in-flight face with `begin_chunked_face(face_id, descriptor, total_size)`.
-- Feed chunks in any order with `append_chunk(face_id, offset, bytes)`.
-- Inspect `missing_ranges(face_id)` when you need more byte ranges.
-- Promote the finished face into the cache with `finalize_chunked_face(face_id)`.
-- Resolve a face during shaping with `FontOptions::from_family(&family)` plus
-  `with_font_family(...)`, `with_font_name(...)`, `with_font_weight(...)`,
-  `with_font_style(...)`, and `with_font_stretch(...)`.
-- For direct use, `family.options()` returns `FontOptions` already anchored to the family.
-- `family.text2svg(...)`, `family.text2commands(...)`, `family.text2glyph_run(...)`, and `family.measure(...)` now reuse the same cached-face fallback path.
-- Direction options such as `with_vertical_flow()` and `with_right_to_left()` work through the same family entrypoints.
+- `-f`, `--font`: font path
+- `-d`, `--dir`: font directory
+- `-i`, `--index`: face index inside a collection
+- `-o`, `--output`: output file path
+- `-s`, `--string`: inline text
+- `-t`, `--text-file`: text file path
 
-This is meant for parallel fetch / reassembly first. It is not a true lazy WOFF2 decoder.
+High-level examples that work without `raw`:
 
-```rust
-use fontloader::{
-    text2commands, FontFaceDescriptor, FontFamily, FontOptions, FontStyle, FontWeight,
-};
+- `api_overview`
+- `fontloader`
 
-let mut family = FontFamily::new("Fira Sans");
-family.begin_chunked_face(
-    "fira-black",
-    FontFaceDescriptor::new("Fira Sans")
-        .with_font_name("Fira Sans Black")
-        .with_font_weight(FontWeight::BLACK)
-        .with_font_style(FontStyle::Normal),
-    total_size,
-)?;
+Raw / inspection examples that require `--features raw`:
 
-family.append_chunk("fira-black", 0, first_chunk)?;
-family.append_chunk("fira-black", next_offset, second_chunk)?;
+- `fontcmaps`
+- `fontcolor`
+- `fontgkana`
+- `fontgsub`
+- `fontheader`
+- `fontload`
+- `fontname`
+- `fontsbix`
+- `fontsvg`
+- `fonttest`
+- `fonttype`
+- `tategaki`
 
-if family.missing_ranges("fira-black")?.is_empty() {
-    family.finalize_chunked_face("fira-black")?;
-}
+Run the high-level example:
 
-let run = text2commands(
-    "Hello",
-    FontOptions::from_family(&family)
-        .with_font_family("Fira Sans")
-        .with_font_weight(FontWeight::BLACK),
-)?;
-assert!(!run.glyphs.is_empty());
+```bash
+cargo run --example api_overview -- -f path/to/font.ttf -s "Hello"
+```
 
-let run = family.text2commands(
-    "Hello",
-    family.options().with_font_weight(FontWeight::BLACK),
-)?;
-assert!(!run.glyphs.is_empty());
-# Ok::<(), Box<dyn std::error::Error>>(())
+Run a raw example:
+
+```bash
+cargo run --example fonttype --features raw -- -d path/to/fonts
 ```
 
 ## WebAssembly
 
-The library now compiles for `wasm32-unknown-unknown`.
+The crate compiles for `wasm32-unknown-unknown`.
 
-- Prefer `load_font_from_buffer()` or `load_font(FontSource::Buffer(...))` on WebAssembly.
-- `load_font_from_file()` and `load_font_from_net()` return `ErrorKind::Unsupported` on
-  `wasm32`.
+- Prefer `load_font_from_buffer()` or `load_font(FontSource::Buffer(...))`
+- `load_font_from_file()` and `load_font_from_net()` return `ErrorKind::Unsupported` on `wasm32`
 
-## Layout support status
+## Raw API
 
-`layout` feature is partially implemented.
+If you still need the older low-level API, enable `raw`.
 
-### GSUB
-
-- Parsed: ScriptList, FeatureList, LookupList
-- Implemented: `lookup_vertical()` for single substitution based vertical forms
-- Partial: `lookup_ccmp()` exists but does not expand results yet
-- Implemented: `lookup_locale()` and `lookup_liga()`
-- Text APIs: `text2command()`, `text2commands()`, and `measure()` apply variation selectors and basic `locl` / `liga` / `dlig` / `ccmp` shaping
-- Direction-aware APIs: `FontOptions::with_vertical_flow()` uses vertical metrics and GSUB vertical forms when available; `with_right_to_left()` reverses inline advance for RTL layout
-- RTL shaping: Arabic joining forms through GSUB `isol` / `init` / `medi` / `fina` are applied when those features exist
-- RTL shaping: GSUB `rlig` required ligatures are also applied in RTL shaping when present
-- RTL shaping: contextual substitutions through GSUB `rclt` / `calt` / `clig` are also applied when the font exposes them
-- Locale-aware lookup collection now prefers matching script tables such as `arab`, `hebr`, and `syrc`, and it includes required features before falling back to `DFLT`
-- Language-system selection now also uses full locale subtags such as `ur-Arab-PK`, so script-specific and language-specific lookups can override the script default when the font provides them
-- Japanese variant forms through GSUB `jp78` / `jp90` / `trad` / `nlck` can be requested from `FontOptions::font_variant`
-- Partial context/chaining support: GSUB Context Format 1 / 2 / 3 and Chaining Context Format 1 / 2 / 3 are wired into the feature-sequence engine
-- Current limitation: many context/chaining cases are still only partially covered, especially broader script-specific chaining behavior beyond the currently wired locale/script selection
-- Not implemented: `lookup_width()`, `lookup_number()`
-
-### Lookup parsing
-
-- Type 1 Single Substitution: parsed and expandable
-- Type 2 Multiple Substitution: parsed and expandable
-- Type 3 Alternate Substitution: parsed and expandable
-- Type 4 Ligature Substitution: parsed and expandable
-- Type 5 Context Substitution:
-  Format 1 is parsed and partially applicable through the feature-sequence engine
-  Format 2 is parsed and partially applicable through the feature-sequence engine
-  Format 3 is parsed and applicable through the feature-sequence engine
-- Type 6 Chaining Context Substitution:
-  Format 1 is parsed and partially applicable through the feature-sequence engine
-  Format 2 is parsed and partially applicable through the feature-sequence engine
-  Format 3 is parsed and applicable through the feature-sequence engine
-- Type 7 Extension Substitution: parsed, not applied
-- Type 8 Reverse Chaining Contextual Single Substitution: parsed, not applied
-
-### GDEF
-
-- Parsed: glyph class definitions, attach list, ligature caret list, mark attach class definition, mark glyph sets definition
-- Current state: data is loaded and printable for inspection, but not yet integrated into higher level shaping behavior
-
-## Running examples
-
-Examples are under `examples/`.
-
-Basic run:
-
-```bash
-cargo run --example fontloader -- path/to/font.ttf
+```toml
+[dependencies]
+fontloader = { version = "0.0.10", features = ["raw"] }
 ```
 
-`examples/fontloader.rs` now demonstrates the current high-level API:
-`load_font_from_file()`, `LoadedFont::text2glyph_run()`, `LoadedFont::text2svg()`, and
-`LoadedFont::measure()`.
+That exposes:
 
-Examples that need layout parsing:
+- `fontloader::Font`
+- `fontloader::fontheader`
+- `fontloader::opentype`
+- deprecated compatibility aliases such as `fontload_*`
 
-```bash
-cargo run --features layout --example fontgsub -- path/to/font.ttf
-```
+## More Detailed Notes
 
-Examples that need CFF support:
-
-```bash
-cargo run --features cff --example fontsvg -- path/to/font.otf
-```
-
-You can also combine features:
-
-```bash
-cargo run --features full --example fontgsub -- path/to/font.otf
-```
-
-`full` now means the practical parser/shaping set: `layout + cff`.
-
-The legacy `encoding` feature is kept separate because it targets older name-table decoding paths
-and may require an external `iconv.lib` on Windows MSVC. Enable it explicitly only when you need
-that compatibility:
-
-```bash
-cargo run --features "full encoding" --example fontgsub -- path/to/font.otf
-```
-
-If the font path is omitted, some examples try to use a platform default font.
+- Implementation notes: [doc/feature-status.md](doc/feature-status.md)

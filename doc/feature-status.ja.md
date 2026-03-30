@@ -1,0 +1,53 @@
+# 機能実装メモ
+
+このファイルは、以前 `README.ja.md` に置いていた実装メモ寄りの内容を移したものです。
+README は公開APIと実行例を優先し、細かい対応状況はここにまとめます。
+
+## Layout 対応状況
+
+`layout` feature は一部のみ実装されています。
+
+### GSUB
+
+- パース済み: `ScriptList`, `FeatureList`, `LookupList`
+- 実装済み: 単一置換ベースの縦書き置換 `lookup_vertical()`
+- 部分実装: `lookup_ccmp()` はあるが結果展開は未完
+- 実装済み: `lookup_locale()`, `lookup_liga()`
+- text API では variation selector と基本的な `locl` / `liga` / `dlig` / `ccmp` を適用
+- 方向指定 API で縦書きと RTL を扱う
+- Arabic shaping は `isol` / `init` / `medi` / `fina` に対応
+- Arabic shaping では `rlig`, `rclt`, `calt`, `clig` も存在すれば適用
+- locale/script に応じた lookup 選択を行う
+- language system 選択では `ur-Arab-PK` のような full locale subtag も見る
+- 日本語 variant form は `FontOptions::font_variant` から要求可能
+- Context / Chaining は feature-sequence 適用器経由で部分対応
+- 未実装: `lookup_width()`, `lookup_number()`
+
+### Lookup パース
+
+- Type 1 Single Substitution: パース済み、展開可能
+- Type 2 Multiple Substitution: パース済み、展開可能
+- Type 3 Alternate Substitution: パース済み、展開可能
+- Type 4 Ligature Substitution: パース済み、展開可能
+- Type 5 Context Substitution:
+  - Format 1 パース済み、部分適用可能
+  - Format 2 パース済み、部分適用可能
+  - Format 3 パース済み、適用可能
+- Type 6 Chaining Context Substitution:
+  - Format 1 パース済み、部分適用可能
+  - Format 2 パース済み、部分適用可能
+  - Format 3 パース済み、適用可能
+- Type 7 Extension Substitution: パース済み、完全適用は未完
+- Type 8 Reverse Chaining Contextual Single Substitution: パース済み、未適用
+
+### GDEF
+
+- パース済み: glyph class definition, attach list, ligature caret list, mark attach class definition, mark glyph sets definition
+- 現状: 読み込みと表示は可能だが、高レベル shaping には未統合
+
+## 補足
+
+- `FontFamily` は cached face 選択と glyph 単位 fallback に対応
+- family fallback chain と Last Resort は未実装
+- SVG glyph layer は現在 `ErrorKind::Unsupported`
+- WOFF2 は完全な byte stream がそろってから decode する前提

@@ -1,16 +1,19 @@
 #[cfg(feature = "raw")]
 pub mod fontheader;
 #[cfg(not(feature = "raw"))]
+#[allow(dead_code)]
 mod fontheader;
 
 #[cfg(feature = "raw")]
 pub mod fontreader;
 #[cfg(not(feature = "raw"))]
+#[allow(dead_code)]
 mod fontreader;
 
 #[cfg(feature = "raw")]
 pub mod opentype;
 #[cfg(not(feature = "raw"))]
+#[allow(dead_code, unused_imports)]
 mod opentype;
 
 pub mod commands;

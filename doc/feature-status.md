@@ -1,0 +1,53 @@
+# Feature Status
+
+This document keeps the implementation-oriented notes that were previously in `README.md`.
+The README now focuses on the public API and runnable examples.
+
+## Layout support
+
+`layout` is partially implemented.
+
+### GSUB
+
+- Parsed: `ScriptList`, `FeatureList`, `LookupList`
+- Implemented: `lookup_vertical()` for single-substitution vertical forms
+- Partial: `lookup_ccmp()` exists but does not expand all results yet
+- Implemented: `lookup_locale()` and `lookup_liga()`
+- Text APIs apply variation selectors and basic `locl` / `liga` / `dlig` / `ccmp`
+- Direction-aware APIs support vertical flow and RTL layout
+- Arabic shaping currently covers `isol` / `init` / `medi` / `fina`
+- Arabic shaping also applies `rlig`, `rclt`, `calt`, and `clig` when present
+- Locale-aware lookup collection prefers matching scripts such as `arab`, `hebr`, and `syrc`
+- Language-system selection also uses full locale subtags such as `ur-Arab-PK`
+- Japanese variant forms can be requested through `FontOptions::font_variant`
+- Context/chaining support is partially wired through the feature-sequence engine
+- Not implemented: `lookup_width()`, `lookup_number()`
+
+### Lookup parsing
+
+- Type 1 Single Substitution: parsed and expandable
+- Type 2 Multiple Substitution: parsed and expandable
+- Type 3 Alternate Substitution: parsed and expandable
+- Type 4 Ligature Substitution: parsed and expandable
+- Type 5 Context Substitution:
+  - Format 1 parsed, partially applicable
+  - Format 2 parsed, partially applicable
+  - Format 3 parsed, applicable
+- Type 6 Chaining Context Substitution:
+  - Format 1 parsed, partially applicable
+  - Format 2 parsed, partially applicable
+  - Format 3 parsed, applicable
+- Type 7 Extension Substitution: parsed, not fully applied
+- Type 8 Reverse Chaining Contextual Single Substitution: parsed, not applied
+
+### GDEF
+
+- Parsed: glyph class definitions, attach list, ligature caret list, mark attach class definition, mark glyph sets definition
+- Current state: loaded and printable for inspection, but not yet integrated into high-level shaping
+
+## Notes
+
+- `FontFamily` currently supports cached-face selection and per-glyph fallback across loaded faces
+- Family fallback chains and Last Resort handling are still not implemented
+- SVG glyph layers still return `ErrorKind::Unsupported`
+- WOFF2 still requires the complete byte stream before decoding
