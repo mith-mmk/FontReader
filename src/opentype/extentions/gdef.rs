@@ -19,6 +19,14 @@ pub(crate) struct GDEF {
     // pub(crate) item_var_store: Option<VariationStore>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum GlyphClass {
+    Base,
+    Ligature,
+    Mark,
+    Component,
+}
+
 impl GDEF {
     pub fn new<R: BinaryReader>(
         reader: &mut R,
@@ -121,6 +129,21 @@ impl GDEF {
             string += &format!("mark_glyph_sets_def: {}\n", mark_glyph_sets_def.to_string());
         }
         string
+    }
+
+    pub(crate) fn glyph_class(&self, glyph_id: u16) -> Option<GlyphClass> {
+        let class = self.glyph_class_def.as_ref()?.get_class(glyph_id);
+        match class {
+            1 => Some(GlyphClass::Base),
+            2 => Some(GlyphClass::Ligature),
+            3 => Some(GlyphClass::Mark),
+            4 => Some(GlyphClass::Component),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn is_mark_glyph(&self, glyph_id: u16) -> bool {
+        self.glyph_class(glyph_id) == Some(GlyphClass::Mark)
     }
 }
 

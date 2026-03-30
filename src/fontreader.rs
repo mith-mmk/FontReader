@@ -757,6 +757,15 @@ impl Font {
         }
     }
 
+    #[cfg(feature = "layout")]
+    fn current_gdef(&self) -> Option<&gdef::GDEF> {
+        if self.current_font == 0 {
+            self.gdef.as_ref()
+        } else {
+            self.more_fonts[self.current_font - 1].gdef.as_ref()
+        }
+    }
+
     #[cfg(feature = "cff")]
     fn current_cff(&self) -> Option<&cff::CFF> {
         if self.current_font == 0 {
@@ -977,6 +986,78 @@ impl Font {
         Self::parse_text_units(text)
     }
 
+    #[cfg(feature = "layout")]
+    fn apply_gsub_sequence_stages(
+        &self,
+        glyphs: &mut Vec<(usize, usize)>,
+        locale: Option<&str>,
+        is_right_to_left: bool,
+        font_variant: crate::commands::FontVariant,
+    ) {
+        let Some(gsub) = self.current_gsub() else {
+            return;
+        };
+
+        // Keep the shaping order explicit:
+        // 1. canonical composition / decomposition
+        // 2. locale / variant specific substitutions
+        // 3. RTL joining and contextual forms
+        gsub.apply_ccmp_sequence(glyphs);
+        gsub.apply_variant_sequence(glyphs, locale, font_variant);
+        if is_right_to_left {
+            gsub.apply_joining_sequence(glyphs, locale);
+            gsub.apply_rtl_contextual_sequence(glyphs, locale);
+        }
+    }
+
+    #[cfg(feature = "layout")]
+    fn apply_gsub_ligature_stage(
+        &self,
+        output: &mut Vec<ResolvedTextUnit>,
+        expanded_glyphs: &[ResolvedGlyph],
+        locale: Option<&str>,
+        is_right_to_left: bool,
+    ) {
+        let Some(gsub) = self.current_gsub() else {
+            output.extend(expanded_glyphs.iter().copied().map(ResolvedTextUnit::Glyph));
+            return;
+        };
+
+        const MAX_LIGATURE_COMPONENTS: usize = 8;
+        let glyph_ids: Vec<usize> = expanded_glyphs.iter().map(|glyph| glyph.glyph_id).collect();
+        let mut index = 0;
+        while index < expanded_glyphs.len() {
+            let max_len = (expanded_glyphs.len() - index).min(MAX_LIGATURE_COMPONENTS);
+            let mut matched = None;
+            for len in (2..=max_len).rev() {
+                if is_right_to_left {
+                    if let Some(glyph_id) =
+                        gsub.lookup_rlig_sequence(&glyph_ids[index..index + len], locale)
+                    {
+                        matched = Some((glyph_id, len));
+                        break;
+                    }
+                }
+                if let Some(glyph_id) = gsub.lookup_liga_sequence(&glyph_ids[index..index + len]) {
+                    matched = Some((glyph_id, len));
+                    break;
+                }
+            }
+
+            if let Some((glyph_id, len)) = matched {
+                output.push(ResolvedTextUnit::Glyph(ResolvedGlyph {
+                    ch: expanded_glyphs[index].ch,
+                    glyph_id,
+                    prefer_color: expanded_glyphs[index].prefer_color,
+                }));
+                index += len;
+            } else {
+                output.push(ResolvedTextUnit::Glyph(expanded_glyphs[index]));
+                index += 1;
+            }
+        }
+    }
+
     fn flush_shaped_glyphs(
         &self,
         output: &mut Vec<ResolvedTextUnit>,
@@ -993,20 +1074,18 @@ impl Font {
         }
 
         #[cfg(feature = "layout")]
-        if let Some(gsub) = self.current_gsub() {
-            const MAX_LIGATURE_COMPONENTS: usize = 8;
-
+        if self.current_gsub().is_some() {
             let mut ccmp_glyphs = glyphs
                 .iter()
                 .enumerate()
                 .map(|(source_index, glyph)| (glyph.glyph_id, source_index))
                 .collect::<Vec<_>>();
-            gsub.apply_ccmp_sequence(&mut ccmp_glyphs);
-            gsub.apply_variant_sequence(&mut ccmp_glyphs, locale, font_variant);
-            if is_right_to_left {
-                gsub.apply_joining_sequence(&mut ccmp_glyphs, locale);
-                gsub.apply_rtl_contextual_sequence(&mut ccmp_glyphs, locale);
-            }
+            self.apply_gsub_sequence_stages(
+                &mut ccmp_glyphs,
+                locale,
+                is_right_to_left,
+                font_variant,
+            );
             let expanded_glyphs = ccmp_glyphs
                 .into_iter()
                 .map(|(glyph_id, source_index)| ResolvedGlyph {
@@ -1015,42 +1094,7 @@ impl Font {
                     prefer_color: glyphs[source_index].prefer_color,
                 })
                 .collect::<Vec<_>>();
-
-            let glyph_ids: Vec<usize> =
-                expanded_glyphs.iter().map(|glyph| glyph.glyph_id).collect();
-            let mut index = 0;
-            while index < expanded_glyphs.len() {
-                let max_len = (expanded_glyphs.len() - index).min(MAX_LIGATURE_COMPONENTS);
-                let mut matched = None;
-                for len in (2..=max_len).rev() {
-                    if is_right_to_left {
-                        if let Some(glyph_id) =
-                            gsub.lookup_rlig_sequence(&glyph_ids[index..index + len], locale)
-                        {
-                            matched = Some((glyph_id, len));
-                            break;
-                        }
-                    }
-                    if let Some(glyph_id) =
-                        gsub.lookup_liga_sequence(&glyph_ids[index..index + len])
-                    {
-                        matched = Some((glyph_id, len));
-                        break;
-                    }
-                }
-
-                if let Some((glyph_id, len)) = matched {
-                    output.push(ResolvedTextUnit::Glyph(ResolvedGlyph {
-                        ch: expanded_glyphs[index].ch,
-                        glyph_id,
-                        prefer_color: expanded_glyphs[index].prefer_color,
-                    }));
-                    index += len;
-                } else {
-                    output.push(ResolvedTextUnit::Glyph(expanded_glyphs[index]));
-                    index += 1;
-                }
-            }
+            self.apply_gsub_ligature_stage(output, &expanded_glyphs, locale, is_right_to_left);
             glyphs.clear();
             return;
         }
@@ -1343,9 +1387,11 @@ impl Font {
             };
 
             let mut adjustment = GlyphPositionAdjustment::default();
+            let previous_index = self.find_previous_spacing_glyph_index(units, index);
+            let next_index = self.find_next_spacing_glyph_index(units, index);
 
-            if index > 0 {
-                if let Some(previous) = Self::glyph_unit_at(units, index - 1) {
+            if let Some(previous_index) = previous_index {
+                if let Some(previous) = Self::glyph_unit_at(units, previous_index) {
                     if let Some(pair) = gpos.lookup_pair_adjustment(
                         previous.glyph_id as u16,
                         current.glyph_id as u16,
@@ -1360,7 +1406,8 @@ impl Font {
                 }
             }
 
-            if let Some(next) = Self::glyph_unit_at(units, index + 1) {
+            if let Some(next_index) = next_index {
+                if let Some(next) = Self::glyph_unit_at(units, next_index) {
                 if let Some(pair) = gpos.lookup_pair_adjustment(
                     current.glyph_id as u16,
                     next.glyph_id as u16,
@@ -1373,9 +1420,58 @@ impl Font {
                     adjustment.advance_y += pair.first.y_advance as f32 * scale_y;
                 }
             }
+            }
 
             adjustment
         }
+    }
+
+    #[cfg(feature = "layout")]
+    fn find_previous_spacing_glyph_index(
+        &self,
+        units: &[ResolvedTextUnit],
+        index: usize,
+    ) -> Option<usize> {
+        let mut cursor = index.checked_sub(1)?;
+        loop {
+            match Self::glyph_unit_at(units, cursor) {
+                Some(glyph) if !self.gdef_is_ignored_for_pair_positioning(glyph.glyph_id as u16) => {
+                    return Some(cursor);
+                }
+                Some(_) => {
+                    cursor = cursor.checked_sub(1)?;
+                }
+                None => return None,
+            }
+        }
+    }
+
+    #[cfg(feature = "layout")]
+    fn find_next_spacing_glyph_index(
+        &self,
+        units: &[ResolvedTextUnit],
+        index: usize,
+    ) -> Option<usize> {
+        let mut cursor = index + 1;
+        while cursor < units.len() {
+            match Self::glyph_unit_at(units, cursor) {
+                Some(glyph) if !self.gdef_is_ignored_for_pair_positioning(glyph.glyph_id as u16) => {
+                    return Some(cursor);
+                }
+                Some(_) => {
+                    cursor += 1;
+                }
+                None => return None,
+            }
+        }
+        None
+    }
+
+    #[cfg(feature = "layout")]
+    fn gdef_is_ignored_for_pair_positioning(&self, glyph_id: u16) -> bool {
+        self.current_gdef()
+            .map(|gdef| gdef.is_mark_glyph(glyph_id))
+            .unwrap_or(false)
     }
 
     pub fn text2glyph_run(

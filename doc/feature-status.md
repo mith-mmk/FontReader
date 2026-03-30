@@ -43,7 +43,9 @@ The README now focuses on the public API and runnable examples.
 ### GDEF
 
 - Parsed: glyph class definitions, attach list, ligature caret list, mark attach class definition, mark glyph sets definition
-- Current state: loaded and printable for inspection, but not yet integrated into high-level shaping
+- Current state: partially integrated
+- Pair positioning now skips GDEF mark glyphs when searching previous/next spacing glyphs for kerning
+- Attach / caret / mark-set data is still not integrated into higher-level layout
 
 ## Notes
 

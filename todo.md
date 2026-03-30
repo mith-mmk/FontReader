@@ -82,7 +82,7 @@
 - [*] examplesのテスト コードの修正ですむか --features rawがいるかいないか判定 `readme`にも反映 パス、ファイル名をハードコーディングしている部分は、引数に変える
 - [x] readmeの整理。説明が技術資料すぎるので、APIとsample中心んしいてわかりやすく書き直す。 今の細かい仕様はdoc/の下に移動
 - [x] github workflows(CI/CD)の作成 exampleのbuild(Windows x86/arm, Linux x64/arm, Mac x64/arm) タグがpushされたら起動
-- [ ] FontFamilyのフォールバック/GPOS/GDEF/GSUB適応順序の整理
+- [*] FontFamilyのフォールバック/GPOS/GDEF/GSUB適応順序の整理
 - [ ] アラビア語フォントの対応 LTR RTLの責務は分離して持たせる
 - [ ] スクリプト文字対応
 - [ ] cff2対応を進める
@@ -393,7 +393,10 @@
 - [*] dead codeの削除または隔離（`src/woff/woff2.rs` など）
   - [x] 未参照だった `src/woff/woff2.rs` を削除
   - [x] default build で不要な低レイヤ dead code を feature 境界の内側へ隔離
-- [ ] `FontFamily` のフォールバック / GPOS / GDEF / GSUB の適用順序を整理
+- [*] `FontFamily` のフォールバック / GPOS / GDEF / GSUB の適用順序を整理
+  - [x] GSUB sequence stage と ligature stage を分離して順序を明示
+  - [x] GPOS pair positioning の前後 glyph 探索に GDEF mark skip を導入
+  - [ ] fallback face をまたぐ script / language / mark attachment の扱いを整理
 
 ## examples / ドキュメント
 - [*] examplesのテスト
