@@ -396,7 +396,11 @@
 - [*] `FontFamily` のフォールバック / GPOS / GDEF / GSUB の適用順序を整理
   - [x] GSUB sequence stage と ligature stage を分離して順序を明示
   - [x] GPOS pair positioning の前後 glyph 探索に GDEF mark skip を導入
-  - [ ] fallback face をまたぐ script / language / mark attachment の扱いを整理
+  - [x] fallback face 選択に text direction / locale / font variant を反映
+  - [*] fallback face をまたぐ script / language / mark attachment の扱いを整理
+    - [x] combining mark を fallback text unit として分断しない
+    - [x] RTL contextual script では同一 face を優先して segment continuity を維持
+    - [ ] 実フォントで script ごとの face 切替境界をさらに詰める
 
 ## examples / ドキュメント
 - [*] examplesのテスト

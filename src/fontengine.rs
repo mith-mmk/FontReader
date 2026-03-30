@@ -1,6 +1,6 @@
 use crate::commands::{
-    Command, FillRule, FontOptions, GlyphBounds, GlyphLayer, GlyphPaint, GlyphRun,
-    PositionedGlyph, RasterGlyphLayer, RasterGlyphSource,
+    Command, FillRule, FontOptions, GlyphBounds, GlyphLayer, GlyphPaint, GlyphRun, PositionedGlyph,
+    RasterGlyphLayer, RasterGlyphSource,
 };
 use crate::fontface::FontFace;
 use crate::util;

@@ -545,8 +545,22 @@ impl FontFamily {
                     }
                 }
                 fontreader::ParsedTextUnit::Glyph { .. } => {
-                    let face_index =
-                        self.select_face_for_unit(&unit, &candidate_indices, options);
+                    let face_index = if let Some(current_face) = pending_face {
+                        if unit_prefers_face_continuity(&unit, options)
+                            && self.faces[current_face].font.font().supports_text_unit(
+                                &unit,
+                                options.text_direction,
+                                options.locale,
+                                options.font_variant,
+                            )
+                        {
+                            current_face
+                        } else {
+                            self.select_face_for_unit(&unit, &candidate_indices, options)
+                        }
+                    } else {
+                        self.select_face_for_unit(&unit, &candidate_indices, options)
+                    };
                     if pending_face != Some(face_index) {
                         self.flush_family_segment(
                             &mut glyphs,
@@ -734,13 +748,13 @@ impl FontFamily {
         candidates: &[usize],
         options: FontOptions<'_>,
     ) -> usize {
-        let is_vertical = options.text_direction.is_vertical();
         for &index in candidates {
-            if self.faces[index]
-                .font
-                .font()
-                .supports_text_unit(unit, is_vertical, options.locale)
-            {
+            if self.faces[index].font.font().supports_text_unit(
+                unit,
+                options.text_direction,
+                options.locale,
+                options.font_variant,
+            ) {
                 return index;
             }
         }
@@ -755,6 +769,83 @@ fn push_text_unit(target: &mut String, unit: &fontreader::ParsedTextUnit) {
         fontreader::ParsedTextUnit::Newline => target.push('\n'),
         fontreader::ParsedTextUnit::Tab => target.push('\t'),
     }
+}
+
+fn unit_prefers_face_continuity(
+    unit: &fontreader::ParsedTextUnit,
+    options: FontOptions<'_>,
+) -> bool {
+    let fontreader::ParsedTextUnit::Glyph { text, .. } = unit else {
+        return false;
+    };
+
+    text_contains_combining_mark(text)
+        || (options.text_direction.is_right_to_left() && text_contains_contextual_rtl_script(text))
+}
+
+fn text_contains_combining_mark(text: &str) -> bool {
+    text.chars().any(is_combining_mark)
+}
+
+fn is_combining_mark(ch: char) -> bool {
+    matches!(
+        ch as u32,
+        0x0300..=0x036F
+            | 0x0483..=0x0489
+            | 0x0591..=0x05BD
+            | 0x05BF
+            | 0x05C1..=0x05C2
+            | 0x05C4..=0x05C5
+            | 0x05C7
+            | 0x0610..=0x061A
+            | 0x064B..=0x065F
+            | 0x0670
+            | 0x06D6..=0x06DC
+            | 0x06DF..=0x06E4
+            | 0x06E7..=0x06E8
+            | 0x06EA..=0x06ED
+            | 0x0711
+            | 0x0730..=0x074A
+            | 0x07A6..=0x07B0
+            | 0x07EB..=0x07F3
+            | 0x0816..=0x0819
+            | 0x081B..=0x0823
+            | 0x0825..=0x0827
+            | 0x0829..=0x082D
+            | 0x0859..=0x085B
+            | 0x08D3..=0x08E1
+            | 0x08E3..=0x08FF
+            | 0x1AB0..=0x1AFF
+            | 0x1DC0..=0x1DFF
+            | 0x20D0..=0x20FF
+            | 0x3099..=0x309A
+            | 0xFE20..=0xFE2F
+    )
+}
+
+fn text_contains_contextual_rtl_script(text: &str) -> bool {
+    text.chars().any(is_contextual_rtl_script)
+}
+
+fn is_contextual_rtl_script(ch: char) -> bool {
+    matches!(
+        ch as u32,
+        0x0590..=0x05FF
+            | 0x0600..=0x06FF
+            | 0x0700..=0x074F
+            | 0x0750..=0x077F
+            | 0x0780..=0x07BF
+            | 0x07C0..=0x07FF
+            | 0x0800..=0x083F
+            | 0x0840..=0x085F
+            | 0x0860..=0x086F
+            | 0x0870..=0x089F
+            | 0x08A0..=0x08FF
+            | 0xFB1D..=0xFDFF
+            | 0xFE70..=0xFEFF
+            | 0x10E60..=0x10E7F
+            | 0x1EE00..=0x1EEFF
+    )
 }
 
 fn glyph_run_cursor_delta(run: &GlyphRun, text_direction: TextDirection) -> (f32, f32) {
@@ -833,4 +924,48 @@ fn face_match_score(
     };
     let stretch_delta = ((descriptor.font_stretch.0 - font_stretch.0).abs() * 1000.0) as u32;
     style_penalty + weight_delta + stretch_delta
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn unit_prefers_face_continuity_for_combining_marks() {
+        let unit = crate::fontreader::ParsedTextUnit::Glyph {
+            text: "e\u{0301}".to_string(),
+            ch: 'e',
+            variation_selector: '\0',
+        };
+
+        let family = FontFamily::new("Test");
+        let options = FontOptions::from_font_ref(FontRef::Family(&family));
+        assert!(unit_prefers_face_continuity(&unit, options));
+    }
+
+    #[test]
+    fn unit_prefers_face_continuity_for_rtl_contextual_scripts() {
+        let unit = crate::fontreader::ParsedTextUnit::Glyph {
+            text: "ب".to_string(),
+            ch: 'ب',
+            variation_selector: '\0',
+        };
+
+        let family = FontFamily::new("Test");
+        let options = FontOptions::from_font_ref(FontRef::Family(&family)).with_right_to_left();
+        assert!(unit_prefers_face_continuity(&unit, options));
+    }
+
+    #[test]
+    fn unit_does_not_prefer_face_continuity_for_plain_latin() {
+        let unit = crate::fontreader::ParsedTextUnit::Glyph {
+            text: "A".to_string(),
+            ch: 'A',
+            variation_selector: '\0',
+        };
+
+        let family = FontFamily::new("Test");
+        let options = FontOptions::from_font_ref(FontRef::Family(&family));
+        assert!(!unit_prefers_face_continuity(&unit, options));
+    }
 }

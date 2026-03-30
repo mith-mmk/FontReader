@@ -1,10 +1,10 @@
 use base64::{engine::general_purpose, Engine as _};
 use bin_rs::reader::{BinaryReader, BytesReader};
 use std::collections::HashMap;
-use std::io::{Error, ErrorKind, SeekFrom};
-use std::path::PathBuf;
 #[cfg(debug_assertions)]
 use std::fs::File;
+use std::io::{Error, ErrorKind, SeekFrom};
+use std::path::PathBuf;
 
 use crate::commands::{
     Command as DrawCommand, FontMetrics as DrawFontMetrics, Glyph, GlyphBounds, GlyphFlow,
@@ -845,6 +845,42 @@ impl Font {
         ch == '\u{20E3}'
     }
 
+    fn is_combining_mark(ch: char) -> bool {
+        matches!(
+            ch as u32,
+            0x0300..=0x036F
+                | 0x0483..=0x0489
+                | 0x0591..=0x05BD
+                | 0x05BF
+                | 0x05C1..=0x05C2
+                | 0x05C4..=0x05C5
+                | 0x05C7
+                | 0x0610..=0x061A
+                | 0x064B..=0x065F
+                | 0x0670
+                | 0x06D6..=0x06DC
+                | 0x06DF..=0x06E4
+                | 0x06E7..=0x06E8
+                | 0x06EA..=0x06ED
+                | 0x0711
+                | 0x0730..=0x074A
+                | 0x07A6..=0x07B0
+                | 0x07EB..=0x07F3
+                | 0x0816..=0x0819
+                | 0x081B..=0x0823
+                | 0x0825..=0x0827
+                | 0x0829..=0x082D
+                | 0x0859..=0x085B
+                | 0x08D3..=0x08E1
+                | 0x08E3..=0x08FF
+                | 0x1AB0..=0x1AFF
+                | 0x1DC0..=0x1DFF
+                | 0x20D0..=0x20FF
+                | 0x3099..=0x309A
+                | 0xFE20..=0xFE2F
+        )
+    }
+
     fn is_regional_indicator(ch: char) -> bool {
         (0x1F1E6..=0x1F1FF).contains(&(ch as u32))
     }
@@ -883,6 +919,7 @@ impl Font {
                 || Self::is_emoji_modifier(ch)
                 || Self::is_keycap_mark(ch)
                 || Self::is_tag_character(ch)
+                || Self::is_combining_mark(ch)
             {
                 text.push(ch);
                 *index += 1;
@@ -1179,22 +1216,21 @@ impl Font {
     pub(crate) fn supports_text_unit(
         &self,
         unit: &ParsedTextUnit,
-        is_vert: bool,
+        text_direction: crate::commands::TextDirection,
         locale: Option<&str>,
+        font_variant: crate::commands::FontVariant,
     ) -> bool {
         #[cfg(not(feature = "layout"))]
-        let _ = locale;
+        let _ = (locale, font_variant);
 
         match unit {
             ParsedTextUnit::Newline | ParsedTextUnit::Tab => true,
             ParsedTextUnit::Glyph { text, .. } => {
-                let Ok(shaped_units) = self.shape_text_units(
-                    text,
-                    is_vert,
-                    false,
-                    locale,
-                    crate::commands::FontVariant::Normal,
-                ) else {
+                let is_vert = text_direction.is_vertical();
+                let is_right_to_left = text_direction.is_right_to_left();
+                let Ok(shaped_units) =
+                    self.shape_text_units(text, is_vert, is_right_to_left, locale, font_variant)
+                else {
                     return false;
                 };
 
@@ -1219,8 +1255,11 @@ impl Font {
                         self.current_glyf()
                             .and_then(|glyf| glyf.get_glyph(glyph.glyph_id))
                             .is_some()
-                            || self.current_sbix()
-                                .and_then(|sbix| sbix.get_raster_glyph(glyph.glyph_id as u32, 16.0, "px"))
+                            || self
+                                .current_sbix()
+                                .and_then(|sbix| {
+                                    sbix.get_raster_glyph(glyph.glyph_id as u32, 16.0, "px")
+                                })
                                 .is_some()
                             || self
                                 .current_svg_table()
@@ -1257,7 +1296,11 @@ impl Font {
             } => {
                 let svg = if text.chars().count() > 2
                     || text.contains('\u{200D}')
-                    || text.chars().filter(|ch| Self::is_regional_indicator(*ch)).count() > 1
+                    || text
+                        .chars()
+                        .filter(|ch| Self::is_regional_indicator(*ch))
+                        .count()
+                        > 1
                 {
                     self.text2svg(&text, fontsize, fontunit)?
                 } else {
@@ -1410,18 +1453,18 @@ impl Font {
 
             if let Some(next_index) = next_index {
                 if let Some(next) = Self::glyph_unit_at(units, next_index) {
-                if let Some(pair) = gpos.lookup_pair_adjustment(
-                    current.glyph_id as u16,
-                    next.glyph_id as u16,
-                    is_vertical,
-                    locale,
-                ) {
-                    adjustment.placement_x += pair.first.x_placement as f32 * scale_x;
-                    adjustment.placement_y += pair.first.y_placement as f32 * scale_y;
-                    adjustment.advance_x += pair.first.x_advance as f32 * scale_x;
-                    adjustment.advance_y += pair.first.y_advance as f32 * scale_y;
+                    if let Some(pair) = gpos.lookup_pair_adjustment(
+                        current.glyph_id as u16,
+                        next.glyph_id as u16,
+                        is_vertical,
+                        locale,
+                    ) {
+                        adjustment.placement_x += pair.first.x_placement as f32 * scale_x;
+                        adjustment.placement_y += pair.first.y_placement as f32 * scale_y;
+                        adjustment.advance_x += pair.first.x_advance as f32 * scale_x;
+                        adjustment.advance_y += pair.first.y_advance as f32 * scale_y;
+                    }
                 }
-            }
             }
 
             adjustment
@@ -1437,7 +1480,9 @@ impl Font {
         let mut cursor = index.checked_sub(1)?;
         loop {
             match Self::glyph_unit_at(units, cursor) {
-                Some(glyph) if !self.gdef_is_ignored_for_pair_positioning(glyph.glyph_id as u16) => {
+                Some(glyph)
+                    if !self.gdef_is_ignored_for_pair_positioning(glyph.glyph_id as u16) =>
+                {
                     return Some(cursor);
                 }
                 Some(_) => {
@@ -1457,7 +1502,9 @@ impl Font {
         let mut cursor = index + 1;
         while cursor < units.len() {
             match Self::glyph_unit_at(units, cursor) {
-                Some(glyph) if !self.gdef_is_ignored_for_pair_positioning(glyph.glyph_id as u16) => {
+                Some(glyph)
+                    if !self.gdef_is_ignored_for_pair_positioning(glyph.glyph_id as u16) =>
+                {
                     return Some(cursor);
                 }
                 Some(_) => {
@@ -1551,8 +1598,7 @@ impl Font {
                         {
                             if resolved.prefer_color || !can_use_outline {
                                 let mut raster = RasterGlyphLayer::from_encoded(bitmap.glyph_data);
-                                raster.offset_x =
-                                    bitmap.offset_x * options.font_stretch.0.max(0.0);
+                                raster.offset_x = bitmap.offset_x * options.font_stretch.0.max(0.0);
                                 raster.offset_y = bitmap.offset_y;
                                 raster.width = bitmap.width;
                                 raster.height = bitmap.height;
@@ -1798,17 +1844,17 @@ impl Font {
                             "px",
                         ) {
                             if resolved.prefer_color || !can_use_outline {
-                                let format =
-                                    if bitmap.graphic_type == u32::from_be_bytes(*b"png ") {
-                                        BitmapGlyphFormat::Png
-                                    } else if bitmap.graphic_type == u32::from_be_bytes(*b"jpg ") {
-                                        BitmapGlyphFormat::Jpeg
-                                    } else {
-                                        return Err(Error::new(
-                                            std::io::ErrorKind::Unsupported,
-                                            "unsupported sbix image format",
-                                        ));
-                                    };
+                                let format = if bitmap.graphic_type == u32::from_be_bytes(*b"png ")
+                                {
+                                    BitmapGlyphFormat::Png
+                                } else if bitmap.graphic_type == u32::from_be_bytes(*b"jpg ") {
+                                    BitmapGlyphFormat::Jpeg
+                                } else {
+                                    return Err(Error::new(
+                                        std::io::ErrorKind::Unsupported,
+                                        "unsupported sbix image format",
+                                    ));
+                                };
                                 let sniffed_dimensions =
                                     sniff_encoded_image_dimensions(&bitmap.glyph_data);
                                 result.push(GlyphCommands {
@@ -1825,8 +1871,7 @@ impl Font {
                                             .width
                                             .map(|width| width as f64)
                                             .or_else(|| {
-                                                sniffed_dimensions
-                                                    .map(|(_, width, _)| width as f64)
+                                                sniffed_dimensions.map(|(_, width, _)| width as f64)
                                             })
                                             .unwrap_or(line_height),
                                         height: bitmap
@@ -1985,7 +2030,12 @@ impl Font {
         })
     }
 
-    pub(crate) fn text2svg(&self, text: &str, fontsize: f64, fontunit: &str) -> Result<String, Error> {
+    pub(crate) fn text2svg(
+        &self,
+        text: &str,
+        fontsize: f64,
+        fontunit: &str,
+    ) -> Result<String, Error> {
         let glyphs = self.text2commands(text)?;
         let line_height = self.default_line_height()?;
         let mut svg_elements = Vec::new();
@@ -3014,7 +3064,8 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Result<Font, Error> {
             if let Some(sbix_table) = sbix_table {
                 let mut reader = BytesReader::new(&sbix_table.data);
                 let num_glyphs = font.maxp.as_ref().unwrap().num_glyphs as u32;
-                let sbix = sbix::SBIX::new(&mut reader, 0, sbix_table.data.len() as u32, num_glyphs)?;
+                let sbix =
+                    sbix::SBIX::new(&mut reader, 0, sbix_table.data.len() as u32, num_glyphs)?;
                 font.sbix = Some(sbix);
             }
             #[cfg(debug_assertions)]

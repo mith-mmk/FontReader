@@ -1,10 +1,10 @@
 use crate::fontface::FontFace;
 use crate::fontreader;
-use std::io::{Error, ErrorKind};
 #[cfg(not(target_arch = "wasm32"))]
 use std::io::Read;
 #[cfg(not(target_arch = "wasm32"))]
 use std::io::Write;
+use std::io::{Error, ErrorKind};
 #[cfg(not(target_arch = "wasm32"))]
 use std::net::TcpStream;
 use std::path::Path;

@@ -2524,7 +2524,7 @@ mod tests {
             for sequence in emoji_ligature_sequence_candidates() {
                 let Ok(glyph_ids) = font.font().debug_shape_glyph_ids(sequence, None) else {
                     continue;
-                }; 
+                };
                 if glyph_ids.len() != 1 || glyph_ids[0] == 0 {
                     continue;
                 }
@@ -2758,11 +2758,18 @@ mod tests {
             .font()
             .debug_shape_glyph_ids("ます", Some("ja-JP"))
             .expect("shape Yu Gothic glyph ids");
-        assert_eq!(glyph_ids.len(), 2, "default shaping should keep ます as two glyphs");
+        assert_eq!(
+            glyph_ids.len(),
+            2,
+            "default shaping should keep ます as two glyphs"
+        );
 
         let cmap = font.font().cmap.as_ref().expect("Yu Gothic cmap");
         let square_masu = cmap.get_glyph_position('〼' as u32) as usize;
-        assert_ne!(glyph_ids[0], square_masu, "must not substitute to 〼 by default");
+        assert_ne!(
+            glyph_ids[0], square_masu,
+            "must not substitute to 〼 by default"
+        );
     }
 
     #[test]
@@ -2839,8 +2846,14 @@ mod tests {
 
         assert!(values[0] < min_x, "viewBox should add left/right padding");
         assert!(values[1] < min_y, "viewBox should add top/bottom padding");
-        assert!(values[2] > width, "viewBox width should exceed glyph bounds");
-        assert!(values[3] > height, "viewBox height should exceed glyph bounds");
+        assert!(
+            values[2] > width,
+            "viewBox width should exceed glyph bounds"
+        );
+        assert!(
+            values[3] > height,
+            "viewBox height should exceed glyph bounds"
+        );
     }
 
     #[test]
@@ -3220,7 +3233,9 @@ mod tests {
         assert!(!commands.is_empty());
         assert!(commands.iter().any(|glyph| glyph.bitmap.is_some()));
 
-        let svg = font.text2svg(sequence, 32.0, "px").expect("svg from Twemoji sbix");
+        let svg = font
+            .text2svg(sequence, 32.0, "px")
+            .expect("svg from Twemoji sbix");
         assert!(svg.contains("data:image/"));
     }
 
@@ -3229,6 +3244,24 @@ mod tests {
         for text in ["👩‍💻", "👨‍👩‍👧‍👦", "🇯🇵", "1️⃣"] {
             let units = crate::fontreader::Font::parse_text_units_for_fallback(text);
             assert_eq!(units.len(), 1, "cluster should stay whole for {text:?}");
+            match &units[0] {
+                crate::fontreader::ParsedTextUnit::Glyph { text: parsed, .. } => {
+                    assert_eq!(parsed, text);
+                }
+                _ => panic!("expected glyph unit for {text:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn parse_text_units_for_fallback_keeps_combining_mark_clusters_together() {
+        for text in ["e\u{0301}", "は\u{3099}", "ب\u{0650}"] {
+            let units = crate::fontreader::Font::parse_text_units_for_fallback(text);
+            assert_eq!(
+                units.len(),
+                1,
+                "combining cluster should stay whole for {text:?}"
+            );
             match &units[0] {
                 crate::fontreader::ParsedTextUnit::Glyph { text: parsed, .. } => {
                     assert_eq!(parsed, text);
@@ -3262,7 +3295,10 @@ mod tests {
             first_real_emoji_ligature_for_legacy().expect("find legacy emoji ligature fixture");
         let font = crate::load_font_from_file(path).expect("load emoji ligature font");
 
-        let commands = font.font().text2command(sequence).expect("legacy emoji ligature");
+        let commands = font
+            .font()
+            .text2command(sequence)
+            .expect("legacy emoji ligature");
         assert_eq!(commands.len(), 1, "expected a single ligature glyph");
         assert!(commands[0].bitmap.is_some() || !commands[0].commands.is_empty());
     }
@@ -3288,7 +3324,11 @@ mod tests {
         )
         .expect("render mixed fallback ligature text");
 
-        assert_eq!(run.glyphs.len(), 3, "emoji ligature cluster should stay a single glyph");
+        assert_eq!(
+            run.glyphs.len(),
+            3,
+            "emoji ligature cluster should stay a single glyph"
+        );
         assert!(!run.glyphs[1].glyph.layers.is_empty());
     }
 
@@ -3327,8 +3367,8 @@ mod tests {
             if !path.exists() {
                 continue;
             }
-            let regular =
-                crate::load_font_from_file(fira_sans_regular_path()).expect("load regular fira sans");
+            let regular = crate::load_font_from_file(fira_sans_regular_path())
+                .expect("load regular fira sans");
             let emoji = crate::load_font_from_file(&path).expect("load emoji font");
 
             let mut family = crate::FontFamily::new("Fira Sans");
@@ -3364,7 +3404,10 @@ mod tests {
         bytes.extend_from_slice(&[0xde, 0xad, 0xbe, 0xef, 0, 1, 2, 3]);
 
         let font = crate::load_font_from_buffer(&bytes).expect("load padded woff2 buffer");
-        let commands = font.font().text2command("🥺").expect("render from padded woff2 buffer");
+        let commands = font
+            .font()
+            .text2command("🥺")
+            .expect("render from padded woff2 buffer");
         assert!(!commands.is_empty());
         assert!(commands.iter().any(|glyph| glyph.bitmap.is_some()));
         assert!(bytes.len() > original_len);
@@ -3569,7 +3612,10 @@ mod tests {
         let font = crate::load_font_from_file(fira_sans_black_path()).expect("load fira sans");
 
         for ch in ['i', 'j'] {
-            let commands = font.font().text2command(&ch.to_string()).expect("text2command");
+            let commands = font
+                .font()
+                .text2command(&ch.to_string())
+                .expect("text2command");
             assert_eq!(commands.len(), 1, "expected one glyph for {ch}");
             assert!(
                 !commands[0].commands.is_empty(),
