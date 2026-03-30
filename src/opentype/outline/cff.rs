@@ -2104,7 +2104,8 @@ impl CFF {
 
     fn get_svg_header(
         &self,
-        gid: usize,
+        #[cfg(debug_assertions)] gid: usize,
+        #[cfg(not(debug_assertions))] _gid: usize,
         parce_data: &ParcePack,
         fontsize: f64,
         fontunit: &str,
@@ -2114,8 +2115,6 @@ impl CFF {
     ) -> String {
         match layout {
             FontLayout::Horizontal(layout) => {
-                let descender = layout.descender;
-                let accender = layout.accender;
                 let line_gap = layout.line_gap;
                 let advance_width = layout.advance_width as f64;
                 // let width = self.width + parce_data.width;
@@ -2142,6 +2141,8 @@ impl CFF {
                 );
                 #[cfg(debug_assertions)]
                 {
+                    let descender = layout.descender;
+                    let accender = layout.accender;
                     svg += &format!(
                         "<!-- gid {} nominal_width {} default_width {} resolved_width {} min_x {} height {} -->\n",
                         gid, nominal_width, default_width, self_width, parce_data.min_x, height
@@ -2155,11 +2156,7 @@ impl CFF {
                 svg
             }
             FontLayout::Vertical(layout) => {
-                let descender = layout.descender;
-                let accender = layout.accender;
-                let line_gap = layout.line_gap;
                 // let width = self.width + parce_data.width;
-                let height = self.bbox[3] - self.bbox[1] as f64;
                 let h = format!("{}{}", fontsize, fontunit);
                 let w = format!("{}{}", fontsize, fontunit);
                 let self_width = if let Some(width) = parce_data.width {
@@ -2180,6 +2177,10 @@ impl CFF {
                 );
                 #[cfg(debug_assertions)]
                 {
+                    let descender = layout.descender;
+                    let accender = layout.accender;
+                    let line_gap = layout.line_gap;
+                    let height = self.bbox[3] - self.bbox[1] as f64;
                     svg += &format!(
                         "<!-- gid {} nominal_width {} default_width {} resolved_width {} min_x {} height {} -->\n",
                         gid, nominal_width, default_width, self_width, parce_data.min_x, height

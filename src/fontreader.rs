@@ -2,7 +2,9 @@ use base64::{engine::general_purpose, Engine as _};
 use bin_rs::reader::{BinaryReader, BytesReader};
 use std::collections::HashMap;
 use std::io::{Error, ErrorKind, SeekFrom};
-use std::{fs::File, path::PathBuf};
+use std::path::PathBuf;
+#[cfg(debug_assertions)]
+use std::fs::File;
 
 use crate::commands::{
     Command as DrawCommand, FontMetrics as DrawFontMetrics, Glyph, GlyphBounds, GlyphFlow,
