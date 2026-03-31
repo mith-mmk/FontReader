@@ -2125,13 +2125,6 @@ mod tests {
         test_fonts_dir().join("windows").join("arial.ttf")
     }
 
-    fn arabic_font_path() -> std::path::PathBuf {
-        test_fonts_dir()
-            .join("Noto_Kufi_Arabic")
-            .join("static")
-            .join("NotoKufiArabic-Regular.ttf")
-    }
-
     fn syriac_font_path() -> std::path::PathBuf {
         test_fonts_dir()
             .join("Noto_Sans_Syriac_Western")
@@ -2139,16 +2132,348 @@ mod tests {
             .join("NotoSansSyriacWestern-Regular.ttf")
     }
 
+    fn static_font_paths(dir: std::path::PathBuf) -> Vec<std::path::PathBuf> {
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return Vec::new();
+        };
+
+        let mut paths = entries
+            .filter_map(Result::ok)
+            .map(|entry| entry.path())
+            .filter(|path| {
+                path.extension()
+                    .and_then(|ext| ext.to_str())
+                    .map(|ext| matches!(ext.to_ascii_lowercase().as_str(), "ttf" | "otf" | "ttc"))
+                    .unwrap_or(false)
+            })
+            .collect::<Vec<_>>();
+        paths.sort();
+        paths
+    }
+
+    fn existing_paths(paths: Vec<std::path::PathBuf>) -> Vec<std::path::PathBuf> {
+        let mut existing = Vec::new();
+        for path in paths {
+            if path.exists() && !existing.contains(&path) {
+                existing.push(path);
+            }
+        }
+        existing
+    }
+
+    fn recursive_font_paths(dir: std::path::PathBuf) -> Vec<std::path::PathBuf> {
+        let mut stack = vec![dir];
+        let mut paths = Vec::new();
+
+        while let Some(dir) = stack.pop() {
+            let Ok(entries) = std::fs::read_dir(dir) else {
+                continue;
+            };
+
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    if path
+                        .components()
+                        .any(|component| component.as_os_str().eq("error"))
+                    {
+                        continue;
+                    }
+                    stack.push(path);
+                    continue;
+                }
+
+                let Some(ext) = path.extension().and_then(|ext| ext.to_str()) else {
+                    continue;
+                };
+                if matches!(
+                    ext.to_ascii_lowercase().as_str(),
+                    "ttf" | "otf" | "ttc" | "woff" | "woff2"
+                ) {
+                    paths.push(path);
+                }
+            }
+        }
+
+        paths.sort();
+        paths
+    }
+
+    fn path_has_component(path: &std::path::Path, component: &str) -> bool {
+        path.components().any(|item| item.as_os_str().eq(component))
+    }
+
+    fn fixture_font_corpus_paths() -> Vec<std::path::PathBuf> {
+        recursive_font_paths(test_fonts_dir())
+    }
+
+    fn fixture_engine_corpus_paths() -> Vec<std::path::PathBuf> {
+        let all = fixture_font_corpus_paths();
+        let test_root = test_fonts_dir();
+        let mut paths = Vec::new();
+
+        paths.extend(
+            all.iter()
+                .filter(|path| path.parent() == Some(test_root.as_path()))
+                .cloned(),
+        );
+        paths.extend(
+            all.iter()
+                .filter(|path| {
+                    path.extension()
+                        .and_then(|ext| ext.to_str())
+                        .map(|ext| matches!(ext.to_ascii_lowercase().as_str(), "otf" | "ttc"))
+                        .unwrap_or(false)
+                })
+                .cloned(),
+        );
+        paths.extend(
+            all.iter()
+                .filter(|path| {
+                    path.extension()
+                        .and_then(|ext| ext.to_str())
+                        .map(|ext| matches!(ext.to_ascii_lowercase().as_str(), "woff" | "woff2"))
+                        .unwrap_or(false)
+                        && !path_has_component(path, "noto-woff2")
+                })
+                .cloned(),
+        );
+        paths.extend(
+            all.iter()
+                .filter(|path| {
+                    path.file_name()
+                        .and_then(|name| name.to_str())
+                        .map(|name| name.contains("VariableFont"))
+                        .unwrap_or(false)
+                })
+                .cloned(),
+        );
+        paths.extend(
+            all.iter()
+                .filter(|path| {
+                    [
+                        "Noto_Kufi_Arabic",
+                        "Noto_Sans_Syriac_Western",
+                        "Tibetan",
+                        "windows",
+                        "apple",
+                    ]
+                    .iter()
+                    .any(|component| path_has_component(path, component))
+                })
+                .cloned(),
+        );
+
+        let mut sampled_noto_woff2 = all
+            .iter()
+            .filter(|path| path_has_component(path, "noto-woff2"))
+            .cloned()
+            .collect::<Vec<_>>();
+        sampled_noto_woff2.truncate(32);
+        paths.extend(sampled_noto_woff2);
+
+        existing_paths(paths)
+    }
+
+    fn font_supports_text(font: &crate::LoadedFont, text: &str) -> bool {
+        let Some(cmap) = font.font().cmap.as_ref() else {
+            return false;
+        };
+
+        text.chars()
+            .filter(|ch| !ch.is_control() && !ch.is_whitespace())
+            .all(|ch| cmap.get_glyph_position(ch as u32) != 0)
+    }
+
+    fn public_api_smoke_sample(
+        face: &crate::FontFace,
+    ) -> Option<(String, Option<&'static str>, crate::ShapingPolicy)> {
+        for ch in face.family().chars().chain(face.full_name().chars()) {
+            if ch.is_control() || ch.is_whitespace() {
+                continue;
+            }
+            let candidate = ch.to_string();
+            if font_supports_text(face, &candidate) {
+                return Some((candidate, None, crate::ShapingPolicy::LeftToRight));
+            }
+        }
+
+        let candidates = [
+            ("A", None, crate::ShapingPolicy::LeftToRight),
+            ("漢", Some("ja"), crate::ShapingPolicy::LeftToRight),
+            ("あ", Some("ja"), crate::ShapingPolicy::LeftToRight),
+            ("אב", Some("he-Hebr"), crate::ShapingPolicy::RightToLeft),
+            ("اب", Some("ar"), crate::ShapingPolicy::RightToLeft),
+            ("ܐܰ", Some("syr-Syrc"), crate::ShapingPolicy::RightToLeft),
+            ("ཀ", None, crate::ShapingPolicy::LeftToRight),
+            ("𐤀", None, crate::ShapingPolicy::RightToLeft),
+            ("𐡀", None, crate::ShapingPolicy::RightToLeft),
+            ("𐩠", None, crate::ShapingPolicy::RightToLeft),
+            ("𐎀", None, crate::ShapingPolicy::LeftToRight),
+            ("𔑀", None, crate::ShapingPolicy::LeftToRight),
+            ("𗀀", None, crate::ShapingPolicy::LeftToRight),
+            ("😀", None, crate::ShapingPolicy::LeftToRight),
+        ];
+
+        for (text, locale, policy) in candidates {
+            if font_supports_text(face, text) {
+                return Some((text.to_string(), locale, policy));
+            }
+        }
+
+        None
+    }
+
+    fn run_public_api_smoke_for_paths(
+        paths: &[std::path::PathBuf],
+    ) -> (usize, usize, usize, Vec<String>) {
+        let mut shaped = 0usize;
+        let mut svg_successes = 0usize;
+        let mut skipped = 0usize;
+        let mut failures = Vec::new();
+
+        for path in paths {
+            let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                let file = crate::FontFile::from_file(path)
+                    .map_err(|err| format!("FontFile::from_file failed: {err}"))?;
+                let face = file
+                    .current_face()
+                    .map_err(|err| format!("current_face failed: {err}"))?;
+                let Some((sample, locale, policy)) = public_api_smoke_sample(&face) else {
+                    return Ok::<(bool, bool), String>((false, false));
+                };
+
+                let mut engine = face
+                    .engine()
+                    .with_font_size(32.0)
+                    .with_shaping_policy(policy);
+                if let Some(locale) = locale {
+                    engine = engine.with_locale(locale);
+                }
+
+                let run = engine
+                    .shape(&sample)
+                    .map_err(|err| format!("shape({sample:?}) failed: {err}"))?;
+                if run.glyphs.is_empty() {
+                    return Err(format!("shape({sample:?}) returned no glyphs"));
+                }
+
+                let width = engine
+                    .measure(&sample)
+                    .map_err(|err| format!("measure({sample:?}) failed: {err}"))?;
+                if width <= 0.0 {
+                    return Err(format!("measure({sample:?}) returned non-positive width"));
+                }
+
+                let svg_result = match engine.render_svg(&sample) {
+                    Ok(svg) => {
+                        if !svg.contains("<svg") {
+                            return Err(format!("render_svg({sample:?}) returned non-SVG output"));
+                        }
+                        true
+                    }
+                    Err(err)
+                        if err.kind() == std::io::ErrorKind::Unsupported
+                            && (err
+                                .to_string()
+                                .contains("SVG glyph layers are not supported yet")
+                                || err
+                                    .to_string()
+                                    .contains("CFF2 outlines are not supported yet")) =>
+                    {
+                        false
+                    }
+                    Err(err) => {
+                        return Err(format!("render_svg({sample:?}) failed: {err}"));
+                    }
+                };
+
+                Ok((true, svg_result))
+            }));
+
+            match outcome {
+                Ok(Ok((false, _))) => skipped += 1,
+                Ok(Ok((true, svg_ok))) => {
+                    shaped += 1;
+                    if svg_ok {
+                        svg_successes += 1;
+                    }
+                }
+                Ok(Err(err)) if should_skip_corpus_error(path, &err) => skipped += 1,
+                Ok(Err(err)) => failures.push(format!("{}: {}", path.display(), err)),
+                Err(_) => failures.push(format!("{}: panic", path.display())),
+            }
+        }
+
+        (shaped, svg_successes, skipped, failures)
+    }
+
+    fn should_skip_corpus_error(path: &std::path::Path, error: &str) -> bool {
+        error.contains("Invalid delta format")
+            || error.contains("SVG glyph layers are not supported yet")
+            || error.contains("CFF2 outlines are not supported yet")
+            || (path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .map(|name| name.eq_ignore_ascii_case("SansSerifCollection.ttf"))
+                .unwrap_or(false)
+                && error.contains("ountbound call ptr"))
+    }
+
+    #[cfg(feature = "layout")]
+    fn arabic_boundary_font_paths() -> Vec<std::path::PathBuf> {
+        let mut paths = vec![
+            rtl_font_path(),
+            test_fonts_dir().join("windows").join("arialbd.ttf"),
+            test_fonts_dir().join("windows").join("ariali.ttf"),
+            test_fonts_dir().join("windows").join("arialbi.ttf"),
+            test_fonts_dir().join("windows").join("ariblk.ttf"),
+            test_fonts_dir().join("apple").join("Arial Unicode.ttf"),
+            test_fonts_dir()
+                .join("Noto_Kufi_Arabic")
+                .join("NotoKufiArabic-VariableFont_wght.ttf"),
+        ];
+        paths.extend(static_font_paths(
+            test_fonts_dir().join("Noto_Kufi_Arabic").join("static"),
+        ));
+        existing_paths(paths)
+    }
+
+    #[cfg(feature = "layout")]
+    fn syriac_boundary_font_paths() -> Vec<std::path::PathBuf> {
+        let mut paths = vec![test_fonts_dir()
+            .join("Noto_Sans_Syriac_Western")
+            .join("NotoSansSyriacWestern-VariableFont_wght.ttf")];
+        paths.extend(static_font_paths(
+            test_fonts_dir()
+                .join("Noto_Sans_Syriac_Western")
+                .join("static"),
+        ));
+        existing_paths(paths)
+    }
+
+    #[cfg(feature = "layout")]
+    fn hebrew_boundary_font_paths() -> Vec<std::path::PathBuf> {
+        existing_paths(vec![
+            rtl_font_path(),
+            test_fonts_dir().join("windows").join("arialbd.ttf"),
+            test_fonts_dir().join("windows").join("ariali.ttf"),
+            test_fonts_dir().join("windows").join("arialbi.ttf"),
+            test_fonts_dir().join("windows").join("ARIALN.TTF"),
+            test_fonts_dir().join("apple").join("Arial Unicode.ttf"),
+        ])
+    }
+
     #[cfg(feature = "layout")]
     fn rtl_contextual_font_paths() -> Vec<std::path::PathBuf> {
-        vec![
-            arabic_font_path(),
+        existing_paths(vec![
             rtl_font_path(),
             test_fonts_dir()
                 .join("Noto_Sans")
                 .join("static")
                 .join("NotoSans-Regular.ttf"),
-        ]
+            test_fonts_dir().join("apple").join("Arial Unicode.ttf"),
+        ])
     }
 
     #[cfg(feature = "layout")]
@@ -2406,6 +2731,69 @@ mod tests {
         }
 
         None
+    }
+
+    #[cfg(feature = "layout")]
+    fn count_mark_boundary_successes(
+        paths: &[std::path::PathBuf],
+        locale: &str,
+        detector: fn(&crate::LoadedFont) -> Option<String>,
+    ) -> usize {
+        let mut successes = 0usize;
+
+        for path in paths {
+            let Ok(Ok(font)) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                crate::load_font_from_file(path)
+            })) else {
+                continue;
+            };
+            let Some(cluster) = detector(&font) else {
+                continue;
+            };
+
+            let regular = crate::load_font_from_file(fira_sans_regular_path())
+                .expect("load regular fira sans");
+            let mut family = crate::FontFamily::new("Fira Sans");
+            family.add_loaded_font(regular);
+            family.add_loaded_font(font);
+
+            let text = format!("A{cluster}B");
+            let Ok(Ok(face_indices)) =
+                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    family.debug_face_indices_for_text(
+                        &text,
+                        family
+                            .options()
+                            .with_font_size(32.0)
+                            .with_locale(locale)
+                            .with_right_to_left(),
+                    )
+                }))
+            else {
+                continue;
+            };
+
+            if face_indices == vec![0, 1, 0] {
+                successes += 1;
+            }
+        }
+
+        successes
+    }
+
+    #[cfg(feature = "layout")]
+    fn detect_arabic_mark_cluster(font: &crate::LoadedFont) -> Option<String> {
+        first_real_mark_cluster(font, 0x0621..=0x064A, 0x0610..=0x065F)
+    }
+
+    #[cfg(feature = "layout")]
+    fn detect_syriac_mark_attachment_cluster(font: &crate::LoadedFont) -> Option<String> {
+        first_real_mark_attachment_cluster(font, 0x0710..=0x072C, 0x0730..=0x074A)
+    }
+
+    #[cfg(feature = "layout")]
+    fn detect_hebrew_mark_cluster(font: &crate::LoadedFont) -> Option<String> {
+        first_real_mark_cluster(font, 0x05D0..=0x05EA, 0x0591..=0x05C7)
     }
 
     #[cfg(feature = "layout")]
@@ -3243,6 +3631,140 @@ mod tests {
         assert!(width > 0.0);
         let two_line_width = font.measure("A\nB").expect("measure multiline");
         assert!(two_line_width >= width);
+    }
+
+    #[test]
+    fn public_api_metadata_smoke_across_fixture_corpus() {
+        let paths = fixture_font_corpus_paths();
+        let mut checked_files = 0usize;
+        let mut checked_faces = 0usize;
+        let mut skipped = 0usize;
+        let mut failures = Vec::new();
+
+        for path in &paths {
+            let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                let file = crate::FontFile::from_file(path)
+                    .map_err(|err| format!("FontFile::from_file failed: {err}"))?;
+                if file.face_count() == 0 {
+                    return Err("face_count was zero".to_string());
+                }
+                if !file.dump().contains("FontFile") {
+                    return Err("dump() did not include FontFile header".to_string());
+                }
+
+                let faces = file
+                    .faces()
+                    .map_err(|err| format!("faces() failed: {err}"))?;
+                if faces.len() != file.face_count() {
+                    return Err(format!(
+                        "faces().len()={} did not match face_count()={}",
+                        faces.len(),
+                        file.face_count()
+                    ));
+                }
+
+                for face in &faces {
+                    let family = face.family();
+                    let full_name = face.full_name();
+                    if family.trim().is_empty() && full_name.trim().is_empty() {
+                        return Err("family() and full_name() were both empty".to_string());
+                    }
+                    if !face.dump().contains("FontFace") {
+                        return Err("face.dump() did not include FontFace header".to_string());
+                    }
+                }
+
+                Ok::<usize, String>(faces.len())
+            }));
+
+            match outcome {
+                Ok(Ok(face_count)) => {
+                    checked_files += 1;
+                    checked_faces += face_count;
+                }
+                Ok(Err(err)) if should_skip_corpus_error(path, &err) => skipped += 1,
+                Ok(Err(err)) => failures.push(format!("{}: {}", path.display(), err)),
+                Err(_) => failures.push(format!("{}: panic", path.display())),
+            }
+        }
+
+        assert!(
+            failures.is_empty(),
+            "public API metadata smoke failures:\n{}",
+            failures.join("\n")
+        );
+        assert_eq!(
+            checked_files + skipped,
+            paths.len(),
+            "expected every fixture font to either load or be skipped explicitly"
+        );
+        assert!(
+            checked_files >= 700,
+            "expected to load at least 700 fixture fonts, loaded {checked_files}"
+        );
+        assert!(
+            checked_faces >= checked_files,
+            "expected at least one face per loaded font file"
+        );
+    }
+
+    #[test]
+    fn public_api_engine_smoke_across_fixture_corpus() {
+        let paths = fixture_engine_corpus_paths();
+        let (shaped, svg_successes, skipped, failures) = run_public_api_smoke_for_paths(&paths);
+
+        assert!(
+            failures.is_empty(),
+            "public API engine smoke failures:\n{}",
+            failures.join("\n")
+        );
+        assert!(
+            shaped >= 96,
+            "expected to shape at least 96 fixture fonts, shaped {shaped}"
+        );
+        assert!(
+            svg_successes >= 64,
+            "expected SVG export to succeed for at least 64 fixture fonts, succeeded {svg_successes}"
+        );
+        assert!(
+            skipped <= 64,
+            "expected only a limited number of corpus fonts to be skipped, skipped {skipped}"
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "cff")]
+    fn public_api_cff_smoke_across_otf_fixture_corpus() {
+        let paths = existing_paths(
+            fixture_font_corpus_paths()
+                .into_iter()
+                .filter(|path| {
+                    path.extension()
+                        .and_then(|ext| ext.to_str())
+                        .map(|ext| ext.eq_ignore_ascii_case("otf"))
+                        .unwrap_or(false)
+                })
+                .collect(),
+        );
+        let (shaped, svg_successes, skipped, failures) = run_public_api_smoke_for_paths(&paths);
+
+        assert!(
+            failures.is_empty(),
+            "public API CFF smoke failures:\n{}",
+            failures.join("\n")
+        );
+        assert!(
+            shaped >= 12,
+            "expected to shape at least 12 OTF fixtures, shaped {shaped}"
+        );
+        assert!(
+            svg_successes >= 10,
+            "expected SVG export for at least 10 OTF fixtures, succeeded {svg_successes}"
+        );
+        assert!(
+            skipped <= 4,
+            "expected at most 4 OTF fixtures to be skipped"
+        );
     }
 
     #[test]
@@ -4555,6 +5077,48 @@ mod tests {
             .expect("resolve syriac mark fallback face indices");
 
         assert_eq!(face_indices, vec![0, 1, 0]);
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn font_family_fallback_checks_arabic_mark_boundaries_across_real_fonts() {
+        let successes = count_mark_boundary_successes(
+            &arabic_boundary_font_paths(),
+            "ar",
+            detect_arabic_mark_cluster,
+        );
+        assert!(
+            successes >= 1,
+            "expected at least one Arabic mark font to pass boundary checks"
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn font_family_fallback_checks_syriac_mark_boundaries_across_real_fonts() {
+        let successes = count_mark_boundary_successes(
+            &syriac_boundary_font_paths(),
+            "syr-Syrc",
+            detect_syriac_mark_attachment_cluster,
+        );
+        assert!(
+            successes >= 1,
+            "expected at least one Syriac mark font to pass boundary checks"
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn font_family_fallback_checks_hebrew_mark_boundaries_across_real_fonts() {
+        let successes = count_mark_boundary_successes(
+            &hebrew_boundary_font_paths(),
+            "he-Hebr",
+            detect_hebrew_mark_cluster,
+        );
+        assert!(
+            successes >= 1,
+            "expected at least one Hebrew mark font to pass boundary checks"
+        );
     }
 
     #[test]

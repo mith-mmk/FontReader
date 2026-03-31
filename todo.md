@@ -401,6 +401,7 @@
     - [x] combining mark を fallback text unit として分断しない
     - [x] RTL contextual script では同一 face を優先して segment continuity を維持
     - [x] Arabic / Syriac の real font fixture で face 切替境界の回帰テストを追加
+    - [x] Arabic / Syriac / Hebrew の複数フォント候補を走査する境界チェックを追加
     - [ ] 実フォントで script ごとの face 切替境界をさらに詰める
 
 ## examples / ドキュメント
@@ -409,6 +410,7 @@
   - [x] `--features raw` が必要か不要かを example ごとに判定
   - [x] 判定結果を `README.md` / `README.ja.md` に反映
   - [x] 既存 common helper ベースで、主要なパス / ファイル名指定が引数化されていることを確認
+  - [x] public API の corpus smoke test を追加して metadata / shape / render_svg を実フォント群で確認
 - [x] `fontmetadata.rs` を追加して metadata 表示用 example を用意
 - [x] READMEの整理
   - [x] APIとsample中心に書き直す
@@ -428,8 +430,14 @@
   - [*] Arabic / Syriac の mark attachment を GDEF attach class まで使って詰める
     - [x] `mark_attachment_class()` / `attach_point_indices()` を GDEF に追加
     - [x] attachable mark では前の base に重ねる fallback 位置決めを導入
+    - [x] boundary test を複数フォント候補へ拡張
     - [ ] GPOS mark-to-base / mark-to-mark 相当の精度までは未対応
 - [ ] スクリプト文字対応
 
 ## format
 - [ ] CFF2対応を進める
+  - [x] CFF INDEX の `count + 1` overflow を修正して大規模 CFF collection を通せるようにした
+  - [x] `CFF2` table を outline format として認識し、未対応時は panic ではなく unsupported へ倒すようにした
+  - [x] CFF2 本体の実装前に、CFF / TTC / WOFF / WOFF2 をまたぐ corpus smoke test を追加
+  - [ ] variable font の `Invalid delta format` は未対応のため skip 扱い
+  - [ ] CFF2 charstring / variation store / blend operator 本体は未着手

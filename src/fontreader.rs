@@ -70,8 +70,7 @@ pub struct GlyphCommands {
     pub bitmap: Option<BitmapGlyphCommands>,
 }
 
-#[derive(Debug, Clone)]
-
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GlyphFormat {
     OpenTypeGlyph,
     CFF,
@@ -113,6 +112,7 @@ pub enum FontData {
 #[derive(Debug, Clone)]
 pub struct Font {
     pub font_type: fontheader::FontHeaders,
+    pub(crate) outline_format: GlyphFormat,
     pub(crate) cmap: Option<CmapEncodings>, // must
     pub(crate) head: Option<head::HEAD>,    // must
     pub(crate) hhea: Option<hhea::HHEA>,    // must
@@ -184,6 +184,7 @@ impl Font {
     fn empty() -> Self {
         Self {
             font_type: fontheader::FontHeaders::Unknown,
+            outline_format: GlyphFormat::Unknown,
             cmap: None,
             head: None,
             hhea: None,
@@ -390,6 +391,13 @@ impl Font {
             return Ok(string);
         }
 
+        if self.current_outline_format() == GlyphFormat::CFF2 {
+            return Err(Error::new(
+                ErrorKind::Unsupported,
+                "CFF2 outlines are not supported yet",
+            ));
+        }
+
         // utf-32
         let pos = glyph_id as u32;
         if let Some(glyf) = &self.glyf {
@@ -522,6 +530,13 @@ impl Font {
             let layout = self.get_layout(glyph_id as usize, is_vert);
             let string = cff.to_svg(glyph_id, fontsize, fontunit, &layout, 0.0, 0.0);
             return string;
+        }
+
+        if self.current_outline_format() == GlyphFormat::CFF2 {
+            return Err(Error::new(
+                ErrorKind::Unsupported,
+                "CFF2 outlines are not supported yet",
+            ));
         }
 
         if self.glyf.is_none() {
@@ -709,6 +724,14 @@ impl Font {
         }
     }
 
+    fn current_outline_format(&self) -> GlyphFormat {
+        if self.current_font == 0 {
+            self.outline_format
+        } else {
+            self.more_fonts[self.current_font - 1].outline_format
+        }
+    }
+
     fn current_colr(&self) -> Option<&colr::COLR> {
         if self.current_font == 0 {
             self.colr.as_ref()
@@ -794,11 +817,27 @@ impl Font {
             };
         }
 
-        let glyf = self.current_glyf().unwrap();
-        let glyph = glyf.get_glyph(glyph_id).unwrap();
-        let open_type_glyph = OpenTypeGlyph {
-            layout,
-            glyph: FontData::Glyph(glyph.clone()),
+        let open_type_glyph = match self.current_outline_format() {
+            GlyphFormat::OpenTypeGlyph => {
+                let glyf = self
+                    .current_glyf()
+                    .expect("glyf outline format should expose glyf table");
+                let glyph = glyf
+                    .get_glyph(glyph_id)
+                    .expect("glyph id should resolve inside glyf table");
+                OpenTypeGlyph {
+                    layout,
+                    glyph: FontData::Glyph(glyph.clone()),
+                }
+            }
+            GlyphFormat::CFF2 => OpenTypeGlyph {
+                layout,
+                glyph: FontData::CFF2(Vec::new()),
+            },
+            _ => OpenTypeGlyph {
+                layout,
+                glyph: FontData::CFF2(Vec::new()),
+            },
         };
 
         GriphData {
@@ -1404,6 +1443,10 @@ impl Font {
             return true;
         }
 
+        if self.current_outline_format() == GlyphFormat::CFF2 {
+            return false;
+        }
+
         matches!(open_type_glyph.glyph, FontData::Glyph(_))
     }
 
@@ -1750,6 +1793,13 @@ impl Font {
             ))]);
         }
 
+        if self.current_outline_format() == GlyphFormat::CFF2 {
+            return Err(Error::new(
+                ErrorKind::Unsupported,
+                "CFF2 outlines are not supported yet",
+            ));
+        }
+
         match &open_type_glyph.glyph {
             FontData::Glyph(_) => {
                 let glyf = self
@@ -1966,6 +2016,12 @@ impl Font {
                                 bitmap: None,
                             });
                             cursor_x += advance_width;
+                        }
+                        FontData::CFF2(_) => {
+                            return Err(Error::new(
+                                ErrorKind::Unsupported,
+                                "CFF2 outlines are not supported yet",
+                            ));
                         }
                         _ => {
                             return Err(Error::new(
@@ -3038,6 +3094,10 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Result<Font, Error> {
                         let mut reader = BytesReader::new(&table.data);
                         let cff = cff::CFF::new(&mut reader, 0, table.data.len() as u32);
                         font.cff = Some(cff.unwrap());
+                        font.outline_format = GlyphFormat::CFF;
+                    }
+                    b"CFF2" => {
+                        font.outline_format = GlyphFormat::CFF2;
                     }
                     #[cfg(feature = "layout")]
                     b"GPOS" => {
@@ -3088,23 +3148,27 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Result<Font, Error> {
                 )?;
                 font.vmtx = Some(vmtx);
             }
-            let mut reader = BytesReader::new(&loca_table.as_ref().unwrap().data);
-            let index_to_loc_format = font.head.as_ref().unwrap().index_to_loc_format as usize;
-            let loca = loca::LOCA::new_by_size(
-                &mut reader,
-                0,
-                loca_table.as_ref().unwrap().data.len() as u32,
-                index_to_loc_format,
-            )?;
-            font.loca = Some(loca);
-            let mut reader = BytesReader::new(&glyf_table.as_ref().unwrap().data);
-            let glyf = glyf::GLYF::new(
-                &mut reader,
-                0,
-                glyf_table.as_ref().unwrap().data.len() as u32,
-                font.loca.as_ref().unwrap(),
-            );
-            font.glyf = Some(glyf);
+            if let (Some(loca_table), Some(glyf_table)) = (loca_table.as_ref(), glyf_table.as_ref())
+            {
+                let mut reader = BytesReader::new(&loca_table.data);
+                let index_to_loc_format = font.head.as_ref().unwrap().index_to_loc_format as usize;
+                let loca = loca::LOCA::new_by_size(
+                    &mut reader,
+                    0,
+                    loca_table.data.len() as u32,
+                    index_to_loc_format,
+                )?;
+                font.loca = Some(loca);
+                let mut reader = BytesReader::new(&glyf_table.data);
+                let glyf = glyf::GLYF::new(
+                    &mut reader,
+                    0,
+                    glyf_table.data.len() as u32,
+                    font.loca.as_ref().unwrap(),
+                );
+                font.glyf = Some(glyf);
+                font.outline_format = GlyphFormat::OpenTypeGlyph;
+            }
 
             if let Some(sbix_table) = sbix_table {
                 let mut reader = BytesReader::new(&sbix_table.data);
@@ -3213,6 +3277,10 @@ fn from_opentype<R: BinaryReader>(file: &mut R, header: &OTFHeader) -> Result<Fo
             b"CFF " => {
                 let cff = cff::CFF::new(file, record.offset, record.length);
                 font.cff = Some(cff.unwrap());
+                font.outline_format = GlyphFormat::CFF;
+            }
+            b"CFF2" => {
+                font.outline_format = GlyphFormat::CFF2;
             }
             #[cfg(feature = "layout")]
             b"GPOS" => {
@@ -3282,6 +3350,7 @@ fn from_opentype<R: BinaryReader>(file: &mut R, header: &OTFHeader) -> Result<Fo
         let loca = font.loca.as_ref().unwrap();
         let glyf = glyf::GLYF::new(file, offset, length, loca);
         font.glyf = Some(glyf);
+        font.outline_format = GlyphFormat::OpenTypeGlyph;
     }
     if let Some(offset) = font.sbix_pos.as_ref() {
         let sbix = sbix::SBIX::new(file, offset.offset, offset.length, num_glyphs as u32)?;

@@ -75,8 +75,8 @@ use std::{
 };
 
 use bin_rs::reader::BinaryReader;
-#[cfg(feature = "encoding")]
-use iconv::Iconv;
+//#[cfg(feature = "encoding")]
+//use iconv::Iconv;
 
 use crate::opentype::platforms::{get_locale_to_language_id, PlatformID};
 

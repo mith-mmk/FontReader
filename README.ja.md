@@ -18,7 +18,7 @@ English: [README.md](README.md)
 - `FontFamily`
   - 複数 face のキャッシュと face 選択、glyph fallback を担当
 
-低レイヤの parser API は `features = ["raw"]` で引き続き利用できます。
+低レイヤの parser API は `features = ["raw"]` で利用できます。
 
 ## 対応フォーマット
 

@@ -41,10 +41,10 @@ pub(crate) struct CFF {
     pub(crate) names: Vec<String>,
     pub(crate) top_dict: Dict, // TopDict
     pub(crate) bbox: [f64; 4],
-    #[cfg(feature = "cff2")]
-    pub(crate) global_subr: Option<GlobalSubr>, // CFF2
-    #[cfg(feature = "cff2")]
-    pub(crate) variation_store: Vec<VariationStore>, // CFF2
+    //#[cfg(feature = "cff2")]
+    //pub(crate) global_subr: Option<GlobalSubr>, // CFF2
+    //#[cfg(feature = "cff2")]
+    //pub(crate) variation_store: Vec<VariationStore>, // CFF2
     pub(crate) strings: Vec<String>,
     pub(crate) charsets: Charsets,
     pub(crate) char_string: CharString,
@@ -167,6 +167,13 @@ impl CFF {
         let mut default_width;
 
         let header = Header::parse(reader)?;
+        if header.major != 1 {
+            return Err(format!(
+                "CFF major version {} is not supported yet; CFF2 support is pending",
+                header.major
+            )
+            .into());
+        }
         let name_index = Index::parse(reader)?;
         let names = name_index
             .data
@@ -2705,9 +2712,10 @@ impl Index {
             return Ok(Self { data: Vec::new() });
         }
         let off_size = r.read_u8()?;
+        let offset_count = count as usize + 1;
 
         let mut offsets = Vec::new();
-        for _ in 0..count + 1 {
+        for _ in 0..offset_count {
             match off_size {
                 1 => offsets.push(r.read_u8()? as u32),
                 2 => offsets.push(r.read_u16_be()? as u32),
@@ -2724,9 +2732,9 @@ impl Index {
         }
 
         let mut data = Vec::new();
-        for i in 0..count {
-            let start = offsets[i as usize] as usize;
-            let end = offsets[i as usize + 1] as usize;
+        for i in 0..count as usize {
+            let start = offsets[i] as usize;
+            let end = offsets[i + 1] as usize;
             let buf = r.read_bytes_as_vec(end - start)?;
             data.push(buf);
         }
