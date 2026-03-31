@@ -2125,9 +2125,24 @@ mod tests {
         test_fonts_dir().join("windows").join("arial.ttf")
     }
 
+    fn arabic_font_path() -> std::path::PathBuf {
+        test_fonts_dir()
+            .join("Noto_Kufi_Arabic")
+            .join("static")
+            .join("NotoKufiArabic-Regular.ttf")
+    }
+
+    fn syriac_font_path() -> std::path::PathBuf {
+        test_fonts_dir()
+            .join("Noto_Sans_Syriac_Western")
+            .join("static")
+            .join("NotoSansSyriacWestern-Regular.ttf")
+    }
+
     #[cfg(feature = "layout")]
     fn rtl_contextual_font_paths() -> Vec<std::path::PathBuf> {
         vec![
+            arabic_font_path(),
             rtl_font_path(),
             test_fonts_dir()
                 .join("Noto_Sans")
@@ -2320,6 +2335,73 @@ mod tests {
             };
             if let Some((text, glyph_ids)) = first_real_arabic_contextual_sequence_in_font(&font) {
                 return Some((path, text, glyph_ids));
+            }
+        }
+
+        None
+    }
+
+    #[cfg(feature = "layout")]
+    fn first_real_mark_attachment_cluster(
+        font: &crate::LoadedFont,
+        base_range: std::ops::RangeInclusive<u32>,
+        mark_range: std::ops::RangeInclusive<u32>,
+    ) -> Option<String> {
+        let gdef = font.font().gdef.as_ref()?;
+        let cmap = font.font().cmap.as_ref()?;
+
+        for base in base_range {
+            let Some(base_char) = char::from_u32(base) else {
+                continue;
+            };
+            let base_glyph = cmap.get_glyph_position(base) as u16;
+            if base_glyph == 0 {
+                continue;
+            }
+
+            for mark in mark_range.clone() {
+                let Some(mark_char) = char::from_u32(mark) else {
+                    continue;
+                };
+                let mark_glyph = cmap.get_glyph_position(mark) as u16;
+                if mark_glyph == 0 {
+                    continue;
+                }
+
+                if gdef.mark_attachment_class(mark_glyph).is_some()
+                    || gdef.has_attach_points(mark_glyph)
+                {
+                    return Some(format!("{base_char}{mark_char}"));
+                }
+            }
+        }
+
+        None
+    }
+
+    #[cfg(feature = "layout")]
+    fn first_real_mark_cluster(
+        font: &crate::LoadedFont,
+        base_range: std::ops::RangeInclusive<u32>,
+        mark_range: std::ops::RangeInclusive<u32>,
+    ) -> Option<String> {
+        let cmap = font.font().cmap.as_ref()?;
+
+        for base in base_range {
+            let Some(base_char) = char::from_u32(base) else {
+                continue;
+            };
+            if cmap.get_glyph_position(base) == 0 {
+                continue;
+            }
+
+            for mark in mark_range.clone() {
+                let Some(mark_char) = char::from_u32(mark) else {
+                    continue;
+                };
+                if cmap.get_glyph_position(mark) != 0 {
+                    return Some(format!("{base_char}{mark_char}"));
+                }
             }
         }
 
@@ -4384,6 +4466,95 @@ mod tests {
             .debug_shape_glyph_ids_with_direction(&text, Some("ar"), true)
             .expect("shape rtl contextual glyph ids");
         assert_eq!(glyph_ids, expected_glyph_ids);
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn font_family_fallback_keeps_real_arabic_contextual_run_on_secondary_face() {
+        let Some((path, text, _)) = first_real_arabic_contextual_sequence() else {
+            return;
+        };
+        let regular =
+            crate::load_font_from_file(fira_sans_regular_path()).expect("load regular fira sans");
+        let arabic = crate::load_font_from_file(&path).expect("load arabic contextual font");
+
+        let mut family = crate::FontFamily::new("Fira Sans");
+        family.add_loaded_font(regular);
+        family.add_loaded_font(arabic);
+
+        let text = format!("A{text}B");
+        let face_indices = family
+            .debug_face_indices_for_text(
+                &text,
+                family
+                    .options()
+                    .with_font_size(32.0)
+                    .with_locale("ar")
+                    .with_right_to_left(),
+            )
+            .expect("resolve fallback face indices");
+
+        assert_eq!(face_indices.first(), Some(&0));
+        assert_eq!(face_indices.last(), Some(&0));
+        assert!(face_indices[1..face_indices.len() - 1]
+            .iter()
+            .all(|face_index| *face_index == 1));
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn font_family_fallback_keeps_real_arabic_mark_cluster_on_secondary_face() {
+        let regular =
+            crate::load_font_from_file(fira_sans_regular_path()).expect("load regular fira sans");
+        let arabic = crate::load_font_from_file(rtl_font_path()).expect("load arabic font");
+        let cluster = first_real_mark_cluster(&arabic, 0x0621..=0x064A, 0x0610..=0x065F)
+            .expect("expected arabic mark cluster");
+
+        let mut family = crate::FontFamily::new("Fira Sans");
+        family.add_loaded_font(regular);
+        family.add_loaded_font(arabic);
+
+        let text = format!("A{cluster}B");
+        let face_indices = family
+            .debug_face_indices_for_text(
+                &text,
+                family
+                    .options()
+                    .with_font_size(32.0)
+                    .with_locale("ar")
+                    .with_right_to_left(),
+            )
+            .expect("resolve arabic mark fallback face indices");
+
+        assert_eq!(face_indices, vec![0, 1, 0]);
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn font_family_fallback_keeps_real_syriac_mark_cluster_on_secondary_face() {
+        let regular =
+            crate::load_font_from_file(fira_sans_regular_path()).expect("load regular fira sans");
+        let syriac = crate::load_font_from_file(syriac_font_path()).expect("load syriac font");
+        let cluster = first_real_mark_attachment_cluster(&syriac, 0x0710..=0x072C, 0x0730..=0x074A)
+            .expect("expected syriac mark attachment cluster");
+
+        let mut family = crate::FontFamily::new("Fira Sans");
+        family.add_loaded_font(regular);
+        family.add_loaded_font(syriac);
+
+        let text = format!("A{cluster}B");
+        let face_indices = family
+            .debug_face_indices_for_text(
+                &text,
+                family
+                    .options()
+                    .with_font_size(32.0)
+                    .with_locale("syr-Syrc")
+                    .with_right_to_left(),
+            )
+            .expect("resolve syriac mark fallback face indices");
+
+        assert_eq!(face_indices, vec![0, 1, 0]);
     }
 
     #[test]

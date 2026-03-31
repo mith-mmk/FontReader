@@ -1,7 +1,7 @@
 mod common;
 
 use common::{font_path, output_path, text_content};
-use fontloader::{FontFile, GlyphLayer};
+use fontloader::{FontFile, GlyphLayer, ShapingPolicy};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
@@ -13,6 +13,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let text = text_content(&args, "./test/read.txt")?;
     let engine = face
         .engine()
+        .with_shaping_policy(ShapingPolicy::LeftToRight)
         .with_font_size(64.0)
         .with_line_height(72.0)
         .with_svg_unit("px");

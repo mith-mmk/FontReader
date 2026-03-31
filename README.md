@@ -33,12 +33,13 @@ Default features include `layout` and `cff`.
 ## Quick Start
 
 ```rust
-use fontloader::FontFile;
+use fontloader::{FontFile, ShapingPolicy};
 
 let file = FontFile::from_file("fonts/YourFont.ttf")?;
 let face = file.current_face()?;
 let engine = face
     .engine()
+    .with_shaping_policy(ShapingPolicy::LeftToRight)
     .with_font_size(32.0)
     .with_line_height(40.0)
     .with_svg_unit("px");
@@ -135,6 +136,7 @@ Examples share a small common CLI.
 High-level examples that work without `raw`:
 
 - `api_overview`
+- `fontmetadata`
 - `fontloader`
 
 Raw / inspection examples that require `--features raw`:

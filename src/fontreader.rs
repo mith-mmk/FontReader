@@ -1523,6 +1523,29 @@ impl Font {
             .unwrap_or(false)
     }
 
+    #[cfg(not(feature = "layout"))]
+    fn gdef_is_ignored_for_pair_positioning(&self, glyph_id: u16) -> bool {
+        let _ = glyph_id;
+        false
+    }
+
+    #[cfg(feature = "layout")]
+    fn gdef_supports_mark_attachment(&self, glyph_id: u16) -> bool {
+        self.current_gdef()
+            .map(|gdef| {
+                gdef.is_mark_glyph(glyph_id)
+                    && (gdef.mark_attachment_class(glyph_id).is_some()
+                        || gdef.has_attach_points(glyph_id))
+            })
+            .unwrap_or(false)
+    }
+
+    #[cfg(not(feature = "layout"))]
+    fn gdef_supports_mark_attachment(&self, glyph_id: u16) -> bool {
+        let _ = glyph_id;
+        false
+    }
+
     pub fn text2glyph_run(
         &self,
         text: &str,
@@ -1550,9 +1573,10 @@ impl Font {
             ));
         }
 
-        let mut glyphs = Vec::new();
+        let mut glyphs: Vec<PositionedGlyph> = Vec::new();
         let mut cursor_x = 0.0f32;
         let mut cursor_y = 0.0f32;
+        let mut last_attach_base_glyph_index: Option<usize> = None;
         let tab_advance = line_height;
         let shaped_units = self.shape_text_units(
             text,
@@ -1565,6 +1589,7 @@ impl Font {
         for (index, unit) in shaped_units.iter().enumerate() {
             match *unit {
                 ResolvedTextUnit::Newline => {
+                    last_attach_base_glyph_index = None;
                     if is_vertical {
                         cursor_x -= line_height;
                         cursor_y = 0.0;
@@ -1574,6 +1599,7 @@ impl Font {
                     }
                 }
                 ResolvedTextUnit::Tab => {
+                    last_attach_base_glyph_index = None;
                     if is_vertical {
                         cursor_y += tab_advance * 4.0;
                     } else if is_right_to_left {
@@ -1644,25 +1670,44 @@ impl Font {
                     metrics.advance_x += adjustment.advance_x;
                     metrics.advance_y += adjustment.advance_y;
                     metrics.bounds = glyph_layers_bounds(&layers);
-
-                    let origin_x = if is_right_to_left && !is_vertical {
+                    let uses_mark_attachment = self.gdef_supports_mark_attachment(glyph_id as u16)
+                        && last_attach_base_glyph_index.is_some();
+                    let origin_x = if uses_mark_attachment {
+                        glyphs[last_attach_base_glyph_index.expect("checked some")].x
+                            + adjustment.placement_x
+                    } else if is_right_to_left && !is_vertical {
                         cursor_x - metrics.advance_x + adjustment.placement_x
                     } else {
                         cursor_x + adjustment.placement_x
                     };
-                    let origin_y = cursor_y + adjustment.placement_y;
+                    let origin_y = if uses_mark_attachment {
+                        glyphs[last_attach_base_glyph_index.expect("checked some")].y
+                            + adjustment.placement_y
+                    } else {
+                        cursor_y + adjustment.placement_y
+                    };
+                    if uses_mark_attachment {
+                        metrics.advance_x = 0.0;
+                        metrics.advance_y = 0.0;
+                    }
                     let glyph = Glyph {
                         font: Some(font_metrics_from_layout(&open_type_glyph.layout, scale_y)),
                         metrics,
                         layers,
                     };
                     glyphs.push(PositionedGlyph::new(glyph, origin_x, origin_y));
-                    if is_right_to_left && !is_vertical {
-                        cursor_x -= metrics.advance_x;
-                    } else {
-                        cursor_x += metrics.advance_x;
+                    if !uses_mark_attachment {
+                        if is_right_to_left && !is_vertical {
+                            cursor_x -= metrics.advance_x;
+                        } else {
+                            cursor_x += metrics.advance_x;
+                        }
+                        cursor_y += metrics.advance_y;
                     }
-                    cursor_y += metrics.advance_y;
+
+                    if !self.gdef_is_ignored_for_pair_positioning(glyph_id as u16) {
+                        last_attach_base_glyph_index = Some(glyphs.len() - 1);
+                    }
                 }
             }
         }

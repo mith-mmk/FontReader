@@ -145,6 +145,27 @@ impl GDEF {
     pub(crate) fn is_mark_glyph(&self, glyph_id: u16) -> bool {
         self.glyph_class(glyph_id) == Some(GlyphClass::Mark)
     }
+
+    pub(crate) fn mark_attachment_class(&self, glyph_id: u16) -> Option<u16> {
+        let class = self.mark_attach_class_def.as_ref()?.get_class(glyph_id);
+        if class == 0 {
+            None
+        } else {
+            Some(class)
+        }
+    }
+
+    pub(crate) fn attach_point_indices(&self, glyph_id: u16) -> Option<&[u16]> {
+        let attach_list = self.attach_list.as_ref()?;
+        let index = attach_list.coverage.contains(glyph_id as usize)?;
+        Some(&attach_list.attach_point.get(index)?.point_indices)
+    }
+
+    pub(crate) fn has_attach_points(&self, glyph_id: u16) -> bool {
+        self.attach_point_indices(glyph_id)
+            .map(|points| !points.is_empty())
+            .unwrap_or(false)
+    }
 }
 
 #[derive(Debug, Clone)]

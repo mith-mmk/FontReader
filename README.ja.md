@@ -33,12 +33,13 @@ default feature には `layout` と `cff` が含まれます。
 ## 最小サンプル
 
 ```rust
-use fontloader::FontFile;
+use fontloader::{FontFile, ShapingPolicy};
 
 let file = FontFile::from_file("fonts/YourFont.ttf")?;
 let face = file.current_face()?;
 let engine = face
     .engine()
+    .with_shaping_policy(ShapingPolicy::LeftToRight)
     .with_font_size(32.0)
     .with_line_height(40.0)
     .with_svg_unit("px");
@@ -135,6 +136,7 @@ example は共通の CLI 引数を持ちます。
 `raw` なしで使える高レベル example:
 
 - `api_overview`
+- `fontmetadata`
 - `fontloader`
 
 `--features raw` が必要な inspection / 旧API example:

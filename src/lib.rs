@@ -30,7 +30,7 @@ pub use commands::{
     FontVariant, FontWeight, Glyph, GlyphBounds, GlyphFlow, GlyphLayer, GlyphMetrics, GlyphPaint,
     GlyphRun, PathGlyphLayer, PositionedGlyph, RasterGlyphLayer, RasterGlyphSource, TextDirection,
 };
-pub use fontengine::FontEngine;
+pub use fontengine::{FontEngine, ShapingPolicy};
 pub use fontface::{FontFace, FontFaceDescriptor, FontFamily};
 pub use fontfile::{
     load_font, load_font_from_buffer, load_font_from_file, load_font_from_net, open_font,

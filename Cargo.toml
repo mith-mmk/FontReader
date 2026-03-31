@@ -71,6 +71,10 @@ name = "fontloader"
 path = "examples/fontloader.rs"
 
 [[example]]
+name = "fontmetadata"
+path = "examples/fontmetadata.rs"
+
+[[example]]
 name = "fontname"
 path = "examples/fontname.rs"
 required-features = ["raw"]

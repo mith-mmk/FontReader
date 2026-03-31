@@ -1,16 +1,48 @@
 use crate::commands::{
     Command, FillRule, FontOptions, GlyphBounds, GlyphLayer, GlyphPaint, GlyphRun, PositionedGlyph,
-    RasterGlyphLayer, RasterGlyphSource,
+    RasterGlyphLayer, RasterGlyphSource, TextDirection,
 };
 use crate::fontface::FontFace;
 use crate::util;
 use base64::{engine::general_purpose, Engine as _};
 use std::io::{Error, ErrorKind};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ShapingPolicy {
+    LeftToRight,
+    RightToLeft,
+    TopToBottom,
+}
+
+impl Default for ShapingPolicy {
+    fn default() -> Self {
+        Self::LeftToRight
+    }
+}
+
+impl ShapingPolicy {
+    pub fn text_direction(self) -> TextDirection {
+        match self {
+            ShapingPolicy::LeftToRight => TextDirection::LeftToRight,
+            ShapingPolicy::RightToLeft => TextDirection::RightToLeft,
+            ShapingPolicy::TopToBottom => TextDirection::TopToBottom,
+        }
+    }
+
+    fn from_text_direction(text_direction: TextDirection) -> Self {
+        match text_direction {
+            TextDirection::LeftToRight => ShapingPolicy::LeftToRight,
+            TextDirection::RightToLeft => ShapingPolicy::RightToLeft,
+            TextDirection::TopToBottom => ShapingPolicy::TopToBottom,
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct FontEngine<'a> {
     face: &'a FontFace,
     options: FontOptions<'a>,
+    shaping_policy: ShapingPolicy,
     svg_unit: String,
 }
 
@@ -19,11 +51,13 @@ impl<'a> FontEngine<'a> {
         Self {
             face,
             options: FontOptions::new(face),
+            shaping_policy: ShapingPolicy::default(),
             svg_unit: "px".to_string(),
         }
     }
 
     pub fn with_options(mut self, options: FontOptions<'a>) -> Self {
+        self.shaping_policy = ShapingPolicy::from_text_direction(options.text_direction);
         self.options = options.with_face(self.face);
         self
     }
@@ -43,13 +77,38 @@ impl<'a> FontEngine<'a> {
         self
     }
 
+    pub fn with_shaping_policy(mut self, shaping_policy: ShapingPolicy) -> Self {
+        self.shaping_policy = shaping_policy;
+        self.options = self
+            .options
+            .with_text_direction(self.shaping_policy.text_direction());
+        self
+    }
+
+    pub fn with_left_to_right(self) -> Self {
+        self.with_shaping_policy(ShapingPolicy::LeftToRight)
+    }
+
+    pub fn with_right_to_left(self) -> Self {
+        self.with_shaping_policy(ShapingPolicy::RightToLeft)
+    }
+
+    pub fn with_vertical_flow(self) -> Self {
+        self.with_shaping_policy(ShapingPolicy::TopToBottom)
+    }
+
     pub fn with_svg_unit(mut self, unit: impl Into<String>) -> Self {
         self.svg_unit = unit.into();
         self
     }
 
+    pub fn shaping_policy(&self) -> ShapingPolicy {
+        self.shaping_policy
+    }
+
     pub fn options(&self) -> FontOptions<'a> {
         self.options
+            .with_text_direction(self.shaping_policy.text_direction())
     }
 
     pub fn shape(&self, text: &str) -> Result<GlyphRun, Error> {
@@ -57,7 +116,7 @@ impl<'a> FontEngine<'a> {
     }
 
     pub fn text2glyph_run(&self, text: &str) -> Result<GlyphRun, Error> {
-        let mut options = self.options;
+        let mut options = self.options();
         options.font = Some(crate::FontRef::Loaded(self.face));
         crate::commands::text2commands(text, options)
     }
@@ -67,7 +126,7 @@ impl<'a> FontEngine<'a> {
     }
 
     pub fn measure(&self, text: &str) -> Result<f64, Error> {
-        let mut options = self.options;
+        let mut options = self.options();
         options.font = Some(crate::FontRef::Loaded(self.face));
         self.face.font().measure_with_options(text, &options)
     }
@@ -79,6 +138,27 @@ impl<'a> FontEngine<'a> {
     pub fn text2svg(&self, text: &str) -> Result<String, Error> {
         let run = self.text2glyph_run(text)?;
         glyph_run_to_svg(&run, &self.svg_unit)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn shaping_policy_maps_to_text_direction() {
+        assert_eq!(
+            ShapingPolicy::LeftToRight.text_direction(),
+            TextDirection::LeftToRight
+        );
+        assert_eq!(
+            ShapingPolicy::RightToLeft.text_direction(),
+            TextDirection::RightToLeft
+        );
+        assert_eq!(
+            ShapingPolicy::TopToBottom.text_direction(),
+            TextDirection::TopToBottom
+        );
     }
 }
 

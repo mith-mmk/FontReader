@@ -400,6 +400,7 @@
   - [*] fallback face をまたぐ script / language / mark attachment の扱いを整理
     - [x] combining mark を fallback text unit として分断しない
     - [x] RTL contextual script では同一 face を優先して segment continuity を維持
+    - [x] Arabic / Syriac の real font fixture で face 切替境界の回帰テストを追加
     - [ ] 実フォントで script ごとの face 切替境界をさらに詰める
 
 ## examples / ドキュメント
@@ -408,6 +409,7 @@
   - [x] `--features raw` が必要か不要かを example ごとに判定
   - [x] 判定結果を `README.md` / `README.ja.md` に反映
   - [x] 既存 common helper ベースで、主要なパス / ファイル名指定が引数化されていることを確認
+- [x] `fontmetadata.rs` を追加して metadata 表示用 example を用意
 - [x] READMEの整理
   - [x] APIとsample中心に書き直す
   - [x] 今の技術資料寄りの細かい仕様は `doc/` 配下へ移動
@@ -422,7 +424,11 @@
 
 ## shaping / script
 - [ ] アラビア語フォントの対応を進める
-  - [ ] LTR / RTL の責務を分離して持たせる
+  - [x] `FontEngine::with_shaping_policy()` と `ShapingPolicy` で LTR / RTL / vertical を公開APIに明示
+  - [*] Arabic / Syriac の mark attachment を GDEF attach class まで使って詰める
+    - [x] `mark_attachment_class()` / `attach_point_indices()` を GDEF に追加
+    - [x] attachable mark では前の base に重ねる fallback 位置決めを導入
+    - [ ] GPOS mark-to-base / mark-to-mark 相当の精度までは未対応
 - [ ] スクリプト文字対応
 
 ## format

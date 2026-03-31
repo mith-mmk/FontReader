@@ -446,6 +446,62 @@ impl FontFamily {
             .max_line_width as f64)
     }
 
+    #[cfg(all(test, feature = "raw"))]
+    pub(crate) fn debug_face_indices_for_text(
+        &self,
+        text: &str,
+        options: FontOptions<'_>,
+    ) -> Result<Vec<usize>, Error> {
+        let candidate_indices = self.face_candidate_indices(
+            options.font_family,
+            options.font_name,
+            options.font_weight,
+            options.font_style,
+            options.font_stretch,
+        );
+        if candidate_indices.is_empty() {
+            return Err(Error::new(
+                ErrorKind::NotFound,
+                format!(
+                    "no cached font face matched family={:?} name={:?}",
+                    options.font_family, options.font_name
+                ),
+            ));
+        }
+
+        let mut pending_face: Option<usize> = None;
+        let mut face_indices = Vec::new();
+        for unit in fontreader::Font::parse_text_units_for_fallback(text) {
+            match unit {
+                fontreader::ParsedTextUnit::Newline | fontreader::ParsedTextUnit::Tab => {
+                    pending_face = None;
+                }
+                fontreader::ParsedTextUnit::Glyph { .. } => {
+                    let face_index = if let Some(current_face) = pending_face {
+                        if unit_prefers_face_continuity(&unit, options)
+                            && self.faces[current_face].font.font().supports_text_unit(
+                                &unit,
+                                options.text_direction,
+                                options.locale,
+                                options.font_variant,
+                            )
+                        {
+                            current_face
+                        } else {
+                            self.select_face_for_unit(&unit, &candidate_indices, options)
+                        }
+                    } else {
+                        self.select_face_for_unit(&unit, &candidate_indices, options)
+                    };
+                    pending_face = Some(face_index);
+                    face_indices.push(face_index);
+                }
+            }
+        }
+
+        Ok(face_indices)
+    }
+
     fn layout_text_with_fallback<'a>(
         &'a self,
         text: &str,
@@ -500,7 +556,7 @@ impl FontFamily {
         let mut cursor_y = 0.0f32;
         let mut max_line_width = 0.0f32;
         let mut pending_segment = String::new();
-        let mut pending_face = None;
+        let mut pending_face: Option<usize> = None;
 
         for unit in fontreader::Font::parse_text_units_for_fallback(text) {
             match unit {
