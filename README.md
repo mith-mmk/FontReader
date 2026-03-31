@@ -55,6 +55,41 @@ println!("{}", run.glyphs.len());
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
+## Common API Patterns
+
+Vertical shaping and SVG output:
+
+```rust
+use fontloader::FontFile;
+
+let face = FontFile::from_file("fonts/YourFont.otf")?.current_face()?;
+let svg = face
+    .engine()
+    .with_font_size(32.0)
+    .with_vertical_flow()
+    .render_svg_vertical("縦書き")?;
+
+assert!(svg.contains("<svg"));
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+GSUB variant switching:
+
+```rust
+use fontloader::{FontFile, FontVariant};
+
+let face = FontFile::from_file("fonts/YourFont.otf")?.current_face()?;
+let run = face
+    .engine()
+    .with_font_size(32.0)
+    .with_locale("ja-JP")
+    .with_font_variant(FontVariant::Jis78)
+    .shape("辻")?;
+
+assert!(!run.glyphs.is_empty());
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
 ## Loading Fonts
 
 ```rust
@@ -132,6 +167,8 @@ Examples share a small common CLI.
 - `-o`, `--output`: output file path
 - `-s`, `--string`: inline text
 - `-t`, `--text-file`: text file path
+- `--vertical`: render with top-to-bottom flow
+- `--variant`: GSUB variant tag shortcut such as `jp78`, `jp90`, `trad`, `nlck`
 
 High-level examples that work without `raw`:
 
@@ -191,4 +228,5 @@ That exposes:
 
 ## More Detailed Notes
 
-- Implementation notes: [doc/feature-status.md](doc/feature-status.md)
+- API recipes: [doc/api-recipes.md](doc/api-recipes.md)
+- Implementation notes and current format status: [doc/feature-status.md](doc/feature-status.md)

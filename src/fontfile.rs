@@ -1,3 +1,5 @@
+//! File and collection entry points for the public API.
+
 use crate::fontface::FontFace;
 use crate::fontreader;
 #[cfg(not(target_arch = "wasm32"))]
@@ -9,27 +11,34 @@ use std::io::{Error, ErrorKind};
 use std::net::TcpStream;
 use std::path::Path;
 
+/// Source used by [`open_font`] and [`load_font`].
 pub enum FontSource<'a> {
+    /// Load from a filesystem path.
     File(&'a Path),
+    /// Load from an in-memory byte slice.
     Buffer(&'a [u8]),
 }
 
+/// Owns a font file or collection and lets callers choose faces from it.
 #[derive(Debug, Clone)]
 pub struct FontFile {
     font: fontreader::Font,
 }
 
 impl FontFile {
+    /// Opens a font file from disk.
     pub fn from_file(path: impl AsRef<Path>) -> Result<Self, Error> {
         let font = fontreader::Font::get_font_from_file(&path.as_ref().to_path_buf())?;
         Ok(Self { font })
     }
 
+    /// Opens a font from bytes already loaded in memory.
     pub fn from_buffer(buffer: &[u8]) -> Result<Self, Error> {
         let font = fontreader::Font::get_font_from_buffer(buffer)?;
         Ok(Self { font })
     }
 
+    /// Opens a font from a generic [`FontSource`].
     pub fn from_source(source: FontSource<'_>) -> Result<Self, Error> {
         match source {
             FontSource::File(path) => Self::from_file(path),
@@ -37,6 +46,9 @@ impl FontFile {
         }
     }
 
+    /// Opens a font over plain `http://`.
+    ///
+    /// This is not available on `wasm32`.
     pub fn from_net(url: &str) -> Result<Self, Error> {
         #[cfg(target_arch = "wasm32")]
         {
@@ -54,10 +66,12 @@ impl FontFile {
         }
     }
 
+    /// Returns the number of faces in the file or collection.
     pub fn face_count(&self) -> usize {
         self.font.get_font_count()
     }
 
+    /// Returns one face by index.
     pub fn face(&self, index: usize) -> Result<FontFace, Error> {
         let mut font = self.font.clone();
         font.set_font(index)
@@ -65,10 +79,12 @@ impl FontFile {
         Ok(FontFace::from_font(font))
     }
 
+    /// Returns the currently selected face.
     pub fn current_face(&self) -> Result<FontFace, Error> {
         self.face(self.font.get_font_number())
     }
 
+    /// Returns all faces in the file or collection.
     pub fn faces(&self) -> Result<Vec<FontFace>, Error> {
         let mut faces = Vec::with_capacity(self.face_count());
         for index in 0..self.face_count() {
@@ -77,6 +93,7 @@ impl FontFile {
         Ok(faces)
     }
 
+    /// Dumps a small human-readable summary of the loaded file.
     pub fn dump(&self) -> String {
         format!(
             "FontFile\nface_count: {}\ncurrent_face: {}\nformat: {}",
@@ -87,39 +104,48 @@ impl FontFile {
     }
 
     #[cfg(feature = "raw")]
+    /// Returns the low-level parsed font when `raw` is enabled.
     pub fn raw_font(&self) -> &crate::fontreader::Font {
         &self.font
     }
 }
 
+/// Opens a [`FontFile`] from disk.
 pub fn open_font_from_file(path: impl AsRef<Path>) -> Result<FontFile, Error> {
     FontFile::from_file(path)
 }
 
+/// Opens a [`FontFile`] from memory.
 pub fn open_font_from_buffer(buffer: &[u8]) -> Result<FontFile, Error> {
     FontFile::from_buffer(buffer)
 }
 
+/// Opens a [`FontFile`] from plain `http://`.
 pub fn open_font_from_net(url: &str) -> Result<FontFile, Error> {
     FontFile::from_net(url)
 }
 
+/// Opens a [`FontFile`] from a generic [`FontSource`].
 pub fn open_font(source: FontSource<'_>) -> Result<FontFile, Error> {
     FontFile::from_source(source)
 }
 
+/// Loads the current face from a file.
 pub fn load_font_from_file(path: impl AsRef<Path>) -> Result<FontFace, Error> {
     FontFile::from_file(path)?.current_face()
 }
 
+/// Loads the current face from an in-memory buffer.
 pub fn load_font_from_buffer(buffer: &[u8]) -> Result<FontFace, Error> {
     FontFile::from_buffer(buffer)?.current_face()
 }
 
+/// Loads the current face from plain `http://`.
 pub fn load_font_from_net(url: &str) -> Result<FontFace, Error> {
     FontFile::from_net(url)?.current_face()
 }
 
+/// Loads the current face from a generic [`FontSource`].
 pub fn load_font(source: FontSource<'_>) -> Result<FontFace, Error> {
     FontFile::from_source(source)?.current_face()
 }
@@ -148,6 +174,7 @@ pub fn fontload(source: FontSource<'_>) -> Result<FontFace, Error> {
     load_font(source)
 }
 
+/// Collects a font file incrementally before decoding it.
 pub struct ChunkedFontBuffer {
     total_size: usize,
     data: Vec<u8>,
@@ -156,6 +183,7 @@ pub struct ChunkedFontBuffer {
 }
 
 impl ChunkedFontBuffer {
+    /// Creates an empty buffer for a known final font size.
     pub fn new(total_size: usize) -> Result<Self, Error> {
         if total_size == 0 {
             return Err(Error::new(
@@ -172,18 +200,22 @@ impl ChunkedFontBuffer {
         })
     }
 
+    /// Returns the target total size in bytes.
     pub fn total_size(&self) -> usize {
         self.total_size
     }
 
+    /// Returns how many bytes are already filled.
     pub fn filled_len(&self) -> usize {
         self.filled_len
     }
 
+    /// Returns `true` when every byte has been supplied.
     pub fn is_complete(&self) -> bool {
         self.filled_len == self.total_size
     }
 
+    /// Appends one chunk at the given byte offset.
     pub fn append(&mut self, offset: usize, bytes: &[u8]) -> Result<(), Error> {
         if bytes.is_empty() {
             return Ok(());
@@ -219,6 +251,7 @@ impl ChunkedFontBuffer {
         Ok(())
     }
 
+    /// Returns missing byte ranges as half-open intervals.
     pub fn missing_ranges(&self) -> Vec<(usize, usize)> {
         let mut ranges = Vec::new();
         let mut start = None;
@@ -241,6 +274,7 @@ impl ChunkedFontBuffer {
         ranges
     }
 
+    /// Clones the complete font bytes.
     pub fn to_vec(&self) -> Result<Vec<u8>, Error> {
         if !self.is_complete() {
             return Err(Error::new(
@@ -252,11 +286,13 @@ impl ChunkedFontBuffer {
         Ok(self.data.clone())
     }
 
+    /// Decodes the collected bytes as a [`FontFile`].
     pub fn load_font_file(&self) -> Result<FontFile, Error> {
         let bytes = self.to_vec()?;
         open_font_from_buffer(&bytes)
     }
 
+    /// Decodes the collected bytes and returns the current face.
     pub fn load_font_face(&self) -> Result<FontFace, Error> {
         self.load_font_file()?.current_face()
     }
@@ -266,6 +302,7 @@ impl ChunkedFontBuffer {
         self.load_font_face()
     }
 
+    /// Consumes the buffer and decodes it as a [`FontFile`].
     pub fn into_font_file(self) -> Result<FontFile, Error> {
         if !self.is_complete() {
             return Err(Error::new(
@@ -277,6 +314,7 @@ impl ChunkedFontBuffer {
         open_font_from_buffer(&self.data)
     }
 
+    /// Consumes the buffer and returns the current face.
     pub fn into_font_face(self) -> Result<FontFace, Error> {
         self.into_font_file()?.current_face()
     }

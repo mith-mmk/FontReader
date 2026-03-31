@@ -1,3 +1,22 @@
+//! Public API for loading fonts, selecting faces, shaping text, and exporting SVG.
+//!
+//! The intended high-level flow is:
+//!
+//! 1. Load a file with [`FontFile`]
+//! 2. Pick one face as a [`FontFace`]
+//! 3. Shape or render through [`FontEngine`]
+//!
+//! ```no_run
+//! use fontloader::FontFile;
+//!
+//! let face = FontFile::from_file("fonts/YourFont.ttf")?.current_face()?;
+//! let svg = face.engine().with_font_size(32.0).render_svg("Hello")?;
+//! assert!(svg.contains("<svg"));
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+//!
+//! Enable `features = ["raw"]` if you need the older low-level parser surface.
+
 #[cfg(feature = "raw")]
 pub mod fontheader;
 #[cfg(not(feature = "raw"))]

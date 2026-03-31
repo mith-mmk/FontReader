@@ -57,6 +57,12 @@ pub fn value_for(args: &[String], names: &[&str]) -> Option<String> {
     None
 }
 
+pub fn has_flag(args: &[String], names: &[&str]) -> bool {
+    args.iter()
+        .skip(1)
+        .any(|arg| names.iter().any(|name| arg == name))
+}
+
 pub fn positional_value(args: &[String]) -> Option<String> {
     args.iter()
         .skip(1)
@@ -88,6 +94,14 @@ pub fn font_index(args: &[String], default: usize) -> usize {
     value_for(args, &["-i", "--index"])
         .and_then(|value| value.parse::<usize>().ok())
         .unwrap_or(default)
+}
+
+pub fn vertical_enabled(args: &[String]) -> bool {
+    has_flag(args, &["--vertical", "--vert"])
+}
+
+pub fn variant_name(args: &[String]) -> Option<String> {
+    value_for(args, &["--variant"])
 }
 
 pub fn text_content(args: &[String], default_file: &str) -> Result<String, std::io::Error> {

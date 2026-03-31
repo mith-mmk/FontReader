@@ -1,12 +1,15 @@
+//! High-level shaping and rendering engine bound to one [`crate::FontFace`].
+
 use crate::commands::{
-    Command, FillRule, FontOptions, GlyphBounds, GlyphLayer, GlyphPaint, GlyphRun, PositionedGlyph,
-    RasterGlyphLayer, RasterGlyphSource, TextDirection,
+    Command, FillRule, FontOptions, FontVariant, GlyphBounds, GlyphLayer, GlyphPaint, GlyphRun,
+    PositionedGlyph, RasterGlyphLayer, RasterGlyphSource, TextDirection,
 };
 use crate::fontface::FontFace;
 use crate::util;
 use base64::{engine::general_purpose, Engine as _};
 use std::io::{Error, ErrorKind};
 
+/// Public shaping direction used by [`FontEngine`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ShapingPolicy {
     LeftToRight,
@@ -21,6 +24,7 @@ impl Default for ShapingPolicy {
 }
 
 impl ShapingPolicy {
+    /// Converts the policy into the lower-level text direction.
     pub fn text_direction(self) -> TextDirection {
         match self {
             ShapingPolicy::LeftToRight => TextDirection::LeftToRight,
@@ -38,6 +42,7 @@ impl ShapingPolicy {
     }
 }
 
+/// High-level builder for shaping, measuring, and SVG rendering.
 #[derive(Clone)]
 pub struct FontEngine<'a> {
     face: &'a FontFace,
@@ -47,6 +52,7 @@ pub struct FontEngine<'a> {
 }
 
 impl<'a> FontEngine<'a> {
+    /// Creates a new engine bound to one face.
     pub fn new(face: &'a FontFace) -> Self {
         Self {
             face,
@@ -56,27 +62,58 @@ impl<'a> FontEngine<'a> {
         }
     }
 
+    /// Replaces the underlying [`FontOptions`].
     pub fn with_options(mut self, options: FontOptions<'a>) -> Self {
         self.shaping_policy = ShapingPolicy::from_text_direction(options.text_direction);
         self.options = options.with_face(self.face);
         self
     }
 
+    /// Sets the font size used for shaping and rendering.
     pub fn with_font_size(mut self, font_size: f32) -> Self {
         self.options = self.options.with_font_size(font_size);
         self
     }
 
+    /// Sets the line height used for layout.
     pub fn with_line_height(mut self, line_height: f32) -> Self {
         self.options = self.options.with_line_height(line_height);
         self
     }
 
+    /// Sets the locale used for GSUB/GPOS lookup.
     pub fn with_locale(mut self, locale: &'a str) -> Self {
         self.options = self.options.with_locale(locale);
         self
     }
 
+    /// Sets the GSUB variant feature selection.
+    pub fn with_font_variant(mut self, font_variant: FontVariant) -> Self {
+        self.options = self.options.with_font_variant(font_variant);
+        self
+    }
+
+    /// Convenience shorthand for `jp78`.
+    pub fn with_jis78(self) -> Self {
+        self.with_font_variant(FontVariant::Jis78)
+    }
+
+    /// Convenience shorthand for `jp90`.
+    pub fn with_jis90(self) -> Self {
+        self.with_font_variant(FontVariant::Jis90)
+    }
+
+    /// Convenience shorthand for `trad`.
+    pub fn with_traditional_forms(self) -> Self {
+        self.with_font_variant(FontVariant::TraditionalForms)
+    }
+
+    /// Convenience shorthand for `nlck`.
+    pub fn with_nlc_kanji_forms(self) -> Self {
+        self.with_font_variant(FontVariant::NlcKanjiForms)
+    }
+
+    /// Sets the shaping policy used by the engine.
     pub fn with_shaping_policy(mut self, shaping_policy: ShapingPolicy) -> Self {
         self.shaping_policy = shaping_policy;
         self.options = self
@@ -85,56 +122,78 @@ impl<'a> FontEngine<'a> {
         self
     }
 
+    /// Shorthand for left-to-right shaping.
     pub fn with_left_to_right(self) -> Self {
         self.with_shaping_policy(ShapingPolicy::LeftToRight)
     }
 
+    /// Shorthand for right-to-left shaping.
     pub fn with_right_to_left(self) -> Self {
         self.with_shaping_policy(ShapingPolicy::RightToLeft)
     }
 
+    /// Shorthand for top-to-bottom shaping.
     pub fn with_vertical_flow(self) -> Self {
         self.with_shaping_policy(ShapingPolicy::TopToBottom)
     }
 
+    /// Sets the SVG unit string such as `"px"` or `"pt"`.
     pub fn with_svg_unit(mut self, unit: impl Into<String>) -> Self {
         self.svg_unit = unit.into();
         self
     }
 
+    /// Returns the currently selected shaping policy.
     pub fn shaping_policy(&self) -> ShapingPolicy {
         self.shaping_policy
     }
 
+    /// Returns the currently selected font variant.
+    pub fn font_variant(&self) -> FontVariant {
+        self.options.font_variant
+    }
+
+    /// Returns the effective options used by this engine.
     pub fn options(&self) -> FontOptions<'a> {
         self.options
             .with_text_direction(self.shaping_policy.text_direction())
     }
 
+    /// Shapes text into a [`GlyphRun`].
     pub fn shape(&self, text: &str) -> Result<GlyphRun, Error> {
         self.text2glyph_run(text)
     }
 
+    /// Shapes text into a [`GlyphRun`].
     pub fn text2glyph_run(&self, text: &str) -> Result<GlyphRun, Error> {
         let mut options = self.options();
         options.font = Some(crate::FontRef::Loaded(self.face));
         crate::commands::text2commands(text, options)
     }
 
+    /// Alias for [`FontEngine::text2glyph_run`].
     pub fn text2commands(&self, text: &str) -> Result<GlyphRun, Error> {
         self.text2glyph_run(text)
     }
 
+    /// Measures the inline extent of shaped text.
     pub fn measure(&self, text: &str) -> Result<f64, Error> {
         let mut options = self.options();
         options.font = Some(crate::FontRef::Loaded(self.face));
         self.face.font().measure_with_options(text, &options)
     }
 
+    /// Renders shaped text to SVG.
     pub fn render_svg(&self, text: &str) -> Result<String, Error> {
         self.text2svg(text)
     }
 
+    /// Renders text to SVG using vertical flow regardless of the current policy.
+    pub fn render_svg_vertical(&self, text: &str) -> Result<String, Error> {
+        self.clone().with_vertical_flow().render_svg(text)
+    }
+
+    /// Alias for [`FontEngine::render_svg`].
     pub fn text2svg(&self, text: &str) -> Result<String, Error> {
         let run = self.text2glyph_run(text)?;
         glyph_run_to_svg(&run, &self.svg_unit)
@@ -144,6 +203,13 @@ impl<'a> FontEngine<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(feature = "raw")]
+    fn japanese_font_path() -> std::path::PathBuf {
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("_test_fonts")
+            .join("NotoSansJP-Regular.otf")
+    }
 
     #[test]
     fn shaping_policy_maps_to_text_direction() {
@@ -159,6 +225,21 @@ mod tests {
             ShapingPolicy::TopToBottom.text_direction(),
             TextDirection::TopToBottom
         );
+    }
+
+    #[test]
+    #[cfg(feature = "raw")]
+    fn engine_stores_font_variant() {
+        let face = crate::FontFile::from_file(japanese_font_path())
+            .expect("load font file")
+            .current_face()
+            .expect("current face");
+        let engine = FontEngine::new(&face).with_jis78().with_vertical_flow();
+
+        assert_eq!(engine.font_variant(), FontVariant::Jis78);
+        assert_eq!(engine.shaping_policy(), ShapingPolicy::TopToBottom);
+        assert_eq!(engine.options().font_variant, FontVariant::Jis78);
+        assert_eq!(engine.options().text_direction, TextDirection::TopToBottom);
     }
 }
 

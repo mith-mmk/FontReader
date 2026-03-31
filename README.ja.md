@@ -55,6 +55,41 @@ println!("{}", run.glyphs.len());
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
+## よく使うAPIパターン
+
+縦書き shaping / SVG 出力:
+
+```rust
+use fontloader::FontFile;
+
+let face = FontFile::from_file("fonts/YourFont.otf")?.current_face()?;
+let svg = face
+    .engine()
+    .with_font_size(32.0)
+    .with_vertical_flow()
+    .render_svg_vertical("縦書き")?;
+
+assert!(svg.contains("<svg"));
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+GSUB variant 切り替え:
+
+```rust
+use fontloader::{FontFile, FontVariant};
+
+let face = FontFile::from_file("fonts/YourFont.otf")?.current_face()?;
+let run = face
+    .engine()
+    .with_font_size(32.0)
+    .with_locale("ja-JP")
+    .with_font_variant(FontVariant::Jis78)
+    .shape("辻")?;
+
+assert!(!run.glyphs.is_empty());
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
 ## フォントの読み込み
 
 ```rust
@@ -132,6 +167,8 @@ example は共通の CLI 引数を持ちます。
 - `-o`, `--output`: 出力ファイル
 - `-s`, `--string`: 文字列を直接指定
 - `-t`, `--text-file`: テキストファイルを指定
+- `--vertical`: 縦書きで出力
+- `--variant`: `jp78`, `jp90`, `trad`, `nlck` などの GSUB variant 指定
 
 `raw` なしで使える高レベル example:
 
@@ -191,4 +228,5 @@ fontloader = { version = "0.0.10", features = ["raw"] }
 
 ## 詳細資料
 
-- 実装メモ: [doc/feature-status.ja.md](doc/feature-status.ja.md)
+- APIレシピ: [doc/api-recipes.ja.md](doc/api-recipes.ja.md)
+- 実装メモ / 現在の format 対応状況: [doc/feature-status.ja.md](doc/feature-status.ja.md)

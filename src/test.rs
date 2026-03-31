@@ -2275,6 +2275,20 @@ mod tests {
         existing_paths(paths)
     }
 
+    fn variable_font_fixture_paths() -> Vec<std::path::PathBuf> {
+        existing_paths(
+            fixture_font_corpus_paths()
+                .into_iter()
+                .filter(|path| {
+                    path.file_name()
+                        .and_then(|name| name.to_str())
+                        .map(|name| name.contains("VariableFont"))
+                        .unwrap_or(false)
+                })
+                .collect(),
+        )
+    }
+
     fn font_supports_text(font: &crate::LoadedFont, text: &str) -> bool {
         let Some(cmap) = font.font().cmap.as_ref() else {
             return false;
@@ -3768,6 +3782,67 @@ mod tests {
     }
 
     #[test]
+    fn public_api_metadata_smoke_across_variable_font_fixtures() {
+        let paths = variable_font_fixture_paths();
+        let mut loaded = 0usize;
+        let mut skipped = 0usize;
+        let mut failures = Vec::new();
+
+        for path in &paths {
+            let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                let file = crate::FontFile::from_file(path)
+                    .map_err(|err| format!("FontFile::from_file failed: {err}"))?;
+                if file.face_count() == 0 {
+                    return Err("face_count was zero".to_string());
+                }
+                Ok::<(), String>(())
+            }));
+
+            match outcome {
+                Ok(Ok(())) => loaded += 1,
+                Ok(Err(err)) if should_skip_corpus_error(path, &err) => skipped += 1,
+                Ok(Err(err)) => failures.push(format!("{}: {}", path.display(), err)),
+                Err(_) => failures.push(format!("{}: panic", path.display())),
+            }
+        }
+
+        assert!(
+            failures.is_empty(),
+            "variable font metadata smoke failures:\n{}",
+            failures.join("\n")
+        );
+        assert_eq!(loaded + skipped, paths.len());
+        assert!(
+            loaded >= 8,
+            "expected to load at least 8 variable font fixtures, loaded {loaded}"
+        );
+    }
+
+    #[test]
+    fn public_api_engine_smoke_across_variable_font_fixtures() {
+        let paths = variable_font_fixture_paths();
+        let (shaped, svg_successes, skipped, failures) = run_public_api_smoke_for_paths(&paths);
+
+        assert!(
+            failures.is_empty(),
+            "variable font engine smoke failures:\n{}",
+            failures.join("\n")
+        );
+        assert!(
+            shaped >= 8,
+            "expected to shape at least 8 variable font fixtures, shaped {shaped}"
+        );
+        assert!(
+            svg_successes >= 6,
+            "expected SVG export for at least 6 variable font fixtures, succeeded {svg_successes}"
+        );
+        assert!(
+            skipped <= 8,
+            "expected at most 8 variable font fixtures to be skipped"
+        );
+    }
+
+    #[test]
     fn text2command_supports_sbix_bitmap_glyphs() {
         let path = first_real_sbix_font_path().expect("load real sbix font");
         let bytes = std::fs::read(&path).expect("read sbix font");
@@ -4581,6 +4656,31 @@ mod tests {
 
     #[test]
     #[cfg(feature = "layout")]
+    fn font_engine_public_api_supports_font_variant_selection() {
+        let Some((path, ch, glyph_id, variant_glyph_id)) =
+            first_real_variant_substitution(crate::FontVariant::Jis78)
+        else {
+            return;
+        };
+        let face = crate::FontFile::from_file(&path)
+            .expect("load font file")
+            .current_face()
+            .expect("current face");
+        let engine = face
+            .engine()
+            .with_font_size(32.0)
+            .with_locale("ja-JP")
+            .with_jis78();
+
+        assert_eq!(engine.font_variant(), crate::FontVariant::Jis78);
+
+        let run = engine.shape(&ch.to_string()).expect("shape variant glyph");
+        assert_eq!(run.glyphs.len(), 1);
+        assert_ne!(glyph_id, variant_glyph_id);
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
     fn font_family_text2commands_uses_real_jp78_variant_when_requested() {
         let Some((path, ch, _, _variant_glyph_id)) =
             first_real_variant_substitution(crate::FontVariant::Jis78)
@@ -4759,6 +4859,29 @@ mod tests {
         assert!(run.glyphs[0].glyph.metrics.advance_y > 0.0);
         assert_ne!(horizontal, vertical);
         assert!(run.glyphs[1].y > run.glyphs[0].y);
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn font_engine_public_api_supports_vertical_svg_output() {
+        let face = crate::FontFile::from_file(japanese_font_path())
+            .expect("load font file")
+            .current_face()
+            .expect("current face");
+        let (ch, _, _) =
+            first_real_vertical_substitution(&face).expect("expected vertical substitution");
+        let text = format!("{ch}{ch}");
+        let engine = face.engine().with_font_size(32.0).with_vertical_flow();
+
+        assert_eq!(engine.shaping_policy(), crate::ShapingPolicy::TopToBottom);
+        let run = engine.shape(&text).expect("vertical shape");
+        assert_eq!(run.glyphs.len(), 2);
+        assert!(run.glyphs[1].y > run.glyphs[0].y);
+
+        let svg = engine
+            .render_svg_vertical(&text)
+            .expect("render vertical svg via public api");
+        assert!(svg.contains("<svg"));
     }
 
     #[test]

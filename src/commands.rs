@@ -237,6 +237,7 @@ impl Default for FontStyle {
     }
 }
 
+/// GSUB variant selection exposed through the public API.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FontVariant {
     Normal,
@@ -301,6 +302,7 @@ pub enum FontRef<'a> {
     Family(&'a crate::FontFamily),
 }
 
+/// High-level options used by shaping, measurement, and SVG export.
 #[derive(Clone, Copy)]
 pub struct FontOptions<'a> {
     pub font: Option<FontRef<'a>>,

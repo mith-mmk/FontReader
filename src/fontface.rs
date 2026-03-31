@@ -1,3 +1,5 @@
+//! Face-level metadata access and family fallback helpers.
+
 use crate::commands::{
     FontOptions, FontRef, FontStretch, FontStyle, FontWeight, GlyphRun, PositionedGlyph,
     TextDirection,
@@ -7,16 +9,23 @@ use crate::{fontreader, ChunkedFontBuffer};
 use std::collections::HashMap;
 use std::io::{Error, ErrorKind};
 
+/// Describes one face inside a [`FontFamily`].
 #[derive(Debug, Clone)]
 pub struct FontFaceDescriptor {
+    /// Family name such as `"Noto Sans JP"`.
     pub family_name: String,
+    /// Full face name when available.
     pub font_name: Option<String>,
+    /// Requested weight used for selection.
     pub font_weight: FontWeight,
+    /// Requested style used for selection.
     pub font_style: FontStyle,
+    /// Requested stretch used for selection.
     pub font_stretch: FontStretch,
 }
 
 impl FontFaceDescriptor {
+    /// Creates a descriptor from a family name.
     pub fn new(family_name: impl Into<String>) -> Self {
         Self {
             family_name: family_name.into(),
@@ -27,26 +36,31 @@ impl FontFaceDescriptor {
         }
     }
 
+    /// Sets a preferred face name.
     pub fn with_font_name(mut self, font_name: impl Into<String>) -> Self {
         self.font_name = Some(font_name.into());
         self
     }
 
+    /// Sets the requested weight.
     pub fn with_font_weight(mut self, font_weight: FontWeight) -> Self {
         self.font_weight = font_weight;
         self
     }
 
+    /// Sets the requested style.
     pub fn with_font_style(mut self, font_style: FontStyle) -> Self {
         self.font_style = font_style;
         self
     }
 
+    /// Sets the requested stretch.
     pub fn with_font_stretch(mut self, font_stretch: FontStretch) -> Self {
         self.font_stretch = font_stretch;
         self
     }
 
+    /// Builds a descriptor from an existing [`FontFace`].
     pub fn from_face(face: &FontFace) -> Self {
         Self::from_font(face.font())
     }
@@ -77,6 +91,7 @@ impl FontFaceDescriptor {
     }
 }
 
+/// Public wrapper around one parsed font face.
 #[derive(Debug, Clone)]
 pub struct FontFace {
     pub(crate) font: fontreader::Font,
@@ -87,26 +102,32 @@ impl FontFace {
         Self { font }
     }
 
+    /// Returns the family name.
     pub fn family(&self) -> String {
         self.font.face_family_name()
     }
 
+    /// Returns the full face name, or the family name if unavailable.
     pub fn full_name(&self) -> String {
         self.font.face_full_name().unwrap_or_else(|| self.family())
     }
 
+    /// Returns the OS/2 weight class as a [`FontWeight`].
     pub fn weight(&self) -> FontWeight {
         FontWeight(self.font.face_weight_class())
     }
 
+    /// Returns the width class mapped to a [`FontStretch`].
     pub fn stretch(&self) -> FontStretch {
         FontStretch(width_class_to_stretch(self.font.face_width_class()))
     }
 
+    /// Returns whether the face is italic.
     pub fn is_italic(&self) -> bool {
         self.font.face_is_italic()
     }
 
+    /// Dumps a small human-readable summary of this face.
     pub fn dump(&self) -> String {
         format!(
             "FontFace\nfamily: {}\nfull_name: {}\nweight: {}\nstretch: {:.3}\nitalic: {}\nface_index: {}\nface_count: {}\nformat: {}",
@@ -121,22 +142,28 @@ impl FontFace {
         )
     }
 
+    /// Creates a [`FontEngine`] bound to this face.
     pub fn engine(&self) -> FontEngine<'_> {
         FontEngine::new(self)
     }
 
+    /// Shapes text with default engine settings.
     pub fn shape(&self, text: &str) -> Result<GlyphRun, Error> {
         self.engine().shape(text)
     }
 
+    /// Measures text with default engine settings.
     pub fn measure(&self, text: &str) -> Result<f64, Error> {
         self.engine().measure(text)
     }
 
+    /// Renders text to one SVG document with default engine settings.
     pub fn render_svg(&self, text: &str) -> Result<String, Error> {
         self.engine().render_svg(text)
     }
 
+    /// Legacy convenience wrapper for rendering SVG with explicit size and unit.
+    /// Renders text to SVG through the family fallback layer.
     pub fn text2svg(&self, text: &str, fontsize: f64, fontunit: &str) -> Result<String, Error> {
         self.text2svg_with_options(
             text,
@@ -145,6 +172,8 @@ impl FontFace {
         )
     }
 
+    /// Renders SVG with fully explicit [`FontOptions`].
+    /// Renders text to SVG with explicit family options.
     pub fn text2svg_with_options<'a>(
         &'a self,
         text: &str,
@@ -156,6 +185,8 @@ impl FontFace {
         glyph_run_to_svg(&run, fontunit)
     }
 
+    /// Shapes text with fully explicit [`FontOptions`].
+    /// Shapes text through the family fallback layer.
     pub fn text2glyph_run<'a>(
         &'a self,
         text: &str,
@@ -165,6 +196,7 @@ impl FontFace {
         crate::commands::text2commands(text, options)
     }
 
+    /// Measures text with fully explicit [`FontOptions`].
     pub fn measure_with_options<'a>(
         &'a self,
         text: &str,
@@ -199,6 +231,7 @@ struct FamilyLayoutResult {
     max_line_width: f32,
 }
 
+/// Cache and fallback layer for multiple faces.
 pub struct FontFamily {
     name: String,
     faces: Vec<CachedFontFace>,
@@ -206,6 +239,7 @@ pub struct FontFamily {
 }
 
 impl FontFamily {
+    /// Creates a new named family cache.
     pub fn new(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
@@ -214,23 +248,28 @@ impl FontFamily {
         }
     }
 
+    /// Returns the family cache name.
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    /// Returns the number of cached faces.
     pub fn cached_faces_len(&self) -> usize {
         self.faces.len()
     }
 
+    /// Returns the number of pending chunked faces.
     pub fn pending_faces_len(&self) -> usize {
         self.pending_faces.len()
     }
 
+    /// Adds a face together with an explicit descriptor.
     pub fn add_face(&mut self, descriptor: FontFaceDescriptor, font: FontFace) -> &FontFace {
         self.faces.push(CachedFontFace { descriptor, font });
         &self.faces.last().expect("face inserted").font
     }
 
+    /// Adds one face and derives its descriptor automatically.
     pub fn add_font_face(&mut self, font: FontFace) -> &FontFace {
         let descriptor = FontFaceDescriptor::from_face(&font);
         self.add_face(descriptor, font)
@@ -257,14 +296,17 @@ impl FontFamily {
         &self.faces[start_index + current_face].font
     }
 
+    /// Returns descriptors for all cached faces.
     pub fn cached_descriptors(&self) -> Vec<&FontFaceDescriptor> {
         self.faces.iter().map(|face| &face.descriptor).collect()
     }
 
+    /// Returns default [`FontOptions`] targeting this family.
     pub fn options(&self) -> FontOptions<'_> {
         FontOptions::from_family(self).with_font_family(self.name())
     }
 
+    /// Starts collecting one chunked face.
     pub fn begin_chunked_face(
         &mut self,
         face_id: impl Into<String>,
@@ -278,6 +320,7 @@ impl FontFamily {
         Ok(())
     }
 
+    /// Appends bytes to a pending chunked face.
     pub fn append_chunk(
         &mut self,
         face_id: &str,
@@ -294,6 +337,7 @@ impl FontFamily {
         Ok(pending.buffer.is_complete())
     }
 
+    /// Returns missing byte ranges for a pending chunked face.
     pub fn missing_ranges(&self, face_id: &str) -> Result<Vec<(usize, usize)>, Error> {
         let pending = self.pending_faces.get(face_id).ok_or_else(|| {
             Error::new(
@@ -304,6 +348,7 @@ impl FontFamily {
         Ok(pending.buffer.missing_ranges())
     }
 
+    /// Finalizes a chunked face and moves it into the cache.
     pub fn finalize_chunked_face(&mut self, face_id: &str) -> Result<&FontFace, Error> {
         let pending = self.pending_faces.remove(face_id).ok_or_else(|| {
             Error::new(
@@ -315,6 +360,7 @@ impl FontFamily {
         Ok(self.add_face(pending.descriptor, font))
     }
 
+    /// Resolves the best face for the requested descriptor fields.
     pub fn resolve_face(
         &self,
         family_name: Option<&str>,
@@ -351,6 +397,7 @@ impl FontFamily {
         )
     }
 
+    /// Resolves the best matching descriptor.
     pub fn resolve_descriptor(
         &self,
         family_name: Option<&str>,
@@ -421,6 +468,7 @@ impl FontFamily {
         Ok(self.layout_text_with_fallback(text, options)?.run)
     }
 
+    /// Alias for [`FontFamily::text2glyph_run`].
     pub fn text2commands<'a>(
         &'a self,
         text: &str,
@@ -429,10 +477,12 @@ impl FontFamily {
         self.text2glyph_run(text, options)
     }
 
+    /// Measures text with default family options.
     pub fn measure(&self, text: &str) -> Result<f64, Error> {
         self.measure_with_options(text, self.options())
     }
 
+    /// Measures text through the family fallback layer.
     pub fn measure_with_options<'a>(
         &'a self,
         text: &str,

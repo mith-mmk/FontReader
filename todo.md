@@ -415,6 +415,7 @@
 - [x] READMEの整理
   - [x] APIとsample中心に書き直す
   - [x] 今の技術資料寄りの細かい仕様は `doc/` 配下へ移動
+  - [x] `cargo doc` 向けに公開APIの rustdoc を追加
 
 ## CI / CD
 - [x] GitHub Workflows を作成
