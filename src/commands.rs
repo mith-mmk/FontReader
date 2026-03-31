@@ -273,6 +273,28 @@ impl FontVariant {
     }
 }
 
+/// One variable-font axis value such as `wght=700` or `wdth=75`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct FontVariationSetting {
+    pub tag: [u8; 4],
+    pub value: f32,
+}
+
+impl FontVariationSetting {
+    /// Creates one axis setting from a four-character OpenType tag.
+    pub fn new(tag: &str, value: f32) -> Result<Self, Error> {
+        Ok(Self {
+            tag: parse_variation_tag(tag)?,
+            value,
+        })
+    }
+
+    /// Returns the OpenType tag as a string such as `"wght"`.
+    pub fn tag_string(&self) -> String {
+        String::from_utf8_lossy(&self.tag).into_owned()
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FontWeight(pub u16);
 
@@ -294,7 +316,7 @@ impl Default for FontWeight {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub enum FontRef<'a> {
     Loaded(&'a crate::FontFace),
     #[cfg(feature = "raw")]
@@ -303,7 +325,7 @@ pub enum FontRef<'a> {
 }
 
 /// High-level options used by shaping, measurement, and SVG export.
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct FontOptions<'a> {
     pub font: Option<FontRef<'a>>,
     pub font_family: Option<&'a str>,
@@ -316,6 +338,7 @@ pub struct FontOptions<'a> {
     pub font_variant: FontVariant,
     pub font_weight: FontWeight,
     pub line_height: Option<f32>,
+    pub variations: Vec<FontVariationSetting>,
 }
 
 impl<'a> FontOptions<'a> {
@@ -352,6 +375,7 @@ impl<'a> FontOptions<'a> {
                 font_variant: FontVariant::default(),
                 font_weight: FontWeight::default(),
                 line_height: None,
+                variations: Vec::new(),
             }
         }
     }
@@ -369,6 +393,7 @@ impl<'a> FontOptions<'a> {
             font_variant: FontVariant::default(),
             font_weight: FontWeight::default(),
             line_height: None,
+            variations: Vec::new(),
         }
     }
 
@@ -442,6 +467,31 @@ impl<'a> FontOptions<'a> {
         self
     }
 
+    pub fn with_variation(mut self, tag: &str, value: f32) -> Self {
+        if let Ok(setting) = FontVariationSetting::new(tag, value) {
+            if let Some(existing) = self
+                .variations
+                .iter_mut()
+                .find(|existing| existing.tag == setting.tag)
+            {
+                existing.value = value;
+            } else {
+                self.variations.push(setting);
+            }
+        }
+        self
+    }
+
+    pub fn with_variations(mut self, variations: &[FontVariationSetting]) -> Self {
+        self.variations = variations.to_vec();
+        self
+    }
+
+    pub fn clear_variations(mut self) -> Self {
+        self.variations.clear();
+        self
+    }
+
     pub fn with_vertical_flow(self) -> Self {
         self.with_text_direction(TextDirection::TopToBottom)
     }
@@ -451,7 +501,7 @@ impl<'a> FontOptions<'a> {
     }
 
     pub fn resolve_font(&self) -> Result<&'a crate::fontreader::Font, Error> {
-        if let Some(font) = self.font {
+        if let Some(font) = &self.font {
             return match font {
                 FontRef::Loaded(font) => Ok(font.font()),
                 #[cfg(feature = "raw")]
@@ -480,4 +530,17 @@ pub fn text2commands(text: &str, options: FontOptions<'_>) -> Result<GlyphRun, E
     }
     let font = options.resolve_font()?;
     font.text2glyph_run(text, &options)
+}
+
+pub(crate) fn parse_variation_tag(tag: &str) -> Result<[u8; 4], Error> {
+    let bytes = tag.as_bytes();
+    if bytes.len() != 4 {
+        return Err(Error::new(
+            ErrorKind::InvalidInput,
+            format!("variation tag must be 4 ASCII bytes, got {tag:?}"),
+        ));
+    }
+    let mut result = [0u8; 4];
+    result.copy_from_slice(bytes);
+    Ok(result)
 }

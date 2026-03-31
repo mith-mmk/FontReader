@@ -20,6 +20,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("full_name: {}", face.full_name());
         println!("weight: {}", face.weight().0);
         println!("italic: {}", face.is_italic());
+        println!("variable: {}", face.is_variable());
+        for axis in face.variation_axes() {
+            println!(
+                "axis: {} min={} default={} max={} hidden={}",
+                axis.tag, axis.min_value, axis.default_value, axis.max_value, axis.hidden
+            );
+        }
     }
 
     let face = file.face(selected_index)?;

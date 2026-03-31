@@ -1,10 +1,17 @@
+pub(crate) mod avar;
 pub(crate) mod cmap;
+pub(crate) mod delta_set;
+pub(crate) mod fvar;
 pub(crate) mod head;
 pub(crate) mod hhea;
 pub(crate) mod hmtx;
+pub(crate) mod hvar;
 pub(crate) mod maxp;
+pub(crate) mod mvar;
 pub(crate) mod name;
 pub(crate) mod os2;
 pub(crate) mod post;
+pub(crate) mod var_store;
 pub(crate) mod vhea;
 pub(crate) mod vmtx;
+pub(crate) mod vvar;

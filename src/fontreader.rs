@@ -122,10 +122,14 @@ pub struct Font {
     pub(crate) name_table: Option<name::NameTable>,
     pub(crate) os2: Option<os2::OS2>,    // must
     pub(crate) post: Option<post::POST>, // must
+    pub(crate) fvar: Option<fvar::FVAR>,
+    pub(crate) avar: Option<avar::AVAR>,
     pub(crate) loca: Option<loca::LOCA>, // openType font, CFF/CFF2 none
     pub(crate) glyf: Option<glyf::GLYF>, // openType font, CFF/CFF2 none
     #[cfg(feature = "cff")]
     pub(crate) cff: Option<cff::CFF>, // CFF font, openType none
+    pub(crate) hvar: Option<hvar::HVAR>,
+    pub(crate) mvar: Option<mvar::MVAR>,
     pub(crate) colr: Option<colr::COLR>,
     pub(crate) cpal: Option<cpal::CPAL>,
     #[cfg(feature = "layout")]
@@ -137,6 +141,7 @@ pub struct Font {
     pub(crate) svg: Option<svg::SVG>,
     pub(crate) sbix: Option<sbix::SBIX>,
     pub(crate) vhea: Option<vhea::VHEA>,
+    pub(crate) vvar: Option<vvar::VVAR>,
     pub(crate) vmtx: Option<vmtx::VMTX>,
     hmtx_pos: Option<Pointer>,
     vmtx_pos: Option<Pointer>,
@@ -194,10 +199,14 @@ impl Font {
             name_table: None,
             os2: None,
             post: None,
+            fvar: None,
+            avar: None,
             loca: None,
             glyf: None,
             #[cfg(feature = "cff")]
             cff: None,
+            hvar: None,
+            mvar: None,
             colr: None,
             cpal: None,
             #[cfg(feature = "layout")]
@@ -209,6 +218,7 @@ impl Font {
             sbix: None,
             svg: None,
             vhea: None,
+            vvar: None,
             vmtx: None,
             hmtx_pos: None,
             vmtx_pos: None,
@@ -272,45 +282,85 @@ impl Font {
         font_load(&mut reader)
     }
 
-    pub(crate) fn get_h_metrix(&self, id: usize) -> LongHorMetric {
+    pub(crate) fn get_h_metrix_with_coords(&self, id: usize, coordinates: &[f32]) -> LongHorMetric {
         if self.current_font == 0 {
-            self.hmtx.as_ref().unwrap().get_metrix(id)
+            let mut metric = self.hmtx.as_ref().unwrap().get_metrix(id);
+            if let Some(hvar) = self.hvar.as_ref() {
+                if let Some(delta) = hvar.advance_offset(id, coordinates) {
+                    metric.advance_width = apply_u16_delta(metric.advance_width, delta);
+                }
+                if let Some(delta) = hvar.left_side_bearing_offset(id, coordinates) {
+                    metric.left_side_bearing = apply_i16_delta(metric.left_side_bearing, delta);
+                }
+            }
+            metric
         } else {
-            self.more_fonts[self.current_font - 1]
-                .hmtx
-                .as_ref()
-                .unwrap()
-                .get_metrix(id)
+            let font = &self.more_fonts[self.current_font - 1];
+            let mut metric = font.hmtx.as_ref().unwrap().get_metrix(id);
+            if let Some(hvar) = font.hvar.as_ref() {
+                if let Some(delta) = hvar.advance_offset(id, coordinates) {
+                    metric.advance_width = apply_u16_delta(metric.advance_width, delta);
+                }
+                if let Some(delta) = hvar.left_side_bearing_offset(id, coordinates) {
+                    metric.left_side_bearing = apply_i16_delta(metric.left_side_bearing, delta);
+                }
+            }
+            metric
         }
     }
 
-    pub(crate) fn get_v_metrix(&self, id: usize) -> VerticalMetric {
+    pub(crate) fn get_v_metrix_with_coords(
+        &self,
+        id: usize,
+        coordinates: &[f32],
+    ) -> VerticalMetric {
         if self.current_font == 0 {
-            self.vmtx.as_ref().unwrap().get_metrix(id)
+            let mut metric = self.vmtx.as_ref().unwrap().get_metrix(id);
+            if let Some(vvar) = self.vvar.as_ref() {
+                if let Some(delta) = vvar.advance_offset(id, coordinates) {
+                    metric.advance_height = apply_u16_delta(metric.advance_height, delta);
+                }
+                if let Some(delta) = vvar.top_side_bearing_offset(id, coordinates) {
+                    metric.top_side_bearing = apply_i16_delta(metric.top_side_bearing, delta);
+                }
+            }
+            metric
         } else {
-            self.more_fonts[self.current_font - 1]
-                .vmtx
-                .as_ref()
-                .unwrap()
-                .get_metrix(id)
+            let font = &self.more_fonts[self.current_font - 1];
+            let mut metric = font.vmtx.as_ref().unwrap().get_metrix(id);
+            if let Some(vvar) = font.vvar.as_ref() {
+                if let Some(delta) = vvar.advance_offset(id, coordinates) {
+                    metric.advance_height = apply_u16_delta(metric.advance_height, delta);
+                }
+                if let Some(delta) = vvar.top_side_bearing_offset(id, coordinates) {
+                    metric.top_side_bearing = apply_i16_delta(metric.top_side_bearing, delta);
+                }
+            }
+            metric
         }
     }
 
     pub fn get_vertical_layout(&self, id: usize) -> Option<VerticalLayout> {
-        let vhea = if self.current_font == 0 {
-            self.vhea.as_ref()
-        } else {
-            self.more_fonts[self.current_font - 1].vhea.as_ref()
-        };
+        self.get_vertical_layout_with_coords(id, &[])
+    }
 
+    pub fn get_vertical_layout_with_coords(
+        &self,
+        id: usize,
+        coordinates: &[f32],
+    ) -> Option<VerticalLayout> {
+        let vhea = self.current_vhea();
         if let Some(vhea) = vhea {
-            let v_metrix = self.get_v_metrix(id);
+            let v_metrix = self.get_v_metrix_with_coords(id, coordinates);
             return Some(VerticalLayout {
                 tsb: v_metrix.top_side_bearing as isize,
                 advance_height: v_metrix.advance_height as isize,
-                accender: vhea.get_accender() as isize,
-                descender: vhea.get_descender() as isize,
-                line_gap: vhea.get_line_gap() as isize,
+                accender: self.metric_value_i16(tag4("vasc"), vhea.get_accender(), coordinates)
+                    as isize,
+                descender: self.metric_value_i16(tag4("vdsc"), vhea.get_descender(), coordinates)
+                    as isize,
+                line_gap: self.metric_value_i16(tag4("vlgp"), vhea.get_line_gap(), coordinates)
+                    as isize,
                 vhea: vhea.clone(),
             });
         } else {
@@ -319,23 +369,25 @@ impl Font {
     }
 
     pub fn get_horizontal_layout(&self, id: usize) -> HorizontalLayout {
-        let h_metrix = self.get_h_metrix(id);
+        self.get_horizontal_layout_with_coords(id, &[])
+    }
 
-        let hhea = if self.current_font == 0 {
-            self.hhea.as_ref().unwrap()
-        } else {
-            self.more_fonts[self.current_font - 1]
-                .hhea
-                .as_ref()
-                .unwrap()
-        };
-
+    pub fn get_horizontal_layout_with_coords(
+        &self,
+        id: usize,
+        coordinates: &[f32],
+    ) -> HorizontalLayout {
+        let h_metrix = self.get_h_metrix_with_coords(id, coordinates);
+        let hhea = self.current_hhea().unwrap();
         let lsb = h_metrix.left_side_bearing as isize;
         let advance_width = h_metrix.advance_width as isize;
 
-        let accender = hhea.get_accender() as isize;
-        let descender = hhea.get_descender() as isize;
-        let line_gap = hhea.get_line_gap() as isize;
+        let accender =
+            self.metric_value_i16(tag4("hasc"), hhea.get_accender(), coordinates) as isize;
+        let descender =
+            self.metric_value_i16(tag4("hdsc"), hhea.get_descender(), coordinates) as isize;
+        let line_gap =
+            self.metric_value_i16(tag4("hlgp"), hhea.get_line_gap(), coordinates) as isize;
 
         HorizontalLayout {
             lsb,
@@ -352,17 +404,40 @@ impl Font {
     }
 
     pub fn get_layout(&self, glyph_id: usize, is_vert: bool) -> FontLayout {
+        self.get_layout_with_coords(glyph_id, is_vert, &[])
+    }
+
+    pub fn get_layout_with_coords(
+        &self,
+        glyph_id: usize,
+        is_vert: bool,
+        coordinates: &[f32],
+    ) -> FontLayout {
         let layout = if is_vert {
-            let result = self.get_vertical_layout(glyph_id as usize);
+            let result = self.get_vertical_layout_with_coords(glyph_id as usize, coordinates);
             if result.is_some() {
                 FontLayout::Vertical(result.unwrap())
             } else {
-                FontLayout::Horizontal(self.get_horizontal_layout(glyph_id as usize))
+                FontLayout::Horizontal(
+                    self.get_horizontal_layout_with_coords(glyph_id as usize, coordinates),
+                )
             }
         } else {
-            FontLayout::Horizontal(self.get_horizontal_layout(glyph_id as usize))
+            FontLayout::Horizontal(
+                self.get_horizontal_layout_with_coords(glyph_id as usize, coordinates),
+            )
         };
         layout
+    }
+
+    pub fn get_layout_with_options(
+        &self,
+        glyph_id: usize,
+        is_vert: bool,
+        options: &crate::commands::FontOptions<'_>,
+    ) -> FontLayout {
+        let coordinates = self.normalized_variation_coords(options);
+        self.get_layout_with_coords(glyph_id, is_vert, &coordinates)
     }
 
     pub fn get_glyph_with_uvs_axis(&self, ch: char, vs: char, is_vert: bool) -> GriphData {
@@ -703,6 +778,14 @@ impl Font {
         }
     }
 
+    fn current_vhea(&self) -> Option<&VHEA> {
+        if self.current_font == 0 {
+            self.vhea.as_ref()
+        } else {
+            self.more_fonts[self.current_font - 1].vhea.as_ref()
+        }
+    }
+
     fn current_cmap(&self) -> Result<&CmapEncodings, Error> {
         if self.current_font == 0 {
             self.cmap
@@ -713,6 +796,30 @@ impl Font {
                 .cmap
                 .as_ref()
                 .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "cmap is none"))
+        }
+    }
+
+    fn current_fvar(&self) -> Option<&fvar::FVAR> {
+        if self.current_font == 0 {
+            self.fvar.as_ref()
+        } else {
+            self.more_fonts[self.current_font - 1].fvar.as_ref()
+        }
+    }
+
+    fn current_avar(&self) -> Option<&avar::AVAR> {
+        if self.current_font == 0 {
+            self.avar.as_ref()
+        } else {
+            self.more_fonts[self.current_font - 1].avar.as_ref()
+        }
+    }
+
+    fn current_mvar(&self) -> Option<&mvar::MVAR> {
+        if self.current_font == 0 {
+            self.mvar.as_ref()
+        } else {
+            self.more_fonts[self.current_font - 1].mvar.as_ref()
         }
     }
 
@@ -800,8 +907,55 @@ impl Font {
         }
     }
 
-    fn get_glyph_from_id_axis(&self, glyph_id: usize, is_vert: bool) -> GriphData {
-        let layout = self.get_layout(glyph_id, is_vert);
+    fn normalized_variation_coords(&self, options: &crate::commands::FontOptions<'_>) -> Vec<f32> {
+        let Some(fvar) = self.current_fvar() else {
+            return Vec::new();
+        };
+
+        let mut coordinates = fvar
+            .axes
+            .iter()
+            .map(|axis| {
+                let value = options
+                    .variations
+                    .iter()
+                    .find(|setting| u32::from_be_bytes(setting.tag) == axis.tag)
+                    .map(|setting| setting.value)
+                    .unwrap_or(axis.default_value);
+                axis.normalized_value(value)
+            })
+            .collect::<Vec<_>>();
+
+        if let Some(avar) = self.current_avar() {
+            for index in 0..coordinates.len() {
+                avar.map_coordinate(&mut coordinates, index);
+            }
+        }
+
+        coordinates
+    }
+
+    fn metric_value_i16(&self, tag: u32, base: i16, coordinates: &[f32]) -> i16 {
+        if coordinates.is_empty() {
+            return base;
+        }
+
+        if let Some(mvar) = self.current_mvar() {
+            if let Some(delta) = mvar.metric_offset(tag, coordinates) {
+                return apply_i16_delta(base, delta);
+            }
+        }
+
+        base
+    }
+
+    fn get_glyph_from_id_with_options(
+        &self,
+        glyph_id: usize,
+        is_vert: bool,
+        options: &crate::commands::FontOptions<'_>,
+    ) -> GriphData {
+        let layout = self.get_layout_with_options(glyph_id, is_vert, options);
 
         #[cfg(feature = "cff")]
         if let Some(cff) = self.current_cff() {
@@ -844,6 +998,14 @@ impl Font {
             glyph_id,
             open_type_glyf: Some(open_type_glyph),
         }
+    }
+
+    fn get_glyph_from_id_axis(&self, glyph_id: usize, is_vert: bool) -> GriphData {
+        self.get_glyph_from_id_with_options(
+            glyph_id,
+            is_vert,
+            &crate::commands::FontOptions::from_parsed(self),
+        )
     }
 
     fn resolve_glyph_id_with_uvs(&self, ch: char, vs: char, is_vert: bool) -> Result<usize, Error> {
@@ -1413,8 +1575,19 @@ impl Font {
     }
 
     fn default_line_height(&self) -> Result<f64, Error> {
+        self.default_line_height_with_options(&crate::commands::FontOptions::from_parsed(self))
+    }
+
+    fn default_line_height_with_options(
+        &self,
+        options: &crate::commands::FontOptions<'_>,
+    ) -> Result<f64, Error> {
         let hhea = self.current_hhea()?;
-        Ok((hhea.get_accender() - hhea.get_descender() + hhea.get_line_gap()) as f64)
+        let coordinates = self.normalized_variation_coords(options);
+        let ascender = self.metric_value_i16(tag4("hasc"), hhea.get_accender(), &coordinates);
+        let descender = self.metric_value_i16(tag4("hdsc"), hhea.get_descender(), &coordinates);
+        let line_gap = self.metric_value_i16(tag4("hlgp"), hhea.get_line_gap(), &coordinates);
+        Ok((ascender - descender + line_gap) as f64)
     }
 
     #[allow(dead_code)]
@@ -1603,7 +1776,7 @@ impl Font {
             ));
         }
 
-        let default_line_height = self.default_line_height()? as f32;
+        let default_line_height = self.default_line_height_with_options(options)? as f32;
         let scale_y = options.font_size / default_line_height.max(1.0);
         let scale_x = scale_y * options.font_stretch.0.max(0.0);
         let line_height = options.line_height.unwrap_or(options.font_size);
@@ -1652,7 +1825,11 @@ impl Font {
                     }
                 }
                 ResolvedTextUnit::Glyph(resolved) => {
-                    let glyph_data = self.get_glyph_from_id_axis(resolved.glyph_id, is_vertical);
+                    let glyph_data = self.get_glyph_from_id_with_options(
+                        resolved.glyph_id,
+                        is_vertical,
+                        options,
+                    );
                     let open_type_glyph = glyph_data
                         .open_type_glyf
                         .as_ref()
@@ -1894,7 +2071,8 @@ impl Font {
         let mut result = Vec::new();
         let mut cursor_x = 0.0;
         let mut line_index = 0usize;
-        let line_height = self.default_line_height()?;
+        let line_height = self
+            .default_line_height_with_options(&crate::commands::FontOptions::from_parsed(self))?;
         let tab_advance = line_height;
         let shaped_units = self.shape_text_units(
             text,
@@ -1914,7 +2092,11 @@ impl Font {
                     cursor_x += tab_advance * 4.0;
                 }
                 ResolvedTextUnit::Glyph(resolved) => {
-                    let glyph_data = self.get_glyph_from_id_axis(resolved.glyph_id, false);
+                    let glyph_data = self.get_glyph_from_id_with_options(
+                        resolved.glyph_id,
+                        false,
+                        &crate::commands::FontOptions::from_parsed(self),
+                    );
                     let open_type_glyph = glyph_data
                         .open_type_glyf
                         .as_ref()
@@ -2054,7 +2236,7 @@ impl Font {
         let mut cursor_x = 0.0;
         let mut cursor_y = 0.0;
         let mut max_line_width: f64 = 0.0;
-        let line_height = self.default_line_height()?;
+        let line_height = self.default_line_height_with_options(options)?;
         let tab_advance = line_height;
         let is_vertical = options.text_direction.is_vertical();
         let is_right_to_left = options.text_direction.is_right_to_left();
@@ -2093,7 +2275,11 @@ impl Font {
                     }
                 }
                 ResolvedTextUnit::Glyph(resolved) => {
-                    let glyph_data = self.get_glyph_from_id_axis(resolved.glyph_id, is_vertical);
+                    let glyph_data = self.get_glyph_from_id_with_options(
+                        resolved.glyph_id,
+                        is_vertical,
+                        options,
+                    );
                     let open_type_glyph = glyph_data
                         .open_type_glyf
                         .as_ref()
@@ -2238,6 +2424,28 @@ impl Font {
         };
         let platform_id = PlatformID::Windows;
         name_table.get_name(name_id, locale, platform_id)
+    }
+
+    pub(crate) fn face_name_by_id(&self, name_id: u16) -> Option<String> {
+        let locale = "en-US".to_string();
+        let name_table = if self.current_font == 0 {
+            self.name_table.as_ref()?
+        } else {
+            self.more_fonts[self.current_font - 1].name_table.as_ref()?
+        };
+
+        let names = name_table.get_name_list(&locale, PlatformID::Windows);
+        names
+            .get(&name_id)
+            .cloned()
+            .or_else(|| name_table.default_namelist.get(&name_id).cloned())
+            .filter(|name| !name.trim().is_empty())
+    }
+
+    pub(crate) fn face_variation_axes(&self) -> Vec<fvar::VariationAxisRecord> {
+        self.current_fvar()
+            .map(|fvar| fvar.axes.clone())
+            .unwrap_or_default()
     }
 
     pub(crate) fn face_family_name(&self) -> String {
@@ -2965,6 +3173,22 @@ fn font_debug(_font: &Font) {
     writeln!(&mut writer, "{}:{:04} ", ch, pos).unwrap();
 }
 
+fn apply_i16_delta(base: i16, delta: f32) -> i16 {
+    let value = base as f32 + delta.round();
+    value.clamp(i16::MIN as f32, i16::MAX as f32) as i16
+}
+
+fn apply_u16_delta(base: u16, delta: f32) -> u16 {
+    let value = base as f32 + delta.round();
+    value.clamp(0.0, u16::MAX as f32) as u16
+}
+
+fn tag4(tag: &str) -> u32 {
+    let mut bytes = [0u8; 4];
+    bytes.copy_from_slice(tag.as_bytes());
+    u32::from_be_bytes(bytes)
+}
+
 fn font_load<R: BinaryReader>(file: &mut R) -> Result<Font, Error> {
     match fontheader::get_font_type(file)? {
         fontheader::FontHeaders::OTF(header) => {
@@ -3040,6 +3264,16 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Result<Font, Error> {
                         let os2 = os2::OS2::new(&mut reader, 0, table.data.len() as u32)?;
                         font.os2 = Some(os2);
                     }
+                    b"fvar" => {
+                        let mut reader = BytesReader::new(&table.data);
+                        let fvar = fvar::FVAR::new(&mut reader, 0, table.data.len() as u32)?;
+                        font.fvar = Some(fvar);
+                    }
+                    b"avar" => {
+                        let mut reader = BytesReader::new(&table.data);
+                        let avar = avar::AVAR::new(&mut reader, 0, table.data.len() as u32)?;
+                        font.avar = Some(avar);
+                    }
                     b"hhea" => {
                         let mut reader = BytesReader::new(&table.data);
                         let hhea = hhea::HHEA::new(&mut reader, 0, table.data.len() as u32)?;
@@ -3075,6 +3309,16 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Result<Font, Error> {
                         let mut reader = BytesReader::new(&table.data);
                         let colr = colr::COLR::new(&mut reader, 0, table.data.len() as u32)?;
                         font.colr = Some(colr);
+                    }
+                    b"HVAR" => {
+                        let mut reader = BytesReader::new(&table.data);
+                        let hvar = hvar::HVAR::new(&mut reader, 0, table.data.len() as u32)?;
+                        font.hvar = Some(hvar);
+                    }
+                    b"MVAR" => {
+                        let mut reader = BytesReader::new(&table.data);
+                        let mvar = mvar::MVAR::new(&mut reader, 0, table.data.len() as u32)?;
+                        font.mvar = Some(mvar);
                     }
                     b"CPAL" => {
                         let mut reader = BytesReader::new(&table.data);
@@ -3124,6 +3368,11 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Result<Font, Error> {
                     }
                     b"vmtx" => {
                         vmtx_table = Some(table);
+                    }
+                    b"VVAR" => {
+                        let mut reader = BytesReader::new(&table.data);
+                        let vvar = vvar::VVAR::new(&mut reader, 0, table.data.len() as u32)?;
+                        font.vvar = Some(vvar);
                     }
                     _ => {}
                 }
@@ -3211,6 +3460,14 @@ fn from_opentype<R: BinaryReader>(file: &mut R, header: &OTFHeader) -> Result<Fo
                 let head = head::HEAD::new(file, record.offset, record.length)?;
                 font.head = Some(head);
             }
+            b"fvar" => {
+                let fvar = fvar::FVAR::new(file, record.offset, record.length)?;
+                font.fvar = Some(fvar);
+            }
+            b"avar" => {
+                let avar = avar::AVAR::new(file, record.offset, record.length)?;
+                font.avar = Some(avar);
+            }
             b"hhea" => {
                 let hhea = hhea::HHEA::new(file, record.offset, record.length)?;
                 font.hhea = Some(hhea);
@@ -3257,6 +3514,14 @@ fn from_opentype<R: BinaryReader>(file: &mut R, header: &OTFHeader) -> Result<Fo
             b"COLR" => {
                 let colr = colr::COLR::new(file, record.offset, record.length)?;
                 font.colr = Some(colr);
+            }
+            b"HVAR" => {
+                let hvar = hvar::HVAR::new(file, record.offset, record.length)?;
+                font.hvar = Some(hvar);
+            }
+            b"MVAR" => {
+                let mvar = mvar::MVAR::new(file, record.offset, record.length)?;
+                font.mvar = Some(mvar);
             }
             b"CPAL" => {
                 let cpal = cpal::CPAL::new(file, record.offset, record.length)?;
@@ -3317,6 +3582,10 @@ fn from_opentype<R: BinaryReader>(file: &mut R, header: &OTFHeader) -> Result<Fo
                     length: record.length,
                 };
                 font.vmtx_pos = Some(vmtx_pos);
+            }
+            b"VVAR" => {
+                let vvar = vvar::VVAR::new(file, record.offset, record.length)?;
+                font.vvar = Some(vvar);
             }
             _ => {
                 debug_assert!(true, "Unknown table tag")

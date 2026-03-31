@@ -440,5 +440,9 @@
   - [x] CFF INDEX の `count + 1` overflow を修正して大規模 CFF collection を通せるようにした
   - [x] `CFF2` table を outline format として認識し、未対応時は panic ではなく unsupported へ倒すようにした
   - [x] CFF2 本体の実装前に、CFF / TTC / WOFF / WOFF2 をまたぐ corpus smoke test を追加
-  - [ ] variable font の `Invalid delta format` は未対応のため skip 扱い
+  - [x] `fvar` / `avar` / `HVAR` / `VVAR` / `MVAR` を読み込み、variable font の public API metadata と metrics variation を通した
+  - [x] `FontEngine::with_variation()` と `FontFace::variation_axes()` を追加
+  - [x] 実フォント fixture で variable axis metadata と `wdth` による measure 変化を回帰テスト化
+  - [x] `Invalid delta format` だった variable font fixture は skip 前提を外した
+  - [x] CFF2 実装前の共有化調査を `doc/cff2-investigation*.md` に追加
   - [ ] CFF2 charstring / variation store / blend operator 本体は未着手

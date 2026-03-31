@@ -90,6 +90,22 @@ assert!(!run.glyphs.is_empty());
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
+Variable font axis 指定:
+
+```rust
+use fontloader::FontFile;
+
+let face = FontFile::from_file("fonts/VariableFont.ttf")?.current_face()?;
+let width = face
+    .engine()
+    .with_font_size(32.0)
+    .with_variation("wdth", 75.0)
+    .measure("Hello")?;
+
+println!("{width}");
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
 ## フォントの読み込み
 
 ```rust
@@ -230,3 +246,4 @@ fontloader = { version = "0.0.10", features = ["raw"] }
 
 - APIレシピ: [doc/api-recipes.ja.md](doc/api-recipes.ja.md)
 - 実装メモ / 現在の format 対応状況: [doc/feature-status.ja.md](doc/feature-status.ja.md)
+- CFF2 調査メモ: [doc/cff2-investigation.ja.md](doc/cff2-investigation.ja.md)

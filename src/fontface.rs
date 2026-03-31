@@ -91,6 +91,19 @@ impl FontFaceDescriptor {
     }
 }
 
+/// One variable-font axis exposed by a face.
+#[derive(Debug, Clone)]
+pub struct FontVariationAxis {
+    /// OpenType tag such as `"wght"` or `"wdth"`.
+    pub tag: String,
+    /// Human-readable axis name when available.
+    pub name: Option<String>,
+    pub min_value: f32,
+    pub default_value: f32,
+    pub max_value: f32,
+    pub hidden: bool,
+}
+
 /// Public wrapper around one parsed font face.
 #[derive(Debug, Clone)]
 pub struct FontFace {
@@ -127,15 +140,37 @@ impl FontFace {
         self.font.face_is_italic()
     }
 
+    /// Returns `true` when this face exposes one or more variable-font axes.
+    pub fn is_variable(&self) -> bool {
+        !self.variation_axes().is_empty()
+    }
+
+    /// Returns the available variable-font axes for this face.
+    pub fn variation_axes(&self) -> Vec<FontVariationAxis> {
+        self.font
+            .face_variation_axes()
+            .into_iter()
+            .map(|axis| FontVariationAxis {
+                tag: String::from_utf8_lossy(&axis.tag.to_be_bytes()).into_owned(),
+                name: self.font.face_name_by_id(axis.name_id),
+                min_value: axis.min_value,
+                default_value: axis.default_value,
+                max_value: axis.max_value,
+                hidden: axis.hidden,
+            })
+            .collect()
+    }
+
     /// Dumps a small human-readable summary of this face.
     pub fn dump(&self) -> String {
         format!(
-            "FontFace\nfamily: {}\nfull_name: {}\nweight: {}\nstretch: {:.3}\nitalic: {}\nface_index: {}\nface_count: {}\nformat: {}",
+            "FontFace\nfamily: {}\nfull_name: {}\nweight: {}\nstretch: {:.3}\nitalic: {}\nvariation_axes: {}\nface_index: {}\nface_count: {}\nformat: {}",
             self.family(),
             self.full_name(),
             self.weight().0,
             self.stretch().0,
             self.is_italic(),
+            self.variation_axes().len(),
             self.font.get_font_number(),
             self.font.get_font_count(),
             self.font.font_type.to_string()
@@ -528,7 +563,7 @@ impl FontFamily {
                 }
                 fontreader::ParsedTextUnit::Glyph { .. } => {
                     let face_index = if let Some(current_face) = pending_face {
-                        if unit_prefers_face_continuity(&unit, options)
+                        if unit_prefers_face_continuity(&unit, &options)
                             && self.faces[current_face].font.font().supports_text_unit(
                                 &unit,
                                 options.text_direction,
@@ -538,10 +573,10 @@ impl FontFamily {
                         {
                             current_face
                         } else {
-                            self.select_face_for_unit(&unit, &candidate_indices, options)
+                            self.select_face_for_unit(&unit, &candidate_indices, &options)
                         }
                     } else {
-                        self.select_face_for_unit(&unit, &candidate_indices, options)
+                        self.select_face_for_unit(&unit, &candidate_indices, &options)
                     };
                     pending_face = Some(face_index);
                     face_indices.push(face_index);
@@ -617,7 +652,7 @@ impl FontFamily {
                         &mut pending_face,
                         &mut cursor_x,
                         &mut cursor_y,
-                        options,
+                        &options,
                     )?;
                     max_line_width = max_line_width.max(cursor_inline_extent(
                         cursor_x,
@@ -642,7 +677,7 @@ impl FontFamily {
                         &mut pending_face,
                         &mut cursor_x,
                         &mut cursor_y,
-                        options,
+                        &options,
                     )?;
                     match options.text_direction {
                         TextDirection::LeftToRight => cursor_x += line_height * 4.0,
@@ -652,7 +687,7 @@ impl FontFamily {
                 }
                 fontreader::ParsedTextUnit::Glyph { .. } => {
                     let face_index = if let Some(current_face) = pending_face {
-                        if unit_prefers_face_continuity(&unit, options)
+                        if unit_prefers_face_continuity(&unit, &options)
                             && self.faces[current_face].font.font().supports_text_unit(
                                 &unit,
                                 options.text_direction,
@@ -662,10 +697,10 @@ impl FontFamily {
                         {
                             current_face
                         } else {
-                            self.select_face_for_unit(&unit, &candidate_indices, options)
+                            self.select_face_for_unit(&unit, &candidate_indices, &options)
                         }
                     } else {
-                        self.select_face_for_unit(&unit, &candidate_indices, options)
+                        self.select_face_for_unit(&unit, &candidate_indices, &options)
                     };
                     if pending_face != Some(face_index) {
                         self.flush_family_segment(
@@ -674,7 +709,7 @@ impl FontFamily {
                             &mut pending_face,
                             &mut cursor_x,
                             &mut cursor_y,
-                            options,
+                            &options,
                         )?;
                         pending_face = Some(face_index);
                     }
@@ -689,7 +724,7 @@ impl FontFamily {
             &mut pending_face,
             &mut cursor_x,
             &mut cursor_y,
-            options,
+            &options,
         )?;
         max_line_width = max_line_width.max(cursor_inline_extent(
             cursor_x,
@@ -710,7 +745,7 @@ impl FontFamily {
         pending_face: &mut Option<usize>,
         cursor_x: &mut f32,
         cursor_y: &mut f32,
-        options: FontOptions<'a>,
+        options: &FontOptions<'a>,
     ) -> Result<(), Error> {
         let Some(face_index) = *pending_face else {
             pending_segment.clear();
@@ -722,7 +757,7 @@ impl FontFamily {
         }
 
         let face = &self.faces[face_index].font;
-        let mut segment_options = options;
+        let mut segment_options = options.clone();
         segment_options.font = Some(FontRef::Loaded(face));
 
         let mut segment_run = face.text2glyph_run(pending_segment, segment_options)?;
@@ -852,7 +887,7 @@ impl FontFamily {
         &self,
         unit: &fontreader::ParsedTextUnit,
         candidates: &[usize],
-        options: FontOptions<'_>,
+        options: &FontOptions<'_>,
     ) -> usize {
         for &index in candidates {
             if self.faces[index].font.font().supports_text_unit(
@@ -879,7 +914,7 @@ fn push_text_unit(target: &mut String, unit: &fontreader::ParsedTextUnit) {
 
 fn unit_prefers_face_continuity(
     unit: &fontreader::ParsedTextUnit,
-    options: FontOptions<'_>,
+    options: &FontOptions<'_>,
 ) -> bool {
     let fontreader::ParsedTextUnit::Glyph { text, .. } = unit else {
         return false;
@@ -1046,7 +1081,7 @@ mod tests {
 
         let family = FontFamily::new("Test");
         let options = FontOptions::from_font_ref(FontRef::Family(&family));
-        assert!(unit_prefers_face_continuity(&unit, options));
+        assert!(unit_prefers_face_continuity(&unit, &options));
     }
 
     #[test]
@@ -1059,7 +1094,7 @@ mod tests {
 
         let family = FontFamily::new("Test");
         let options = FontOptions::from_font_ref(FontRef::Family(&family)).with_right_to_left();
-        assert!(unit_prefers_face_continuity(&unit, options));
+        assert!(unit_prefers_face_continuity(&unit, &options));
     }
 
     #[test]
@@ -1072,6 +1107,6 @@ mod tests {
 
         let family = FontFamily::new("Test");
         let options = FontOptions::from_font_ref(FontRef::Family(&family));
-        assert!(!unit_prefers_face_continuity(&unit, options));
+        assert!(!unit_prefers_face_continuity(&unit, &options));
     }
 }

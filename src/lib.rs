@@ -46,11 +46,12 @@ pub mod woff;
 pub use commands as commads;
 pub use commands::{
     text2commands, Command, FillRule, FontMetrics, FontOptions, FontRef, FontStretch, FontStyle,
-    FontVariant, FontWeight, Glyph, GlyphBounds, GlyphFlow, GlyphLayer, GlyphMetrics, GlyphPaint,
-    GlyphRun, PathGlyphLayer, PositionedGlyph, RasterGlyphLayer, RasterGlyphSource, TextDirection,
+    FontVariant, FontVariationSetting, FontWeight, Glyph, GlyphBounds, GlyphFlow, GlyphLayer,
+    GlyphMetrics, GlyphPaint, GlyphRun, PathGlyphLayer, PositionedGlyph, RasterGlyphLayer,
+    RasterGlyphSource, TextDirection,
 };
 pub use fontengine::{FontEngine, ShapingPolicy};
-pub use fontface::{FontFace, FontFaceDescriptor, FontFamily};
+pub use fontface::{FontFace, FontFaceDescriptor, FontFamily, FontVariationAxis};
 pub use fontfile::{
     load_font, load_font_from_buffer, load_font_from_file, load_font_from_net, open_font,
     open_font_from_buffer, open_font_from_file, open_font_from_net, ChunkedFontBuffer, FontFile,

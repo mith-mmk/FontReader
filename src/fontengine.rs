@@ -1,8 +1,8 @@
 //! High-level shaping and rendering engine bound to one [`crate::FontFace`].
 
 use crate::commands::{
-    Command, FillRule, FontOptions, FontVariant, GlyphBounds, GlyphLayer, GlyphPaint, GlyphRun,
-    PositionedGlyph, RasterGlyphLayer, RasterGlyphSource, TextDirection,
+    Command, FillRule, FontOptions, FontVariant, FontVariationSetting, GlyphBounds, GlyphLayer,
+    GlyphPaint, GlyphRun, PositionedGlyph, RasterGlyphLayer, RasterGlyphSource, TextDirection,
 };
 use crate::fontface::FontFace;
 use crate::util;
@@ -93,6 +93,24 @@ impl<'a> FontEngine<'a> {
         self
     }
 
+    /// Sets one variable-font axis value such as `wght=700`.
+    pub fn with_variation(mut self, tag: &str, value: f32) -> Self {
+        self.options = self.options.with_variation(tag, value);
+        self
+    }
+
+    /// Replaces the current variable-font axis settings.
+    pub fn with_variations(mut self, variations: &[FontVariationSetting]) -> Self {
+        self.options = self.options.with_variations(variations);
+        self
+    }
+
+    /// Clears all variable-font axis settings and returns to the default instance.
+    pub fn clear_variations(mut self) -> Self {
+        self.options = self.options.clear_variations();
+        self
+    }
+
     /// Convenience shorthand for `jp78`.
     pub fn with_jis78(self) -> Self {
         self.with_font_variant(FontVariant::Jis78)
@@ -153,9 +171,15 @@ impl<'a> FontEngine<'a> {
         self.options.font_variant
     }
 
+    /// Returns the currently selected variable-font axis settings.
+    pub fn variation_settings(&self) -> &[FontVariationSetting] {
+        &self.options.variations
+    }
+
     /// Returns the effective options used by this engine.
     pub fn options(&self) -> FontOptions<'a> {
         self.options
+            .clone()
             .with_text_direction(self.shaping_policy.text_direction())
     }
 

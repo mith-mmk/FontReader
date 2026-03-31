@@ -41,6 +41,27 @@ let run = face
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
+## Variable font axes
+
+```rust
+use fontloader::FontFile;
+
+let face = FontFile::from_file("fonts/VariableFont.ttf")?.current_face()?;
+for axis in face.variation_axes() {
+    println!(
+        "{} {}..{} (default {})",
+        axis.tag, axis.min_value, axis.max_value, axis.default_value
+    );
+}
+
+let width = face
+    .engine()
+    .with_font_size(32.0)
+    .with_variation("wdth", 75.0)
+    .measure("Hello")?;
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
 ## TTC / collection access
 
 ```rust
@@ -55,5 +76,7 @@ println!("{}", face.full_name());
 ## Notes
 
 - `FontEngine` is the intended place to choose shaping direction and variant behavior.
+- Variable-font axis values are also configured through `FontEngine`.
 - `FontOptions` still exists for lower-level control and `FontFamily` integration.
 - Technical implementation notes and current limitations live in `feature-status.md`.
+- CFF2 implementation notes live in `cff2-investigation.md`.

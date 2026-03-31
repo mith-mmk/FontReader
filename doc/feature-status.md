@@ -51,5 +51,9 @@ The README now focuses on the public API and runnable examples.
 
 - `FontFamily` currently supports cached-face selection and per-glyph fallback across loaded faces
 - Family fallback chains and Last Resort handling are still not implemented
+- Variable-font metadata and axis-driven metrics are available through `fvar` / `avar` / `HVAR` / `VVAR` / `MVAR`
+- Public API axis entry points are `FontFace::variation_axes()` and `FontEngine::with_variation()`
+- `gvar` outline deltas are not implemented yet
 - SVG glyph layers still return `ErrorKind::Unsupported`
 - WOFF2 still requires the complete byte stream before decoding
+- CFF2 planning notes live in `cff2-investigation.md`

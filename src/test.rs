@@ -3843,6 +3843,128 @@ mod tests {
     }
 
     #[test]
+    fn public_api_exposes_variable_font_axes_for_real_fixtures() {
+        let paths = variable_font_fixture_paths();
+        let mut variable_faces = 0usize;
+        let mut named_axes = 0usize;
+        let mut failures = Vec::new();
+
+        for path in &paths {
+            let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                let face = crate::FontFile::from_file(path)
+                    .map_err(|err| format!("FontFile::from_file failed: {err}"))?
+                    .current_face()
+                    .map_err(|err| format!("current_face failed: {err}"))?;
+
+                let axes = face.variation_axes();
+                if !face.is_variable() {
+                    return Err("face.is_variable() returned false".to_string());
+                }
+                if axes.is_empty() {
+                    return Err("variation_axes() was empty".to_string());
+                }
+                if axes.iter().any(|axis| axis.tag.len() != 4) {
+                    return Err("variation axis tag was not 4 bytes".to_string());
+                }
+
+                let named_axes = axes
+                    .iter()
+                    .filter(|axis| !axis.name.as_deref().unwrap_or("").trim().is_empty())
+                    .count();
+
+                Ok::<(usize, usize), String>((1, named_axes))
+            }));
+
+            match outcome {
+                Ok(Ok((faces, axis_names))) => {
+                    variable_faces += faces;
+                    named_axes += axis_names;
+                }
+                Ok(Err(err)) => failures.push(format!("{}: {}", path.display(), err)),
+                Err(_) => failures.push(format!("{}: panic", path.display())),
+            }
+        }
+
+        assert!(
+            failures.is_empty(),
+            "variable axis exposure failures:\n{}",
+            failures.join("\n")
+        );
+        assert!(
+            variable_faces >= 8,
+            "expected at least 8 variable faces, found {variable_faces}"
+        );
+        assert!(
+            named_axes >= 4,
+            "expected some named variable axes, found {named_axes}"
+        );
+    }
+
+    #[test]
+    fn variable_width_axis_changes_measure_on_real_fonts() {
+        let paths = variable_font_fixture_paths();
+        let mut exercised = 0usize;
+        let mut failures = Vec::new();
+
+        for path in &paths {
+            let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                let face = crate::FontFile::from_file(path)
+                    .map_err(|err| format!("FontFile::from_file failed: {err}"))?
+                    .current_face()
+                    .map_err(|err| format!("current_face failed: {err}"))?;
+                let Some(axis) = face
+                    .variation_axes()
+                    .into_iter()
+                    .find(|axis| axis.tag == "wdth")
+                else {
+                    return Ok::<bool, String>(false);
+                };
+
+                if (axis.max_value - axis.min_value).abs() < 0.1 {
+                    return Err("wdth axis had no measurable range".to_string());
+                }
+
+                let engine = face.engine().with_font_size(32.0);
+                let narrow = engine
+                    .clone()
+                    .with_variation("wdth", axis.min_value)
+                    .measure("Hello")
+                    .map_err(|err| format!("measure narrow failed: {err}"))?;
+                let wide = engine
+                    .clone()
+                    .with_variation("wdth", axis.max_value)
+                    .measure("Hello")
+                    .map_err(|err| format!("measure wide failed: {err}"))?;
+
+                if (wide - narrow).abs() <= 0.5 {
+                    return Err(format!(
+                        "wdth axis did not change measure enough: narrow={narrow} wide={wide}"
+                    ));
+                }
+
+                Ok(true)
+            }));
+
+            match outcome {
+                Ok(Ok(true)) => exercised += 1,
+                Ok(Ok(false)) => {}
+                Ok(Err(err)) => failures.push(format!("{}: {}", path.display(), err)),
+                Err(_) => failures.push(format!("{}: panic", path.display())),
+            }
+        }
+
+        assert!(
+            failures.is_empty(),
+            "variable width axis failures:\n{}",
+            failures.join("\n")
+        );
+        assert!(
+            exercised >= 3,
+            "expected to exercise at least 3 wdth variable fonts, exercised {exercised}"
+        );
+    }
+
+    #[test]
     fn text2command_supports_sbix_bitmap_glyphs() {
         let path = first_real_sbix_font_path().expect("load real sbix font");
         let bytes = std::fs::read(&path).expect("read sbix font");
@@ -4733,9 +4855,11 @@ mod tests {
         let options = crate::FontOptions::new(&font).with_font_size(32.0);
         let pair = format!("{left}{right}");
 
-        let left_run = crate::text2commands(&left.to_string(), options).expect("left glyph run");
-        let right_run = crate::text2commands(&right.to_string(), options).expect("right glyph run");
-        let pair_run = crate::text2commands(&pair, options).expect("pair glyph run");
+        let left_run =
+            crate::text2commands(&left.to_string(), options.clone()).expect("left glyph run");
+        let right_run =
+            crate::text2commands(&right.to_string(), options.clone()).expect("right glyph run");
+        let pair_run = crate::text2commands(&pair, options.clone()).expect("pair glyph run");
 
         assert_eq!(pair_run.glyphs.len(), 2);
         let sum_single = left_run.glyphs[0].glyph.metrics.advance_x
@@ -4894,9 +5018,9 @@ mod tests {
         let options = crate::FontOptions::new(&font)
             .with_font_size(32.0)
             .with_vertical_flow();
-        let run = crate::text2commands(&text, options).expect("vertical glyph run");
+        let run = crate::text2commands(&text, options.clone()).expect("vertical glyph run");
         let measure = font
-            .measure_with_options(&text, options)
+            .measure_with_options(&text, options.clone())
             .expect("measure vertical flow");
 
         assert!(measure > 0.0);
@@ -4921,8 +5045,8 @@ mod tests {
         let rtl_options = crate::FontOptions::new(&font)
             .with_font_size(32.0)
             .with_right_to_left();
-        let ltr_run = crate::text2commands(text, ltr_options).expect("ltr glyph run");
-        let rtl_run = crate::text2commands(text, rtl_options).expect("rtl glyph run");
+        let ltr_run = crate::text2commands(text, ltr_options.clone()).expect("ltr glyph run");
+        let rtl_run = crate::text2commands(text, rtl_options.clone()).expect("rtl glyph run");
 
         assert_eq!(rtl_run.glyphs.len(), 3);
         assert_eq!(
@@ -4933,10 +5057,10 @@ mod tests {
         assert!(rtl_run.glyphs[1].x > rtl_run.glyphs[2].x);
 
         let ltr_measure = font
-            .measure_with_options(text, ltr_options)
+            .measure_with_options(text, ltr_options.clone())
             .expect("measure ltr");
         let rtl_measure = font
-            .measure_with_options(text, rtl_options)
+            .measure_with_options(text, rtl_options.clone())
             .expect("measure rtl");
         assert!(rtl_measure > 0.0);
         assert!((ltr_measure - rtl_measure).abs() <= 1.0);

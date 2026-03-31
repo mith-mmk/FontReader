@@ -41,6 +41,27 @@ let run = face
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
+## Variable font axis 指定
+
+```rust
+use fontloader::FontFile;
+
+let face = FontFile::from_file("fonts/VariableFont.ttf")?.current_face()?;
+for axis in face.variation_axes() {
+    println!(
+        "{} {}..{} (default {})",
+        axis.tag, axis.min_value, axis.max_value, axis.default_value
+    );
+}
+
+let width = face
+    .engine()
+    .with_font_size(32.0)
+    .with_variation("wdth", 75.0)
+    .measure("Hello")?;
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
 ## TTC / collection の face 選択
 
 ```rust
@@ -55,5 +76,7 @@ println!("{}", face.full_name());
 ## メモ
 
 - shaping direction や variant の指定は `FontEngine` を主な入口にする想定です。
+- variable font axis の指定も `FontEngine` を主な入口にする想定です。
 - `FontOptions` は `FontFamily` と組み合わせる低レイヤ寄りの制御として残しています。
 - 実装メモや現時点の制限事項は `feature-status.ja.md` にまとめています。
+- CFF2 の実装前調査は `cff2-investigation.ja.md` にまとめています。

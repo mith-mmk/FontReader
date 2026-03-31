@@ -90,6 +90,22 @@ assert!(!run.glyphs.is_empty());
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
+Variable font axes:
+
+```rust
+use fontloader::FontFile;
+
+let face = FontFile::from_file("fonts/VariableFont.ttf")?.current_face()?;
+let width = face
+    .engine()
+    .with_font_size(32.0)
+    .with_variation("wdth", 75.0)
+    .measure("Hello")?;
+
+println!("{width}");
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
 ## Loading Fonts
 
 ```rust
@@ -230,3 +246,4 @@ That exposes:
 
 - API recipes: [doc/api-recipes.md](doc/api-recipes.md)
 - Implementation notes and current format status: [doc/feature-status.md](doc/feature-status.md)
+- CFF2 investigation notes: [doc/cff2-investigation.md](doc/cff2-investigation.md)
