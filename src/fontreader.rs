@@ -98,6 +98,7 @@ pub struct GriphData {
 pub struct OpenTypeGlyph {
     layout: FontLayout,
     glyph: FontData,
+    variation_coords: Vec<f32>,
 }
 
 #[derive(Debug, Clone)]
@@ -982,10 +983,11 @@ impl Font {
 
         #[cfg(feature = "cff")]
         if let Some(cff) = self.current_cff() {
-            let string = cff.to_code(glyph_id, &layout);
+            let string = cff.to_code_with_coords(glyph_id, &layout, &coordinates);
             let open_type_glyf = Some(OpenTypeGlyph {
                 layout,
                 glyph: FontData::CFF(string.as_bytes().to_vec()),
+                variation_coords: coordinates.clone(),
             });
 
             return GriphData {
@@ -1009,15 +1011,21 @@ impl Font {
                 } else {
                     FontData::Glyph(glyph.clone())
                 };
-                OpenTypeGlyph { layout, glyph }
+                OpenTypeGlyph {
+                    layout,
+                    glyph,
+                    variation_coords: coordinates.clone(),
+                }
             }
             GlyphFormat::CFF2 => OpenTypeGlyph {
                 layout,
                 glyph: FontData::CFF2(Vec::new()),
+                variation_coords: coordinates.clone(),
             },
             _ => OpenTypeGlyph {
                 layout,
                 glyph: FontData::CFF2(Vec::new()),
+                variation_coords: coordinates.clone(),
             },
         };
 
@@ -1992,7 +2000,8 @@ impl Font {
 
         #[cfg(feature = "cff")]
         if let Some(cff) = self.current_cff() {
-            let commands = cff.to_path_commands(glyph_id, 1.0)?;
+            let commands =
+                cff.to_path_commands_with_coords(glyph_id, 1.0, &open_type_glyph.variation_coords)?;
             let commands = transform_cff_commands(&commands, scale_x, scale_y);
             return Ok(vec![GlyphLayer::Path(PathGlyphLayer::new(
                 commands,
@@ -2257,10 +2266,10 @@ impl Font {
                             });
                             cursor_x += advance_width;
                         }
-                        FontData::CFF2(_) => {
+                        FontData::CFF(_) | FontData::CFF2(_) => {
                             return Err(Error::new(
                                 ErrorKind::Unsupported,
-                                "CFF2 outlines are not supported yet",
+                                "legacy text2commands does not support CFF/CFF2 outlines",
                             ));
                         }
                         _ => {
@@ -2727,73 +2736,67 @@ impl Font {
     }
 
     #[cfg(debug_assertions)]
+    fn debug_optional_table_string<T, F>(table: Option<&T>, name: &str, to_string: F) -> String
+    where
+        F: FnOnce(&T) -> String,
+    {
+        if let Some(table) = table {
+            to_string(table)
+        } else {
+            format!("{} is none", name)
+        }
+    }
+
+    #[cfg(debug_assertions)]
     pub fn get_cpal_raw(&self) -> String {
         let cpal = if self.current_font == 0 {
-            self.cpal.as_ref().unwrap()
+            self.cpal.as_ref()
         } else {
-            self.more_fonts[self.current_font - 1]
-                .cpal
-                .as_ref()
-                .unwrap()
+            self.more_fonts[self.current_font - 1].cpal.as_ref()
         };
-        cpal.to_string()
+        Self::debug_optional_table_string(cpal, "cpal", |cpal| cpal.to_string())
     }
 
     #[cfg(debug_assertions)]
     pub fn get_colr_raw(&self) -> String {
         let colr = if self.current_font == 0 {
-            self.colr.as_ref().unwrap()
+            self.colr.as_ref()
         } else {
-            self.more_fonts[self.current_font - 1]
-                .colr
-                .as_ref()
-                .unwrap()
+            self.more_fonts[self.current_font - 1].colr.as_ref()
         };
-        colr.to_string()
+        Self::debug_optional_table_string(colr, "colr", |colr| colr.to_string())
     }
     #[cfg(debug_assertions)]
     #[cfg(feature = "layout")]
     pub fn get_vhea_raw(&self) -> String {
         let vhea = if self.current_font == 0 {
-            self.vhea.as_ref().unwrap()
+            self.vhea.as_ref()
         } else {
-            self.more_fonts[self.current_font - 1]
-                .vhea
-                .as_ref()
-                .unwrap()
+            self.more_fonts[self.current_font - 1].vhea.as_ref()
         };
-        vhea.to_string()
+        Self::debug_optional_table_string(vhea, "vhea", |vhea| vhea.to_string())
     }
 
     #[cfg(debug_assertions)]
     #[cfg(feature = "layout")]
     pub fn get_gdef_raw(&self) -> String {
         let gdef = if self.current_font == 0 {
-            if self.gdef.is_none() {
-                return "".to_string();
-            }
-            self.gdef.as_ref().unwrap()
+            self.gdef.as_ref()
         } else {
-            self.more_fonts[self.current_font - 1]
-                .gdef
-                .as_ref()
-                .unwrap()
+            self.more_fonts[self.current_font - 1].gdef.as_ref()
         };
-        gdef.to_string()
+        Self::debug_optional_table_string(gdef, "gdef", |gdef| gdef.to_string())
     }
 
     #[cfg(debug_assertions)]
     #[cfg(feature = "layout")]
     pub fn get_gsub_raw(&self) -> String {
         let gsub = if self.current_font == 0 {
-            self.gsub.as_ref().unwrap()
+            self.gsub.as_ref()
         } else {
-            self.more_fonts[self.current_font - 1]
-                .gsub
-                .as_ref()
-                .unwrap()
+            self.more_fonts[self.current_font - 1].gsub.as_ref()
         };
-        gsub.to_string()
+        Self::debug_optional_table_string(gsub, "gsub", |gsub| gsub.to_string())
     }
 
     pub fn get_html_vert(
@@ -3403,7 +3406,11 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Result<Font, Error> {
                         font.cff = Some(cff.unwrap());
                         font.outline_format = GlyphFormat::CFF;
                     }
+                    #[cfg(feature = "cff")]
                     b"CFF2" => {
+                        let mut reader = BytesReader::new(&table.data);
+                        let cff = cff::CFF::new(&mut reader, 0, table.data.len() as u32);
+                        font.cff = Some(cff.unwrap());
                         font.outline_format = GlyphFormat::CFF2;
                     }
                     #[cfg(feature = "layout")]
@@ -3611,7 +3618,10 @@ fn from_opentype<R: BinaryReader>(file: &mut R, header: &OTFHeader) -> Result<Fo
                 font.cff = Some(cff.unwrap());
                 font.outline_format = GlyphFormat::CFF;
             }
+            #[cfg(feature = "cff")]
             b"CFF2" => {
+                let cff = cff::CFF::new(file, record.offset, record.length);
+                font.cff = Some(cff.unwrap());
                 font.outline_format = GlyphFormat::CFF2;
             }
             #[cfg(feature = "layout")]

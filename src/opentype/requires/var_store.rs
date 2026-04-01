@@ -125,6 +125,21 @@ impl ItemVariationStore {
 
         Some(delta)
     }
+
+    pub(crate) fn region_scalars(&self, outer_index: u16, coordinates: &[f32]) -> Option<Vec<f32>> {
+        let offset = *self.data_offsets.get(outer_index as usize)? as usize;
+        let mut cursor = offset;
+        let _item_count = read_u16(&self.data, &mut cursor).ok()?;
+        let _word_delta_count = read_u16(&self.data, &mut cursor).ok()?;
+        let region_index_count = read_u16(&self.data, &mut cursor).ok()? as usize;
+
+        let mut scalars = Vec::with_capacity(region_index_count);
+        for _ in 0..region_index_count {
+            let region_index = read_u16(&self.data, &mut cursor).ok()?;
+            scalars.push(self.regions.evaluate_region(region_index, coordinates));
+        }
+        Some(scalars)
+    }
 }
 
 impl VariationRegionList {

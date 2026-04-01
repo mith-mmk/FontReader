@@ -4,6 +4,7 @@ use std::{collections::HashMap, error::Error, io::SeekFrom};
 
 use crate::commands::Command;
 use crate::fontreader::FontLayout;
+use crate::opentype::requires::var_store::ItemVariationStore;
 
 // Compare this snippet from src/outline/cff.rs:
 
@@ -41,10 +42,7 @@ pub(crate) struct CFF {
     pub(crate) names: Vec<String>,
     pub(crate) top_dict: Dict, // TopDict
     pub(crate) bbox: [f64; 4],
-    //#[cfg(feature = "cff2")]
-    //pub(crate) global_subr: Option<GlobalSubr>, // CFF2
-    //#[cfg(feature = "cff2")]
-    //pub(crate) variation_store: Vec<VariationStore>, // CFF2
+    pub(crate) variation_store: Option<ItemVariationStore>,
     pub(crate) strings: Vec<String>,
     pub(crate) charsets: Charsets,
     pub(crate) char_string: CharString,
@@ -57,6 +55,7 @@ pub(crate) struct CFF {
     pub(crate) subr: Option<CharString>,
     pub(crate) default_width: f64,
     pub(crate) width: f64,
+    pub(crate) is_cff2: bool,
 }
 
 #[allow(dead_code)]
@@ -67,6 +66,7 @@ pub(crate) struct FontDict {
     pub(crate) subr: Option<CharString>,
     pub(crate) default_width: f64,
     pub(crate) width: f64,
+    pub(crate) vsindex: u16,
 }
 
 #[derive(Debug, Clone)]
@@ -74,6 +74,7 @@ struct GlyphContext {
     default_width: f64,
     width: f64,
     subr: Option<CharString>,
+    vsindex: u16,
 }
 
 struct ParcePack {
@@ -87,6 +88,10 @@ struct ParcePack {
     subr: Option<CharString>,
     gsubr: Option<CharString>,
     commands: Box<Commands>,
+    is_cff2: bool,
+    vsindex: u16,
+    coordinates: Vec<f32>,
+    variation_store: Option<ItemVariationStore>,
 }
 
 enum Operation {
@@ -117,22 +122,35 @@ impl CFF {
         private: &[i32],
         fallback_default_width: f64,
         fallback_width: f64,
-    ) -> Result<(Option<PrivateDict>, Option<CharString>, f64, f64), Box<dyn Error>> {
+        is_cff2: bool,
+    ) -> Result<(Option<PrivateDict>, Option<CharString>, f64, f64, u16), Box<dyn Error>> {
+        if private.first().copied().unwrap_or(0) <= 0 {
+            return Ok((None, None, fallback_default_width, fallback_width, 0));
+        }
         let private_dict_offset = private[1] as u64 + cff_offset;
         reader.seek(SeekFrom::Start(private_dict_offset))?;
         let buffer = reader.read_bytes_as_vec(private[0] as usize)?;
         let private_dict = Dict::parse(&buffer)?;
-        let default_width = private_dict
-            .get_f64(0, 20)
-            .unwrap_or(fallback_default_width);
-        let width = private_dict.get_f64(0, 21).unwrap_or(fallback_width);
+        let default_width = if is_cff2 {
+            fallback_default_width
+        } else {
+            private_dict
+                .get_f64(0, 20)
+                .unwrap_or(fallback_default_width)
+        };
+        let width = if is_cff2 {
+            fallback_width
+        } else {
+            private_dict.get_f64(0, 21).unwrap_or(fallback_width)
+        };
         let subr = if let Some(sub_offset) = private_dict.get_i32(0, 19) {
             let subr_offset = sub_offset as u64 + private_dict_offset;
-            Some(CharString::new(reader, subr_offset)?)
+            Some(CharString::new_with_format(reader, subr_offset, is_cff2)?)
         } else {
             None
         };
-        Ok((Some(private_dict), subr, default_width, width))
+        let vsindex = private_dict.get_i32(0, 22).unwrap_or(0).max(0) as u16;
+        Ok((Some(private_dict), subr, default_width, width, vsindex))
     }
 
     fn glyph_context(&self, gid: usize) -> GlyphContext {
@@ -143,6 +161,7 @@ impl CFF {
                         default_width: font_dict.default_width,
                         width: font_dict.width,
                         subr: font_dict.subr.clone(),
+                        vsindex: font_dict.vsindex,
                     };
                 }
             }
@@ -152,6 +171,7 @@ impl CFF {
             default_width: self.default_width,
             width: self.width,
             subr: self.subr.clone(),
+            vsindex: 0,
         }
     }
 
@@ -163,68 +183,77 @@ impl CFF {
         let offset = offset as u64;
         reader.seek(SeekFrom::Start(offset))?;
         let mut bbox = [0.0, 0.0, 1000.0, 1000.0];
-        let mut width;
-        let mut default_width;
+        let mut width = 0.0;
+        let mut default_width = 0.0;
 
         let header = Header::parse(reader)?;
-        if header.major != 1 {
-            return Err(format!(
-                "CFF major version {} is not supported yet; CFF2 support is pending",
-                header.major
-            )
-            .into());
+        let is_cff2 = header.major == 2;
+        if header.major != 1 && header.major != 2 {
+            return Err(format!("CFF major version {} is not supported", header.major).into());
         }
-        let name_index = Index::parse(reader)?;
-        let names = name_index
-            .data
-            .iter()
-            .map(|name| String::from_utf8(name.clone()))
-            .collect::<Result<Vec<String>, _>>()?;
-        let top_dict_index = Index::parse(reader)?;
-        let top_dict = Dict::parse(&top_dict_index.data[0])?;
-        let _string_index = if header.major == 1 {
+
+        let (names, top_dict, strings, gsubr) = if is_cff2 {
+            let top_dict_data = reader.read_bytes_as_vec(header.top_dict_size as usize)?;
+            let top_dict = Dict::parse(&top_dict_data)?;
+            let gsubr = Some(CharString::new_with_format(reader, 0, true)?);
+            (Vec::new(), top_dict, Vec::new(), gsubr)
+        } else {
+            let name_index = Index::parse(reader)?;
+            let names = name_index
+                .data
+                .iter()
+                .map(|name| String::from_utf8(name.clone()))
+                .collect::<Result<Vec<String>, _>>()?;
+            let top_dict_index = Index::parse(reader)?;
+            let top_dict = Dict::parse(&top_dict_index.data[0])?;
             let index = Index::parse(reader)?;
             let mut strings = Vec::new();
             for data in &index.data {
-                let string = String::from_utf8(data.clone())?;
-                strings.push(string);
+                strings.push(String::from_utf8(data.clone())?);
             }
-            Some(strings)
-        } else {
-            None // CFF2
+            let gsubr = Some(CharString::new_with_format(reader, 0, false)?);
+            (names, top_dict, strings, gsubr)
         };
-        // Global Index Subr
-        let gsbrtn = CharString::new(reader, 0)?;
-        let gsubr = Some(gsbrtn);
-        // cff2
-        /*
-        let variation_store = VariationStore::new(reader)?;
-        */
 
         let _encording_offset = top_dict.get_i32(0, 16); // none
         let fd_array_offset = top_dict.get_i32(12, 36);
         let fd_select_offset = top_dict.get_i32(12, 37);
         let opt_bbox = top_dict.get_f64_array(0, 5);
-        width = top_dict.get_f64(12, 8).unwrap_or(0.0);
-        default_width = width;
+        if !is_cff2 {
+            width = top_dict.get_f64(12, 8).unwrap_or(0.0);
+            default_width = width;
+        }
         if let Some(some_bbox) = opt_bbox {
             bbox = [some_bbox[0], some_bbox[1], some_bbox[2], some_bbox[3]];
         }
-        let charsets_offset = top_dict.get_i32(0, 15).unwrap();
+        let charsets_offset = top_dict.get_i32(0, 15);
         let char_strings_offset = top_dict.get_i32(0, 17).unwrap();
-        let _vsstore_offset = top_dict.get_i32(0, 24); // none
+        let vsstore_offset = top_dict.get_i32(0, 24);
         let ros = top_dict.get_i32_array(12, 30);
         let char_strings_offset = char_strings_offset as u64 + offset;
-        let char_string = CharString::new(reader, char_strings_offset)?;
+        let char_string = CharString::new_with_format(reader, char_strings_offset, is_cff2)?;
         let n_glyphs = char_string.data.data.len();
-        let charsets_offset = charsets_offset as u64 + offset;
-        let charsets = Charsets::new(reader, charsets_offset, n_glyphs as u32)?;
+        let charsets = if is_cff2 {
+            Charsets::sequential(n_glyphs as u32)
+        } else {
+            let charsets_offset = charsets_offset.unwrap() as u64 + offset;
+            Charsets::new(reader, charsets_offset, n_glyphs as u32)?
+        };
+        let variation_store = if let Some(vsstore_offset) = vsstore_offset {
+            let vsstore_offset = vsstore_offset as u64 + offset;
+            reader.seek(SeekFrom::Start(vsstore_offset))?;
+            let store_length = reader.read_u16_be()? as usize;
+            let store_data = reader.read_bytes_as_vec(store_length)?;
+            Some(ItemVariationStore::parse(&store_data)?)
+        } else {
+            None
+        };
 
         let private = top_dict.get_i32_array(0, 18);
         let mut subr = None;
         let private_dict = if let Some(private) = private {
-            let (private_dict, private_subr, private_default_width, private_width) =
-                Self::parse_private_dict(reader, offset, &private, default_width, width)?;
+            let (private_dict, private_subr, private_default_width, private_width, _vsindex) =
+                Self::parse_private_dict(reader, offset, &private, default_width, width, is_cff2)?;
             default_width = private_default_width;
             width = private_width;
             subr = private_subr;
@@ -235,33 +264,39 @@ impl CFF {
         };
         let mut fd_select = None;
         let mut fd_arrays = Vec::new();
-        if ros.is_some() {
+        if ros.is_some() || is_cff2 {
             if let Some(fd_array_offset) = fd_array_offset {
                 let fd_array_offset = (fd_array_offset as u64 + offset) as u64;
                 reader.seek(SeekFrom::Start(fd_array_offset))?;
-                let fd_arrays_index = Index::parse(reader)?;
+                let fd_arrays_index = if is_cff2 {
+                    Index::parse_cff2(reader)?
+                } else {
+                    Index::parse(reader)?
+                };
                 for data in fd_arrays_index.data {
                     let font_dict = Dict::parse(&data)?;
-                    let (private_dict, subr, default_width, width) = if let Some(private) =
-                        font_dict.get_i32_array(0, 18)
-                    {
-                        let (private_dict, subr, default_width, width) = Self::parse_private_dict(
-                            reader,
-                            offset,
-                            &private,
-                            default_width,
-                            width,
-                        )?;
-                        (private_dict, subr, default_width, width)
-                    } else {
-                        (None, None, default_width, width)
-                    };
+                    let (private_dict, subr, default_width, width, vsindex) =
+                        if let Some(private) = font_dict.get_i32_array(0, 18) {
+                            let (private_dict, subr, default_width, width, vsindex) =
+                                Self::parse_private_dict(
+                                    reader,
+                                    offset,
+                                    &private,
+                                    default_width,
+                                    width,
+                                    is_cff2,
+                                )?;
+                            (private_dict, subr, default_width, width, vsindex)
+                        } else {
+                            (None, None, default_width, width, 0)
+                        };
                     fd_arrays.push(FontDict {
                         dict: font_dict,
                         private_dict,
                         subr,
                         default_width,
                         width,
+                        vsindex,
                     });
                 }
             }
@@ -285,7 +320,8 @@ impl CFF {
             header,
             names,
             top_dict,
-            strings: Vec::new(),
+            variation_store,
+            strings,
             charsets,
             char_string,
             bbox,
@@ -298,19 +334,51 @@ impl CFF {
             subr,
             width,
             default_width,
+            is_cff2,
         })
     }
 
+    #[allow(dead_code)]
     pub fn to_code(&self, gid: usize, layout: &FontLayout) -> String {
-        let data = &self.char_string.data.data[gid as usize];
-        let context = self.glyph_context(gid);
-        self.parse_data(gid, data, 24.0, "pt", layout, 0.0, 0.0, false, context)
+        self.to_code_with_coords(gid, layout, &[])
     }
 
+    pub fn to_code_with_coords(
+        &self,
+        gid: usize,
+        layout: &FontLayout,
+        coordinates: &[f32],
+    ) -> String {
+        let data = &self.char_string.data.data[gid as usize];
+        let context = self.glyph_context(gid);
+        self.parse_data(
+            gid,
+            data,
+            24.0,
+            "pt",
+            layout,
+            0.0,
+            0.0,
+            false,
+            context,
+            coordinates,
+        )
+    }
+
+    #[allow(dead_code)]
     pub(crate) fn to_path_commands(
         &self,
         gid: usize,
         scale: f32,
+    ) -> Result<Vec<Command>, std::io::Error> {
+        self.to_path_commands_with_coords(gid, scale, &[])
+    }
+
+    pub(crate) fn to_path_commands_with_coords(
+        &self,
+        gid: usize,
+        scale: f32,
+        coordinates: &[f32],
     ) -> Result<Vec<Command>, std::io::Error> {
         if gid >= self.char_string.data.data.len() {
             return Err(std::io::Error::new(
@@ -321,7 +389,7 @@ impl CFF {
 
         let data = &self.char_string.data.data[gid];
         let context = self.glyph_context(gid);
-        let parce_data = self.parse_operations(data, context.clone());
+        let parce_data = self.parse_operations(data, context.clone(), coordinates);
         let mut commands = Vec::new();
 
         for operation in parce_data.commands.operations.iter() {
@@ -346,9 +414,15 @@ impl CFF {
         Ok(commands)
     }
 
-    fn parse_operations(&self, data: &[u8], context: GlyphContext) -> ParcePack {
+    fn parse_operations(
+        &self,
+        data: &[u8],
+        context: GlyphContext,
+        coordinates: &[f32],
+    ) -> ParcePack {
         let commands = Box::new(Commands::new());
-        let stacks = Box::new(Vec::with_capacity(48)); // CFF1 max stack depth 48
+        let stack_limit = if self.is_cff2 { 513 } else { 48 };
+        let stacks = Box::new(Vec::with_capacity(stack_limit));
         let mut parce_data = ParcePack {
             x: 0.0,
             y: 0.0,
@@ -360,10 +434,53 @@ impl CFF {
             is_first: 0,
             subr: context.subr.clone(),
             gsubr: self.gsubr.clone(),
+            is_cff2: self.is_cff2,
+            vsindex: context.vsindex,
+            coordinates: coordinates.to_vec(),
+            variation_store: self.variation_store.clone(),
         };
 
         self.parse(data, &mut parce_data);
         parce_data
+    }
+
+    fn apply_blend(&self, parce_data: &mut ParcePack) -> Option<()> {
+        let n = parce_data.stacks.pop()?.max(0.0) as usize;
+        if n == 0 {
+            return Some(());
+        }
+
+        let scalars = parce_data
+            .variation_store
+            .as_ref()
+            .and_then(|store| store.region_scalars(parce_data.vsindex, &parce_data.coordinates))
+            .unwrap_or_default();
+        let k = scalars.len();
+        let needed = n.checked_mul(k.checked_add(1)?)?;
+        if needed > parce_data.stacks.len() {
+            return Some(());
+        }
+
+        let start = parce_data.stacks.len() - needed;
+        let slice = &parce_data.stacks[start..];
+        let mut blended = Vec::with_capacity(n);
+        for value_index in 0..n {
+            let mut value = slice[value_index];
+            for (region_index, scalar) in scalars.iter().copied().enumerate() {
+                let delta_index = n + region_index * n + value_index;
+                value += slice[delta_index] * scalar as f64;
+            }
+            blended.push(value);
+        }
+
+        parce_data.stacks.truncate(start);
+        parce_data.stacks.extend(blended);
+        parce_data
+            .commands
+            .as_mut()
+            .commands
+            .push(format!("blend vsindex={} n={}", parce_data.vsindex, n));
+        Some(())
     }
 
     fn parse(&self, data: &[u8], parce_data: &mut ParcePack) -> Option<()> {
@@ -592,7 +709,10 @@ impl CFF {
                         .operations
                         .push(Operation::M(parce_data.x, parce_data.y));
 
-                    if 1 <= parce_data.stacks.len() && parce_data.is_first == 0 {
+                    if !parce_data.is_cff2
+                        && 1 <= parce_data.stacks.len()
+                        && parce_data.is_first == 0
+                    {
                         parce_data.width = parce_data.stacks.pop();
                         let width = parce_data.width;
                         parce_data
@@ -618,7 +738,10 @@ impl CFF {
                         .as_mut()
                         .operations
                         .push(Operation::M(parce_data.x, parce_data.y));
-                    if 1 <= parce_data.stacks.len() && parce_data.is_first == 0 {
+                    if !parce_data.is_cff2
+                        && 1 <= parce_data.stacks.len()
+                        && parce_data.is_first == 0
+                    {
                         parce_data.width = parce_data.stacks.pop();
                         let width = parce_data.width;
                         parce_data
@@ -644,7 +767,10 @@ impl CFF {
                         .operations
                         .push(Operation::M(parce_data.x, parce_data.y));
 
-                    if 1 <= parce_data.stacks.len() && parce_data.is_first == 0 {
+                    if !parce_data.is_cff2
+                        && 1 <= parce_data.stacks.len()
+                        && parce_data.is_first == 0
+                    {
                         parce_data.width = parce_data.stacks.pop();
                         let width = parce_data.width;
                         parce_data
@@ -1508,6 +1634,9 @@ impl CFF {
                 }
 
                 14 => {
+                    if parce_data.is_cff2 {
+                        continue;
+                    }
                     if 1 <= parce_data.stacks.len() && parce_data.is_first == 0 {
                         parce_data.width = parce_data.stacks.pop();
                         let width = parce_data.width;
@@ -1524,6 +1653,22 @@ impl CFF {
                         .push("endchar".to_string());
                     parce_data.commands.as_mut().operations.push(Operation::Z);
                     return Some(());
+                }
+                15 => {
+                    if parce_data.is_cff2 {
+                        let index = parce_data.stacks.pop()?.max(0.0) as u16;
+                        parce_data.vsindex = index;
+                        parce_data
+                            .commands
+                            .as_mut()
+                            .commands
+                            .push(format!("vsindex {}", index));
+                    }
+                }
+                16 => {
+                    if parce_data.is_cff2 {
+                        self.apply_blend(parce_data)?;
+                    }
                 }
                 12 => {
                     let b1 = data[i];
@@ -2096,6 +2241,19 @@ impl CFF {
         sx: f64,
         sy: f64,
     ) -> Result<String, std::io::Error> {
+        self.to_svg_with_coords(gid, fontsize, fontunit, layout, sx, sy, &[])
+    }
+
+    pub(crate) fn to_svg_with_coords(
+        &self,
+        gid: usize,
+        fontsize: f64,
+        fontunit: &str,
+        layout: &FontLayout,
+        sx: f64,
+        sy: f64,
+        coordinates: &[f32],
+    ) -> Result<String, std::io::Error> {
         if gid >= self.char_string.data.data.len() {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::Other,
@@ -2105,7 +2263,16 @@ impl CFF {
         let data = &self.char_string.data.data[gid as usize];
         let context = self.glyph_context(gid);
         Ok(self.parse_data(
-            gid, &data, fontsize, fontunit, layout, sx, sy, true, context,
+            gid,
+            &data,
+            fontsize,
+            fontunit,
+            layout,
+            sx,
+            sy,
+            true,
+            context,
+            coordinates,
         ))
     }
 
@@ -2215,8 +2382,9 @@ impl CFF {
         sy: f64,
         is_svg: bool,
         context: GlyphContext,
+        coordinates: &[f32],
     ) -> String {
-        let parce_data = self.parse_operations(data, context.clone());
+        let parce_data = self.parse_operations(data, context.clone(), coordinates);
         let commands = &parce_data.commands;
         if is_svg {
             let mut svg = self.get_svg_header(
@@ -2272,6 +2440,7 @@ pub(crate) struct FDSelect {
 }
 
 impl FDSelect {
+    #[allow(dead_code)]
     pub(crate) fn new<R: BinaryReader>(
         reader: &mut R,
         offset: u32,
@@ -2325,6 +2494,14 @@ pub(crate) struct Charsets {
 }
 
 impl Charsets {
+    fn sequential(n_glyphs: u32) -> Self {
+        let mut sid = Vec::with_capacity(n_glyphs as usize);
+        for gid in 0..n_glyphs {
+            sid.push(gid.min(u16::MAX as u32) as u16);
+        }
+        Self { format: 0, sid }
+    }
+
     fn new<R: BinaryReader>(
         reader: &mut R,
         offset: u64,
@@ -2506,8 +2683,7 @@ pub(crate) struct Header {
     pub(crate) minor: u8,
     pub(crate) hdr_size: u8,
     pub(crate) off_size: u8,
-    #[cfg(feature = "cff2")]
-    pub(crate) top_dict_index_offset: u32,
+    pub(crate) top_dict_size: u16,
 }
 
 #[derive(Debug, Clone)]
@@ -2658,14 +2834,27 @@ pub(crate) struct CharString {
 }
 
 impl CharString {
+    #[allow(dead_code)]
     pub(crate) fn new<R: BinaryReader>(
         reader: &mut R,
         offset: u64,
     ) -> Result<Self, Box<dyn Error>> {
+        Self::new_with_format(reader, offset, false)
+    }
+
+    pub(crate) fn new_with_format<R: BinaryReader>(
+        reader: &mut R,
+        offset: u64,
+        is_cff2: bool,
+    ) -> Result<Self, Box<dyn Error>> {
         if offset > 0 {
             reader.seek(SeekFrom::Start(offset))?;
         }
-        let index = Index::parse(reader)?;
+        let index = if is_cff2 {
+            Index::parse_cff2(reader)?
+        } else {
+            Index::parse(reader)?
+        };
         Ok(Self { data: index })
     }
 }
@@ -2675,32 +2864,17 @@ impl Header {
         let major = r.read_u8()?; // CFF = 1 / CFF2 = 2
         let minor = r.read_u8()?;
         let hdr_size = r.read_u8()?; // CFF = 4 / CFF2 = 5
-        let off_size = // CFF only
-        if major == 1 {
-            r.read_u8()?
+        let (off_size, top_dict_size) = if major == 1 {
+            (r.read_u8()?, 0)
         } else {
-            #[cfg(not(feature = "cff2"))]
-            r.skip_ptr(hdr_size as usize - 3)?;
-            0
+            (0, r.read_u16_be()?)
         };
-        #[cfg(feature = "cff2")]
-        if major == 2 {
-            let top_dict_index_offset = r.read_u32_be()?;
-            return Ok(Self {
-                major,
-                minor,
-                hdr_size,
-                off_size,
-                top_dict_index_offset,
-            });
-        }
         Ok(Self {
             major,
             minor,
             hdr_size,
             off_size,
-            #[cfg(feature = "cff2")]
-            top_dict_index_offset: 0,
+            top_dict_size,
         })
     }
 }
@@ -2739,5 +2913,142 @@ impl Index {
             data.push(buf);
         }
         Ok(Self { data })
+    }
+
+    pub(crate) fn parse_cff2<R: BinaryReader>(r: &mut R) -> Result<Self, Box<dyn Error>> {
+        let count = r.read_u32_be()?;
+        if count == 0 {
+            return Ok(Self { data: Vec::new() });
+        }
+        let off_size = r.read_u8()?;
+        let offset_count = count as usize + 1;
+
+        let mut offsets = Vec::with_capacity(offset_count);
+        for _ in 0..offset_count {
+            match off_size {
+                1 => offsets.push(r.read_u8()? as u32),
+                2 => offsets.push(r.read_u16_be()? as u32),
+                3 => {
+                    let b0 = r.read_u8()?;
+                    let b1 = r.read_u16_be()?;
+                    offsets.push(((b0 as u32) << 16) + (b1 as u32));
+                }
+                4 => offsets.push(r.read_u32_be()?),
+                _ => return Err("Illegal offset size".into()),
+            }
+        }
+
+        let mut data = Vec::with_capacity(count as usize);
+        for i in 0..count as usize {
+            let start = offsets[i] as usize;
+            let end = offsets[i + 1] as usize;
+            let buf = r.read_bytes_as_vec(end - start)?;
+            data.push(buf);
+        }
+        Ok(Self { data })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_item_variation_store() -> ItemVariationStore {
+        let data = vec![
+            0x00, 0x01, // format
+            0x00, 0x00, 0x00, 0x0c, // region_list_offset = 12
+            0x00, 0x01, // itemVariationData count
+            0x00, 0x00, 0x00, 0x16, // data offset = 22
+            0x00, 0x01, // axis_count
+            0x00, 0x01, // region_count
+            0x00, 0x00, // startCoord = 0.0
+            0x40, 0x00, // peakCoord = 1.0
+            0x40, 0x00, // endCoord = 1.0
+            0x00, 0x01, // item_count
+            0x00, 0x00, // word_delta_count
+            0x00, 0x01, // region_index_count
+            0x00, 0x00, // region index 0
+        ];
+        ItemVariationStore::parse(&data).expect("parse ItemVariationStore")
+    }
+
+    fn dummy_cff() -> CFF {
+        CFF {
+            header: Header {
+                major: 2,
+                minor: 0,
+                hdr_size: 5,
+                off_size: 0,
+                top_dict_size: 0,
+            },
+            names: Vec::new(),
+            top_dict: Dict {
+                entries: HashMap::new(),
+            },
+            bbox: [0.0, 0.0, 1000.0, 1000.0],
+            variation_store: Some(test_item_variation_store()),
+            strings: Vec::new(),
+            charsets: Charsets::sequential(1),
+            char_string: CharString {
+                data: Index {
+                    data: vec![Vec::new()],
+                },
+            },
+            fd_select: None,
+            fd_arrays: Vec::new(),
+            private_dict: None,
+            gsubr: None,
+            subr: None,
+            default_width: 0.0,
+            width: 0.0,
+            is_cff2: true,
+        }
+    }
+
+    #[test]
+    fn cff2_blend_interpolates_stack_values() {
+        let cff = dummy_cff();
+        let mut pack = ParcePack {
+            x: 0.0,
+            y: 0.0,
+            min_x: 0.0,
+            width: None,
+            stacks: Box::new(vec![100.0, 20.0, 1.0]),
+            is_first: 0,
+            hints: 0,
+            subr: None,
+            gsubr: None,
+            commands: Box::new(Commands::new()),
+            is_cff2: true,
+            vsindex: 0,
+            coordinates: vec![0.5],
+            variation_store: cff.variation_store.clone(),
+        };
+
+        cff.apply_blend(&mut pack).expect("apply blend");
+        assert_eq!(pack.stacks.len(), 1);
+        assert!((pack.stacks[0] - 110.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn cff2_charstring_supports_vsindex_and_blend() {
+        let cff = dummy_cff();
+        let context = GlyphContext {
+            default_width: 0.0,
+            width: 0.0,
+            subr: None,
+            vsindex: 0,
+        };
+        let data = vec![
+            139, 15, // 0 vsindex
+            239, 159, 140, 16, // 100 20 1 blend => 110
+            139, 21, // 0 rmoveto dy=0
+        ];
+        let parsed = cff.parse_operations(&data, context, &[0.5]);
+        assert!(parsed.stacks.is_empty());
+        assert!(matches!(
+            parsed.commands.operations.first(),
+            Some(Operation::M(x, y)) if (*x - 110.0).abs() < 0.001 && (*y).abs() < 0.001
+        ));
     }
 }

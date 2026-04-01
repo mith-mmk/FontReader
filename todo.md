@@ -448,4 +448,6 @@
   - [x] real variable-font fixture で outline signature の変化を回帰テスト化
   - [x] CFF2 実装前の共有化調査を `doc/cff2-investigation*.md` に追加
   - [ ] composite glyph の `gvar` delta は未対応
-  - [ ] CFF2 charstring / variation store / blend operator 本体は未着手
+  - [x] CFF2 charstring / variation store / blend operator 本体を `cff.rs` 共有経路に実装
+  - [x] real CFF2 fixture で `shape()` / `render_svg()` を smoke test 化
+  - [ ] CFF2 の Private DICT blend-heavy edge case は追加検証したい

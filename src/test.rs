@@ -2289,6 +2289,13 @@ mod tests {
         )
     }
 
+    fn cff2_fixture_paths() -> Vec<std::path::PathBuf> {
+        existing_paths(vec![
+            test_fonts_dir().join("apple").join("AppleGothic.ttf"),
+            test_fonts_dir().join("windows").join("msyhl.ttc"),
+        ])
+    }
+
     fn font_supports_text(font: &crate::LoadedFont, text: &str) -> bool {
         let Some(cmap) = font.font().cmap.as_ref() else {
             return false;
@@ -2388,12 +2395,9 @@ mod tests {
                     }
                     Err(err)
                         if err.kind() == std::io::ErrorKind::Unsupported
-                            && (err
+                            && err
                                 .to_string()
-                                .contains("SVG glyph layers are not supported yet")
-                                || err
-                                    .to_string()
-                                    .contains("CFF2 outlines are not supported yet")) =>
+                                .contains("SVG glyph layers are not supported yet") =>
                     {
                         false
                     }
@@ -2424,7 +2428,6 @@ mod tests {
 
     fn should_skip_corpus_error(path: &std::path::Path, error: &str) -> bool {
         error.contains("SVG glyph layers are not supported yet")
-            || error.contains("CFF2 outlines are not supported yet")
             || (path
                 .file_name()
                 .and_then(|name| name.to_str())
@@ -3781,6 +3784,31 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "cff")]
+    fn public_api_cff2_smoke_across_real_fixtures() {
+        let paths = cff2_fixture_paths();
+        let (shaped, svg_successes, skipped, failures) = run_public_api_smoke_for_paths(&paths);
+
+        assert!(
+            failures.is_empty(),
+            "public API CFF2 smoke failures:\n{}",
+            failures.join("\n")
+        );
+        assert!(
+            shaped >= 1,
+            "expected to shape at least one CFF2 fixture, shaped {shaped}"
+        );
+        assert!(
+            svg_successes >= 1,
+            "expected SVG export for at least one CFF2 fixture, succeeded {svg_successes}"
+        );
+        assert!(
+            skipped <= 1,
+            "expected at most one CFF2 fixture to be skipped"
+        );
+    }
+
+    #[test]
     fn public_api_metadata_smoke_across_variable_font_fixtures() {
         let paths = variable_font_fixture_paths();
         let mut loaded = 0usize;
@@ -3897,6 +3925,31 @@ mod tests {
             named_axes >= 4,
             "expected some named variable axes, found {named_axes}"
         );
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn raw_vhea_dump_returns_placeholder_when_table_is_missing() {
+        let path = test_fonts_dir()
+            .join("source")
+            .join("SourceSerif4-Italic-VariableFont_opsz,wght.ttf");
+        if !path.exists() {
+            return;
+        }
+
+        let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let mut font = crate::Font::get_font_from_file(&path)
+                .map_err(|err| format!("get_font_from_file failed: {err}"))?;
+            font.set_font(0)
+                .map_err(|err| format!("set_font failed: {err}"))?;
+            Ok::<String, String>(font.get_vhea_raw())
+        }));
+
+        match outcome {
+            Ok(Ok(vhea)) => assert_eq!(vhea, "vhea is none"),
+            Ok(Err(err)) => panic!("failed to dump vhea table: {err}"),
+            Err(_) => panic!("get_vhea_raw panicked for {}", path.display()),
+        }
     }
 
     #[test]
