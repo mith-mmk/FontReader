@@ -2066,6 +2066,17 @@ mod tests {
         test_fonts_dir().join("ZenMaruGothic-Regular.ttf")
     }
 
+    fn source_serif_variable_paths() -> Vec<std::path::PathBuf> {
+        existing_paths(vec![
+            test_fonts_dir()
+                .join("source")
+                .join("SourceSerif4-VariableFont_opsz,wght.ttf"),
+            test_fonts_dir()
+                .join("source")
+                .join("SourceSerif4-Italic-VariableFont_opsz,wght.ttf"),
+        ])
+    }
+
     fn woff2_font_path() -> std::path::PathBuf {
         test_fonts_dir().join("notosanswoff2.woff2")
     }
@@ -2203,6 +2214,62 @@ mod tests {
         path.components().any(|item| item.as_os_str().eq(component))
     }
 
+    fn read_be_u16(data: &[u8], offset: usize) -> Option<u16> {
+        let bytes: [u8; 2] = data.get(offset..offset + 2)?.try_into().ok()?;
+        Some(u16::from_be_bytes(bytes))
+    }
+
+    fn read_be_u32(data: &[u8], offset: usize) -> Option<u32> {
+        let bytes: [u8; 4] = data.get(offset..offset + 4)?.try_into().ok()?;
+        Some(u32::from_be_bytes(bytes))
+    }
+
+    fn sfnt_face_offsets(data: &[u8]) -> Vec<usize> {
+        match data.get(0..4) {
+            Some(b"ttcf") => {
+                let Some(num_fonts) = read_be_u32(data, 8) else {
+                    return Vec::new();
+                };
+                let mut offsets = Vec::new();
+                for index in 0..num_fonts as usize {
+                    let offset_pos = 12 + index * 4;
+                    if let Some(offset) = read_be_u32(data, offset_pos) {
+                        offsets.push(offset as usize);
+                    }
+                }
+                offsets
+            }
+            Some(_) => vec![0],
+            None => Vec::new(),
+        }
+    }
+
+    fn sfnt_face_has_table(data: &[u8], face_offset: usize, tag: &[u8; 4]) -> bool {
+        let Some(num_tables) = read_be_u16(data, face_offset + 4) else {
+            return false;
+        };
+        let mut offset = face_offset + 12;
+        for _ in 0..num_tables as usize {
+            let Some(table_tag) = data.get(offset..offset + 4) else {
+                return false;
+            };
+            if table_tag == tag {
+                return true;
+            }
+            offset += 16;
+        }
+        false
+    }
+
+    fn font_file_has_sfnt_table(path: &std::path::Path, tag: &[u8; 4]) -> bool {
+        let Ok(data) = std::fs::read(path) else {
+            return false;
+        };
+        sfnt_face_offsets(&data)
+            .into_iter()
+            .any(|offset| sfnt_face_has_table(&data, offset, tag))
+    }
+
     fn fixture_font_corpus_paths() -> Vec<std::path::PathBuf> {
         recursive_font_paths(test_fonts_dir())
     }
@@ -2290,10 +2357,12 @@ mod tests {
     }
 
     fn cff2_fixture_paths() -> Vec<std::path::PathBuf> {
-        existing_paths(vec![
-            test_fonts_dir().join("apple").join("AppleGothic.ttf"),
-            test_fonts_dir().join("windows").join("msyhl.ttc"),
-        ])
+        existing_paths(
+            fixture_font_corpus_paths()
+                .into_iter()
+                .filter(|path| font_file_has_sfnt_table(path, b"CFF2"))
+                .collect(),
+        )
     }
 
     fn font_supports_text(font: &crate::LoadedFont, text: &str) -> bool {
@@ -3856,6 +3925,9 @@ mod tests {
     #[cfg(feature = "cff")]
     fn public_api_cff2_smoke_across_real_fixtures() {
         let paths = cff2_fixture_paths();
+        if paths.is_empty() {
+            return;
+        }
         let (shaped, svg_successes, skipped, failures) = run_public_api_smoke_for_paths(&paths);
 
         assert!(
@@ -3875,6 +3947,33 @@ mod tests {
             skipped <= 1,
             "expected at most one CFF2 fixture to be skipped"
         );
+    }
+
+    #[test]
+    fn source_serif_variable_fonts_are_not_cff2_fixtures() {
+        let paths = source_serif_variable_paths();
+        assert!(
+            !paths.is_empty(),
+            "expected Source Serif variable fixtures to exist"
+        );
+
+        for path in paths {
+            assert!(
+                !font_file_has_sfnt_table(&path, b"CFF2"),
+                "{} should not be classified as CFF2",
+                path.display()
+            );
+            assert!(
+                font_file_has_sfnt_table(&path, b"glyf"),
+                "{} should expose a glyf table",
+                path.display()
+            );
+            assert!(
+                font_file_has_sfnt_table(&path, b"gvar"),
+                "{} should expose a gvar table",
+                path.display()
+            );
+        }
     }
 
     #[test]
@@ -4231,6 +4330,104 @@ mod tests {
         assert!(
             exercised >= 6,
             "expected to exercise at least 6 variable fonts with outline changes, exercised {exercised}"
+        );
+    }
+
+    #[test]
+    fn source_serif_composite_gvar_changes_outline_signature() {
+        fn outline_signature(run: &crate::GlyphRun) -> Option<String> {
+            let mut signature = String::new();
+            let mut saw_path = false;
+            for glyph in &run.glyphs {
+                for layer in &glyph.glyph.layers {
+                    let crate::GlyphLayer::Path(path) = layer else {
+                        continue;
+                    };
+                    saw_path = true;
+                    for command in &path.commands {
+                        match command {
+                            crate::Command::MoveTo(x, y) => {
+                                signature.push_str(&format!("M{:.1},{:.1};", x, y));
+                            }
+                            crate::Command::Line(x, y) => {
+                                signature.push_str(&format!("L{:.1},{:.1};", x, y));
+                            }
+                            crate::Command::Bezier((cx, cy), (x, y)) => {
+                                signature
+                                    .push_str(&format!("Q{:.1},{:.1},{:.1},{:.1};", cx, cy, x, y));
+                            }
+                            crate::Command::CubicBezier((cx1, cy1), (cx2, cy2), (x, y)) => {
+                                signature.push_str(&format!(
+                                    "C{:.1},{:.1},{:.1},{:.1},{:.1},{:.1};",
+                                    cx1, cy1, cx2, cy2, x, y
+                                ));
+                            }
+                            crate::Command::Close => signature.push_str("Z;"),
+                        }
+                    }
+                }
+            }
+
+            if saw_path {
+                Some(signature)
+            } else {
+                None
+            }
+        }
+
+        let path = test_fonts_dir()
+            .join("source")
+            .join("SourceSerif4-VariableFont_opsz,wght.ttf");
+        if !path.exists() {
+            return;
+        }
+
+        let mut raw_font = crate::Font::get_font_from_file(&path).expect("load Source Serif");
+        raw_font.set_font(0).expect("select Source Serif face");
+        let cmap = raw_font.cmap.as_ref().expect("Source Serif cmap");
+        let glyph_id = cmap.get_glyph_position('Á' as u32) as usize;
+        assert!(glyph_id > 0, "expected Source Serif to resolve Á");
+        let glyf = raw_font.glyf.as_ref().expect("Source Serif glyf");
+        let source_glyph = glyf.get_glyph(glyph_id).expect("Source Serif glyph");
+        assert!(
+            source_glyph.parse().number_of_contours < 0,
+            "expected Á to be a composite glyph in Source Serif"
+        );
+        let flattened = glyf
+            .parse_glyph(glyph_id)
+            .expect("flatten Source Serif composite glyph");
+        assert!(
+            flattened.number_of_contours > 0,
+            "expected flattened composite glyph to expose contours"
+        );
+
+        let face = crate::FontFile::from_file(&path)
+            .expect("load Source Serif as FontFile")
+            .current_face()
+            .expect("load Source Serif face");
+        let axis = face
+            .variation_axes()
+            .into_iter()
+            .find(|axis| axis.tag == "wght")
+            .expect("Source Serif wght axis");
+
+        let engine = face.engine().with_font_size(72.0);
+        let low = engine
+            .clone()
+            .with_variation("wght", axis.min_value)
+            .shape("Á")
+            .expect("shape low-weight composite glyph");
+        let high = engine
+            .clone()
+            .with_variation("wght", axis.max_value)
+            .shape("Á")
+            .expect("shape high-weight composite glyph");
+
+        let low_signature = outline_signature(&low).expect("low-weight outline signature");
+        let high_signature = outline_signature(&high).expect("high-weight outline signature");
+        assert_ne!(
+            low_signature, high_signature,
+            "expected Source Serif composite glyph outline to vary across weight axis"
         );
     }
 

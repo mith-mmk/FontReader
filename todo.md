@@ -447,7 +447,8 @@
   - [x] `gvar` simple glyph の outline delta を実装し、`FontEngine::shape()` の outline に反映
   - [x] real variable-font fixture で outline signature の変化を回帰テスト化
   - [x] CFF2 実装前の共有化調査を `doc/cff2-investigation*.md` に追加
-  - [ ] composite glyph の `gvar` delta は未対応
+  - [x] composite glyph の `gvar` delta は再帰 flatten + component variation 適用で対応
+  - [ ] phantom point 由来の outline / metrics 補正は未対応
   - [x] CFF2 charstring / variation store / blend operator 本体を `cff.rs` 共有経路に実装
-  - [x] real CFF2 fixture で `shape()` / `render_svg()` を smoke test 化
-  - [*] CFF2 の Private DICT `vsindex` / `blend` は parser 側に実装済み。real fixture で blend-heavy な追加検証はまだ増やしたい
+  - [*] local corpus に true CFF2 実フォントがまだ無く、現状の CFF2 coverage は synthetic test 中心。実フォント fixture 入手後に `shape()` / `render_svg()` smoke を増やしたい
+  - [x] CFF2 の Private DICT `vsindex` / `blend` は parser 側に実装済み

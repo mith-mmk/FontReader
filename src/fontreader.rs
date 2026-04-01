@@ -1005,7 +1005,14 @@ impl Font {
                     .get_glyph(glyph_id)
                     .expect("glyph id should resolve inside glyf table");
                 let glyph = if let Some(parsed) = self.current_gvar().and_then(|gvar| {
-                    gvar.apply_to_parsed_glyph(glyph_id, &coordinates, &glyph.parse())
+                    let raw_parsed = glyph.parse();
+                    if raw_parsed.number_of_contours < 0 {
+                        glyf.parse_glyph_with_variation(glyph_id, &|component_glyph_id, parsed| {
+                            gvar.apply_to_parsed_glyph(component_glyph_id, &coordinates, parsed)
+                        })
+                    } else {
+                        gvar.apply_to_parsed_glyph(glyph_id, &coordinates, &raw_parsed)
+                    }
                 }) {
                     FontData::ParsedGlyph(parsed)
                 } else {

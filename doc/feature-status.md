@@ -53,10 +53,11 @@ The README now focuses on the public API and runnable examples.
 - Family fallback chains and Last Resort handling are still not implemented
 - Variable-font metadata and axis-driven metrics are available through `fvar` / `avar` / `HVAR` / `VVAR` / `MVAR`
 - Public API axis entry points are `FontFace::variation_axes()` and `FontEngine::with_variation()`
-- `gvar` simple-glyph outline deltas are implemented and exercised across real variable-font fixtures
-- Composite-glyph `gvar` deltas and phantom-point-driven outline adjustments are still pending
+- `gvar` outline deltas now cover both simple glyphs and composite glyphs, including recursive component variation for Source Serif variable-font fixtures
+- Phantom-point-driven outline / metrics adjustments are still pending
 - CFF2 outlines now load through the shared `cff.rs` path, including `vsindex` / `blend` evaluation and real-fixture SVG smoke coverage
-- CFF2 variation support now covers both outline charstrings and Private DICT `vsindex` / `blend` parsing; remaining risk is mainly broader real-fixture validation for blend-heavy fonts
+- CFF2 variation support now covers both outline charstrings and Private DICT `vsindex` / `blend` parsing
+- The current local corpus does not contain a confirmed real CFF2 font; coverage is therefore synthetic/unit-test heavy until a true CFF2 fixture is added
 - SVG glyph layers still return `ErrorKind::Unsupported`
 - WOFF2 still requires the complete byte stream before decoding
 - CFF2 planning notes live in `cff2-investigation.md`
