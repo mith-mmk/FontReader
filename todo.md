@@ -234,7 +234,10 @@
   - [x] GPOS 1.1 の壊れた optional `FeatureVariationList` は無視して続行する
   - [x] `hmtx` / `vmtx` の 0-metric edge case で panic しないよう修正
   - [x] lookup index out-of-bounds は panic ではなく `InvalidData` を返す
-  - [ ] `opentype::mod` / `ttc` / `colr` など constructor 系の `unwrap()` をさらに減らす
+  - [x] `opentype::mod` / `ttc` / `colr` の constructor 系 `unwrap()` を `Result` / safe fallback に置き換え
+  - [x] `get_font_type()` は short buffer で panic せず `UnexpectedEof` を返す
+  - [x] `COLR::get_layer_record()` は壊れた layer range でも panic しない
+  - [ ] `fontreader.rs` の load/shaping 系 `unwrap()` を段階的に減らす
 - [x] svg svgのサイズが巨大なので文字毎にsvgを切り出す
 # Layout 対応状況
 

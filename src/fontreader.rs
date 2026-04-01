@@ -3394,15 +3394,19 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Result<Font, Error> {
                     #[cfg(feature = "cff")]
                     b"CFF " => {
                         let mut reader = BytesReader::new(&table.data);
-                        let cff = cff::CFF::new(&mut reader, 0, table.data.len() as u32);
-                        font.cff = Some(cff.unwrap());
+                        let cff = cff::CFF::new(&mut reader, 0, table.data.len() as u32).map_err(
+                            |err| Error::new(std::io::ErrorKind::InvalidData, err.to_string()),
+                        )?;
+                        font.cff = Some(cff);
                         font.outline_format = GlyphFormat::CFF;
                     }
                     #[cfg(feature = "cff")]
                     b"CFF2" => {
                         let mut reader = BytesReader::new(&table.data);
-                        let cff = cff::CFF::new(&mut reader, 0, table.data.len() as u32);
-                        font.cff = Some(cff.unwrap());
+                        let cff = cff::CFF::new(&mut reader, 0, table.data.len() as u32).map_err(
+                            |err| Error::new(std::io::ErrorKind::InvalidData, err.to_string()),
+                        )?;
+                        font.cff = Some(cff);
                         font.outline_format = GlyphFormat::CFF2;
                     }
                     #[cfg(feature = "layout")]
@@ -3606,14 +3610,16 @@ fn from_opentype<R: BinaryReader>(file: &mut R, header: &OTFHeader) -> Result<Fo
             }
             #[cfg(feature = "cff")]
             b"CFF " => {
-                let cff = cff::CFF::new(file, record.offset, record.length);
-                font.cff = Some(cff.unwrap());
+                let cff = cff::CFF::new(file, record.offset, record.length)
+                    .map_err(|err| Error::new(std::io::ErrorKind::InvalidData, err.to_string()))?;
+                font.cff = Some(cff);
                 font.outline_format = GlyphFormat::CFF;
             }
             #[cfg(feature = "cff")]
             b"CFF2" => {
-                let cff = cff::CFF::new(file, record.offset, record.length);
-                font.cff = Some(cff.unwrap());
+                let cff = cff::CFF::new(file, record.offset, record.length)
+                    .map_err(|err| Error::new(std::io::ErrorKind::InvalidData, err.to_string()))?;
+                font.cff = Some(cff);
                 font.outline_format = GlyphFormat::CFF2;
             }
             #[cfg(feature = "layout")]

@@ -57,6 +57,8 @@ The README now focuses on the public API and runnable examples.
 - Phantom-point-driven outline / metrics adjustments are still pending
 - Parser hardening is in progress: malformed optional GSUB/GPOS feature-variation data is now skipped instead of panicking
 - `hmtx` / `vmtx` now tolerate zero-metric edge cases without panicking, returning zero advances as a fallback
+- `OTFHeader`, `TTCHeader`, `get_font_type()`, and `COLR::new()` now return errors instead of panicking on truncated input
+- `COLR::get_layer_record()` now stops at available layers instead of trusting malformed layer ranges
 - CFF2 outlines now load through the shared `cff.rs` path, including `vsindex` / `blend` evaluation and real-fixture SVG smoke coverage
 - CFF2 variation support now covers both outline charstrings and Private DICT `vsindex` / `blend` parsing
 - The current local corpus does not contain a confirmed real CFF2 font; coverage is therefore synthetic/unit-test heavy until a true CFF2 fixture is added
