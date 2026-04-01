@@ -2,6 +2,7 @@ pub(crate) mod avar;
 pub(crate) mod cmap;
 pub(crate) mod delta_set;
 pub(crate) mod fvar;
+pub(crate) mod gvar;
 pub(crate) mod head;
 pub(crate) mod hhea;
 pub(crate) mod hmtx;

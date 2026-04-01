@@ -53,7 +53,8 @@ The README now focuses on the public API and runnable examples.
 - Family fallback chains and Last Resort handling are still not implemented
 - Variable-font metadata and axis-driven metrics are available through `fvar` / `avar` / `HVAR` / `VVAR` / `MVAR`
 - Public API axis entry points are `FontFace::variation_axes()` and `FontEngine::with_variation()`
-- `gvar` outline deltas are not implemented yet
+- `gvar` simple-glyph outline deltas are implemented and exercised across real variable-font fixtures
+- Composite-glyph `gvar` deltas and phantom-point-driven outline adjustments are still pending
 - SVG glyph layers still return `ErrorKind::Unsupported`
 - WOFF2 still requires the complete byte stream before decoding
 - CFF2 planning notes live in `cff2-investigation.md`

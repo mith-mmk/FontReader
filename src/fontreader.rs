@@ -103,6 +103,7 @@ pub struct OpenTypeGlyph {
 #[derive(Debug, Clone)]
 pub enum FontData {
     Glyph(glyf::Glyph),
+    ParsedGlyph(glyf::ParsedGlyph),
     CFF(Vec<u8>),
     CFF2(Vec<u8>),
     SVG(String),
@@ -124,6 +125,7 @@ pub struct Font {
     pub(crate) post: Option<post::POST>, // must
     pub(crate) fvar: Option<fvar::FVAR>,
     pub(crate) avar: Option<avar::AVAR>,
+    pub(crate) gvar: Option<gvar::GVAR>,
     pub(crate) loca: Option<loca::LOCA>, // openType font, CFF/CFF2 none
     pub(crate) glyf: Option<glyf::GLYF>, // openType font, CFF/CFF2 none
     #[cfg(feature = "cff")]
@@ -201,6 +203,7 @@ impl Font {
             post: None,
             fvar: None,
             avar: None,
+            gvar: None,
             loca: None,
             glyf: None,
             #[cfg(feature = "cff")]
@@ -625,116 +628,127 @@ impl Font {
         let glyf_data = self.get_glyph_with_uvs_axis(ch, vs, is_vert);
         let glyph_id = glyf_data.glyph_id;
 
-        if let FontData::Glyph(glyph) = &glyf_data.open_type_glyf.as_ref().unwrap().glyph {
-            let layout = &glyf_data.open_type_glyf.as_ref().unwrap().layout;
-            if let Some(sbix) = self.sbix.as_ref() {
-                let result = sbix.get_svg(glyph_id as u32, fontsize, fontunit, &layout, 0.0, 0.0);
-                if let Some(svg) = result {
-                    let mut string = "".to_string();
-                    #[cfg(debug_assertions)]
-                    {
-                        string += &format!("<!-- {} glyf id: {} -->", ch, glyph_id);
-                    }
-                    string += &svg;
-                    return Ok(string);
-                }
-            } else if let Some(svg) = self.svg.as_ref() {
-                let result = svg.get_svg(glyph_id as u32, fontsize, fontunit, &layout, 0.0, 0.0);
-                if let Some(svg) = result {
-                    let mut string = "".to_string();
-                    #[cfg(debug_assertions)]
-                    {
-                        string += &format!("<!-- {} glyf id: {} -->", ch, glyph_id);
-                        if let FontLayout::Horizontal(layout) = layout {
-                            string += &format!(
-                                "<!-- layout {} {} {} {} {} -->\n",
-                                layout.lsb,
-                                layout.advance_width,
-                                layout.accender,
-                                layout.descender,
-                                layout.line_gap
-                            );
-                        } else if let FontLayout::Vertical(layout) = layout {
-                            string += &format!(
-                                "<!-- layout vert {} {} {} {} {} -->\n",
-                                layout.tsb,
-                                layout.advance_height,
-                                layout.accender,
-                                layout.descender,
-                                layout.line_gap
-                            );
+        let open_type_glyph = glyf_data.open_type_glyf.as_ref().unwrap();
+        let layout = &open_type_glyph.layout;
+        match &open_type_glyph.glyph {
+            FontData::Glyph(glyph) => {
+                if let Some(sbix) = self.sbix.as_ref() {
+                    let result =
+                        sbix.get_svg(glyph_id as u32, fontsize, fontunit, &layout, 0.0, 0.0);
+                    if let Some(svg) = result {
+                        let mut string = "".to_string();
+                        #[cfg(debug_assertions)]
+                        {
+                            string += &format!("<!-- {} glyf id: {} -->", ch, glyph_id);
                         }
+                        string += &svg;
+                        return Ok(string);
                     }
-                    string += &svg;
-                    return Ok(string);
+                } else if let Some(svg) = self.svg.as_ref() {
+                    let result =
+                        svg.get_svg(glyph_id as u32, fontsize, fontunit, &layout, 0.0, 0.0);
+                    if let Some(svg) = result {
+                        let mut string = "".to_string();
+                        #[cfg(debug_assertions)]
+                        {
+                            string += &format!("<!-- {} glyf id: {} -->", ch, glyph_id);
+                            if let FontLayout::Horizontal(layout) = layout {
+                                string += &format!(
+                                    "<!-- layout {} {} {} {} {} -->\n",
+                                    layout.lsb,
+                                    layout.advance_width,
+                                    layout.accender,
+                                    layout.descender,
+                                    layout.line_gap
+                                );
+                            } else if let FontLayout::Vertical(layout) = layout {
+                                string += &format!(
+                                    "<!-- layout vert {} {} {} {} {} -->\n",
+                                    layout.tsb,
+                                    layout.advance_height,
+                                    layout.accender,
+                                    layout.descender,
+                                    layout.line_gap
+                                );
+                            }
+                        }
+                        string += &svg;
+                        return Ok(string);
+                    }
                 }
-            }
-            let glyf = if self.current_font == 0 {
-                self.glyf.as_ref().unwrap()
-            } else {
-                self.more_fonts[self.current_font - 1]
-                    .glyf
-                    .as_ref()
-                    .unwrap()
-            };
-
-            let (cpal, colr) = if self.current_font == 0 {
-                (self.cpal.as_ref(), self.colr.as_ref())
-            } else {
-                (
-                    self.more_fonts[self.current_font - 1].cpal.as_ref(),
-                    self.more_fonts[self.current_font - 1].colr.as_ref(),
-                )
-            };
-
-            if let Some(colr) = colr.as_ref() {
-                let layers = colr.get_layer_record(glyph_id as u16);
-                if layers.is_empty() {
-                    return Ok(glyf.to_svg(glyph_id, fontsize, fontunit, &layout, 0.0, 0.0));
-                }
-                let mut string = glyph.get_svg_heder(fontsize, fontunit, &layout);
-                #[cfg(debug_assertions)]
-                {
-                    string += &format!("\n<!-- {} glyf id: {} -->", ch, glyph_id);
-                }
-
-                for layer in layers {
-                    let glyf_id = layer.glyph_id as u32;
-                    let pallet = cpal
+                let glyf = if self.current_font == 0 {
+                    self.glyf.as_ref().unwrap()
+                } else {
+                    self.more_fonts[self.current_font - 1]
+                        .glyf
                         .as_ref()
                         .unwrap()
-                        .get_pallet(layer.palette_index as usize);
+                };
+
+                let (cpal, colr) = if self.current_font == 0 {
+                    (self.cpal.as_ref(), self.colr.as_ref())
+                } else {
+                    (
+                        self.more_fonts[self.current_font - 1].cpal.as_ref(),
+                        self.more_fonts[self.current_font - 1].colr.as_ref(),
+                    )
+                };
+
+                if let Some(colr) = colr.as_ref() {
+                    let layers = colr.get_layer_record(glyph_id as u16);
+                    if layers.is_empty() {
+                        return Ok(glyf.to_svg(glyph_id, fontsize, fontunit, &layout, 0.0, 0.0));
+                    }
+                    let mut string = glyph.get_svg_heder(fontsize, fontunit, &layout);
                     #[cfg(debug_assertions)]
                     {
-                        string += &format!("<!-- pallet index {} -->\n", layer.palette_index);
+                        string += &format!("\n<!-- {} glyf id: {} -->", ch, glyph_id);
+                    }
+
+                    for layer in layers {
+                        let glyf_id = layer.glyph_id as u32;
+                        let pallet = cpal
+                            .as_ref()
+                            .unwrap()
+                            .get_pallet(layer.palette_index as usize);
+                        #[cfg(debug_assertions)]
+                        {
+                            string += &format!("<!-- pallet index {} -->\n", layer.palette_index);
+                            string += &format!(
+                                "<!-- Red {} Green {} Blue {} Alpha {} -->\n",
+                                pallet.red, pallet.green, pallet.blue, pallet.alpha
+                            );
+                        }
                         string += &format!(
-                            "<!-- Red {} Green {} Blue {} Alpha {} -->\n",
+                            "<g fill=\"rgba({}, {}, {}, {})\">\n",
                             pallet.red, pallet.green, pallet.blue, pallet.alpha
                         );
+                        string += &glyf.get_svg_path(glyf_id as usize, &layout, 0.0, 0.0);
+                        string += "</g>\n";
                     }
-                    string += &format!(
-                        "<g fill=\"rgba({}, {}, {}, {})\">\n",
-                        pallet.red, pallet.green, pallet.blue, pallet.alpha
-                    );
-                    string += &glyf.get_svg_path(glyf_id as usize, &layout, 0.0, 0.0);
-                    string += "</g>\n";
+                    string += "</svg>";
+                    Ok(string)
+                } else {
+                    #[cfg(debug_assertions)]
+                    {
+                        let string = glyf.to_svg(glyph_id, fontsize, fontunit, &layout, 0.0, 0.0);
+                        return Ok(format!("<!-- {} glyf id: {} -->{}", ch, glyph_id, string));
+                    }
+                    #[cfg(not(debug_assertions))]
+                    Ok(glyf.to_svg(glyph_id, fontsize, fontunit, &layout, 0.0, 0.0))
                 }
-                string += "</svg>";
-                Ok(string)
-            } else {
-                #[cfg(debug_assertions)]
-                {
-                    let string = glyf.to_svg(glyph_id, fontsize, fontunit, &layout, 0.0, 0.0);
-                    return Ok(format!("<!-- {} glyf id: {} -->{}", ch, glyph_id, string));
-                }
-                #[cfg(not(debug_assertions))]
-                Ok(glyf.to_svg(glyph_id, fontsize, fontunit, &layout, 0.0, 0.0))
             }
-        } else {
-            return Err(Error::new(
+            FontData::ParsedGlyph(parsed) => {
+                let mut string =
+                    glyf::Glyph::get_svg_header_from_parsed(parsed, fontsize, fontunit, layout);
+                string += &glyf::Glyph::get_svg_path_parsed(parsed, layout, 0.0, 0.0);
+                string += "\n</svg>";
+                Ok(string)
+            }
+            _ => Err(Error::new(
                 std::io::ErrorKind::Other,
                 "glyf is none".to_string(),
-            ));
+            )),
         }
     }
 
@@ -820,6 +834,14 @@ impl Font {
             self.mvar.as_ref()
         } else {
             self.more_fonts[self.current_font - 1].mvar.as_ref()
+        }
+    }
+
+    fn current_gvar(&self) -> Option<&gvar::GVAR> {
+        if self.current_font == 0 {
+            self.gvar.as_ref()
+        } else {
+            self.more_fonts[self.current_font - 1].gvar.as_ref()
         }
     }
 
@@ -955,7 +977,8 @@ impl Font {
         is_vert: bool,
         options: &crate::commands::FontOptions<'_>,
     ) -> GriphData {
-        let layout = self.get_layout_with_options(glyph_id, is_vert, options);
+        let coordinates = self.normalized_variation_coords(options);
+        let layout = self.get_layout_with_coords(glyph_id, is_vert, &coordinates);
 
         #[cfg(feature = "cff")]
         if let Some(cff) = self.current_cff() {
@@ -979,10 +1002,14 @@ impl Font {
                 let glyph = glyf
                     .get_glyph(glyph_id)
                     .expect("glyph id should resolve inside glyf table");
-                OpenTypeGlyph {
-                    layout,
-                    glyph: FontData::Glyph(glyph.clone()),
-                }
+                let glyph = if let Some(parsed) = self.current_gvar().and_then(|gvar| {
+                    gvar.apply_to_parsed_glyph(glyph_id, &coordinates, &glyph.parse())
+                }) {
+                    FontData::ParsedGlyph(parsed)
+                } else {
+                    FontData::Glyph(glyph.clone())
+                };
+                OpenTypeGlyph { layout, glyph }
             }
             GlyphFormat::CFF2 => OpenTypeGlyph {
                 layout,
@@ -1620,7 +1647,10 @@ impl Font {
             return false;
         }
 
-        matches!(open_type_glyph.glyph, FontData::Glyph(_))
+        matches!(
+            open_type_glyph.glyph,
+            FontData::Glyph(_) | FontData::ParsedGlyph(_)
+        )
     }
 
     fn pair_adjustment_for_index(
@@ -1990,6 +2020,16 @@ impl Font {
                     GlyphPaint::CurrentColor,
                 ))])
             }
+            FontData::ParsedGlyph(parsed) => {
+                let commands =
+                    glyf::Glyph::to_path_commands_parsed(parsed, &open_type_glyph.layout, 0.0, 0.0);
+                let commands =
+                    transform_glyf_commands(&commands, &open_type_glyph.layout, scale_x, scale_y);
+                Ok(vec![GlyphLayer::Path(PathGlyphLayer::new(
+                    commands,
+                    GlyphPaint::CurrentColor,
+                ))])
+            }
             FontData::Bitmap(_, _) => Err(Error::new(
                 ErrorKind::Unsupported,
                 "bitmap glyphs are only supported through sbix raster layers",
@@ -2188,6 +2228,24 @@ impl Font {
                                     origin_y,
                                 );
                             }
+                            result.push(GlyphCommands {
+                                ch: resolved.ch,
+                                glyph_id: glyph_data.glyph_id,
+                                origin_x,
+                                origin_y,
+                                advance_width,
+                                commands,
+                                bitmap: None,
+                            });
+                            cursor_x += advance_width;
+                        }
+                        FontData::ParsedGlyph(parsed) => {
+                            let commands = glyf::Glyph::to_path_commands_parsed(
+                                parsed,
+                                &open_type_glyph.layout,
+                                origin_x,
+                                origin_y,
+                            );
                             result.push(GlyphCommands {
                                 ch: resolved.ch,
                                 glyph_id: glyph_data.glyph_id,
@@ -3269,6 +3327,11 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Result<Font, Error> {
                         let fvar = fvar::FVAR::new(&mut reader, 0, table.data.len() as u32)?;
                         font.fvar = Some(fvar);
                     }
+                    b"gvar" => {
+                        let mut reader = BytesReader::new(&table.data);
+                        let gvar = gvar::GVAR::new(&mut reader, 0, table.data.len() as u32)?;
+                        font.gvar = Some(gvar);
+                    }
                     b"avar" => {
                         let mut reader = BytesReader::new(&table.data);
                         let avar = avar::AVAR::new(&mut reader, 0, table.data.len() as u32)?;
@@ -3463,6 +3526,10 @@ fn from_opentype<R: BinaryReader>(file: &mut R, header: &OTFHeader) -> Result<Fo
             b"fvar" => {
                 let fvar = fvar::FVAR::new(file, record.offset, record.length)?;
                 font.fvar = Some(fvar);
+            }
+            b"gvar" => {
+                let gvar = gvar::GVAR::new(file, record.offset, record.length)?;
+                font.gvar = Some(gvar);
             }
             b"avar" => {
                 let avar = avar::AVAR::new(file, record.offset, record.length)?;

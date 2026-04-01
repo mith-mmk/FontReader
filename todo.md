@@ -444,5 +444,8 @@
   - [x] `FontEngine::with_variation()` と `FontFace::variation_axes()` を追加
   - [x] 実フォント fixture で variable axis metadata と `wdth` による measure 変化を回帰テスト化
   - [x] `Invalid delta format` だった variable font fixture は skip 前提を外した
+  - [x] `gvar` simple glyph の outline delta を実装し、`FontEngine::shape()` の outline に反映
+  - [x] real variable-font fixture で outline signature の変化を回帰テスト化
   - [x] CFF2 実装前の共有化調査を `doc/cff2-investigation*.md` に追加
+  - [ ] composite glyph の `gvar` delta は未対応
   - [ ] CFF2 charstring / variation store / blend operator 本体は未着手

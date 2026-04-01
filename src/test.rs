@@ -2423,8 +2423,7 @@ mod tests {
     }
 
     fn should_skip_corpus_error(path: &std::path::Path, error: &str) -> bool {
-        error.contains("Invalid delta format")
-            || error.contains("SVG glyph layers are not supported yet")
+        error.contains("SVG glyph layers are not supported yet")
             || error.contains("CFF2 outlines are not supported yet")
             || (path
                 .file_name()
@@ -3961,6 +3960,128 @@ mod tests {
         assert!(
             exercised >= 3,
             "expected to exercise at least 3 wdth variable fonts, exercised {exercised}"
+        );
+    }
+
+    #[test]
+    fn variable_axes_change_outline_signature_on_real_fonts() {
+        fn outline_signature(run: &crate::GlyphRun) -> Option<String> {
+            let mut signature = String::new();
+            let mut saw_path = false;
+            for glyph in &run.glyphs {
+                let Some(bounds) = glyph.glyph.metrics.bounds else {
+                    continue;
+                };
+                for layer in &glyph.glyph.layers {
+                    let crate::GlyphLayer::Path(path) = layer else {
+                        continue;
+                    };
+                    saw_path = true;
+                    signature.push_str(&format!(
+                        "B{:.1},{:.1},{:.1},{:.1}|",
+                        bounds.min_x, bounds.min_y, bounds.max_x, bounds.max_y
+                    ));
+                    for command in &path.commands {
+                        match command {
+                            crate::Command::MoveTo(x, y) => {
+                                signature.push_str(&format!("M{:.1},{:.1};", x, y));
+                            }
+                            crate::Command::Line(x, y) => {
+                                signature.push_str(&format!("L{:.1},{:.1};", x, y));
+                            }
+                            crate::Command::Bezier((cx, cy), (x, y)) => {
+                                signature
+                                    .push_str(&format!("Q{:.1},{:.1},{:.1},{:.1};", cx, cy, x, y));
+                            }
+                            crate::Command::CubicBezier((cx1, cy1), (cx2, cy2), (x, y)) => {
+                                signature.push_str(&format!(
+                                    "C{:.1},{:.1},{:.1},{:.1},{:.1},{:.1};",
+                                    cx1, cy1, cx2, cy2, x, y
+                                ));
+                            }
+                            crate::Command::Close => signature.push_str("Z;"),
+                        }
+                    }
+                }
+            }
+
+            if saw_path {
+                Some(signature)
+            } else {
+                None
+            }
+        }
+
+        let paths = variable_font_fixture_paths();
+        let mut exercised = 0usize;
+        let mut failures = Vec::new();
+
+        for path in &paths {
+            let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                let face = crate::FontFile::from_file(path)
+                    .map_err(|err| format!("FontFile::from_file failed: {err}"))?
+                    .current_face()
+                    .map_err(|err| format!("current_face failed: {err}"))?;
+                let Some(axis) = face.variation_axes().into_iter().find(|axis| {
+                    matches!(axis.tag.as_str(), "wdth" | "wght")
+                        && (axis.max_value - axis.min_value).abs() >= 0.1
+                }) else {
+                    return Ok::<bool, String>(false);
+                };
+                let Some((sample, locale, policy)) = public_api_smoke_sample(&face) else {
+                    return Ok(false);
+                };
+
+                let mut engine = face
+                    .engine()
+                    .with_font_size(72.0)
+                    .with_shaping_policy(policy);
+                if let Some(locale) = locale {
+                    engine = engine.with_locale(locale);
+                }
+
+                let low = engine
+                    .clone()
+                    .with_variation(&axis.tag, axis.min_value)
+                    .shape(&sample)
+                    .map_err(|err| format!("low variation shape failed: {err}"))?;
+                let high = engine
+                    .clone()
+                    .with_variation(&axis.tag, axis.max_value)
+                    .shape(&sample)
+                    .map_err(|err| format!("high variation shape failed: {err}"))?;
+
+                let low_signature = outline_signature(&low)
+                    .ok_or_else(|| "missing outline at low value".to_string())?;
+                let high_signature = outline_signature(&high)
+                    .ok_or_else(|| "missing outline at high value".to_string())?;
+
+                if low_signature == high_signature {
+                    return Err(format!(
+                        "{} axis did not change outline signature for sample {:?}",
+                        axis.tag, sample
+                    ));
+                }
+
+                Ok(true)
+            }));
+
+            match outcome {
+                Ok(Ok(true)) => exercised += 1,
+                Ok(Ok(false)) => {}
+                Ok(Err(err)) => failures.push(format!("{}: {}", path.display(), err)),
+                Err(_) => failures.push(format!("{}: panic", path.display())),
+            }
+        }
+
+        assert!(
+            failures.is_empty(),
+            "variable outline signature failures:\n{}",
+            failures.join("\n")
+        );
+        assert!(
+            exercised >= 6,
+            "expected to exercise at least 6 variable fonts with outline changes, exercised {exercised}"
         );
     }
 
