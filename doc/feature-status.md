@@ -56,7 +56,7 @@ The README now focuses on the public API and runnable examples.
 - `gvar` simple-glyph outline deltas are implemented and exercised across real variable-font fixtures
 - Composite-glyph `gvar` deltas and phantom-point-driven outline adjustments are still pending
 - CFF2 outlines now load through the shared `cff.rs` path, including `vsindex` / `blend` evaluation and real-fixture SVG smoke coverage
-- CFF2 variation support is currently focused on outline charstrings; Private DICT blend-heavy edge cases are still a risk area
+- CFF2 variation support now covers both outline charstrings and Private DICT `vsindex` / `blend` parsing; remaining risk is mainly broader real-fixture validation for blend-heavy fonts
 - SVG glyph layers still return `ErrorKind::Unsupported`
 - WOFF2 still requires the complete byte stream before decoding
 - CFF2 planning notes live in `cff2-investigation.md`

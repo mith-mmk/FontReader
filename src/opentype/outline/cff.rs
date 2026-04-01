@@ -123,6 +123,7 @@ impl CFF {
         fallback_default_width: f64,
         fallback_width: f64,
         is_cff2: bool,
+        variation_store: Option<&ItemVariationStore>,
     ) -> Result<(Option<PrivateDict>, Option<CharString>, f64, f64, u16), Box<dyn Error>> {
         if private.first().copied().unwrap_or(0) <= 0 {
             return Ok((None, None, fallback_default_width, fallback_width, 0));
@@ -130,7 +131,11 @@ impl CFF {
         let private_dict_offset = private[1] as u64 + cff_offset;
         reader.seek(SeekFrom::Start(private_dict_offset))?;
         let buffer = reader.read_bytes_as_vec(private[0] as usize)?;
-        let private_dict = Dict::parse(&buffer)?;
+        let private_dict = if is_cff2 {
+            Dict::parse_cff2_private(&buffer, variation_store, &[])?
+        } else {
+            Dict::parse(&buffer)?
+        };
         let default_width = if is_cff2 {
             fallback_default_width
         } else {
@@ -253,7 +258,15 @@ impl CFF {
         let mut subr = None;
         let private_dict = if let Some(private) = private {
             let (private_dict, private_subr, private_default_width, private_width, _vsindex) =
-                Self::parse_private_dict(reader, offset, &private, default_width, width, is_cff2)?;
+                Self::parse_private_dict(
+                    reader,
+                    offset,
+                    &private,
+                    default_width,
+                    width,
+                    is_cff2,
+                    variation_store.as_ref(),
+                )?;
             default_width = private_default_width;
             width = private_width;
             subr = private_subr;
@@ -285,6 +298,7 @@ impl CFF {
                                     default_width,
                                     width,
                                     is_cff2,
+                                    variation_store.as_ref(),
                                 )?;
                             (private_dict, subr, default_width, width, vsindex)
                         } else {
@@ -2731,6 +2745,131 @@ impl Dict {
         Ok(Self { entries })
     }
 
+    pub(crate) fn parse_cff2_private(
+        buffer: &[u8],
+        variation_store: Option<&ItemVariationStore>,
+        coordinates: &[f32],
+    ) -> Result<Self, Box<dyn Error>> {
+        let mut entries = HashMap::new();
+        let mut i = 0;
+        let mut operands = Vec::new();
+        let mut vsindex = 0u16;
+
+        while i < buffer.len() {
+            let b = buffer[i];
+            if b == 12 {
+                let operator = (b as u16) << 8 | buffer[i + 1] as u16;
+                entries.insert(operator, operands);
+                operands = Vec::new();
+                i += 2;
+                continue;
+            }
+            if b <= 27 {
+                match b {
+                    22 => {
+                        let operator = b as u16;
+                        entries.insert(operator, operands.clone());
+                        if let Some(value) = operands
+                            .last()
+                            .and_then(Self::operand_to_i32)
+                            .map(|v| v.max(0))
+                        {
+                            vsindex = value as u16;
+                        }
+                        operands = Vec::new();
+                        i += 1;
+                        continue;
+                    }
+                    23 => {
+                        Self::apply_cff2_dict_blend(
+                            &mut operands,
+                            variation_store,
+                            vsindex,
+                            coordinates,
+                        )?;
+                        i += 1;
+                        continue;
+                    }
+                    _ => {
+                        let operator = b as u16;
+                        entries.insert(operator, operands);
+                        operands = Vec::new();
+                        i += 1;
+                        continue;
+                    }
+                }
+            }
+
+            let (operand, len) = operand_encoding(&buffer[i..])?;
+            operands.push(operand);
+            i += len;
+        }
+
+        Ok(Self { entries })
+    }
+
+    fn operand_to_i32(operand: &Operand) -> Option<i32> {
+        match operand {
+            Operand::Integer(value) => Some(*value),
+            Operand::Real(value) => Some(*value as i32),
+        }
+    }
+
+    fn operand_to_f64(operand: &Operand) -> f64 {
+        match operand {
+            Operand::Integer(value) => *value as f64,
+            Operand::Real(value) => *value,
+        }
+    }
+
+    fn apply_cff2_dict_blend(
+        operands: &mut Vec<Operand>,
+        variation_store: Option<&ItemVariationStore>,
+        vsindex: u16,
+        coordinates: &[f32],
+    ) -> Result<(), Box<dyn Error>> {
+        let Some(n_operand) = operands.pop() else {
+            return Err("CFF2 DICT blend requires an operand count".into());
+        };
+        let n = Self::operand_to_i32(&n_operand)
+            .ok_or("CFF2 DICT blend operand count must be numeric")?
+            .max(0) as usize;
+        if n == 0 {
+            return Ok(());
+        }
+
+        let region_count = variation_store
+            .and_then(|store| store.region_index_count(vsindex))
+            .unwrap_or(0);
+        let mut scalars = variation_store
+            .and_then(|store| store.region_scalars(vsindex, coordinates))
+            .unwrap_or_default();
+        if scalars.len() < region_count {
+            scalars.resize(region_count, 0.0);
+        }
+
+        let required = n
+            .checked_mul(region_count + 1)
+            .ok_or("CFF2 DICT blend operand count overflow")?;
+        if operands.len() < required {
+            return Err("CFF2 DICT blend operand underflow".into());
+        }
+
+        let start = operands.len() - required;
+        let blend_operands = operands.split_off(start);
+        for value_index in 0..n {
+            let mut value = Self::operand_to_f64(&blend_operands[value_index]);
+            for region_index in 0..region_count {
+                let delta_index = n + region_index * n + value_index;
+                value += Self::operand_to_f64(&blend_operands[delta_index])
+                    * scalars.get(region_index).copied().unwrap_or(0.0) as f64;
+            }
+            operands.push(Operand::Real(value));
+        }
+
+        Ok(())
+    }
+
     #[allow(dead_code)]
     pub(crate) fn get(&self, key: u16) -> Option<Vec<Operand>> {
         self.entries.get(&key).cloned()
@@ -3050,5 +3189,42 @@ mod tests {
             parsed.commands.operations.first(),
             Some(Operation::M(x, y)) if (*x - 110.0).abs() < 0.001 && (*y).abs() < 0.001
         ));
+    }
+
+    #[test]
+    fn cff2_private_dict_blend_applies_before_operator() {
+        let store = test_item_variation_store();
+        let dict = Dict::parse_cff2_private(
+            &[
+                139, 22, // 0 vsindex
+                239, 159, 140, 23, // 100 20 1 blend => 110 at coord 0.5
+                10, // StdHW
+            ],
+            Some(&store),
+            &[0.5],
+        )
+        .expect("parse private dict");
+
+        let std_hw = dict.get_f64(0, 10).expect("StdHW");
+        assert!((std_hw - 110.0).abs() < 0.001);
+        assert_eq!(dict.get_i32(0, 22), Some(0));
+    }
+
+    #[test]
+    fn cff2_private_dict_blend_defaults_to_zero_coords() {
+        let store = test_item_variation_store();
+        let dict = Dict::parse_cff2_private(
+            &[
+                139, 22, // 0 vsindex
+                239, 159, 140, 23, // 100 20 1 blend => 100 at default coords
+                10, // StdHW
+            ],
+            Some(&store),
+            &[],
+        )
+        .expect("parse private dict with default coords");
+
+        let std_hw = dict.get_f64(0, 10).expect("StdHW");
+        assert!((std_hw - 100.0).abs() < 0.001);
     }
 }

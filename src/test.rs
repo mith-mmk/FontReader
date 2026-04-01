@@ -2345,6 +2345,58 @@ mod tests {
         None
     }
 
+    #[cfg(debug_assertions)]
+    fn run_raw_dump_smoke_for_paths(paths: &[std::path::PathBuf]) -> (usize, Vec<String>) {
+        let mut dumped_faces = 0usize;
+        let mut failures = Vec::new();
+
+        for path in paths {
+            let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                let mut font = crate::Font::get_font_from_file(path)
+                    .map_err(|err| format!("get_font_from_file failed: {err}"))?;
+                let face_count = font.get_font_count();
+                if face_count == 0 {
+                    return Err("face_count was zero".to_string());
+                }
+
+                for index in 0..face_count {
+                    font.set_font(index)
+                        .map_err(|err| format!("set_font({index}) failed: {err}"))?;
+
+                    let _ = font.get_header_raw();
+                    let _ = font.get_name_raw();
+                    let _ = font.get_maxp_raw();
+                    let _ = font.get_os2_raw();
+                    let _ = font.get_hhea_raw();
+                    let _ = font.get_cmap_raw();
+                    let _ = font.get_post_raw();
+                    let _ = font.get_sbix_raw();
+                    let _ = font.get_svg_raw();
+                    let _ = font.get_colr_raw();
+                    let _ = font.get_cpal_raw();
+
+                    #[cfg(feature = "layout")]
+                    {
+                        let _ = font.get_vhea_raw();
+                        let _ = font.get_gdef_raw();
+                        let _ = font.get_gsub_raw();
+                    }
+                }
+
+                Ok::<usize, String>(face_count)
+            }));
+
+            match outcome {
+                Ok(Ok(face_count)) => dumped_faces += face_count,
+                Ok(Err(err)) if should_skip_corpus_error(path, &err) => {}
+                Ok(Err(err)) => failures.push(format!("{}: {}", path.display(), err)),
+                Err(_) => failures.push(format!("{}: panic", path.display())),
+            }
+        }
+
+        (dumped_faces, failures)
+    }
+
     fn run_public_api_smoke_for_paths(
         paths: &[std::path::PathBuf],
     ) -> (usize, usize, usize, Vec<String>) {
@@ -3650,6 +3702,23 @@ mod tests {
     }
 
     #[test]
+    #[cfg(debug_assertions)]
+    fn raw_table_dump_smoke_across_fixture_corpus() {
+        let paths = fixture_engine_corpus_paths();
+        let (dumped_faces, failures) = run_raw_dump_smoke_for_paths(&paths);
+
+        assert!(
+            failures.is_empty(),
+            "raw table dump smoke failures:\n{}",
+            failures.join("\n")
+        );
+        assert!(
+            dumped_faces >= 32,
+            "expected to dump at least 32 faces, dumped {dumped_faces}"
+        );
+    }
+
+    #[test]
     fn public_api_metadata_smoke_across_fixture_corpus() {
         let paths = fixture_font_corpus_paths();
         let mut checked_files = 0usize;
@@ -3949,6 +4018,33 @@ mod tests {
             Ok(Ok(vhea)) => assert_eq!(vhea, "vhea is none"),
             Ok(Err(err)) => panic!("failed to dump vhea table: {err}"),
             Err(_) => panic!("get_vhea_raw panicked for {}", path.display()),
+        }
+    }
+
+    #[test]
+    fn raw_color_dump_returns_placeholders_when_tables_are_missing() {
+        let path = test_fonts_dir()
+            .join("source")
+            .join("SourceSerif4-Italic-VariableFont_opsz,wght.ttf");
+        if !path.exists() {
+            return;
+        }
+
+        let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let mut font = crate::Font::get_font_from_file(&path)
+                .map_err(|err| format!("get_font_from_file failed: {err}"))?;
+            font.set_font(0)
+                .map_err(|err| format!("set_font failed: {err}"))?;
+            Ok::<(String, String), String>((font.get_colr_raw(), font.get_cpal_raw()))
+        }));
+
+        match outcome {
+            Ok(Ok((colr, cpal))) => {
+                assert_eq!(colr, "colr is none");
+                assert_eq!(cpal, "cpal is none");
+            }
+            Ok(Err(err)) => panic!("failed to dump color tables: {err}"),
+            Err(_) => panic!("color raw dump panicked for {}", path.display()),
         }
     }
 

@@ -2600,74 +2600,62 @@ impl Font {
     #[cfg(debug_assertions)]
     pub fn get_name_raw(&self) -> String {
         let name = if self.current_font == 0 {
-            self.name.as_ref().unwrap()
+            self.name.as_ref()
         } else {
-            self.more_fonts[self.current_font - 1]
-                .name
-                .as_ref()
-                .unwrap()
+            self.more_fonts[self.current_font - 1].name.as_ref()
         };
-        name.to_string()
+        Self::debug_optional_table_string(name, "name", |name| name.to_string())
     }
 
     #[cfg(debug_assertions)]
     pub fn get_maxp_raw(&self) -> String {
         let maxp = if self.current_font == 0 {
-            self.maxp.as_ref().unwrap()
+            self.maxp.as_ref()
         } else {
-            self.more_fonts[self.current_font - 1]
-                .maxp
-                .as_ref()
-                .unwrap()
+            self.more_fonts[self.current_font - 1].maxp.as_ref()
         };
-        maxp.to_string()
+        Self::debug_optional_table_string(maxp, "maxp", |maxp| maxp.to_string())
     }
 
     #[cfg(debug_assertions)]
     pub fn get_header_raw(&self) -> String {
         let head = if self.current_font == 0 {
-            self.head.as_ref().unwrap()
+            self.head.as_ref()
         } else {
-            self.more_fonts[self.current_font - 1]
-                .head
-                .as_ref()
-                .unwrap()
+            self.more_fonts[self.current_font - 1].head.as_ref()
         };
-        head.to_string()
+        Self::debug_optional_table_string(head, "head", |head| head.to_string())
     }
 
     #[cfg(debug_assertions)]
     pub fn get_os2_raw(&self) -> String {
         let os2 = if self.current_font == 0 {
-            self.os2.as_ref().unwrap()
+            self.os2.as_ref()
         } else {
-            self.more_fonts[self.current_font - 1].os2.as_ref().unwrap()
+            self.more_fonts[self.current_font - 1].os2.as_ref()
         };
-        os2.to_string()
+        Self::debug_optional_table_string(os2, "os2", |os2| os2.to_string())
     }
 
     #[cfg(debug_assertions)]
     pub fn get_hhea_raw(&self) -> String {
         let hhea = if self.current_font == 0 {
-            self.hhea.as_ref().unwrap()
+            self.hhea.as_ref()
         } else {
-            self.more_fonts[self.current_font - 1]
-                .hhea
-                .as_ref()
-                .unwrap()
+            self.more_fonts[self.current_font - 1].hhea.as_ref()
         };
-        hhea.to_string()
+        Self::debug_optional_table_string(hhea, "hhea", |hhea| hhea.to_string())
     }
 
     #[cfg(debug_assertions)]
     pub fn get_cmap_raw(&self) -> String {
         let cmap = if self.current_font == 0 {
-            self.cmap.as_ref().unwrap()
+            self.cmap.as_ref()
         } else {
-            self.more_fonts[self.current_font - 1]
-                .cmap
-                .as_ref()
-                .unwrap()
+            self.more_fonts[self.current_font - 1].cmap.as_ref()
+        };
+        let Some(cmap) = cmap else {
+            return "cmap is none".to_string();
         };
         let encodings = &cmap.cmap_encodings;
         let mut string = String::new();
@@ -2725,14 +2713,11 @@ impl Font {
     #[cfg(debug_assertions)]
     pub fn get_post_raw(&self) -> String {
         let post = if self.current_font == 0 {
-            self.post.as_ref().unwrap()
+            self.post.as_ref()
         } else {
-            self.more_fonts[self.current_font - 1]
-                .post
-                .as_ref()
-                .unwrap()
+            self.more_fonts[self.current_font - 1].post.as_ref()
         };
-        post.to_string()
+        Self::debug_optional_table_string(post, "post", |post| post.to_string())
     }
 
     #[cfg(debug_assertions)]

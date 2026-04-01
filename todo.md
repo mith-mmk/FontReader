@@ -450,4 +450,4 @@
   - [ ] composite glyph の `gvar` delta は未対応
   - [x] CFF2 charstring / variation store / blend operator 本体を `cff.rs` 共有経路に実装
   - [x] real CFF2 fixture で `shape()` / `render_svg()` を smoke test 化
-  - [ ] CFF2 の Private DICT blend-heavy edge case は追加検証したい
+  - [*] CFF2 の Private DICT `vsindex` / `blend` は parser 側に実装済み。real fixture で blend-heavy な追加検証はまだ増やしたい

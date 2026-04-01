@@ -140,12 +140,21 @@ impl ItemVariationStore {
         }
         Some(scalars)
     }
+
+    pub(crate) fn region_index_count(&self, outer_index: u16) -> Option<usize> {
+        let offset = *self.data_offsets.get(outer_index as usize)? as usize;
+        let mut cursor = offset;
+        let _item_count = read_u16(&self.data, &mut cursor).ok()?;
+        let _word_delta_count = read_u16(&self.data, &mut cursor).ok()?;
+        Some(read_u16(&self.data, &mut cursor).ok()? as usize)
+    }
 }
 
 impl VariationRegionList {
     fn evaluate_region(&self, index: u16, coordinates: &[f32]) -> f32 {
         let mut scale = 1.0f32;
-        for (axis_index, coord) in coordinates.iter().copied().enumerate() {
+        for axis_index in 0..self.axis_count as usize {
+            let coord = coordinates.get(axis_index).copied().unwrap_or(0.0);
             let offset = index as usize * self.axis_count as usize + axis_index;
             let Some(region) = self.regions.get(offset) else {
                 return 0.0;
