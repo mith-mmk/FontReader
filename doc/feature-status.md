@@ -55,6 +55,8 @@ The README now focuses on the public API and runnable examples.
 - Public API axis entry points are `FontFace::variation_axes()` and `FontEngine::with_variation()`
 - `gvar` outline deltas now cover both simple glyphs and composite glyphs, including recursive component variation for Source Serif variable-font fixtures
 - Phantom-point-driven outline / metrics adjustments are still pending
+- Parser hardening is in progress: malformed optional GSUB/GPOS feature-variation data is now skipped instead of panicking
+- `hmtx` / `vmtx` now tolerate zero-metric edge cases without panicking, returning zero advances as a fallback
 - CFF2 outlines now load through the shared `cff.rs` path, including `vsindex` / `blend` evaluation and real-fixture SVG smoke coverage
 - CFF2 variation support now covers both outline charstrings and Private DICT `vsindex` / `blend` parsing
 - The current local corpus does not contain a confirmed real CFF2 font; coverage is therefore synthetic/unit-test heavy until a true CFF2 fixture is added

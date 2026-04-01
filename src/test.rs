@@ -224,6 +224,20 @@ mod tests {
 
     #[test]
     #[cfg(feature = "layout")]
+    fn gpos_skips_truncated_feature_variations() {
+        let gpos = parse_gpos(build_gpos_v11_with_truncated_feature_variations(
+            *b"kern",
+            2,
+            build_gpos_pair_format1_subtable(10, 20, -50),
+        ));
+
+        assert_eq!(gpos.major_version, 1);
+        assert_eq!(gpos.minor_version, 1);
+        assert!(gpos.feature_variations.is_none());
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
     fn lookup_multiple_and_alternate_expand_sequences() {
         let multiple = LookupSubstitution::Multiple(MultipleSubstitutionFormat1 {
             subst_format: 1,
@@ -753,6 +767,43 @@ mod tests {
     fn parse_gpos(buffer: Vec<u8>) -> crate::opentype::extentions::gpos::GPOS {
         let mut reader = BytesReader::new(&buffer);
         crate::opentype::extentions::gpos::GPOS::new(&mut reader, 0, buffer.len() as u32).unwrap()
+    }
+
+    #[cfg(feature = "layout")]
+    fn build_gpos_v11_with_truncated_feature_variations(
+        feature_tag: [u8; 4],
+        lookup_type: u16,
+        subtable: Vec<u8>,
+    ) -> Vec<u8> {
+        let script_list = build_script_list_with_default_lang_systems(&[(*b"DFLT", 0xFFFF, &[0])]);
+        let feature_list = build_feature_list_with_entries(&[(feature_tag, &[0])]);
+
+        let mut lookup_list = Vec::new();
+        push_u16(&mut lookup_list, 1);
+        push_u16(&mut lookup_list, 4);
+        push_u16(&mut lookup_list, lookup_type);
+        push_u16(&mut lookup_list, 0);
+        push_u16(&mut lookup_list, 1);
+        push_u16(&mut lookup_list, 8);
+        lookup_list.extend_from_slice(&subtable);
+
+        let script_list_offset = 12u16;
+        let feature_list_offset = script_list_offset + script_list.len() as u16;
+        let lookup_list_offset = feature_list_offset + feature_list.len() as u16;
+        let feature_variations_offset = lookup_list_offset + lookup_list.len() as u16;
+
+        let mut buffer = Vec::new();
+        push_u16(&mut buffer, 1);
+        push_u16(&mut buffer, 1);
+        push_u16(&mut buffer, script_list_offset);
+        push_u16(&mut buffer, feature_list_offset);
+        push_u16(&mut buffer, lookup_list_offset);
+        push_u16(&mut buffer, feature_variations_offset);
+        buffer.extend_from_slice(&script_list);
+        buffer.extend_from_slice(&feature_list);
+        buffer.extend_from_slice(&lookup_list);
+        buffer.push(0x00);
+        buffer
     }
 
     #[cfg(feature = "layout")]

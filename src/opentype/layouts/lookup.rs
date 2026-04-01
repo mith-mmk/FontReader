@@ -154,7 +154,12 @@ impl LookupList {
             let lookup_raw = LookupRaw::new(reader, offset)?;
             lookups.push(lookup_raw);
         }
-        let lookup_raw = lookups.get(number).unwrap();
+        let lookup_raw = lookups.get(number).ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("lookup index {} out of bounds {}", number, lookups.len()),
+            )
+        })?;
         Lookup::new(reader, lookup_raw)
     }
 
@@ -902,7 +907,8 @@ impl LookupList {
         let extension_offset = reader.read_u32_be()?;
 
         let offset = offset + extension_offset as u64;
-        let lookup_type = num_traits::FromPrimitive::from_u16(extension_lookup_type).unwrap();
+        let lookup_type = num_traits::FromPrimitive::from_u16(extension_lookup_type)
+            .unwrap_or(LookupType::Unknown);
         let subtable = Self::parse_subtable(reader, lookup_type, offset)?;
         Ok(LookupSubstitution::ExtensionSubstitution(
             ExtensionSubstitutionFormat1 {

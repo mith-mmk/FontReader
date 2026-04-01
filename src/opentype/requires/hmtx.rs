@@ -76,8 +76,11 @@ fn get_hmtx<R: bin_rs::reader::BinaryReader>(
             left_side_bearing,
         });
     }
-    let advance_width = h_metrics.last().unwrap().advance_width;
-    let number = num_glyphs - number_of_hmetrics;
+    let advance_width = h_metrics
+        .last()
+        .map(|metric| metric.advance_width)
+        .unwrap_or(0);
+    let number = num_glyphs.saturating_sub(number_of_hmetrics);
     for _ in 0..number {
         let left_side_bearing = file.read_i16_be()?;
         h_metrics.push(LongHorMetric {
@@ -88,4 +91,24 @@ fn get_hmtx<R: bin_rs::reader::BinaryReader>(
     Ok(HMTX {
         h_metrics: Box::new(h_metrics),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bin_rs::reader::BytesReader;
+
+    #[test]
+    fn hmtx_allows_zero_long_metrics() {
+        let buffer = [0x00, 0x01, 0xFF, 0xFE, 0x00, 0x03];
+        let mut reader = BytesReader::new(&buffer);
+        let hmtx = HMTX::new(&mut reader, 0, buffer.len() as u32, 0, 3).expect("parse hmtx");
+
+        assert_eq!(hmtx.h_metrics.len(), 3);
+        assert_eq!(hmtx.get_metrix(0).advance_width, 0);
+        assert_eq!(hmtx.get_metrix(0).left_side_bearing, 1);
+        assert_eq!(hmtx.get_metrix(1).left_side_bearing, -2);
+        assert_eq!(hmtx.get_metrix(2).left_side_bearing, 3);
+        assert_eq!(hmtx.get_metrix(99).advance_width, 0);
+    }
 }

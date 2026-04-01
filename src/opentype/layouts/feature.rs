@@ -146,28 +146,32 @@ pub(crate) struct FeatureVariations {
     pub(crate) feature_table_substitutions: Box<Vec<FeatureTableSubstitution>>,
 }
 impl FeatureVariations {
-    pub(crate) fn new<R: BinaryReader>(reader: &mut R, offset: u64, _length: u32) -> Self {
-        reader.seek(SeekFrom::Start(offset as u64)).unwrap();
-        let major_version = reader.read_u16_be().unwrap();
-        let minor_version = reader.read_u16_be().unwrap();
-        let feature_table_substitution_count = reader.read_u16_be().unwrap();
+    pub(crate) fn new<R: BinaryReader>(
+        reader: &mut R,
+        offset: u64,
+        _length: u32,
+    ) -> Result<Self, std::io::Error> {
+        reader.seek(SeekFrom::Start(offset))?;
+        let major_version = reader.read_u16_be()?;
+        let minor_version = reader.read_u16_be()?;
+        let feature_table_substitution_count = reader.read_u16_be()?;
         let mut feature_table_substitutions = Vec::new();
         for _ in 0..feature_table_substitution_count {
-            let feature_table_substitution_offset = reader.read_u16_be().unwrap();
+            let feature_table_substitution_offset = reader.read_u16_be()?;
             feature_table_substitutions.push(FeatureTableSubstitution {
                 feature_table_substitution: feature_table_substitution_offset,
             });
         }
-        let condition_set_count = reader.read_u16_be().unwrap();
+        let condition_set_count = reader.read_u16_be()?;
         let mut condition_sets = Vec::new();
         for _ in 0..condition_set_count {
-            let condition_count = reader.read_u16_be().unwrap();
+            let condition_count = reader.read_u16_be()?;
             let mut conditions = Vec::new();
             for _ in 0..condition_count {
-                let format = reader.read_u16_be().unwrap();
-                let axis_index = reader.read_u16_be().unwrap();
-                let filter_range_min_value = reader.read_f32_be().unwrap();
-                let filter_range_max_value = reader.read_f32_be().unwrap();
+                let format = reader.read_u16_be()?;
+                let axis_index = reader.read_u16_be()?;
+                let filter_range_min_value = reader.read_f32_be()?;
+                let filter_range_max_value = reader.read_f32_be()?;
                 conditions.push(ConditionTable {
                     format,
                     axis_index,
@@ -180,13 +184,13 @@ impl FeatureVariations {
                 conditions: Box::new(conditions),
             });
         }
-        Self {
+        Ok(Self {
             major_version,
             minor_version,
             condition_set_count,
             condition_sets: Box::new(condition_sets),
             feature_table_substitutions: Box::new(feature_table_substitutions),
-        }
+        })
     }
 }
 
@@ -207,18 +211,22 @@ pub(crate) struct FeatureVariationList {
     pub(crate) feature_variations: Vec<FeatureVariation>,
 }
 impl FeatureVariationList {
-    pub(crate) fn new<R: BinaryReader>(reader: &mut R, offset: u64, _length: u32) -> Self {
-        reader.seek(SeekFrom::Start(offset as u64)).unwrap();
-        let feature_variation_count = reader.read_u16_be().unwrap();
+    pub(crate) fn new<R: BinaryReader>(
+        reader: &mut R,
+        offset: u64,
+        _length: u32,
+    ) -> Result<Self, std::io::Error> {
+        reader.seek(SeekFrom::Start(offset))?;
+        let feature_variation_count = reader.read_u16_be()?;
         let mut feature_variations = Vec::new();
         for _ in 0..feature_variation_count {
-            let major_version = reader.read_u16_be().unwrap();
-            let minor_version = reader.read_u16_be().unwrap();
-            let feature_variation_record_count = reader.read_u16_be().unwrap();
+            let major_version = reader.read_u16_be()?;
+            let minor_version = reader.read_u16_be()?;
+            let feature_variation_record_count = reader.read_u16_be()?;
             let mut feature_variation_records = Vec::new();
             for _ in 0..feature_variation_record_count {
-                let condition_set_offset = reader.read_u16_be().unwrap();
-                let feature_table_substitution_offset = reader.read_u16_be().unwrap();
+                let condition_set_offset = reader.read_u16_be()?;
+                let feature_table_substitution_offset = reader.read_u16_be()?;
                 feature_variation_records.push(FeatureVariationRecord {
                     condition_set_offset,
                     feature_table_substitution_offset,
@@ -230,9 +238,9 @@ impl FeatureVariationList {
                 feature_variations: Box::new(feature_variation_records),
             });
         }
-        Self {
+        Ok(Self {
             feature_variation_count,
             feature_variations,
-        }
+        })
     }
 }

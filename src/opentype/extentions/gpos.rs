@@ -197,11 +197,9 @@ impl GPOS {
         )?);
         let lookups = Self::parse_lookups(reader, offset + lookup_list_offset as u64)?;
         let feature_variations = if feature_variations_offset > 0 {
-            Some(Box::new(FeatureVariationList::new(
-                reader,
-                offset + feature_variations_offset as u64,
-                length,
-            )))
+            FeatureVariationList::new(reader, offset + feature_variations_offset as u64, length)
+                .ok()
+                .map(Box::new)
         } else {
             None
         };

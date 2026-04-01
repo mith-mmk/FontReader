@@ -28,9 +28,13 @@ impl VMTX {
     pub(crate) fn get_metrix(&self, i: usize) -> VerticalMetric {
         let v_metric = self.v_metrics.get(i);
         if v_metric.is_none() {
-            let v_metric = self.v_metrics.last();
+            let advance_height = self
+                .v_metrics
+                .last()
+                .map(|metric| metric.advance_height)
+                .unwrap_or(0);
             return VerticalMetric {
-                advance_height: v_metric.unwrap().advance_height,
+                advance_height,
                 top_side_bearing: 0,
             };
         }
@@ -76,8 +80,11 @@ fn get_vmtx<R: bin_rs::reader::BinaryReader>(
             top_side_bearing,
         });
     }
-    let advance_height = v_metrics.last().unwrap().advance_height;
-    let number = num_glyphs - number_of_vmetrics;
+    let advance_height = v_metrics
+        .last()
+        .map(|metric| metric.advance_height)
+        .unwrap_or(0);
+    let number = num_glyphs.saturating_sub(number_of_vmetrics);
     for _ in 0..number {
         let top_side_bearing = file.read_i16_be()?;
         v_metrics.push(VerticalMetric {
@@ -88,4 +95,24 @@ fn get_vmtx<R: bin_rs::reader::BinaryReader>(
     Ok(VMTX {
         v_metrics: Box::new(v_metrics),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bin_rs::reader::BytesReader;
+
+    #[test]
+    fn vmtx_allows_zero_vertical_metrics() {
+        let buffer = [0x00, 0x04, 0xFF, 0xFD];
+        let mut reader = BytesReader::new(&buffer);
+        let vmtx = VMTX::new(&mut reader, 0, buffer.len() as u32, 0, 2).expect("parse vmtx");
+
+        assert_eq!(vmtx.v_metrics.len(), 2);
+        assert_eq!(vmtx.get_metrix(0).advance_height, 0);
+        assert_eq!(vmtx.get_metrix(0).top_side_bearing, 4);
+        assert_eq!(vmtx.get_metrix(1).top_side_bearing, -3);
+        assert_eq!(vmtx.get_metrix(99).advance_height, 0);
+        assert_eq!(vmtx.get_metrix(99).top_side_bearing, 0);
+    }
 }

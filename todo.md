@@ -228,7 +228,13 @@
 # format
 - [+] woff2対応
 - [+] CID-keyed CFF / FDSelect
-- [ ] 境界条件をチェックしpanic!を回避
+- [*] 境界条件をチェックしpanic!を回避
+  - [x] optional raw table dump は欠損時に placeholder を返し panic しない
+  - [x] `SourceSerif4-BlackIt.otf` の GSUB/GPOS `FeatureParams` 境界超過で panic しないよう修正
+  - [x] GPOS 1.1 の壊れた optional `FeatureVariationList` は無視して続行する
+  - [x] `hmtx` / `vmtx` の 0-metric edge case で panic しないよう修正
+  - [x] lookup index out-of-bounds は panic ではなく `InvalidData` を返す
+  - [ ] `opentype::mod` / `ttc` / `colr` など constructor 系の `unwrap()` をさらに減らす
 - [x] svg svgのサイズが巨大なので文字毎にsvgを切り出す
 # Layout 対応状況
 
