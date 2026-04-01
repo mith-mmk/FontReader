@@ -92,8 +92,8 @@ impl GSUB {
         let features = Box::new(FeatureList::new(
             reader,
             offset + feature_list_offset as u64,
-            length,
-        ));
+            offset + length as u64,
+        )?);
         let lookups = Box::new(LookupList::new(
             reader,
             offset + lookup_list_offset as u64,

@@ -51,13 +51,17 @@ pub(crate) struct FeatureList {
 }
 
 impl FeatureList {
-    pub(crate) fn new<R: BinaryReader>(reader: &mut R, offset: u64, length: u32) -> FeatureList {
-        reader.seek(SeekFrom::Start(offset as u64)).unwrap();
-        let feature_count = reader.read_u16_be().unwrap();
+    pub(crate) fn new<R: BinaryReader>(
+        reader: &mut R,
+        offset: u64,
+        table_end: u64,
+    ) -> Result<FeatureList, std::io::Error> {
+        reader.seek(SeekFrom::Start(offset))?;
+        let feature_count = reader.read_u16_be()?;
         let mut features = Vec::new();
         for _ in 0..feature_count {
-            let feature_tag = reader.read_u32_be().unwrap();
-            let feature_offset = reader.read_u16_be().unwrap();
+            let feature_tag = reader.read_u32_be()?;
+            let feature_offset = reader.read_u16_be()?;
             features.push(Feature {
                 feature_tag,
                 feature_offset,
@@ -65,31 +69,50 @@ impl FeatureList {
                 lookup_list_indices: Vec::new(),
             });
         }
-        for feature in features.iter_mut() {
-            let offset = offset + feature.feature_offset as u64;
-            reader.seek(SeekFrom::Start(offset as u64)).unwrap();
-            let feature_params_offset = reader.read_u16_be().unwrap();
-            let lookup_count = reader.read_u16_be().unwrap();
+        for index in 0..features.len() {
+            let next_feature_start = features[index + 1..]
+                .iter()
+                .map(|next| offset + next.feature_offset as u64)
+                .filter(|next_offset| *next_offset > offset + features[index].feature_offset as u64)
+                .min()
+                .unwrap_or(table_end);
+            let feature = &mut features[index];
+            let feature_start = offset + feature.feature_offset as u64;
+            if feature_start + 4 > table_end {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!(
+                        "feature table offset {} exceeds layout table end {}",
+                        feature_start, table_end
+                    ),
+                ));
+            }
+
+            reader.seek(SeekFrom::Start(feature_start))?;
+            let feature_params_offset = reader.read_u16_be()?;
+            let lookup_count = reader.read_u16_be()?;
             for _ in 0..lookup_count {
-                feature
-                    .lookup_list_indices
-                    .push(reader.read_u16_be().unwrap());
+                feature.lookup_list_indices.push(reader.read_u16_be()?);
             }
             if feature_params_offset > 0 {
-                let offset = offset + feature_params_offset as u64;
-                reader.seek(SeekFrom::Start(offset as u64)).unwrap();
-                let length = length as usize - feature_params_offset as usize;
-                let feature_params = reader.read_bytes_as_vec(length).unwrap();
+                let params_start = feature_start + feature_params_offset as u64;
+                let params_end = next_feature_start.min(table_end);
+                if params_start > params_end {
+                    continue;
+                }
+                reader.seek(SeekFrom::Start(params_start))?;
+                let feature_params =
+                    reader.read_bytes_as_vec((params_end - params_start) as usize)?;
                 feature.feature_params = Some(FeatureParams {
                     feature_params: feature_params.to_vec(),
                 });
             }
         }
 
-        Self {
+        Ok(Self {
             feature_count,
             features: Box::new(features),
-        }
+        })
     }
 
     pub(crate) fn to_string(&self) -> String {

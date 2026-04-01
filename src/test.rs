@@ -2077,6 +2077,13 @@ mod tests {
         ])
     }
 
+    fn source_serif_otf_paths() -> Vec<std::path::PathBuf> {
+        existing_paths(vec![test_fonts_dir()
+            .join("source-serif-4.005_Desktop")
+            .join("OTF")
+            .join("SourceSerif4-BlackIt.otf")])
+    }
+
     fn woff2_font_path() -> std::path::PathBuf {
         test_fonts_dir().join("notosanswoff2.woff2")
     }
@@ -4429,6 +4436,39 @@ mod tests {
             low_signature, high_signature,
             "expected Source Serif composite glyph outline to vary across weight axis"
         );
+    }
+
+    #[test]
+    fn source_serif_otf_metadata_loads_without_layout_panic() {
+        for path in source_serif_otf_paths() {
+            let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                let file = crate::FontFile::from_file(&path)
+                    .map_err(|err| format!("FontFile::from_file failed: {err}"))?;
+                let face = file
+                    .current_face()
+                    .map_err(|err| format!("current_face failed: {err}"))?;
+                Ok::<(String, String), String>((face.family(), face.full_name()))
+            }));
+
+            match outcome {
+                Ok(Ok((family, full_name))) => {
+                    assert!(
+                        family.contains("Source Serif 4"),
+                        "unexpected family for {}: {}",
+                        path.display(),
+                        family
+                    );
+                    assert!(
+                        full_name.contains("Black"),
+                        "unexpected full name for {}: {}",
+                        path.display(),
+                        full_name
+                    );
+                }
+                Ok(Err(err)) => panic!("failed to load {}: {}", path.display(), err),
+                Err(_) => panic!("loading {} panicked", path.display()),
+            }
+        }
     }
 
     #[test]
