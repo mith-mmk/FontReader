@@ -1,24 +1,24 @@
 # Fontloader for Rust
 
-Fontloader is a Rust library for loading fonts and turning text into shaped glyph runs or SVG.
+Fontloader is a Rust library for loading fonts, selecting a face, shaping text, and exporting SVG.
 
 Japanese: [README.ja.md](README.ja.md)
 
-## What This Crate Exposes
+## What To Use First
+
+Most users only need these three types.
 
 - `FontFile`
-  - Owns a font file or collection entry point
-  - Lets you choose a face from TTC / collection data
+  - Opens a font file, TTC, or in-memory buffer
+  - Lets you choose a face
 - `FontFace`
   - Represents one face
-  - Exposes simple metadata such as `family()`, `full_name()`, `weight()`, `is_italic()`
+  - Exposes metadata such as `family()`, `full_name()`, `weight()`, `is_italic()`
 - `FontEngine`
-  - Shapes text and renders output
-  - Exposes `shape(text)`, `measure(text)`, and `render_svg(text)`
-- `FontFamily`
-  - Cache layer for multiple faces with face selection and per-glyph fallback
+  - Shapes text, measures text, and renders SVG
+  - Main entry point for direction, locale, variant, and variable-font axes
 
-The low-level parser API is still available behind `features = ["raw"]`.
+The old low-level parser surface still exists behind `features = ["raw"]`.
 
 ## Supported Formats
 
@@ -30,161 +30,65 @@ The low-level parser API is still available behind `features = ["raw"]`.
 
 Default features include `layout` and `cff`.
 
+## Install
+
+```toml
+[dependencies]
+fontloader = "0.0.10"
+```
+
+If you need the low-level parser API:
+
+```toml
+[dependencies]
+fontloader = { version = "0.0.10", features = ["raw"] }
+```
+
 ## Quick Start
 
 ```rust
 use fontloader::{FontFile, ShapingPolicy};
 
-let file = FontFile::from_file("fonts/YourFont.ttf")?;
-let face = file.current_face()?;
+let face = FontFile::from_file("fonts/YourFont.ttf")?.current_face()?;
 let engine = face
     .engine()
     .with_shaping_policy(ShapingPolicy::LeftToRight)
     .with_font_size(32.0)
-    .with_line_height(40.0)
     .with_svg_unit("px");
 
-let run = engine.shape("Hello")?;
-let width = engine.measure("Hello")?;
-let svg = engine.render_svg("Hello")?;
-
 println!("{}", face.family());
-println!("{}", width);
-println!("{}", svg);
-println!("{}", run.glyphs.len());
+println!("{}", engine.measure("Hello")?);
+println!("{}", engine.render_svg("Hello")?);
+println!("{}", engine.shape("Hello")?.glyphs.len());
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-## Common API Patterns
+## Common Tasks
 
-Vertical shaping and SVG output:
+- Show metadata
+  - `face.family()`
+  - `face.full_name()`
+  - `face.weight()`
+  - `face.is_italic()`
+- Shape text
+  - `engine.shape(text)`
+- Measure text
+  - `engine.measure(text)`
+- Render SVG
+  - `engine.render_svg(text)`
+- Vertical flow
+  - `engine.with_vertical_flow()`
+- RTL shaping
+  - `engine.with_right_to_left()`
+- GSUB variant selection
+  - `engine.with_font_variant(...)`
+- Variable-font axes
+  - `face.variation_axes()`
+  - `engine.with_variation("wght", 700.0)`
 
-```rust
-use fontloader::FontFile;
-
-let face = FontFile::from_file("fonts/YourFont.otf")?.current_face()?;
-let svg = face
-    .engine()
-    .with_font_size(32.0)
-    .with_vertical_flow()
-    .render_svg_vertical("縦書き")?;
-
-assert!(svg.contains("<svg"));
-# Ok::<(), Box<dyn std::error::Error>>(())
-```
-
-GSUB variant switching:
-
-```rust
-use fontloader::{FontFile, FontVariant};
-
-let face = FontFile::from_file("fonts/YourFont.otf")?.current_face()?;
-let run = face
-    .engine()
-    .with_font_size(32.0)
-    .with_locale("ja-JP")
-    .with_font_variant(FontVariant::Jis78)
-    .shape("辻")?;
-
-assert!(!run.glyphs.is_empty());
-# Ok::<(), Box<dyn std::error::Error>>(())
-```
-
-Variable font axes:
-
-```rust
-use fontloader::FontFile;
-
-let face = FontFile::from_file("fonts/VariableFont.ttf")?.current_face()?;
-let width = face
-    .engine()
-    .with_font_size(32.0)
-    .with_variation("wdth", 75.0)
-    .measure("Hello")?;
-
-println!("{width}");
-# Ok::<(), Box<dyn std::error::Error>>(())
-```
-
-## Loading Fonts
-
-```rust
-use fontloader::{load_font_from_buffer, FontFile};
-
-let bytes = std::fs::read("fonts/YourFont.ttf")?;
-
-let face = load_font_from_buffer(&bytes)?;
-let file = FontFile::from_buffer(&bytes)?;
-assert!(file.face_count() >= 1);
-# Ok::<(), Box<dyn std::error::Error>>(())
-```
-
-For TTC or collections:
-
-```rust
-use fontloader::FontFile;
-
-let file = FontFile::from_file("fonts/YourCollection.ttc")?;
-let face0 = file.face(0)?;
-let face1 = file.face(1)?;
-
-println!("{}", face0.full_name());
-println!("{}", face1.full_name());
-# Ok::<(), Box<dyn std::error::Error>>(())
-```
-
-## FontFamily Cache
-
-`FontFamily` is the high-level cache and fallback layer.
-
-```rust
-use fontloader::{FontFamily, FontFile, FontWeight};
-
-let regular = FontFile::from_file("fonts/FiraSans-Regular.ttf")?.current_face()?;
-let bold = FontFile::from_file("fonts/FiraSans-Bold.ttf")?.current_face()?;
-
-let mut family = FontFamily::new("Fira Sans");
-family.add_font_face(regular);
-family.add_font_face(bold);
-
-let run = family.text2glyph_run(
-    "Hello",
-    family.options().with_font_weight(FontWeight::BOLD),
-)?;
-
-assert!(!run.glyphs.is_empty());
-# Ok::<(), Box<dyn std::error::Error>>(())
-```
-
-## Chunked WOFF2 / Range Loading
-
-```rust
-use fontloader::ChunkedFontBuffer;
-
-let mut buffer = ChunkedFontBuffer::new(total_size)?;
-buffer.append(0, first_chunk)?;
-buffer.append(second_offset, second_chunk)?;
-
-if buffer.is_complete() {
-    let face = buffer.into_font_face()?;
-    let width = face.measure("Hello")?;
-    assert!(width > 0.0);
-}
-# Ok::<(), Box<dyn std::error::Error>>(())
-```
+More runnable examples live in [doc/api-recipes.md](doc/api-recipes.md).
 
 ## Examples
-
-Examples share a small common CLI.
-
-- `-f`, `--font`: font path
-- `-d`, `--dir`: font directory
-- `-i`, `--index`: face index inside a collection
-- `-o`, `--output`: output file path
-- `-s`, `--string`: inline text
-- `-t`, `--text-file`: text file path
-- `--vertical`: render with top-to-bottom flow
-- `--variant`: GSUB variant tag shortcut such as `jp78`, `jp90`, `trad`, `nlck`
 
 High-level examples that work without `raw`:
 
@@ -192,7 +96,7 @@ High-level examples that work without `raw`:
 - `fontmetadata`
 - `fontloader`
 
-Raw / inspection examples that require `--features raw`:
+Low-level inspection examples that require `--features raw`:
 
 - `fontcmaps`
 - `fontcolor`
@@ -207,7 +111,18 @@ Raw / inspection examples that require `--features raw`:
 - `fonttype`
 - `tategaki`
 
-Run the high-level example:
+Shared CLI flags:
+
+- `-f`, `--font`: font path
+- `-d`, `--dir`: font directory
+- `-i`, `--index`: face index inside a collection
+- `-o`, `--output`: output file path
+- `-s`, `--string`: inline text
+- `-t`, `--text-file`: text file path
+- `--vertical`: top-to-bottom flow
+- `--variant`: variant shortcut such as `jp78`, `jp90`, `trad`, `nlck`
+
+Run a high-level example:
 
 ```bash
 cargo run --example api_overview -- -f path/to/font.ttf -s "Hello"
@@ -216,34 +131,42 @@ cargo run --example api_overview -- -f path/to/font.ttf -s "Hello"
 Run a raw example:
 
 ```bash
-cargo run --example fonttype --features raw -- -d path/to/fonts
+cargo run --example fontheader --features raw -- -f path/to/font.otf
 ```
+
+## `cargo doc`
+
+The crate has rustdoc on the public API surface.
+
+```bash
+cargo doc --no-deps
+```
+
+If you want to open it immediately:
+
+```bash
+cargo doc --no-deps --open
+```
+
+The crate-level docs and type docs are the best entry point for:
+
+- `FontFile`
+- `FontFace`
+- `FontEngine`
+- `FontFamily`
+- `FontVariant`
+- `ShapingPolicy`
 
 ## WebAssembly
 
-The crate compiles for `wasm32-unknown-unknown`.
+The crate supports `wasm32-unknown-unknown`.
 
 - Prefer `load_font_from_buffer()` or `load_font(FontSource::Buffer(...))`
 - `load_font_from_file()` and `load_font_from_net()` return `ErrorKind::Unsupported` on `wasm32`
 
-## Raw API
+## Documentation Map
 
-If you still need the older low-level API, enable `raw`.
-
-```toml
-[dependencies]
-fontloader = { version = "0.0.10", features = ["raw"] }
-```
-
-That exposes:
-
-- `fontloader::Font`
-- `fontloader::fontheader`
-- `fontloader::opentype`
-- deprecated compatibility aliases such as `fontload_*`
-
-## More Detailed Notes
-
-- API recipes: [doc/api-recipes.md](doc/api-recipes.md)
-- Implementation notes and current format status: [doc/feature-status.md](doc/feature-status.md)
+- Overview of the extra docs: [doc/README.md](doc/README.md)
+- Public API recipes: [doc/api-recipes.md](doc/api-recipes.md)
+- Current implementation status and limitations: [doc/feature-status.md](doc/feature-status.md)
 - CFF2 investigation notes: [doc/cff2-investigation.md](doc/cff2-investigation.md)

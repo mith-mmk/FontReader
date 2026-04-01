@@ -1,24 +1,24 @@
 # Rust向け Fontloader
 
-Fontloader は、フォントを読み込み、文字列を shaping して `GlyphRun` や SVG に変換するための Rust ライブラリです。
+Fontloader は、フォントを読み込み、face を選び、文字列を shaping し、SVG を出力するための Rust ライブラリです。
 
 English: [README.md](README.md)
 
-## 公開API
+## 最初に使うAPI
+
+通常は次の 3 つから始めれば十分です。
 
 - `FontFile`
-  - フォントファイル / コレクションの入口
-  - TTC などから face を選ぶ
+  - フォントファイル、TTC、メモリ上の bytes を開く入口
+  - face を選ぶ
 - `FontFace`
   - 1 face を表す
   - `family()`, `full_name()`, `weight()`, `is_italic()` などの metadata を持つ
 - `FontEngine`
-  - shaping と描画担当
-  - `shape(text)`, `measure(text)`, `render_svg(text)` を持つ
-- `FontFamily`
-  - 複数 face のキャッシュと face 選択、glyph fallback を担当
+  - shaping、measure、SVG 出力を担当
+  - 方向、locale、variant、variable-font axis の指定もここが主な入口
 
-低レイヤの parser API は `features = ["raw"]` で利用できます。
+旧来の低レイヤ parser API は `features = ["raw"]` で引き続き利用できます。
 
 ## 対応フォーマット
 
@@ -30,161 +30,65 @@ English: [README.md](README.md)
 
 default feature には `layout` と `cff` が含まれます。
 
+## 導入
+
+```toml
+[dependencies]
+fontloader = "0.0.10"
+```
+
+低レイヤ parser API も必要な場合:
+
+```toml
+[dependencies]
+fontloader = { version = "0.0.10", features = ["raw"] }
+```
+
 ## 最小サンプル
 
 ```rust
 use fontloader::{FontFile, ShapingPolicy};
 
-let file = FontFile::from_file("fonts/YourFont.ttf")?;
-let face = file.current_face()?;
+let face = FontFile::from_file("fonts/YourFont.ttf")?.current_face()?;
 let engine = face
     .engine()
     .with_shaping_policy(ShapingPolicy::LeftToRight)
     .with_font_size(32.0)
-    .with_line_height(40.0)
     .with_svg_unit("px");
 
-let run = engine.shape("Hello")?;
-let width = engine.measure("Hello")?;
-let svg = engine.render_svg("Hello")?;
-
 println!("{}", face.family());
-println!("{}", width);
-println!("{}", svg);
-println!("{}", run.glyphs.len());
+println!("{}", engine.measure("Hello")?);
+println!("{}", engine.render_svg("Hello")?);
+println!("{}", engine.shape("Hello")?.glyphs.len());
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-## よく使うAPIパターン
+## よく使う処理
 
-縦書き shaping / SVG 出力:
+- metadata 表示
+  - `face.family()`
+  - `face.full_name()`
+  - `face.weight()`
+  - `face.is_italic()`
+- shaping
+  - `engine.shape(text)`
+- 幅の計測
+  - `engine.measure(text)`
+- SVG 出力
+  - `engine.render_svg(text)`
+- 縦書き
+  - `engine.with_vertical_flow()`
+- RTL shaping
+  - `engine.with_right_to_left()`
+- GSUB variant 指定
+  - `engine.with_font_variant(...)`
+- variable-font axis 指定
+  - `face.variation_axes()`
+  - `engine.with_variation("wght", 700.0)`
 
-```rust
-use fontloader::FontFile;
-
-let face = FontFile::from_file("fonts/YourFont.otf")?.current_face()?;
-let svg = face
-    .engine()
-    .with_font_size(32.0)
-    .with_vertical_flow()
-    .render_svg_vertical("縦書き")?;
-
-assert!(svg.contains("<svg"));
-# Ok::<(), Box<dyn std::error::Error>>(())
-```
-
-GSUB variant 切り替え:
-
-```rust
-use fontloader::{FontFile, FontVariant};
-
-let face = FontFile::from_file("fonts/YourFont.otf")?.current_face()?;
-let run = face
-    .engine()
-    .with_font_size(32.0)
-    .with_locale("ja-JP")
-    .with_font_variant(FontVariant::Jis78)
-    .shape("辻")?;
-
-assert!(!run.glyphs.is_empty());
-# Ok::<(), Box<dyn std::error::Error>>(())
-```
-
-Variable font axis 指定:
-
-```rust
-use fontloader::FontFile;
-
-let face = FontFile::from_file("fonts/VariableFont.ttf")?.current_face()?;
-let width = face
-    .engine()
-    .with_font_size(32.0)
-    .with_variation("wdth", 75.0)
-    .measure("Hello")?;
-
-println!("{width}");
-# Ok::<(), Box<dyn std::error::Error>>(())
-```
-
-## フォントの読み込み
-
-```rust
-use fontloader::{load_font_from_buffer, FontFile};
-
-let bytes = std::fs::read("fonts/YourFont.ttf")?;
-
-let face = load_font_from_buffer(&bytes)?;
-let file = FontFile::from_buffer(&bytes)?;
-assert!(file.face_count() >= 1);
-# Ok::<(), Box<dyn std::error::Error>>(())
-```
-
-TTC / collection の場合:
-
-```rust
-use fontloader::FontFile;
-
-let file = FontFile::from_file("fonts/YourCollection.ttc")?;
-let face0 = file.face(0)?;
-let face1 = file.face(1)?;
-
-println!("{}", face0.full_name());
-println!("{}", face1.full_name());
-# Ok::<(), Box<dyn std::error::Error>>(())
-```
-
-## FontFamily
-
-`FontFamily` は高レベルの cache / fallback 層です。
-
-```rust
-use fontloader::{FontFamily, FontFile, FontWeight};
-
-let regular = FontFile::from_file("fonts/FiraSans-Regular.ttf")?.current_face()?;
-let bold = FontFile::from_file("fonts/FiraSans-Bold.ttf")?.current_face()?;
-
-let mut family = FontFamily::new("Fira Sans");
-family.add_font_face(regular);
-family.add_font_face(bold);
-
-let run = family.text2glyph_run(
-    "Hello",
-    family.options().with_font_weight(FontWeight::BOLD),
-)?;
-
-assert!(!run.glyphs.is_empty());
-# Ok::<(), Box<dyn std::error::Error>>(())
-```
-
-## 分割 WOFF2 / range request
-
-```rust
-use fontloader::ChunkedFontBuffer;
-
-let mut buffer = ChunkedFontBuffer::new(total_size)?;
-buffer.append(0, first_chunk)?;
-buffer.append(second_offset, second_chunk)?;
-
-if buffer.is_complete() {
-    let face = buffer.into_font_face()?;
-    let width = face.measure("Hello")?;
-    assert!(width > 0.0);
-}
-# Ok::<(), Box<dyn std::error::Error>>(())
-```
+用途別の実行例は [doc/api-recipes.ja.md](doc/api-recipes.ja.md) にまとめています。
 
 ## examples
-
-example は共通の CLI 引数を持ちます。
-
-- `-f`, `--font`: フォントファイル
-- `-d`, `--dir`: フォントディレクトリ
-- `-i`, `--index`: コレクション中の face index
-- `-o`, `--output`: 出力ファイル
-- `-s`, `--string`: 文字列を直接指定
-- `-t`, `--text-file`: テキストファイルを指定
-- `--vertical`: 縦書きで出力
-- `--variant`: `jp78`, `jp90`, `trad`, `nlck` などの GSUB variant 指定
 
 `raw` なしで使える高レベル example:
 
@@ -192,7 +96,7 @@ example は共通の CLI 引数を持ちます。
 - `fontmetadata`
 - `fontloader`
 
-`--features raw` が必要な inspection / 旧API example:
+`--features raw` が必要な低レイヤ inspection example:
 
 - `fontcmaps`
 - `fontcolor`
@@ -207,6 +111,17 @@ example は共通の CLI 引数を持ちます。
 - `fonttype`
 - `tategaki`
 
+共通 CLI 引数:
+
+- `-f`, `--font`: フォントファイル
+- `-d`, `--dir`: フォントディレクトリ
+- `-i`, `--index`: コレクション中の face index
+- `-o`, `--output`: 出力ファイル
+- `-s`, `--string`: 文字列を直接指定
+- `-t`, `--text-file`: テキストファイル
+- `--vertical`: 縦書き
+- `--variant`: `jp78`, `jp90`, `trad`, `nlck` などの variant 指定
+
 高レベル example:
 
 ```bash
@@ -216,34 +131,42 @@ cargo run --example api_overview -- -f path/to/font.ttf -s "Hello"
 `raw` example:
 
 ```bash
-cargo run --example fonttype --features raw -- -d path/to/fonts
+cargo run --example fontheader --features raw -- -f path/to/font.otf
 ```
+
+## `cargo doc`
+
+公開API には rustdoc を付けています。
+
+```bash
+cargo doc --no-deps
+```
+
+そのまま開く場合:
+
+```bash
+cargo doc --no-deps --open
+```
+
+まず見るとよい型:
+
+- `FontFile`
+- `FontFace`
+- `FontEngine`
+- `FontFamily`
+- `FontVariant`
+- `ShapingPolicy`
 
 ## WebAssembly
 
-`wasm32-unknown-unknown` でもコンパイルできます。
+`wasm32-unknown-unknown` でも利用できます。
 
 - `load_font_from_buffer()` または `load_font(FontSource::Buffer(...))` を使ってください
 - `load_font_from_file()` と `load_font_from_net()` は `wasm32` では `ErrorKind::Unsupported`
 
-## raw API
+## ドキュメント一覧
 
-旧来の低レイヤAPIが必要な場合は `raw` feature を有効にします。
-
-```toml
-[dependencies]
-fontloader = { version = "0.0.10", features = ["raw"] }
-```
-
-これで以下が有効になります。
-
-- `fontloader::Font`
-- `fontloader::fontheader`
-- `fontloader::opentype`
-- `fontload_*` などの deprecated 互換 API
-
-## 詳細資料
-
-- APIレシピ: [doc/api-recipes.ja.md](doc/api-recipes.ja.md)
-- 実装メモ / 現在の format 対応状況: [doc/feature-status.ja.md](doc/feature-status.ja.md)
+- 追加ドキュメントの入口: [doc/README.ja.md](doc/README.ja.md)
+- 公開APIレシピ: [doc/api-recipes.ja.md](doc/api-recipes.ja.md)
+- 実装状況と制限事項: [doc/feature-status.ja.md](doc/feature-status.ja.md)
 - CFF2 調査メモ: [doc/cff2-investigation.ja.md](doc/cff2-investigation.ja.md)

@@ -425,6 +425,9 @@
   - [x] APIとsample中心に書き直す
   - [x] 今の技術資料寄りの細かい仕様は `doc/` 配下へ移動
   - [x] `cargo doc` 向けに公開APIの rustdoc を追加
+  - [x] README を「導入と公開APIの入口」へ寄せ直した
+  - [x] `doc/README*.md` を追加して文書索引を用意した
+  - [x] `api-recipes*.md` を用途別レシピとして整理した
 
 ## CI / CD
 - [x] GitHub Workflows を作成
