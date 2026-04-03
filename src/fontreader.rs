@@ -21,6 +21,7 @@ use crate::opentype::extentions::gdef;
 use crate::opentype::extentions::gpos;
 #[cfg(feature = "layout")]
 use crate::opentype::extentions::gsub;
+use crate::opentype::outline::glyf::ParsedGlyph;
 use crate::opentype::platforms::PlatformID;
 use crate::opentype::requires::cmap::CmapEncodings;
 use crate::opentype::requires::hhea::HHEA;
@@ -355,7 +356,12 @@ impl Font {
     ) -> Option<VerticalLayout> {
         let vhea = self.current_vhea();
         if let Some(vhea) = vhea {
-            let v_metrix = self.get_v_metrix_with_coords(id, coordinates);
+            let mut v_metrix = self.get_v_metrix_with_coords(id, coordinates);
+            if let Some(variation) = self.current_gvar_variation(id, coordinates) {
+                if let Some(metric) = variation.vertical_metric {
+                    v_metrix = metric;
+                }
+            }
             return Some(VerticalLayout {
                 tsb: v_metrix.top_side_bearing as isize,
                 advance_height: v_metrix.advance_height as isize,
@@ -381,7 +387,12 @@ impl Font {
         id: usize,
         coordinates: &[f32],
     ) -> HorizontalLayout {
-        let h_metrix = self.get_h_metrix_with_coords(id, coordinates);
+        let mut h_metrix = self.get_h_metrix_with_coords(id, coordinates);
+        if let Some(variation) = self.current_gvar_variation(id, coordinates) {
+            if let Some(metric) = variation.horizontal_metric {
+                h_metrix = metric;
+            }
+        }
         let hhea = self.current_hhea().unwrap();
         let lsb = h_metrix.left_side_bearing as isize;
         let advance_width = h_metrix.advance_width as isize;
@@ -979,7 +990,7 @@ impl Font {
         options: &crate::commands::FontOptions<'_>,
     ) -> GriphData {
         let coordinates = self.normalized_variation_coords(options);
-        let layout = self.get_layout_with_coords(glyph_id, is_vert, &coordinates);
+        let mut layout = self.get_layout_with_coords(glyph_id, is_vert, &coordinates);
 
         #[cfg(feature = "cff")]
         if let Some(cff) = self.current_cff() {
@@ -1004,20 +1015,25 @@ impl Font {
                 let glyph = glyf
                     .get_glyph(glyph_id)
                     .expect("glyph id should resolve inside glyf table");
-                let glyph = if let Some(parsed) = self.current_gvar().and_then(|gvar| {
-                    let raw_parsed = glyph.parse();
-                    if raw_parsed.number_of_contours < 0 {
-                        glyf.parse_glyph_with_variation(glyph_id, &|component_glyph_id, parsed| {
-                            gvar.apply_to_parsed_glyph(component_glyph_id, &coordinates, parsed)
-                        })
+                let glyph =
+                    if let Some(variation) = self.current_gvar_variation(glyph_id, &coordinates) {
+                        Self::apply_varied_metrics_to_layout(
+                            &mut layout,
+                            variation.horizontal_metric.as_ref(),
+                            variation.vertical_metric.as_ref(),
+                        );
+                        FontData::ParsedGlyph(variation.parsed)
+                    } else if self.current_gvar().is_some() {
+                        if let Some(parsed) =
+                            self.current_gvar_component_varied_parsed(glyph_id, &coordinates)
+                        {
+                            FontData::ParsedGlyph(parsed)
+                        } else {
+                            FontData::Glyph(glyph.clone())
+                        }
                     } else {
-                        gvar.apply_to_parsed_glyph(glyph_id, &coordinates, &raw_parsed)
-                    }
-                }) {
-                    FontData::ParsedGlyph(parsed)
-                } else {
-                    FontData::Glyph(glyph.clone())
-                };
+                        FontData::Glyph(glyph.clone())
+                    };
                 OpenTypeGlyph {
                     layout,
                     glyph,
@@ -1039,6 +1055,73 @@ impl Font {
         GriphData {
             glyph_id,
             open_type_glyf: Some(open_type_glyph),
+        }
+    }
+
+    fn current_gvar_variation(
+        &self,
+        glyph_id: usize,
+        coordinates: &[f32],
+    ) -> Option<gvar::GlyphVariationResult> {
+        let gvar = self.current_gvar()?;
+        let component_varied = self.current_gvar_component_varied_parsed(glyph_id, coordinates)?;
+
+        let horizontal_metric = Some(self.get_h_metrix_with_coords(glyph_id, coordinates));
+        let vertical_metric = self
+            .current_vhea()
+            .map(|_| self.get_v_metrix_with_coords(glyph_id, coordinates));
+
+        gvar.apply_to_parsed_glyph_with_metrics(
+            glyph_id,
+            coordinates,
+            &component_varied,
+            horizontal_metric,
+            vertical_metric,
+        )
+    }
+
+    fn current_gvar_component_varied_parsed(
+        &self,
+        glyph_id: usize,
+        coordinates: &[f32],
+    ) -> Option<ParsedGlyph> {
+        let gvar = self.current_gvar()?;
+        let glyf = self.current_glyf()?;
+        let glyph = glyf.get_glyph(glyph_id)?;
+        let raw_parsed = glyph.parse();
+        if raw_parsed.number_of_contours < 0 {
+            glyf.parse_glyph_with_variation(glyph_id, &|component_glyph_id, parsed| {
+                if component_glyph_id == glyph_id {
+                    None
+                } else {
+                    gvar.apply_to_parsed_glyph(component_glyph_id, coordinates, parsed)
+                }
+            })
+            .or(Some(raw_parsed))
+        } else {
+            Some(raw_parsed)
+        }
+    }
+
+    fn apply_varied_metrics_to_layout(
+        layout: &mut FontLayout,
+        horizontal_metric: Option<&LongHorMetric>,
+        vertical_metric: Option<&VerticalMetric>,
+    ) {
+        match layout {
+            FontLayout::Horizontal(current) => {
+                if let Some(metric) = horizontal_metric {
+                    current.lsb = metric.left_side_bearing as isize;
+                    current.advance_width = metric.advance_width as isize;
+                }
+            }
+            FontLayout::Vertical(current) => {
+                if let Some(metric) = vertical_metric {
+                    current.tsb = metric.top_side_bearing as isize;
+                    current.advance_height = metric.advance_height as isize;
+                }
+            }
+            FontLayout::Unknown => {}
         }
     }
 

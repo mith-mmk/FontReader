@@ -54,7 +54,8 @@ The README now focuses on the public API and runnable examples.
 - Variable-font metadata and axis-driven metrics are available through `fvar` / `avar` / `HVAR` / `VVAR` / `MVAR`
 - Public API axis entry points are `FontFace::variation_axes()` and `FontEngine::with_variation()`
 - `gvar` outline deltas now cover both simple glyphs and composite glyphs, including recursive component variation for Source Serif variable-font fixtures
-- Phantom-point-driven outline / metrics adjustments are still pending
+- `gvar` phantom-point deltas now feed horizontal and vertical glyph metrics in both layout getters and shaping output
+- Phantom-point behavior is covered by synthetic unit tests and Source Serif real-font regressions
 - Parser hardening is in progress: malformed optional GSUB/GPOS feature-variation data is now skipped instead of panicking
 - `hmtx` / `vmtx` now tolerate zero-metric edge cases without panicking, returning zero advances as a fallback
 - `OTFHeader`, `TTCHeader`, `get_font_type()`, and `COLR::new()` now return errors instead of panicking on truncated input

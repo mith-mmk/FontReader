@@ -1,6 +1,15 @@
 use std::io::{Error, ErrorKind};
 
 use crate::opentype::outline::glyf::ParsedGlyph;
+use crate::opentype::requires::hmtx::LongHorMetric;
+use crate::opentype::requires::vmtx::VerticalMetric;
+
+#[derive(Debug, Clone)]
+pub(crate) struct GlyphVariationResult {
+    pub(crate) parsed: ParsedGlyph,
+    pub(crate) horizontal_metric: Option<LongHorMetric>,
+    pub(crate) vertical_metric: Option<VerticalMetric>,
+}
 
 #[derive(Debug, Clone)]
 pub(crate) struct GVAR {
@@ -166,6 +175,70 @@ impl GVAR {
         }
 
         Some(rebuild_parsed_glyph(parsed, &varied_points))
+    }
+
+    pub(crate) fn apply_to_parsed_glyph_with_metrics(
+        &self,
+        glyph_id: usize,
+        coordinates: &[f32],
+        parsed: &ParsedGlyph,
+        horizontal_metric: Option<LongHorMetric>,
+        vertical_metric: Option<VerticalMetric>,
+    ) -> Option<GlyphVariationResult> {
+        if coordinates.is_empty() || coordinates.len() != self.axis_count as usize {
+            return None;
+        }
+
+        let variation_data = self.glyph_variation_data(glyph_id)?;
+        if variation_data.is_empty() {
+            return None;
+        }
+
+        let point_count = parsed.xs.len();
+        let total_points = point_count.checked_add(4)? as u16;
+        let tuples = self.parse_glyph_variation_data(variation_data, coordinates, total_points)?;
+        if tuples.is_empty() {
+            return None;
+        }
+
+        let base_points = absolute_points(parsed);
+        let contour_ranges = contour_ranges(parsed);
+        let phantom_points =
+            build_phantom_points(parsed, horizontal_metric, vertical_metric.as_ref());
+        let mut varied_points = base_points
+            .iter()
+            .map(|&(x, y)| (x as f32, y as f32))
+            .chain(phantom_points.iter().copied())
+            .collect::<Vec<_>>();
+
+        let mut any_change = false;
+        for tuple in &tuples {
+            any_change |= apply_tuple_to_points(
+                &mut varied_points,
+                &base_points,
+                &contour_ranges,
+                point_count,
+                tuple,
+            );
+        }
+
+        if !any_change {
+            return None;
+        }
+
+        let parsed = rebuild_parsed_glyph(parsed, &varied_points[..point_count]);
+        let horizontal_metric = horizontal_metric.map(|metric| {
+            apply_horizontal_phantom_metrics(metric, &parsed, &varied_points, point_count)
+        });
+        let vertical_metric = vertical_metric.map(|metric| {
+            apply_vertical_phantom_metrics(metric, &parsed, &varied_points, point_count)
+        });
+
+        Some(GlyphVariationResult {
+            parsed,
+            horizontal_metric,
+            vertical_metric,
+        })
     }
 
     fn glyph_variation_data(&self, glyph_id: usize) -> Option<&[u8]> {
@@ -444,14 +517,14 @@ fn apply_tuple_to_points(
 ) -> bool {
     let mut changed = false;
     if let Some(point_numbers) = tuple.point_numbers.as_ref() {
-        let mut explicit = vec![None::<(f32, f32)>; point_count];
+        let mut explicit = vec![None::<(f32, f32)>; points.len()];
         for (point_index, delta) in point_numbers
             .iter()
             .copied()
             .zip(tuple.deltas.iter().copied())
         {
             let point_index = point_index as usize;
-            if point_index >= point_count {
+            if point_index >= points.len() {
                 continue;
             }
             match &mut explicit[point_index] {
@@ -486,8 +559,19 @@ fn apply_tuple_to_points(
                 }
             }
         }
+
+        for index in point_count..points.len() {
+            let Some((dx, dy)) = explicit.get(index).copied().flatten() else {
+                continue;
+            };
+            if dx != 0.0 || dy != 0.0 {
+                points[index].0 += dx;
+                points[index].1 += dy;
+                changed = true;
+            }
+        }
     } else {
-        for (index, delta) in tuple.deltas.iter().copied().enumerate().take(point_count) {
+        for (index, delta) in tuple.deltas.iter().copied().enumerate().take(points.len()) {
             if delta.0 != 0.0 || delta.1 != 0.0 {
                 points[index].0 += delta.0;
                 points[index].1 += delta.1;
@@ -497,6 +581,63 @@ fn apply_tuple_to_points(
     }
 
     changed
+}
+
+fn build_phantom_points(
+    parsed: &ParsedGlyph,
+    horizontal_metric: Option<LongHorMetric>,
+    vertical_metric: Option<&VerticalMetric>,
+) -> [(f32, f32); 4] {
+    let left = horizontal_metric
+        .map(|metric| parsed.x_min as f32 - metric.left_side_bearing as f32)
+        .unwrap_or(parsed.x_min as f32);
+    let right = horizontal_metric
+        .map(|metric| left + metric.advance_width as f32)
+        .unwrap_or(parsed.x_max as f32);
+    let top = vertical_metric
+        .map(|metric| parsed.y_max as f32 + metric.top_side_bearing as f32)
+        .unwrap_or(parsed.y_max as f32);
+    let bottom = vertical_metric
+        .map(|metric| top - metric.advance_height as f32)
+        .unwrap_or(parsed.y_min as f32);
+
+    [(left, 0.0), (right, 0.0), (0.0, top), (0.0, bottom)]
+}
+
+fn apply_horizontal_phantom_metrics(
+    mut metric: LongHorMetric,
+    parsed: &ParsedGlyph,
+    varied_points: &[(f32, f32)],
+    point_count: usize,
+) -> LongHorMetric {
+    let Some(left) = varied_points.get(point_count).map(|point| point.0) else {
+        return metric;
+    };
+    let Some(right) = varied_points.get(point_count + 1).map(|point| point.0) else {
+        return metric;
+    };
+
+    metric.left_side_bearing = round_to_i16(parsed.x_min as f32 - left);
+    metric.advance_width = round_to_u16(right - left);
+    metric
+}
+
+fn apply_vertical_phantom_metrics(
+    mut metric: VerticalMetric,
+    parsed: &ParsedGlyph,
+    varied_points: &[(f32, f32)],
+    point_count: usize,
+) -> VerticalMetric {
+    let Some(top) = varied_points.get(point_count + 2).map(|point| point.1) else {
+        return metric;
+    };
+    let Some(bottom) = varied_points.get(point_count + 3).map(|point| point.1) else {
+        return metric;
+    };
+
+    metric.top_side_bearing = round_to_i16(top - parsed.y_max as f32);
+    metric.advance_height = round_to_u16(top - bottom);
+    metric
 }
 
 fn infer_contour_delta(
@@ -640,6 +781,10 @@ fn round_to_i16(value: f32) -> i16 {
     value.round().clamp(i16::MIN as f32, i16::MAX as f32) as i16
 }
 
+fn round_to_u16(value: f32) -> u16 {
+    value.round().clamp(0.0, u16::MAX as f32) as u16
+}
+
 fn read_u8(data: &[u8], cursor: &mut usize) -> Option<u8> {
     let value = *data.get(*cursor)?;
     *cursor += 1;
@@ -681,4 +826,94 @@ fn read_bytes<const N: usize>(data: &[u8], cursor: &mut usize) -> Option<[u8; N]
 
 fn f2dot14_to_f32(value: i16) -> f32 {
     value as f32 / 16384.0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parsed_glyph_sample() -> ParsedGlyph {
+        ParsedGlyph {
+            number_of_contours: 1,
+            x_min: 10,
+            y_min: 0,
+            x_max: 30,
+            y_max: 40,
+            offset: 0,
+            length: 0,
+            end_pts_of_contours: vec![1],
+            instructions: Vec::new(),
+            flags: vec![1, 1],
+            xs: vec![10, 20],
+            ys: vec![0, 40],
+            on_curves: vec![true, true],
+        }
+    }
+
+    #[test]
+    fn phantom_deltas_adjust_horizontal_metrics() {
+        let parsed = parsed_glyph_sample();
+        let base_points = absolute_points(&parsed);
+        let contour_ranges = contour_ranges(&parsed);
+        let horizontal_metric = LongHorMetric {
+            advance_width: 50,
+            left_side_bearing: 5,
+        };
+        let mut varied_points = base_points
+            .iter()
+            .map(|&(x, y)| (x as f32, y as f32))
+            .chain(build_phantom_points(&parsed, Some(horizontal_metric), None))
+            .collect::<Vec<_>>();
+        let tuple = TupleVariation {
+            point_numbers: Some(vec![2, 3]),
+            deltas: vec![(3.0, 0.0), (8.0, 0.0)],
+        };
+
+        assert!(apply_tuple_to_points(
+            &mut varied_points,
+            &base_points,
+            &contour_ranges,
+            base_points.len(),
+            &tuple,
+        ));
+
+        let varied = rebuild_parsed_glyph(&parsed, &varied_points[..base_points.len()]);
+        let metric =
+            apply_horizontal_phantom_metrics(horizontal_metric, &varied, &varied_points, 2);
+        assert_eq!(metric.left_side_bearing, 2);
+        assert_eq!(metric.advance_width, 55);
+    }
+
+    #[test]
+    fn phantom_deltas_adjust_vertical_metrics() {
+        let parsed = parsed_glyph_sample();
+        let base_points = absolute_points(&parsed);
+        let contour_ranges = contour_ranges(&parsed);
+        let vertical_metric = VerticalMetric {
+            advance_height: 60,
+            top_side_bearing: 10,
+        };
+        let mut varied_points = base_points
+            .iter()
+            .map(|&(x, y)| (x as f32, y as f32))
+            .chain(build_phantom_points(&parsed, None, Some(&vertical_metric)))
+            .collect::<Vec<_>>();
+        let tuple = TupleVariation {
+            point_numbers: Some(vec![4, 5]),
+            deltas: vec![(0.0, 5.0), (0.0, -15.0)],
+        };
+
+        assert!(apply_tuple_to_points(
+            &mut varied_points,
+            &base_points,
+            &contour_ranges,
+            base_points.len(),
+            &tuple,
+        ));
+
+        let varied = rebuild_parsed_glyph(&parsed, &varied_points[..base_points.len()]);
+        let metric = apply_vertical_phantom_metrics(vertical_metric, &varied, &varied_points, 2);
+        assert_eq!(metric.top_side_bearing, 15);
+        assert_eq!(metric.advance_height, 80);
+    }
 }

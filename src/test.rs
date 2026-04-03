@@ -4490,6 +4490,61 @@ mod tests {
     }
 
     #[test]
+    fn source_serif_variable_metrics_change_glyph_advance_and_bearing() {
+        let path = test_fonts_dir()
+            .join("source")
+            .join("SourceSerif4-VariableFont_opsz,wght.ttf");
+        if !path.exists() {
+            return;
+        }
+
+        assert!(
+            font_file_has_sfnt_table(&path, b"gvar"),
+            "{} should expose gvar",
+            path.display()
+        );
+
+        let face = crate::FontFile::from_file(&path)
+            .expect("load Source Serif as FontFile")
+            .current_face()
+            .expect("load Source Serif face");
+        let axis = face
+            .variation_axes()
+            .into_iter()
+            .find(|axis| axis.tag == "wght")
+            .expect("Source Serif wght axis");
+        let engine = face.engine().with_font_size(72.0);
+        let low = engine
+            .clone()
+            .with_variation("wght", axis.min_value)
+            .shape("A")
+            .expect("shape low-weight A");
+        let high = engine
+            .clone()
+            .with_variation("wght", axis.max_value)
+            .shape("A")
+            .expect("shape high-weight A");
+
+        let low_metrics = low.glyphs.first().expect("low-weight glyph").glyph.metrics;
+        let high_metrics = high
+            .glyphs
+            .first()
+            .expect("high-weight glyph")
+            .glyph
+            .metrics;
+
+        let low_advance = low_metrics.advance_x;
+        let high_advance = high_metrics.advance_x;
+        let low_lsb = low_metrics.bearing_x;
+        let high_lsb = high_metrics.bearing_x;
+
+        assert!(
+            low_advance != high_advance || low_lsb != high_lsb,
+            "expected variable metrics to change horizontal glyph metrics: low=({low_advance}, {low_lsb}) high=({high_advance}, {high_lsb})"
+        );
+    }
+
+    #[test]
     fn source_serif_otf_metadata_loads_without_layout_panic() {
         for path in source_serif_otf_paths() {
             let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {

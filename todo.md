@@ -460,7 +460,11 @@
   - [x] real variable-font fixture で outline signature の変化を回帰テスト化
   - [x] CFF2 実装前の共有化調査を `doc/cff2-investigation*.md` に追加
   - [x] composite glyph の `gvar` delta は再帰 flatten + component variation 適用で対応
-  - [ ] phantom point 由来の outline / metrics 補正は未対応
+  - [*] phantom point 由来の outline / metrics 補正を進める
+    - [x] `gvar` phantom point deltas を horizontal / vertical metrics に反映
+    - [x] `get_layout_with_options()` と shaping 経路の glyph metrics に反映
+    - [x] synthetic unit test と Source Serif real-font regression を追加
+    - [ ] phantom point 起点の残差をさらに corpus 全体で確認
   - [x] CFF2 charstring / variation store / blend operator 本体を `cff.rs` 共有経路に実装
   - [*] local corpus に true CFF2 実フォントがまだ無く、現状の CFF2 coverage は synthetic test 中心。実フォント fixture 入手後に `shape()` / `render_svg()` smoke を増やしたい
   - [x] CFF2 の Private DICT `vsindex` / `blend` は parser 側に実装済み
