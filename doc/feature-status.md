@@ -45,7 +45,9 @@ The README now focuses on the public API and runnable examples.
 - Parsed: glyph class definitions, attach list, ligature caret list, mark attach class definition, mark glyph sets definition
 - Current state: partially integrated
 - Pair positioning now skips GDEF mark glyphs when searching previous/next spacing glyphs for kerning
-- Attach / caret / mark-set data is still not integrated into higher-level layout
+- `GPOS mark-to-base` (Type 4 Format 1) is now parsed and used during shaping when a `mark` feature lookup is available
+- When no `GPOS mark-to-base` anchor is available, shaping still falls back to the existing GDEF-based mark attachment heuristic
+- Attach / caret / mark-set data is still not fully integrated into higher-level layout, and `mark-to-mark` remains unimplemented
 
 ## Notes
 
@@ -57,6 +59,7 @@ The README now focuses on the public API and runnable examples.
 - `gvar` phantom-point deltas now feed horizontal and vertical glyph metrics in both layout getters and shaping output
 - Phantom-point behavior is covered by synthetic unit tests and Source Serif real-font regressions
 - Parser hardening is in progress: malformed optional GSUB/GPOS feature-variation data is now skipped instead of panicking
+- Unsupported contextual GSUB subtables now fall back to `LookupResult::None` instead of panicking during shaping
 - `hmtx` / `vmtx` now tolerate zero-metric edge cases without panicking, returning zero advances as a fallback
 - `OTFHeader`, `TTCHeader`, `get_font_type()`, and `COLR::new()` now return errors instead of panicking on truncated input
 - `COLR::get_layer_record()` now stops at available layers instead of trusting malformed layer ranges

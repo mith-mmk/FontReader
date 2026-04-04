@@ -237,7 +237,8 @@
   - [x] `opentype::mod` / `ttc` / `colr` の constructor 系 `unwrap()` を `Result` / safe fallback に置き換え
   - [x] `get_font_type()` は short buffer で panic せず `UnexpectedEof` を返す
   - [x] `COLR::get_layer_record()` は壊れた layer range でも panic しない
-  - [ ] `fontreader.rs` の load/shaping 系 `unwrap()` を段階的に減らす
+  - [x] GSUB の未展開 contextual lookup は shaping 継続のため `LookupResult::None` に倒し、panic しないよう修正
+  - [*] `fontreader.rs` の load/shaping 系 `unwrap()` を段階的に減らす
 - [x] svg svgのサイズが巨大なので文字毎にsvgを切り出す
 # Layout 対応状況
 
@@ -271,8 +272,10 @@
 # GPOS
 - [*] 実装
 - [x] pair adjustment (Format 1 / 2)
+- [x] mark-to-base positioning (Type 4 Format 1)
 - [x] extension positioning (Type 9 経由の pair adjustment)
 - [x] text2command / text2commands / measure への `kern` 反映
+- [x] text2glyph_run で `GPOS mark-to-base` anchor を優先し、無い場合だけ `GDEF` fallback にする
 - [x] locale に応じて script を優先し、required feature を含めて `kern` lookup を選ぶ
 - [ ] palt
 - [ ] vpal
@@ -440,11 +443,12 @@
 ## shaping / script
 - [ ] アラビア語フォントの対応を進める
   - [x] `FontEngine::with_shaping_policy()` と `ShapingPolicy` で LTR / RTL / vertical を公開APIに明示
-  - [*] Arabic / Syriac の mark attachment を GDEF attach class まで使って詰める
+  - [*] Arabic / Syriac の mark attachment を詰める
     - [x] `mark_attachment_class()` / `attach_point_indices()` を GDEF に追加
     - [x] attachable mark では前の base に重ねる fallback 位置決めを導入
     - [x] boundary test を複数フォント候補へ拡張
-    - [ ] GPOS mark-to-base / mark-to-mark 相当の精度までは未対応
+    - [x] `GPOS mark-to-base` を parser / shaping に統合し、Syriac real-font regression を追加
+    - [ ] `mark-to-mark` は未対応
 - [ ] スクリプト文字対応
 
 ## format

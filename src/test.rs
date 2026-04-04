@@ -2987,6 +2987,50 @@ mod tests {
     }
 
     #[cfg(feature = "layout")]
+    fn first_real_gpos_mark_to_base_cluster(
+        font: &crate::LoadedFont,
+        locale: &str,
+        base_range: std::ops::RangeInclusive<u32>,
+        mark_range: std::ops::RangeInclusive<u32>,
+    ) -> Option<(
+        String,
+        crate::opentype::extentions::gpos::MarkAttachmentAdjustment,
+    )> {
+        let gpos = font.font().gpos.as_ref()?;
+        let cmap = font.font().cmap.as_ref()?;
+
+        for base in base_range {
+            let Some(base_char) = char::from_u32(base) else {
+                continue;
+            };
+            let base_glyph = cmap.get_glyph_position(base) as u16;
+            if base_glyph == 0 {
+                continue;
+            }
+
+            for mark in mark_range.clone() {
+                let Some(mark_char) = char::from_u32(mark) else {
+                    continue;
+                };
+                let mark_glyph = cmap.get_glyph_position(mark) as u16;
+                if mark_glyph == 0 {
+                    continue;
+                }
+
+                let Some(adjustment) =
+                    gpos.lookup_mark_to_base_adjustment(base_glyph, mark_glyph, Some(locale))
+                else {
+                    continue;
+                };
+
+                return Some((format!("{base_char}{mark_char}"), adjustment));
+            }
+        }
+
+        None
+    }
+
+    #[cfg(feature = "layout")]
     fn detect_hebrew_mark_cluster(font: &crate::LoadedFont) -> Option<String> {
         first_real_mark_cluster(font, 0x05D0..=0x05EA, 0x0591..=0x05C7)
     }
@@ -5937,6 +5981,53 @@ mod tests {
             .expect("resolve syriac mark fallback face indices");
 
         assert_eq!(face_indices, vec![0, 1, 0]);
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn rtl_shaping_applies_real_gpos_mark_to_base_attachment() {
+        let font = crate::load_font_from_file(syriac_font_path()).expect("load syriac font");
+        let Some((text, attachment)) = first_real_gpos_mark_to_base_cluster(
+            &font,
+            "syr-Syrc",
+            0x0710..=0x072C,
+            0x0730..=0x074A,
+        ) else {
+            return;
+        };
+
+        let options = crate::FontOptions::new(&font)
+            .with_font_size(32.0)
+            .with_locale("syr-Syrc")
+            .with_right_to_left();
+        let run = crate::text2commands(&text, options.clone()).expect("syriac mark glyph run");
+        assert_eq!(run.glyphs.len(), 2);
+
+        let base_char = text.chars().next().expect("base char");
+        let base_glyph_id = font
+            .font()
+            .cmap
+            .as_ref()
+            .expect("cmap")
+            .get_glyph_position(base_char as u32) as usize;
+        let base_layout = font
+            .font()
+            .get_layout_with_options(base_glyph_id, false, &options);
+        let scale = match base_layout {
+            crate::fontreader::FontLayout::Horizontal(ref layout) if layout.advance_width != 0 => {
+                run.glyphs[0].glyph.metrics.advance_x / layout.advance_width as f32
+            }
+            _ => 1.0,
+        };
+        let expected_dx = attachment.x_placement as f32 * scale;
+        let expected_dy = attachment.y_placement as f32 * scale;
+
+        let actual_dx = run.glyphs[1].x - run.glyphs[0].x;
+        let actual_dy = run.glyphs[1].y - run.glyphs[0].y;
+        assert!((actual_dx - expected_dx).abs() <= 1.0);
+        assert!((actual_dy - expected_dy).abs() <= 1.0);
+        assert_eq!(run.glyphs[1].glyph.metrics.advance_x, 0.0);
+        assert_eq!(run.glyphs[1].glyph.metrics.advance_y, 0.0);
     }
 
     #[test]

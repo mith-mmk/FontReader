@@ -635,6 +635,7 @@ impl GLYF {
         self.griphs.get(index)
     }
 
+    #[allow(dead_code)]
     pub(crate) fn parse_glyph(&self, index: usize) -> Option<ParsedGlyph> {
         self.parse_glyph_recursive(index, 0)
     }
@@ -732,6 +733,7 @@ impl GLYF {
         self.composite_to_path_commands(glyph, layout, depth)
     }
 
+    #[allow(dead_code)]
     fn parse_glyph_recursive(&self, index: usize, depth: usize) -> Option<ParsedGlyph> {
         self.parse_glyph_recursive_with_variation(index, depth, &|_, _| None)
     }

@@ -1816,6 +1816,46 @@ impl Font {
     }
 
     #[cfg(feature = "layout")]
+    fn mark_attachment_for_index(
+        &self,
+        units: &[ResolvedTextUnit],
+        index: usize,
+        locale: Option<&str>,
+        scale_x: f32,
+        scale_y: f32,
+    ) -> Option<GlyphPositionAdjustment> {
+        let gpos = self.current_gpos()?;
+        let current = Self::glyph_unit_at(units, index)?;
+        let base_index = self.find_previous_spacing_glyph_index(units, index)?;
+        let base = Self::glyph_unit_at(units, base_index)?;
+        let adjustment = gpos.lookup_mark_to_base_adjustment(
+            base.glyph_id as u16,
+            current.glyph_id as u16,
+            locale,
+        )?;
+
+        Some(GlyphPositionAdjustment {
+            placement_x: adjustment.x_placement as f32 * scale_x,
+            placement_y: adjustment.y_placement as f32 * scale_y,
+            advance_x: 0.0,
+            advance_y: 0.0,
+        })
+    }
+
+    #[cfg(not(feature = "layout"))]
+    fn mark_attachment_for_index(
+        &self,
+        units: &[ResolvedTextUnit],
+        index: usize,
+        locale: Option<&str>,
+        scale_x: f32,
+        scale_y: f32,
+    ) -> Option<GlyphPositionAdjustment> {
+        let _ = (units, index, locale, scale_x, scale_y);
+        None
+    }
+
+    #[cfg(feature = "layout")]
     fn find_previous_spacing_glyph_index(
         &self,
         units: &[ResolvedTextUnit],
@@ -2015,22 +2055,40 @@ impl Font {
                         scale_x,
                         scale_y,
                     );
+                    let mark_attachment = self.mark_attachment_for_index(
+                        &shaped_units,
+                        index,
+                        options.locale,
+                        scale_x,
+                        scale_y,
+                    );
                     metrics.advance_x += adjustment.advance_x;
                     metrics.advance_y += adjustment.advance_y;
                     metrics.bounds = glyph_layers_bounds(&layers);
-                    let uses_mark_attachment = self.gdef_supports_mark_attachment(glyph_id as u16)
+                    let uses_gpos_mark_attachment = mark_attachment.is_some();
+                    let uses_gdef_mark_attachment = !uses_gpos_mark_attachment
+                        && self.gdef_supports_mark_attachment(glyph_id as u16)
                         && last_attach_base_glyph_index.is_some();
+                    let uses_mark_attachment =
+                        uses_gpos_mark_attachment || uses_gdef_mark_attachment;
+                    let attach_base_index = last_attach_base_glyph_index;
                     let origin_x = if uses_mark_attachment {
-                        glyphs[last_attach_base_glyph_index.expect("checked some")].x
-                            + adjustment.placement_x
+                        let base_x = glyphs[attach_base_index.expect("checked some")].x;
+                        let placement_x =
+                            mark_attachment.map(|mark| mark.placement_x).unwrap_or(0.0)
+                                + adjustment.placement_x;
+                        base_x + placement_x
                     } else if is_right_to_left && !is_vertical {
                         cursor_x - metrics.advance_x + adjustment.placement_x
                     } else {
                         cursor_x + adjustment.placement_x
                     };
                     let origin_y = if uses_mark_attachment {
-                        glyphs[last_attach_base_glyph_index.expect("checked some")].y
-                            + adjustment.placement_y
+                        let base_y = glyphs[attach_base_index.expect("checked some")].y;
+                        let placement_y =
+                            mark_attachment.map(|mark| mark.placement_y).unwrap_or(0.0)
+                                + adjustment.placement_y;
+                        base_y + placement_y
                     } else {
                         cursor_y + adjustment.placement_y
                     };
