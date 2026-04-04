@@ -3031,8 +3031,83 @@ mod tests {
     }
 
     #[cfg(feature = "layout")]
+    fn first_real_gpos_mark_stack_cluster(
+        font: &crate::LoadedFont,
+        locale: &str,
+        base_range: std::ops::RangeInclusive<u32>,
+        mark_range: std::ops::RangeInclusive<u32>,
+    ) -> Option<(
+        String,
+        crate::opentype::extentions::gpos::MarkAttachmentAdjustment,
+        crate::opentype::extentions::gpos::MarkAttachmentAdjustment,
+    )> {
+        let gpos = font.font().gpos.as_ref()?;
+        let cmap = font.font().cmap.as_ref()?;
+
+        for base in base_range {
+            let Some(base_char) = char::from_u32(base) else {
+                continue;
+            };
+            let base_glyph = cmap.get_glyph_position(base) as u16;
+            if base_glyph == 0 {
+                continue;
+            }
+
+            for mark1 in mark_range.clone() {
+                let Some(mark1_char) = char::from_u32(mark1) else {
+                    continue;
+                };
+                let mark1_glyph = cmap.get_glyph_position(mark1) as u16;
+                if mark1_glyph == 0 {
+                    continue;
+                }
+                let Some(base_adjustment) =
+                    gpos.lookup_mark_to_base_adjustment(base_glyph, mark1_glyph, Some(locale))
+                else {
+                    continue;
+                };
+
+                for mark2 in mark_range.clone() {
+                    let Some(mark2_char) = char::from_u32(mark2) else {
+                        continue;
+                    };
+                    let mark2_glyph = cmap.get_glyph_position(mark2) as u16;
+                    if mark2_glyph == 0 {
+                        continue;
+                    }
+                    let Some(mark_adjustment) =
+                        gpos.lookup_mark_to_mark_adjustment(mark1_glyph, mark2_glyph, Some(locale))
+                    else {
+                        continue;
+                    };
+
+                    return Some((
+                        format!("{base_char}{mark1_char}{mark2_char}"),
+                        base_adjustment,
+                        mark_adjustment,
+                    ));
+                }
+            }
+        }
+
+        None
+    }
+
+    #[cfg(feature = "layout")]
     fn detect_hebrew_mark_cluster(font: &crate::LoadedFont) -> Option<String> {
         first_real_mark_cluster(font, 0x05D0..=0x05EA, 0x0591..=0x05C7)
+    }
+
+    #[cfg(feature = "layout")]
+    fn detect_arabic_mark_stack_cluster(font: &crate::LoadedFont) -> Option<String> {
+        first_real_gpos_mark_stack_cluster(font, "ar", 0x0621..=0x064A, 0x0610..=0x065F)
+            .map(|(cluster, _, _)| cluster)
+    }
+
+    #[cfg(feature = "layout")]
+    fn detect_syriac_mark_stack_cluster(font: &crate::LoadedFont) -> Option<String> {
+        first_real_gpos_mark_stack_cluster(font, "syr-Syrc", 0x0710..=0x072C, 0x0730..=0x074A)
+            .map(|(cluster, _, _)| cluster)
     }
 
     #[cfg(feature = "layout")]
@@ -6032,6 +6107,53 @@ mod tests {
 
     #[test]
     #[cfg(feature = "layout")]
+    fn rtl_shaping_applies_real_gpos_mark_to_mark_attachment() {
+        let font = crate::load_font_from_file(syriac_font_path()).expect("load syriac font");
+        let Some((text, base_attachment, mark_attachment)) =
+            first_real_gpos_mark_stack_cluster(&font, "syr-Syrc", 0x0710..=0x072C, 0x0730..=0x074A)
+        else {
+            return;
+        };
+
+        let options = crate::FontOptions::new(&font)
+            .with_font_size(32.0)
+            .with_locale("syr-Syrc")
+            .with_right_to_left();
+        let run = crate::text2commands(&text, options.clone()).expect("syriac stacked marks");
+        assert_eq!(run.glyphs.len(), 3);
+
+        let base_char = text.chars().next().expect("base char");
+        let base_glyph_id = font
+            .font()
+            .cmap
+            .as_ref()
+            .expect("cmap")
+            .get_glyph_position(base_char as u32) as usize;
+        let base_layout = font
+            .font()
+            .get_layout_with_options(base_glyph_id, false, &options);
+        let scale = match base_layout {
+            crate::fontreader::FontLayout::Horizontal(ref layout) if layout.advance_width != 0 => {
+                run.glyphs[0].glyph.metrics.advance_x / layout.advance_width as f32
+            }
+            _ => 1.0,
+        };
+
+        let first_mark_dx = run.glyphs[1].x - run.glyphs[0].x;
+        let first_mark_dy = run.glyphs[1].y - run.glyphs[0].y;
+        assert!((first_mark_dx - base_attachment.x_placement as f32 * scale).abs() <= 1.0);
+        assert!((first_mark_dy - base_attachment.y_placement as f32 * scale).abs() <= 1.0);
+
+        let second_mark_dx = run.glyphs[2].x - run.glyphs[1].x;
+        let second_mark_dy = run.glyphs[2].y - run.glyphs[1].y;
+        assert!((second_mark_dx - mark_attachment.x_placement as f32 * scale).abs() <= 1.0);
+        assert!((second_mark_dy - mark_attachment.y_placement as f32 * scale).abs() <= 1.0);
+        assert_eq!(run.glyphs[1].glyph.metrics.advance_x, 0.0);
+        assert_eq!(run.glyphs[2].glyph.metrics.advance_x, 0.0);
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
     fn font_family_fallback_checks_arabic_mark_boundaries_across_real_fonts() {
         let successes = count_mark_boundary_successes(
             &arabic_boundary_font_paths(),
@@ -6046,6 +6168,20 @@ mod tests {
 
     #[test]
     #[cfg(feature = "layout")]
+    fn font_family_fallback_checks_arabic_mark_stack_boundaries_across_real_fonts() {
+        let successes = count_mark_boundary_successes(
+            &arabic_boundary_font_paths(),
+            "ar",
+            detect_arabic_mark_stack_cluster,
+        );
+        assert!(
+            successes >= 1,
+            "expected at least one Arabic stacked-mark font to pass boundary checks"
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
     fn font_family_fallback_checks_syriac_mark_boundaries_across_real_fonts() {
         let successes = count_mark_boundary_successes(
             &syriac_boundary_font_paths(),
@@ -6055,6 +6191,20 @@ mod tests {
         assert!(
             successes >= 1,
             "expected at least one Syriac mark font to pass boundary checks"
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn font_family_fallback_checks_syriac_mark_stack_boundaries_across_real_fonts() {
+        let successes = count_mark_boundary_successes(
+            &syriac_boundary_font_paths(),
+            "syr-Syrc",
+            detect_syriac_mark_stack_cluster,
+        );
+        assert!(
+            successes >= 1,
+            "expected at least one Syriac stacked-mark font to pass boundary checks"
         );
     }
 

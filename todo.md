@@ -195,7 +195,13 @@
   - font.get_fontsize() -> f32
   - font.set_line_spacing(f32)
   - font.get_line_spacing() -> 32
-
+- features svg-font
+  - [ ] svg fontのサポート
+  - [ ] svgのサポートに必要な最低限のファンクションを追加(css/textは無視)
+- features ritchtext
+  - [ ] font.ritchtext2command(&self, &str, size: Option<f32>) -> &FontCommand // ritch text(Unity Super Set)をコマンドにして返す
+  - [ ] font.ritchtext2svg(&self, &str, size: Option<f32>) -> &FontCommand // ritch text(Unity Super Set)をコマンドにして返す
+  - Unity Super SetはRubyをサポートする
 
 ## APIの破壊的変更
 - [+] load_font フォントロード from any
@@ -239,6 +245,9 @@
   - [x] `COLR::get_layer_record()` は壊れた layer range でも panic しない
   - [x] GSUB の未展開 contextual lookup は shaping 継続のため `LookupResult::None` に倒し、panic しないよう修正
   - [*] `fontreader.rs` の load/shaping 系 `unwrap()` を段階的に減らす
+    - [x] `get_name_list()` / metrics getter / layout getter の `unwrap()` を fallback 化
+    - [x] `font_load()` 終盤の mandatory table 参照を `ok_or_else()` に置き換え
+    - [ ] SVG / raw debug 系の古い `unwrap()` はさらに整理が必要
 - [x] svg svgのサイズが巨大なので文字毎にsvgを切り出す
 # Layout 対応状況
 
@@ -273,9 +282,11 @@
 - [*] 実装
 - [x] pair adjustment (Format 1 / 2)
 - [x] mark-to-base positioning (Type 4 Format 1)
+- [x] mark-to-mark positioning (Type 6 Format 1)
 - [x] extension positioning (Type 9 経由の pair adjustment)
 - [x] text2command / text2commands / measure への `kern` 反映
 - [x] text2glyph_run で `GPOS mark-to-base` anchor を優先し、無い場合だけ `GDEF` fallback にする
+- [x] text2glyph_run で `GPOS mark-to-mark` を前の mark glyph に適用
 - [x] locale に応じて script を優先し、required feature を含めて `kern` lookup を選ぶ
 - [ ] palt
 - [ ] vpal
@@ -448,7 +459,8 @@
     - [x] attachable mark では前の base に重ねる fallback 位置決めを導入
     - [x] boundary test を複数フォント候補へ拡張
     - [x] `GPOS mark-to-base` を parser / shaping に統合し、Syriac real-font regression を追加
-    - [ ] `mark-to-mark` は未対応
+    - [x] `GPOS mark-to-mark` を parser / shaping に統合し、Syriac stacked-mark regression を追加
+    - [x] Arabic / Syriac の stacked-mark fallback 境界 test を追加
 - [ ] スクリプト文字対応
 
 ## format

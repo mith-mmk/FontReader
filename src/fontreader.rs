@@ -189,6 +189,12 @@ struct GlyphPositionAdjustment {
     advance_y: f32,
 }
 
+#[derive(Debug, Clone, Copy)]
+struct GlyphAttachmentPlacement {
+    glyph_index: usize,
+    adjustment: GlyphPositionAdjustment,
+}
+
 impl Font {
     fn empty() -> Self {
         Self {
@@ -236,13 +242,8 @@ impl Font {
     }
 
     pub fn get_name_list(&self, locale: &String) -> HashMap<u16, String> {
-        let name_table = if self.current_font == 0 {
-            self.name_table.as_ref().unwrap()
-        } else {
-            self.more_fonts[self.current_font - 1]
-                .name_table
-                .as_ref()
-                .unwrap()
+        let Some(name_table) = self.current_name_table() else {
+            return HashMap::new();
         };
         let platform_id = PlatformID::Windows;
         let name = name_table.get_name_list(locale, platform_id);
@@ -289,7 +290,14 @@ impl Font {
 
     pub(crate) fn get_h_metrix_with_coords(&self, id: usize, coordinates: &[f32]) -> LongHorMetric {
         if self.current_font == 0 {
-            let mut metric = self.hmtx.as_ref().unwrap().get_metrix(id);
+            let mut metric = self
+                .hmtx
+                .as_ref()
+                .map(|hmtx| hmtx.get_metrix(id))
+                .unwrap_or(LongHorMetric {
+                    advance_width: 0,
+                    left_side_bearing: 0,
+                });
             if let Some(hvar) = self.hvar.as_ref() {
                 if let Some(delta) = hvar.advance_offset(id, coordinates) {
                     metric.advance_width = apply_u16_delta(metric.advance_width, delta);
@@ -301,7 +309,14 @@ impl Font {
             metric
         } else {
             let font = &self.more_fonts[self.current_font - 1];
-            let mut metric = font.hmtx.as_ref().unwrap().get_metrix(id);
+            let mut metric = font
+                .hmtx
+                .as_ref()
+                .map(|hmtx| hmtx.get_metrix(id))
+                .unwrap_or(LongHorMetric {
+                    advance_width: 0,
+                    left_side_bearing: 0,
+                });
             if let Some(hvar) = font.hvar.as_ref() {
                 if let Some(delta) = hvar.advance_offset(id, coordinates) {
                     metric.advance_width = apply_u16_delta(metric.advance_width, delta);
@@ -320,7 +335,14 @@ impl Font {
         coordinates: &[f32],
     ) -> VerticalMetric {
         if self.current_font == 0 {
-            let mut metric = self.vmtx.as_ref().unwrap().get_metrix(id);
+            let mut metric = self
+                .vmtx
+                .as_ref()
+                .map(|vmtx| vmtx.get_metrix(id))
+                .unwrap_or(VerticalMetric {
+                    advance_height: 0,
+                    top_side_bearing: 0,
+                });
             if let Some(vvar) = self.vvar.as_ref() {
                 if let Some(delta) = vvar.advance_offset(id, coordinates) {
                     metric.advance_height = apply_u16_delta(metric.advance_height, delta);
@@ -332,7 +354,14 @@ impl Font {
             metric
         } else {
             let font = &self.more_fonts[self.current_font - 1];
-            let mut metric = font.vmtx.as_ref().unwrap().get_metrix(id);
+            let mut metric = font
+                .vmtx
+                .as_ref()
+                .map(|vmtx| vmtx.get_metrix(id))
+                .unwrap_or(VerticalMetric {
+                    advance_height: 0,
+                    top_side_bearing: 0,
+                });
             if let Some(vvar) = font.vvar.as_ref() {
                 if let Some(delta) = vvar.advance_offset(id, coordinates) {
                     metric.advance_height = apply_u16_delta(metric.advance_height, delta);
@@ -393,7 +422,26 @@ impl Font {
                 h_metrix = metric;
             }
         }
-        let hhea = self.current_hhea().unwrap();
+        let hhea = self.current_hhea().cloned().unwrap_or(HHEA {
+            major_version: 0,
+            minor_version: 0,
+            ascender: 0,
+            descender: 0,
+            line_gap: 0,
+            advance_width_max: 0,
+            min_left_side_bearing: 0,
+            min_right_side_bearing: 0,
+            x_max_extent: 0,
+            caret_slope_rise: 0,
+            caret_slope_run: 0,
+            caret_offset: 0,
+            reserved1: 0,
+            reserved2: 0,
+            reserved3: 0,
+            reserved4: 0,
+            metric_data_format: 0,
+            number_of_hmetrics: 0,
+        });
         let lsb = h_metrix.left_side_bearing as isize;
         let advance_width = h_metrix.advance_width as isize;
 
@@ -410,7 +458,7 @@ impl Font {
             accender,
             descender,
             line_gap,
-            hhea: hhea.clone(),
+            hhea,
         }
     }
 
@@ -428,21 +476,17 @@ impl Font {
         is_vert: bool,
         coordinates: &[f32],
     ) -> FontLayout {
-        let layout = if is_vert {
-            let result = self.get_vertical_layout_with_coords(glyph_id as usize, coordinates);
-            if result.is_some() {
-                FontLayout::Vertical(result.unwrap())
+        if is_vert {
+            if let Some(result) = self.get_vertical_layout_with_coords(glyph_id, coordinates) {
+                FontLayout::Vertical(result)
             } else {
                 FontLayout::Horizontal(
-                    self.get_horizontal_layout_with_coords(glyph_id as usize, coordinates),
+                    self.get_horizontal_layout_with_coords(glyph_id, coordinates),
                 )
             }
         } else {
-            FontLayout::Horizontal(
-                self.get_horizontal_layout_with_coords(glyph_id as usize, coordinates),
-            )
-        };
-        layout
+            FontLayout::Horizontal(self.get_horizontal_layout_with_coords(glyph_id, coordinates))
+        }
     }
 
     pub fn get_layout_with_options(
@@ -456,7 +500,7 @@ impl Font {
     }
 
     pub fn get_glyph_with_uvs_axis(&self, ch: char, vs: char, is_vert: bool) -> GriphData {
-        let glyph_id = self.resolve_glyph_id_with_uvs(ch, vs, is_vert).unwrap();
+        let glyph_id = self.resolve_glyph_id_with_uvs(ch, vs, is_vert).unwrap_or(0);
         self.get_glyph_from_id_axis(glyph_id, is_vert)
     }
 
@@ -809,6 +853,14 @@ impl Font {
             self.vhea.as_ref()
         } else {
             self.more_fonts[self.current_font - 1].vhea.as_ref()
+        }
+    }
+
+    fn current_name_table(&self) -> Option<&name::NameTable> {
+        if self.current_font == 0 {
+            self.name_table.as_ref()
+        } else {
+            self.more_fonts[self.current_font - 1].name_table.as_ref()
         }
     }
 
@@ -1819,26 +1871,55 @@ impl Font {
     fn mark_attachment_for_index(
         &self,
         units: &[ResolvedTextUnit],
+        unit_glyph_indices: &[Option<usize>],
         index: usize,
         locale: Option<&str>,
         scale_x: f32,
         scale_y: f32,
-    ) -> Option<GlyphPositionAdjustment> {
+    ) -> Option<GlyphAttachmentPlacement> {
         let gpos = self.current_gpos()?;
         let current = Self::glyph_unit_at(units, index)?;
+        if let Some(previous_mark_unit_index) = self.find_previous_mark_glyph_index(units, index) {
+            let previous_mark = Self::glyph_unit_at(units, previous_mark_unit_index)?;
+            let glyph_index = unit_glyph_indices
+                .get(previous_mark_unit_index)
+                .and_then(|glyph_index| *glyph_index)?;
+            if let Some(adjustment) = gpos.lookup_mark_to_mark_adjustment(
+                previous_mark.glyph_id as u16,
+                current.glyph_id as u16,
+                locale,
+            ) {
+                return Some(GlyphAttachmentPlacement {
+                    glyph_index,
+                    adjustment: GlyphPositionAdjustment {
+                        placement_x: adjustment.x_placement as f32 * scale_x,
+                        placement_y: adjustment.y_placement as f32 * scale_y,
+                        advance_x: 0.0,
+                        advance_y: 0.0,
+                    },
+                });
+            }
+        }
+
         let base_index = self.find_previous_spacing_glyph_index(units, index)?;
         let base = Self::glyph_unit_at(units, base_index)?;
+        let glyph_index = unit_glyph_indices
+            .get(base_index)
+            .and_then(|glyph_index| *glyph_index)?;
         let adjustment = gpos.lookup_mark_to_base_adjustment(
             base.glyph_id as u16,
             current.glyph_id as u16,
             locale,
         )?;
 
-        Some(GlyphPositionAdjustment {
-            placement_x: adjustment.x_placement as f32 * scale_x,
-            placement_y: adjustment.y_placement as f32 * scale_y,
-            advance_x: 0.0,
-            advance_y: 0.0,
+        Some(GlyphAttachmentPlacement {
+            glyph_index,
+            adjustment: GlyphPositionAdjustment {
+                placement_x: adjustment.x_placement as f32 * scale_x,
+                placement_y: adjustment.y_placement as f32 * scale_y,
+                advance_x: 0.0,
+                advance_y: 0.0,
+            },
         })
     }
 
@@ -1846,13 +1927,24 @@ impl Font {
     fn mark_attachment_for_index(
         &self,
         units: &[ResolvedTextUnit],
+        unit_glyph_indices: &[Option<usize>],
         index: usize,
         locale: Option<&str>,
         scale_x: f32,
         scale_y: f32,
-    ) -> Option<GlyphPositionAdjustment> {
-        let _ = (units, index, locale, scale_x, scale_y);
+    ) -> Option<GlyphAttachmentPlacement> {
+        let _ = (units, unit_glyph_indices, index, locale, scale_x, scale_y);
         None
+    }
+
+    #[cfg(feature = "layout")]
+    fn find_previous_mark_glyph_index(
+        &self,
+        units: &[ResolvedTextUnit],
+        index: usize,
+    ) -> Option<usize> {
+        let cursor = index.checked_sub(1)?;
+        Self::glyph_unit_at(units, cursor).map(|_| cursor)
     }
 
     #[cfg(feature = "layout")]
@@ -1960,7 +2052,6 @@ impl Font {
         let mut glyphs: Vec<PositionedGlyph> = Vec::new();
         let mut cursor_x = 0.0f32;
         let mut cursor_y = 0.0f32;
-        let mut last_attach_base_glyph_index: Option<usize> = None;
         let tab_advance = line_height;
         let shaped_units = self.shape_text_units(
             text,
@@ -1969,11 +2060,11 @@ impl Font {
             options.locale,
             options.font_variant,
         )?;
+        let mut unit_glyph_indices = vec![None; shaped_units.len()];
 
         for (index, unit) in shaped_units.iter().enumerate() {
             match *unit {
                 ResolvedTextUnit::Newline => {
-                    last_attach_base_glyph_index = None;
                     if is_vertical {
                         cursor_x -= line_height;
                         cursor_y = 0.0;
@@ -1983,7 +2074,6 @@ impl Font {
                     }
                 }
                 ResolvedTextUnit::Tab => {
-                    last_attach_base_glyph_index = None;
                     if is_vertical {
                         cursor_y += tab_advance * 4.0;
                     } else if is_right_to_left {
@@ -2057,6 +2147,7 @@ impl Font {
                     );
                     let mark_attachment = self.mark_attachment_for_index(
                         &shaped_units,
+                        &unit_glyph_indices,
                         index,
                         options.locale,
                         scale_x,
@@ -2066,17 +2157,28 @@ impl Font {
                     metrics.advance_y += adjustment.advance_y;
                     metrics.bounds = glyph_layers_bounds(&layers);
                     let uses_gpos_mark_attachment = mark_attachment.is_some();
-                    let uses_gdef_mark_attachment = !uses_gpos_mark_attachment
+                    let gdef_attach_glyph_index = if !uses_gpos_mark_attachment
                         && self.gdef_supports_mark_attachment(glyph_id as u16)
-                        && last_attach_base_glyph_index.is_some();
+                    {
+                        self.find_previous_spacing_glyph_index(&shaped_units, index)
+                            .and_then(|unit_index| unit_glyph_indices.get(unit_index))
+                            .and_then(|glyph_index| *glyph_index)
+                    } else {
+                        None
+                    };
+                    let uses_gdef_mark_attachment =
+                        !uses_gpos_mark_attachment && gdef_attach_glyph_index.is_some();
                     let uses_mark_attachment =
                         uses_gpos_mark_attachment || uses_gdef_mark_attachment;
-                    let attach_base_index = last_attach_base_glyph_index;
+                    let attach_glyph_index = mark_attachment
+                        .map(|attachment| attachment.glyph_index)
+                        .or(gdef_attach_glyph_index);
                     let origin_x = if uses_mark_attachment {
-                        let base_x = glyphs[attach_base_index.expect("checked some")].x;
-                        let placement_x =
-                            mark_attachment.map(|mark| mark.placement_x).unwrap_or(0.0)
-                                + adjustment.placement_x;
+                        let base_x = glyphs[attach_glyph_index.expect("checked some")].x;
+                        let placement_x = mark_attachment
+                            .map(|mark| mark.adjustment.placement_x)
+                            .unwrap_or(0.0)
+                            + adjustment.placement_x;
                         base_x + placement_x
                     } else if is_right_to_left && !is_vertical {
                         cursor_x - metrics.advance_x + adjustment.placement_x
@@ -2084,10 +2186,11 @@ impl Font {
                         cursor_x + adjustment.placement_x
                     };
                     let origin_y = if uses_mark_attachment {
-                        let base_y = glyphs[attach_base_index.expect("checked some")].y;
-                        let placement_y =
-                            mark_attachment.map(|mark| mark.placement_y).unwrap_or(0.0)
-                                + adjustment.placement_y;
+                        let base_y = glyphs[attach_glyph_index.expect("checked some")].y;
+                        let placement_y = mark_attachment
+                            .map(|mark| mark.adjustment.placement_y)
+                            .unwrap_or(0.0)
+                            + adjustment.placement_y;
                         base_y + placement_y
                     } else {
                         cursor_y + adjustment.placement_y
@@ -2102,6 +2205,7 @@ impl Font {
                         layers,
                     };
                     glyphs.push(PositionedGlyph::new(glyph, origin_x, origin_y));
+                    unit_glyph_indices[index] = Some(glyphs.len() - 1);
                     if !uses_mark_attachment {
                         if is_right_to_left && !is_vertical {
                             cursor_x -= metrics.advance_x;
@@ -2109,10 +2213,6 @@ impl Font {
                             cursor_x += metrics.advance_x;
                         }
                         cursor_y += metrics.advance_y;
-                    }
-
-                    if !self.gdef_is_ignored_for_pair_positioning(glyph_id as u16) {
-                        last_attach_base_glyph_index = Some(glyphs.len() - 1);
                     }
                 }
             }
@@ -3809,30 +3909,61 @@ fn from_opentype<R: BinaryReader>(file: &mut R, header: &OTFHeader) -> Result<Fo
         }
     }
 
-    let num_glyphs = font.maxp.as_ref().unwrap().num_glyphs;
-    let number_of_hmetrics = font.hhea.as_ref().unwrap().number_of_hmetrics;
-    let offset = font.hmtx_pos.as_ref().unwrap().offset;
-    let length = font.hmtx_pos.as_ref().unwrap().length;
+    let num_glyphs = font
+        .maxp
+        .as_ref()
+        .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "No maxp table"))?
+        .num_glyphs;
+    let number_of_hmetrics = font
+        .hhea
+        .as_ref()
+        .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "No hhea table"))?
+        .number_of_hmetrics;
+    let hmtx_pointer = font
+        .hmtx_pos
+        .as_ref()
+        .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "No hmtx table pointer"))?;
+    let offset = hmtx_pointer.offset;
+    let length = hmtx_pointer.length;
 
     let hmtx = hmtx::HMTX::new(file, offset, length, number_of_hmetrics, num_glyphs)?;
     font.hmtx = Some(hmtx);
 
     if font.vmtx_pos.is_some() {
-        let number_of_vmetrics = font.vhea.as_ref().unwrap().number_of_vmetrics;
-        let offset = font.vmtx_pos.as_ref().unwrap().offset;
-        let length = font.vmtx_pos.as_ref().unwrap().length;
+        let number_of_vmetrics = font
+            .vhea
+            .as_ref()
+            .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "No vhea table"))?
+            .number_of_vmetrics;
+        let vmtx_pointer = font
+            .vmtx_pos
+            .as_ref()
+            .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "No vmtx table pointer"))?;
+        let offset = vmtx_pointer.offset;
+        let length = vmtx_pointer.length;
         let vmtx = vmtx::VMTX::new(file, offset, length, number_of_vmetrics, num_glyphs)?;
         font.vmtx = Some(vmtx);
     }
 
     if let Some(offset) = font.loca_pos.as_ref() {
-        let length = font.loca_pos.as_ref().unwrap().length;
-        let index_to_loc_format = font.head.as_ref().unwrap().index_to_loc_format as usize;
+        let length = offset.length;
+        let index_to_loc_format = font
+            .head
+            .as_ref()
+            .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "No head table"))?
+            .index_to_loc_format as usize;
         let loca = loca::LOCA::new_by_size(file, offset.offset, length, index_to_loc_format)?;
         font.loca = Some(loca);
-        let offset = font.glyf_pos.as_ref().unwrap().offset;
-        let length = font.glyf_pos.as_ref().unwrap().length;
-        let loca = font.loca.as_ref().unwrap();
+        let glyf_pointer = font
+            .glyf_pos
+            .as_ref()
+            .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "No glyf table pointer"))?;
+        let offset = glyf_pointer.offset;
+        let length = glyf_pointer.length;
+        let loca = font
+            .loca
+            .as_ref()
+            .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "No loca table"))?;
         let glyf = glyf::GLYF::new(file, offset, length, loca);
         font.glyf = Some(glyf);
         font.outline_format = GlyphFormat::OpenTypeGlyph;

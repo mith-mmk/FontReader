@@ -46,8 +46,9 @@ The README now focuses on the public API and runnable examples.
 - Current state: partially integrated
 - Pair positioning now skips GDEF mark glyphs when searching previous/next spacing glyphs for kerning
 - `GPOS mark-to-base` (Type 4 Format 1) is now parsed and used during shaping when a `mark` feature lookup is available
-- When no `GPOS mark-to-base` anchor is available, shaping still falls back to the existing GDEF-based mark attachment heuristic
-- Attach / caret / mark-set data is still not fully integrated into higher-level layout, and `mark-to-mark` remains unimplemented
+- `GPOS mark-to-mark` (Type 6 Format 1) is now parsed and used during shaping when an `mkmk` feature lookup is available
+- When neither `GPOS mark-to-base` nor `mark-to-mark` anchors are available, shaping still falls back to the existing GDEF-based mark attachment heuristic
+- Attach / caret / mark-set data is still not fully integrated into higher-level layout
 
 ## Notes
 
@@ -63,6 +64,7 @@ The README now focuses on the public API and runnable examples.
 - `hmtx` / `vmtx` now tolerate zero-metric edge cases without panicking, returning zero advances as a fallback
 - `OTFHeader`, `TTCHeader`, `get_font_type()`, and `COLR::new()` now return errors instead of panicking on truncated input
 - `COLR::get_layer_record()` now stops at available layers instead of trusting malformed layer ranges
+- `fontreader.rs` now removes more public-path `unwrap()` calls in name lookup, metrics/layout getters, and mandatory-table loading
 - CFF2 outlines now load through the shared `cff.rs` path, including `vsindex` / `blend` evaluation and real-fixture SVG smoke coverage
 - CFF2 variation support now covers both outline charstrings and Private DICT `vsindex` / `blend` parsing
 - The current local corpus does not contain a confirmed real CFF2 font; coverage is therefore synthetic/unit-test heavy until a true CFF2 fixture is added

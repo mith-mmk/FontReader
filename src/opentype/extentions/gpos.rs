@@ -141,6 +141,24 @@ struct MarkToBaseFormat1 {
     base_array: BaseArray,
 }
 
+#[derive(Debug, Clone)]
+struct Mark2Record {
+    mark2_anchors: Vec<Option<Anchor>>,
+}
+
+#[derive(Debug, Clone)]
+struct Mark2Array {
+    mark2_records: Vec<Mark2Record>,
+}
+
+#[derive(Debug, Clone)]
+struct MarkToMarkFormat1 {
+    mark1_coverage: Coverage,
+    mark2_coverage: Coverage,
+    mark1_array: MarkArray,
+    mark2_array: Mark2Array,
+}
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub(crate) struct MarkAttachmentAdjustment {
     pub(crate) x_placement: i16,
@@ -152,6 +170,7 @@ enum PositioningSubtable {
     PairFormat1(PairPosFormat1),
     PairFormat2(PairPosFormat2),
     MarkToBaseFormat1(MarkToBaseFormat1),
+    MarkToMarkFormat1(MarkToMarkFormat1),
     Extension(Box<PositioningSubtable>),
     Unsupported,
 }
@@ -187,8 +206,9 @@ impl PositioningSubtable {
             PositioningSubtable::Extension(extension) => {
                 extension.lookup_pair_adjustment(left, right)
             }
-            PositioningSubtable::Unsupported => None,
-            PositioningSubtable::MarkToBaseFormat1(_) => None,
+            PositioningSubtable::Unsupported
+            | PositioningSubtable::MarkToBaseFormat1(_)
+            | PositioningSubtable::MarkToMarkFormat1(_) => None,
         }
     }
 
@@ -217,6 +237,45 @@ impl PositioningSubtable {
             }
             PositioningSubtable::PairFormat1(_)
             | PositioningSubtable::PairFormat2(_)
+            | PositioningSubtable::MarkToMarkFormat1(_)
+            | PositioningSubtable::Unsupported => None,
+        }
+    }
+
+    fn lookup_mark_to_mark_adjustment(
+        &self,
+        base_mark: u16,
+        combining_mark: u16,
+    ) -> Option<MarkAttachmentAdjustment> {
+        match self {
+            PositioningSubtable::MarkToMarkFormat1(mark_to_mark) => {
+                let base_mark_index = mark_to_mark.mark2_coverage.contains(base_mark as usize)?;
+                let combining_mark_index = mark_to_mark
+                    .mark1_coverage
+                    .contains(combining_mark as usize)?;
+                let mark1_record = mark_to_mark
+                    .mark1_array
+                    .mark_records
+                    .get(combining_mark_index)?;
+                let mark2_record = mark_to_mark
+                    .mark2_array
+                    .mark2_records
+                    .get(base_mark_index)?;
+                let mark2_anchor = mark2_record
+                    .mark2_anchors
+                    .get(mark1_record.mark_class as usize)?
+                    .as_ref()?;
+                Some(MarkAttachmentAdjustment {
+                    x_placement: mark2_anchor.x.saturating_sub(mark1_record.mark_anchor.x),
+                    y_placement: mark2_anchor.y.saturating_sub(mark1_record.mark_anchor.y),
+                })
+            }
+            PositioningSubtable::Extension(extension) => {
+                extension.lookup_mark_to_mark_adjustment(base_mark, combining_mark)
+            }
+            PositioningSubtable::PairFormat1(_)
+            | PositioningSubtable::PairFormat2(_)
+            | PositioningSubtable::MarkToBaseFormat1(_)
             | PositioningSubtable::Unsupported => None,
         }
     }
@@ -335,6 +394,7 @@ impl GPOS {
         match lookup_type {
             2 => Self::parse_pair_adjustment(reader, offset),
             4 => Self::parse_mark_to_base(reader, offset),
+            6 => Self::parse_mark_to_mark(reader, offset),
             9 => Self::parse_extension(reader, offset),
             _ => Ok(PositioningSubtable::Unsupported),
         }
@@ -429,11 +489,38 @@ impl GPOS {
         Ok(PositioningSubtable::MarkToBaseFormat1(MarkToBaseFormat1 {
             mark_coverage: Coverage::new(reader, offset + mark_coverage_offset as u64)?,
             base_coverage: Coverage::new(reader, offset + base_coverage_offset as u64)?,
-            mark_array: Self::parse_mark_array(reader, offset + mark_array_offset as u64, offset)?,
+            mark_array: Self::parse_mark_array(reader, offset + mark_array_offset as u64)?,
             base_array: Self::parse_base_array(
                 reader,
                 offset + base_array_offset as u64,
-                offset,
+                class_count,
+            )?,
+        }))
+    }
+
+    fn parse_mark_to_mark<R: BinaryReader>(
+        reader: &mut R,
+        offset: u64,
+    ) -> Result<PositioningSubtable, std::io::Error> {
+        reader.seek(SeekFrom::Start(offset))?;
+        let pos_format = reader.read_u16_be()?;
+        if pos_format != 1 {
+            return Ok(PositioningSubtable::Unsupported);
+        }
+
+        let mark1_coverage_offset = reader.read_u16_be()?;
+        let mark2_coverage_offset = reader.read_u16_be()?;
+        let class_count = reader.read_u16_be()?;
+        let mark1_array_offset = reader.read_u16_be()?;
+        let mark2_array_offset = reader.read_u16_be()?;
+
+        Ok(PositioningSubtable::MarkToMarkFormat1(MarkToMarkFormat1 {
+            mark1_coverage: Coverage::new(reader, offset + mark1_coverage_offset as u64)?,
+            mark2_coverage: Coverage::new(reader, offset + mark2_coverage_offset as u64)?,
+            mark1_array: Self::parse_mark_array(reader, offset + mark1_array_offset as u64)?,
+            mark2_array: Self::parse_mark2_array(
+                reader,
+                offset + mark2_array_offset as u64,
                 class_count,
             )?,
         }))
@@ -442,7 +529,6 @@ impl GPOS {
     fn parse_mark_array<R: BinaryReader>(
         reader: &mut R,
         offset: u64,
-        _subtable_offset: u64,
     ) -> Result<MarkArray, std::io::Error> {
         reader.seek(SeekFrom::Start(offset))?;
         let mark_count = reader.read_u16_be()?;
@@ -482,7 +568,6 @@ impl GPOS {
     fn parse_base_array<R: BinaryReader>(
         reader: &mut R,
         offset: u64,
-        _subtable_offset: u64,
         class_count: u16,
     ) -> Result<BaseArray, std::io::Error> {
         reader.seek(SeekFrom::Start(offset))?;
@@ -512,6 +597,40 @@ impl GPOS {
         }
 
         Ok(BaseArray { base_records })
+    }
+
+    fn parse_mark2_array<R: BinaryReader>(
+        reader: &mut R,
+        offset: u64,
+        class_count: u16,
+    ) -> Result<Mark2Array, std::io::Error> {
+        reader.seek(SeekFrom::Start(offset))?;
+        let mark2_count = reader.read_u16_be()?;
+        let mut anchor_offsets = Vec::with_capacity(mark2_count as usize);
+
+        for _ in 0..mark2_count {
+            let mut offsets = Vec::with_capacity(class_count as usize);
+            for _ in 0..class_count {
+                offsets.push(reader.read_u16_be()?);
+            }
+            anchor_offsets.push(offsets);
+        }
+
+        let mut mark2_records = Vec::with_capacity(anchor_offsets.len());
+        for offsets in anchor_offsets {
+            let mut mark2_anchors = Vec::with_capacity(offsets.len());
+            for anchor_offset in offsets {
+                let anchor = if anchor_offset == 0 {
+                    None
+                } else {
+                    Self::parse_anchor(reader, offset + anchor_offset as u64)?
+                };
+                mark2_anchors.push(anchor);
+            }
+            mark2_records.push(Mark2Record { mark2_anchors });
+        }
+
+        Ok(Mark2Array { mark2_records })
     }
 
     fn parse_anchor<R: BinaryReader>(
@@ -945,6 +1064,30 @@ impl GPOS {
 
         None
     }
+
+    pub(crate) fn lookup_mark_to_mark_adjustment(
+        &self,
+        base_mark: u16,
+        combining_mark: u16,
+        locale: Option<&str>,
+    ) -> Option<MarkAttachmentAdjustment> {
+        let feature_tags: &[[u8; 4]] = &[*b"mkmk"];
+
+        for lookup in self.collect_lookups(locale, feature_tags) {
+            if lookup.lookup_type != 6 && lookup.lookup_type != 9 {
+                continue;
+            }
+            for subtable in &lookup.subtables {
+                if let Some(found) =
+                    subtable.lookup_mark_to_mark_adjustment(base_mark, combining_mark)
+                {
+                    return Some(found);
+                }
+            }
+        }
+
+        None
+    }
 }
 
 #[cfg(test)]
@@ -991,6 +1134,49 @@ mod tests {
             MarkAttachmentAdjustment {
                 x_placement: 7,
                 y_placement: 13,
+            }
+        );
+    }
+
+    #[test]
+    fn mark_to_mark_format1_lookup_returns_anchor_delta() {
+        let bytes = [
+            0x00, 0x01, // posFormat
+            0x00, 0x0C, // mark1CoverageOffset
+            0x00, 0x12, // mark2CoverageOffset
+            0x00, 0x01, // classCount
+            0x00, 0x18, // mark1ArrayOffset
+            0x00, 0x24, // mark2ArrayOffset
+            0x00, 0x01, // mark1 coverage format
+            0x00, 0x01, // glyph count
+            0x00, 0x1E, // glyph 30
+            0x00, 0x01, // mark2 coverage format
+            0x00, 0x01, // glyph count
+            0x00, 0x14, // glyph 20
+            0x00, 0x01, // mark count
+            0x00, 0x00, // mark class
+            0x00, 0x06, // mark anchor offset
+            0x00, 0x01, // anchor format 1
+            0x00, 0x04, // mark1 x
+            0x00, 0x05, // mark1 y
+            0x00, 0x01, // mark2 count
+            0x00, 0x04, // mark2 anchor offset
+            0x00, 0x01, // anchor format 1
+            0x00, 0x0C, // mark2 x
+            0x00, 0x14, // mark2 y
+        ];
+        let mut reader = BytesReader::new(&bytes);
+
+        let subtable = GPOS::parse_subtable(&mut reader, 6, 0).expect("parse mark-to-mark");
+        let adjustment = subtable
+            .lookup_mark_to_mark_adjustment(20, 30)
+            .expect("mark-to-mark adjustment");
+
+        assert_eq!(
+            adjustment,
+            MarkAttachmentAdjustment {
+                x_placement: 8,
+                y_placement: 15,
             }
         );
     }
