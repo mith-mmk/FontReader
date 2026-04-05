@@ -231,7 +231,7 @@ mod tests {
     #[cfg(feature = "raw")]
     fn japanese_font_path() -> std::path::PathBuf {
         std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("_test_fonts")
+            .join(".test_fonts")
             .join("NotoSansJP-Regular.otf")
     }
 

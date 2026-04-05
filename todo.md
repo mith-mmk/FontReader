@@ -1,6 +1,7 @@
 # todo
-- _test* が作業用フォルダ
-- _test_fonts/* がテスト用フォント
+- .test* が作業用フォルダ
+- .test_fonts/* がテスト用フォント
+
 ```
 - [+] 実装済み
 - [x] 動作確認済み
@@ -12,9 +13,13 @@
 - `issue.md`でイシュー管理
 - `readme`と書いた場合はreadme.ja.mdが正本でread.mdが英語版である
 
+# next
+- [ ] mark-to-ligature を追加して複合字上の mark attachment を詰める
+- [ ] script ごとの fallback 境界を増やすためArabic/Syriac/Hebrew 以外の fixture を追加する
+
 # APIの大幅破壊的変更
 
-　現在FontReaderのAPIに、責務が混在しています。
+[+]　現在FontReaderのAPIに、責務が混在しています。
 これを「使いやすい公開API」として再設計する。
 
 　これに伴いバージョンをを0.0.4から0.0.10にアップデート
