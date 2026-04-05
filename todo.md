@@ -14,8 +14,11 @@
 - `readme`と書いた場合はreadme.ja.mdが正本でread.mdが英語版である
 
 # next
-- [ ] mark-to-ligature を追加して複合字上の mark attachment を詰める
+- [+] mark-to-ligature を追加して複合字上の mark attachment を詰める
 - [ ] script ごとの fallback 境界を増やすためArabic/Syriac/Hebrew 以外の fixture を追加する
+- [ ] features `svg-fonts`
+    - [ ] svg実装のためのCommand拡張
+    - [ ] svgフォントから必要な部分だけ切り出すパーサー
 
 # APIの大幅破壊的変更
 
@@ -90,7 +93,7 @@
 - [*] FontFamilyのフォールバック/GPOS/GDEF/GSUB適応順序の整理
 - [ ] アラビア語フォントの対応 LTR RTLの責務は分離して持たせる
 - [ ] スクリプト文字対応
-- [ ] cff2対応を進める
+- [-] cff2対応を進める
 
 - [+] web assemblyでもコンパイル出来るようにする
 - [+] fontをbufferからloadする機能
@@ -277,7 +280,7 @@
 # opentype
 - [x] True Type
 - [x] cff
-- [ ] cff2
+- [-] cff2
 - [x] color true type
 - [+] sbix
 - [ ] svg  # svgパーサーがいる

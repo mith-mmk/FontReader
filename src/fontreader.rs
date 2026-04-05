@@ -179,6 +179,7 @@ struct ResolvedGlyph {
     ch: char,
     glyph_id: usize,
     prefer_color: bool,
+    ligature_components: u16,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -1435,6 +1436,7 @@ impl Font {
                     ch: expanded_glyphs[index].ch,
                     glyph_id,
                     prefer_color: expanded_glyphs[index].prefer_color,
+                    ligature_components: len as u16,
                 }));
                 index += len;
             } else {
@@ -1478,6 +1480,7 @@ impl Font {
                     ch: glyphs[source_index].ch,
                     glyph_id,
                     prefer_color: glyphs[source_index].prefer_color,
+                    ligature_components: glyphs[source_index].ligature_components,
                 })
                 .collect::<Vec<_>>();
             self.apply_gsub_ligature_stage(output, &expanded_glyphs, locale, is_right_to_left);
@@ -1544,6 +1547,7 @@ impl Font {
                             ch,
                             glyph_id,
                             prefer_color,
+                            ligature_components: 1,
                         });
                     }
                 }
@@ -1875,11 +1879,28 @@ impl Font {
         let glyph_index = unit_glyph_indices
             .get(base_index)
             .and_then(|glyph_index| *glyph_index)?;
-        let adjustment = gpos.lookup_mark_to_base_adjustment(
-            base.glyph_id as u16,
-            current.glyph_id as u16,
-            locale,
-        )?;
+        let ligature_component_index = base.ligature_components.saturating_sub(1) as usize;
+        let adjustment = if base.ligature_components > 1 {
+            gpos.lookup_mark_to_ligature_adjustment(
+                base.glyph_id as u16,
+                current.glyph_id as u16,
+                ligature_component_index,
+                locale,
+            )
+            .or_else(|| {
+                gpos.lookup_mark_to_base_adjustment(
+                    base.glyph_id as u16,
+                    current.glyph_id as u16,
+                    locale,
+                )
+            })?
+        } else {
+            gpos.lookup_mark_to_base_adjustment(
+                base.glyph_id as u16,
+                current.glyph_id as u16,
+                locale,
+            )?
+        };
 
         Some(GlyphAttachmentPlacement {
             glyph_index,
