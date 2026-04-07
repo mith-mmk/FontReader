@@ -78,6 +78,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             match layer {
                 GlyphLayer::Path(_) => html.push_str("<li>  path layer</li>\n"),
                 GlyphLayer::Raster(_) => html.push_str("<li>  raster layer</li>\n"),
+                #[cfg(feature = "svg-fonts")]
+                GlyphLayer::Svg(_) => html.push_str("<li>  svg layer</li>\n"),
             }
         }
     }
