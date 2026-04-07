@@ -1748,7 +1748,9 @@ mod tests {
 
     #[test]
     fn emoji_font_renders_svg() {
-        let path = test_fonts_dir().join("NotoColorEmoji-Regular.ttf");
+        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join(".test_fonts")
+            .join("NotoColorEmoji-Regular.ttf");
         let font = crate::fontload_file(&path).expect("load emoji font");
         let svg = font.font().get_svg('😀', 32.0, "px").expect("emoji svg");
         assert!(svg.contains("<svg"));
@@ -2141,10 +2143,6 @@ mod tests {
 
     fn woff_font_path() -> std::path::PathBuf {
         test_fonts_dir().join("MS-Gothic.ttf.woff")
-    }
-
-    fn svg_font_path() -> std::path::PathBuf {
-        test_fonts_dir().join("EmojiOneColor.otf")
     }
 
     fn fira_sans_black_path() -> std::path::PathBuf {
@@ -3297,6 +3295,112 @@ mod tests {
         ["👩‍💻", "👨‍👩‍👧‍👦", "🏳️‍🌈", "❤️", "🇯🇵", "1️⃣", "👩🏽‍💻"]
     }
 
+    #[cfg(feature = "svg-fonts")]
+    fn direct_svg_emoji_font_path(name: &str) -> std::path::PathBuf {
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join(".test_fonts")
+            .join(name)
+    }
+
+    #[cfg(feature = "svg-fonts")]
+    fn assert_svg_font_supports_any_sequence(
+        font_name: &str,
+        sequences: &[&str],
+        label: &str,
+    ) {
+        let path = direct_svg_emoji_font_path(font_name);
+        let bytes = std::fs::read(&path)
+            .unwrap_or_else(|err| panic!("read {font_name} for {label}: {err}"));
+        let font = crate::load_font_from_buffer(&bytes)
+            .unwrap_or_else(|err| panic!("load {font_name} for {label}: {err}"));
+
+        for sequence in sequences {
+            let Ok(run) = crate::text2commands(
+                sequence,
+                crate::FontOptions::new(&font).with_font_size(32.0),
+            ) else {
+                continue;
+            };
+            if run.glyphs.len() != 1 {
+                continue;
+            }
+            match run.glyphs[0].glyph.layers.first() {
+                Some(crate::GlyphLayer::Svg(layer)) if !layer.document.is_empty() => {
+                    let svg = font
+                        .text2svg(sequence, 32.0, "px")
+                        .unwrap_or_else(|err| panic!("render {font_name} {sequence:?}: {err}"));
+                    assert!(
+                        svg.contains("<svg"),
+                        "expected nested svg output for {font_name} {sequence:?}"
+                    );
+                    return;
+                }
+                _ => {}
+            }
+        }
+
+        panic!(
+            "expected {font_name} to support at least one {label} sequence from {:?}",
+            sequences
+        );
+    }
+
+    #[cfg(feature = "svg-fonts")]
+    fn assert_svg_font_family_fallback_supports_any_sequence(
+        font_name: &str,
+        sequences: &[&str],
+        label: &str,
+    ) {
+        let regular_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join(".test_fonts")
+            .join("Fira_Sans")
+            .join("FiraSans-Regular.ttf");
+        let regular = crate::load_font_from_file(&regular_path).expect("load regular fira sans");
+        let path = direct_svg_emoji_font_path(font_name);
+        let bytes = std::fs::read(&path)
+            .unwrap_or_else(|err| panic!("read {font_name} for fallback {label}: {err}"));
+        let emoji = crate::load_font_from_buffer(&bytes)
+            .unwrap_or_else(|err| panic!("load {font_name} for fallback {label}: {err}"));
+
+        let mut family = crate::FontFamily::new("Fira Sans");
+        family.add_loaded_font(regular);
+        family.add_loaded_font(emoji);
+
+        for sequence in sequences {
+            let text = format!("A{sequence}B");
+            let Ok(run) = crate::text2commands(
+                &text,
+                crate::FontOptions::from_family(&family)
+                    .with_font_family("Fira Sans")
+                    .with_font_size(32.0),
+            ) else {
+                continue;
+            };
+            if run.glyphs.len() != 3 {
+                continue;
+            }
+            match run.glyphs[1].glyph.layers.first() {
+                Some(crate::GlyphLayer::Svg(layer)) if !layer.document.is_empty() => {
+                    let svg = family
+                        .text2svg(&text, 32.0, "px")
+                        .unwrap_or_else(|err| panic!("family svg {font_name} {sequence:?}: {err}"));
+                    assert!(svg.starts_with("<svg"));
+                    assert!(
+                        svg.matches("<svg").count() >= 2,
+                        "expected nested svg output for fallback {font_name} {sequence:?}"
+                    );
+                    return;
+                }
+                _ => {}
+            }
+        }
+
+        panic!(
+            "expected fallback family with {font_name} to support at least one {label} sequence from {:?}",
+            sequences
+        );
+    }
+
     fn first_real_emoji_ligature() -> Option<(std::path::PathBuf, &'static str)> {
         for path in emoji_ligature_font_candidates() {
             if !path.exists() {
@@ -3884,6 +3988,10 @@ mod tests {
                 Some(crate::GlyphLayer::Path(layer)) => assert!(!layer.commands.is_empty()),
                 Some(crate::GlyphLayer::Raster(_)) => {
                     panic!("plain digits should not fall back to sbix raster glyphs")
+                }
+                #[cfg(feature = "svg-fonts")]
+                Some(crate::GlyphLayer::Svg(_)) => {
+                    panic!("plain digits should not fall back to SVG glyph layers")
                 }
                 None => panic!("expected digit layer"),
             }
@@ -5132,12 +5240,143 @@ mod tests {
     }
 
     #[test]
-    fn glyph_run_rejects_svg_glyphs() {
-        let font = crate::load_font_from_file(svg_font_path()).expect("load svg font");
+    #[cfg(not(feature = "svg-fonts"))]
+    fn glyph_run_rejects_svg_glyphs_without_svg_fonts_feature() {
+        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join(".test_fonts")
+            .join("EmojiOneColor.otf");
+        let bytes = std::fs::read(path).expect("read svg font");
+        let font = crate::load_font_from_buffer(&bytes).expect("load svg font");
         let err = crate::text2commands("😀", crate::FontOptions::new(&font).with_font_size(32.0))
             .expect_err("svg glyphs should be rejected for now");
 
         assert_eq!(err.kind(), std::io::ErrorKind::Unsupported);
+    }
+
+    #[test]
+    #[cfg(feature = "svg-fonts")]
+    fn glyph_run_supports_svg_glyphs_with_svg_fonts_feature() {
+        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join(".test_fonts")
+            .join("EmojiOneColor.otf");
+        let bytes = std::fs::read(path).expect("read svg font");
+        let font = crate::load_font_from_buffer(&bytes).expect("load svg font");
+        let run = crate::text2commands("😀", crate::FontOptions::new(&font).with_font_size(32.0))
+            .expect("svg glyph run");
+
+        assert_eq!(run.glyphs.len(), 1);
+        match run.glyphs[0].glyph.layers.first() {
+            Some(crate::GlyphLayer::Svg(layer)) => {
+                assert!(!layer.document.is_empty(), "expected embedded SVG payload");
+                assert!(layer.view_box_width > 0.0, "expected positive SVG width");
+                assert!(layer.view_box_height > 0.0, "expected positive SVG height");
+            }
+            other => panic!("expected SVG glyph layer, got {other:?}"),
+        }
+
+        let svg = font.text2svg("😀", 32.0, "px").expect("svg font render");
+        assert!(svg.contains("<svg"));
+    }
+
+    #[test]
+    #[cfg(feature = "svg-fonts")]
+    fn glyph_run_supports_noto_color_emoji_svg_with_svg_fonts_feature() {
+        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join(".test_fonts")
+            .join("NotoColorEmoji-Regular.ttf");
+        let bytes = std::fs::read(path).expect("read noto color emoji");
+        let font = crate::load_font_from_buffer(&bytes).expect("load noto color emoji");
+        let run = crate::text2commands("😀", crate::FontOptions::new(&font).with_font_size(32.0))
+            .expect("noto color emoji glyph run");
+
+        assert_eq!(run.glyphs.len(), 1);
+        match run.glyphs[0].glyph.layers.first() {
+            Some(crate::GlyphLayer::Svg(layer)) => {
+                assert!(!layer.document.is_empty(), "expected embedded SVG payload");
+                assert!(layer.view_box_width > 0.0, "expected positive SVG width");
+                assert!(layer.view_box_height > 0.0, "expected positive SVG height");
+            }
+            other => panic!("expected SVG glyph layer, got {other:?}"),
+        }
+
+        let svg = font.text2svg("😀", 32.0, "px").expect("noto color emoji svg");
+        assert!(svg.contains("<svg"));
+    }
+
+    #[test]
+    #[cfg(feature = "svg-fonts")]
+    fn emojione_color_supports_some_zwj_svg_sequence() {
+        assert_svg_font_supports_any_sequence(
+            "EmojiOneColor.otf",
+            &["👩‍💻", "👨‍👩‍👧‍👦", "🏳️‍🌈", "👩🏽‍💻"],
+            "ZWJ",
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "svg-fonts")]
+    fn emojione_color_supports_some_variation_svg_sequence() {
+        assert_svg_font_supports_any_sequence("EmojiOneColor.otf", &["❤️", "1️⃣"], "variation");
+    }
+
+    #[test]
+    #[cfg(feature = "svg-fonts")]
+    fn noto_color_emoji_supports_some_zwj_svg_sequence() {
+        assert_svg_font_supports_any_sequence(
+            "NotoColorEmoji-Regular.ttf",
+            &["👩‍💻", "👨‍👩‍👧‍👦", "🏳️‍🌈", "👩🏽‍💻"],
+            "ZWJ",
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "svg-fonts")]
+    fn noto_color_emoji_supports_some_variation_svg_sequence() {
+        assert_svg_font_supports_any_sequence(
+            "NotoColorEmoji-Regular.ttf",
+            &["❤️", "1️⃣"],
+            "variation",
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "svg-fonts")]
+    fn emojione_color_family_fallback_keeps_some_zwj_svg_sequence() {
+        assert_svg_font_family_fallback_supports_any_sequence(
+            "EmojiOneColor.otf",
+            &["👩‍💻", "👨‍👩‍👧‍👦", "🏳️‍🌈", "👩🏽‍💻"],
+            "ZWJ",
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "svg-fonts")]
+    fn emojione_color_family_fallback_keeps_some_variation_svg_sequence() {
+        assert_svg_font_family_fallback_supports_any_sequence(
+            "EmojiOneColor.otf",
+            &["❤️", "1️⃣"],
+            "variation",
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "svg-fonts")]
+    fn noto_color_emoji_family_fallback_keeps_some_zwj_svg_sequence() {
+        assert_svg_font_family_fallback_supports_any_sequence(
+            "NotoColorEmoji-Regular.ttf",
+            &["👩‍💻", "👨‍👩‍👧‍👦", "🏳️‍🌈", "👩🏽‍💻"],
+            "ZWJ",
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "svg-fonts")]
+    fn noto_color_emoji_family_fallback_keeps_some_variation_svg_sequence() {
+        assert_svg_font_family_fallback_supports_any_sequence(
+            "NotoColorEmoji-Regular.ttf",
+            &["❤️", "1️⃣"],
+            "variation",
+        );
     }
 
     #[test]
@@ -5177,6 +5416,10 @@ mod tests {
                     );
                 }
                 Some(crate::GlyphLayer::Raster(_)) => {
+                    panic!("expected outline layer for Fira Sans glyph {index}");
+                }
+                #[cfg(feature = "svg-fonts")]
+                Some(crate::GlyphLayer::Svg(_)) => {
                     panic!("expected outline layer for Fira Sans glyph {index}");
                 }
                 None => panic!("expected at least one layer for glyph {index}"),
@@ -5227,6 +5470,10 @@ mod tests {
                 crate::GlyphLayer::Raster(_) => {
                     panic!("expected COLR glyph to use only path layers")
                 }
+                #[cfg(feature = "svg-fonts")]
+                crate::GlyphLayer::Svg(_) => {
+                    panic!("expected COLR glyph to use only path layers")
+                }
             }
         }
     }
@@ -5252,6 +5499,10 @@ mod tests {
                     );
                 }
                 crate::GlyphLayer::Raster(_) => {
+                    panic!("expected COLR glyph to use only path layers");
+                }
+                #[cfg(feature = "svg-fonts")]
+                crate::GlyphLayer::Svg(_) => {
                     panic!("expected COLR glyph to use only path layers");
                 }
             }
@@ -5684,6 +5935,8 @@ mod tests {
         match run.glyphs[0].glyph.layers.first() {
             Some(crate::GlyphLayer::Path(path)) => assert!(!path.commands.is_empty()),
             Some(crate::GlyphLayer::Raster(_)) => panic!("expected outline ligature glyph"),
+            #[cfg(feature = "svg-fonts")]
+            Some(crate::GlyphLayer::Svg(_)) => panic!("expected outline ligature glyph"),
             None => panic!("expected ligature layer"),
         }
     }

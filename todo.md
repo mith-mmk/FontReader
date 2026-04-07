@@ -17,8 +17,11 @@
 - [+] mark-to-ligature を追加して複合字上の mark attachment を詰める
 - [ ] script ごとの fallback 境界を増やすためArabic/Syriac/Hebrew 以外の fixture を追加する
 - [ ] features `svg-fonts`
-    - [ ] svg実装のためのCommand拡張
-    - [ ] svgフォントから必要な部分だけ切り出すパーサー
+    - [+] svg実装のためのCommand拡張
+    - [+] svgフォントから必要な部分だけ切り出すパーサー
+    - [+] `EmojiOneColor.otf` / `NotoColorEmoji-Regular.ttf` の単体 emoji glyph を回帰テスト
+    - [+] `EmojiOneColor.otf` / `NotoColorEmoji-Regular.ttf` の ZWJ / variation sequence を回帰テスト
+    - [+] `FontFamily` fallback でも `EmojiOneColor.otf` / `NotoColorEmoji-Regular.ttf` の SVG cluster 維持を回帰テスト
 
 # APIの大幅破壊的変更
 
@@ -204,8 +207,8 @@
   - font.set_line_spacing(f32)
   - font.get_line_spacing() -> 32
 - features svg-font
-  - [ ] svg fontのサポート
-  - [ ] svgのサポートに必要な最低限のファンクションを追加(css/textは無視)
+  - [+] svg fontの暫定サポート (`svg-fonts`)
+  - [+] svgのサポートに必要な最低限のファンクションを追加(css/textは無視)
 - features ritchtext
   - [ ] font.ritchtext2command(&self, &str, size: Option<f32>) -> &FontCommand // ritch text(Unity Super Set)をコマンドにして返す
   - [ ] font.ritchtext2svg(&self, &str, size: Option<f32>) -> &FontCommand // ritch text(Unity Super Set)をコマンドにして返す
@@ -405,6 +408,7 @@
     - [ ] SVG **SHOULD**
         - [x] getter
         - [x] svg divider
+        - [+] `svg-fonts` feature で glyph payload を `GlyphLayer` に載せて SVG 出力
   - OTHERS
     - [ ] DSIG	Digital signature
     - [ ] 'hdmx'	Horizontal device metrics

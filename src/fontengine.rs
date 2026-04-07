@@ -4,6 +4,8 @@ use crate::commands::{
     Command, FillRule, FontOptions, FontVariant, FontVariationSetting, GlyphBounds, GlyphLayer,
     GlyphPaint, GlyphRun, PositionedGlyph, RasterGlyphLayer, RasterGlyphSource, TextDirection,
 };
+#[cfg(feature = "svg-fonts")]
+use crate::commands::SvgGlyphLayer;
 use crate::fontface::FontFace;
 use crate::util;
 use base64::{engine::general_purpose, Engine as _};
@@ -310,6 +312,10 @@ pub(crate) fn glyph_run_to_svg(run: &GlyphRun, fontunit: &str) -> Result<String,
                 GlyphLayer::Raster(raster) => {
                     svg += &raster_layer_to_svg_image(raster, glyph.x, glyph.y)?;
                 }
+                #[cfg(feature = "svg-fonts")]
+                GlyphLayer::Svg(layer) => {
+                    svg += &svg_layer_to_svg_fragment(layer, glyph.x, glyph.y);
+                }
             }
         }
     }
@@ -400,6 +406,19 @@ fn glyph_layer_bounds(glyph: &PositionedGlyph) -> Result<Option<GlyphBounds>, Er
                         glyph.y + raster.offset_y + height,
                     );
                 }
+            }
+            #[cfg(feature = "svg-fonts")]
+            GlyphLayer::Svg(layer) => {
+                extend_point(
+                    &mut bounds,
+                    glyph.x + layer.offset_x + layer.view_box_min_x,
+                    glyph.y + layer.offset_y + layer.view_box_min_y,
+                );
+                extend_point(
+                    &mut bounds,
+                    glyph.x + layer.offset_x + layer.view_box_min_x + layer.view_box_width,
+                    glyph.y + layer.offset_y + layer.view_box_min_y + layer.view_box_height,
+                );
             }
         }
     }
@@ -561,4 +580,20 @@ fn raster_layer_dimensions(raster: &RasterGlyphLayer) -> Result<Option<(f32, f32
     }
 
     Ok(Some((width as f32, height as f32)))
+}
+
+#[cfg(feature = "svg-fonts")]
+fn svg_layer_to_svg_fragment(layer: &SvgGlyphLayer, glyph_x: f32, glyph_y: f32) -> String {
+    format!(
+        "<svg x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" viewBox=\"{} {} {} {}\" overflow=\"visible\">{}</svg>",
+        glyph_x + layer.offset_x,
+        glyph_y + layer.offset_y,
+        layer.width,
+        layer.height,
+        layer.view_box_min_x,
+        layer.view_box_min_y,
+        layer.view_box_width,
+        layer.view_box_height,
+        layer.document
+    )
 }

@@ -162,11 +162,28 @@ impl RasterGlyphLayer {
     }
 }
 
+/// Embedded SVG glyph payload extracted from an OpenType `SVG ` table.
+#[cfg(feature = "svg-fonts")]
+#[derive(Debug, Clone)]
+pub struct SvgGlyphLayer {
+    pub document: String,
+    pub view_box_min_x: f32,
+    pub view_box_min_y: f32,
+    pub view_box_width: f32,
+    pub view_box_height: f32,
+    pub width: f32,
+    pub height: f32,
+    pub offset_x: f32,
+    pub offset_y: f32,
+}
+
 /// Extensible glyph layer model.
 #[derive(Debug, Clone)]
 pub enum GlyphLayer {
     Path(PathGlyphLayer),
     Raster(RasterGlyphLayer),
+    #[cfg(feature = "svg-fonts")]
+    Svg(SvgGlyphLayer),
 }
 
 /// A single glyph as prepared by the font parser.

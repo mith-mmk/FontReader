@@ -11,6 +11,8 @@ use crate::commands::{
     GlyphLayer, GlyphMetrics as DrawGlyphMetrics, GlyphPaint, GlyphRun, PathGlyphLayer,
     PositionedGlyph, RasterGlyphLayer,
 };
+#[cfg(feature = "svg-fonts")]
+use crate::commands::SvgGlyphLayer;
 use crate::fontheader;
 use crate::opentype::color::sbix;
 use crate::opentype::color::svg;
@@ -1776,6 +1778,30 @@ impl Font {
         )
     }
 
+    #[cfg(feature = "svg-fonts")]
+    fn build_svg_layers(
+        &self,
+        glyph_id: usize,
+        layout: &FontLayout,
+        scale_x: f32,
+        scale_y: f32,
+    ) -> Option<Vec<GlyphLayer>> {
+        let document = self
+            .current_svg_table()?
+            .get_glyph_document(glyph_id as u32, layout)?;
+        Some(vec![GlyphLayer::Svg(SvgGlyphLayer {
+            document: document.payload,
+            view_box_min_x: document.view_box_min_x * scale_x,
+            view_box_min_y: document.view_box_min_y * scale_y,
+            view_box_width: document.view_box_width * scale_x,
+            view_box_height: document.view_box_height * scale_y,
+            width: (document.view_box_width * scale_x).abs().max(1.0),
+            height: (document.view_box_height * scale_y).abs().max(1.0),
+            offset_x: 0.0,
+            offset_y: 0.0,
+        })])
+    }
+
     fn pair_adjustment_for_index(
         &self,
         units: &[ResolvedTextUnit],
@@ -2085,6 +2111,11 @@ impl Font {
                     let glyph_id = glyph_data.glyph_id;
                     let can_use_outline =
                         self.resolved_glyph_can_use_outline(open_type_glyph, glyph_id);
+                    #[cfg(feature = "svg-fonts")]
+                    let can_use_svg = self
+                        .current_svg_table()
+                        .map(|svg| svg.has_glyph(glyph_id as u32))
+                        .unwrap_or(false);
 
                     let layers = if let Some(sbix) = self.current_sbix() {
                         if let Some(bitmap) =
@@ -2107,6 +2138,76 @@ impl Font {
                                 )?
                             }
                         } else {
+                            #[cfg(feature = "svg-fonts")]
+                            {
+                                if can_use_svg && (resolved.prefer_color || !can_use_outline) {
+                                    self.build_svg_layers(
+                                        glyph_id,
+                                        &open_type_glyph.layout,
+                                        scale_x,
+                                        scale_y,
+                                    )
+                                    .ok_or_else(|| {
+                                        Error::new(
+                                            ErrorKind::Unsupported,
+                                            format!(
+                                                "failed to extract SVG glyph layer for {:?}",
+                                                resolved.ch
+                                            ),
+                                        )
+                                    })?
+                                } else {
+                                    self.build_outline_layers(
+                                        glyph_id,
+                                        open_type_glyph,
+                                        scale_x,
+                                        scale_y,
+                                        resolved.ch,
+                                    )?
+                                }
+                            }
+                            #[cfg(not(feature = "svg-fonts"))]
+                            {
+                                self.build_outline_layers(
+                                    glyph_id,
+                                    open_type_glyph,
+                                    scale_x,
+                                    scale_y,
+                                    resolved.ch,
+                                )?
+                            }
+                        }
+                    } else {
+                        #[cfg(feature = "svg-fonts")]
+                        {
+                            if can_use_svg && (resolved.prefer_color || !can_use_outline) {
+                                self.build_svg_layers(
+                                    glyph_id,
+                                    &open_type_glyph.layout,
+                                    scale_x,
+                                    scale_y,
+                                )
+                                .ok_or_else(|| {
+                                    Error::new(
+                                        ErrorKind::Unsupported,
+                                        format!(
+                                            "failed to extract SVG glyph layer for {:?}",
+                                            resolved.ch
+                                        ),
+                                    )
+                                })?
+                            } else {
+                                self.build_outline_layers(
+                                    glyph_id,
+                                    open_type_glyph,
+                                    scale_x,
+                                    scale_y,
+                                    resolved.ch,
+                                )?
+                            }
+                        }
+                        #[cfg(not(feature = "svg-fonts"))]
+                        {
                             self.build_outline_layers(
                                 glyph_id,
                                 open_type_glyph,
@@ -2115,14 +2216,6 @@ impl Font {
                                 resolved.ch,
                             )?
                         }
-                    } else {
-                        self.build_outline_layers(
-                            glyph_id,
-                            open_type_glyph,
-                            scale_x,
-                            scale_y,
-                            resolved.ch,
-                        )?
                     };
 
                     let mut metrics =
@@ -3336,6 +3429,19 @@ fn glyph_layers_bounds(layers: &[GlyphLayer]) -> Option<GlyphBounds> {
                         raster.offset_y + height as f32,
                     );
                 }
+            }
+            #[cfg(feature = "svg-fonts")]
+            GlyphLayer::Svg(svg) => {
+                extend_bounds(
+                    &mut bounds,
+                    svg.offset_x + svg.view_box_min_x,
+                    svg.offset_y + svg.view_box_min_y,
+                );
+                extend_bounds(
+                    &mut bounds,
+                    svg.offset_x + svg.view_box_min_x + svg.view_box_width,
+                    svg.offset_y + svg.view_box_min_y + svg.view_box_height,
+                );
             }
         }
     }

@@ -50,6 +50,8 @@ pub use commands::{
     GlyphMetrics, GlyphPaint, GlyphRun, PathGlyphLayer, PositionedGlyph, RasterGlyphLayer,
     RasterGlyphSource, TextDirection,
 };
+#[cfg(feature = "svg-fonts")]
+pub use commands::SvgGlyphLayer;
 pub use fontengine::{FontEngine, ShapingPolicy};
 pub use fontface::{FontFace, FontFaceDescriptor, FontFamily, FontVariationAxis};
 pub use fontfile::{

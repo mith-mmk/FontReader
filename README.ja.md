@@ -30,6 +30,21 @@ English: [README.md](README.md)
 
 default feature には `layout` と `cff` が含まれます。
 
+## feature
+
+- `layout`
+  - GSUB / GPOS を使った shaping
+  - 縦書き、RTL、locale、variant 指定
+- `cff`
+  - OpenType / CFF outline
+- `raw`
+  - 旧来の低レイヤ parser API
+- `svg-fonts`
+  - OpenType `SVG ` テーブルを `GlyphLayer::Svg` として扱う暫定サポート
+  - 現状は `EmojiOneColor.otf` と `NotoColorEmoji-Regular.ttf` を主対象に回帰テスト済み
+  - `FontEngine::render_svg()` / `FontFamily::text2svg()` では nested SVG として出力
+  - path への完全展開や CSS / text 解釈は未対応
+
 ## 導入
 
 ```toml
@@ -42,6 +57,13 @@ fontloader = "0.0.10"
 ```toml
 [dependencies]
 fontloader = { version = "0.0.10", features = ["raw"] }
+```
+
+SVG emoji font の暫定サポートも使う場合:
+
+```toml
+[dependencies]
+fontloader = { version = "0.0.10", features = ["svg-fonts"] }
 ```
 
 ## 最小サンプル
@@ -87,6 +109,12 @@ println!("{}", engine.shape("Hello")?.glyphs.len());
   - `engine.with_variation("wght", 700.0)`
 
 用途別の実行例は [doc/api-recipes.ja.md](doc/api-recipes.ja.md) にまとめています。
+
+## SVG color font について
+
+`sbix` は raster layer、`COLR/CPAL` は path layer、`SVG ` テーブルは `svg-fonts` 有効時のみ `Svg` layer として扱います。
+
+現状の `svg-fonts` は「SVG glyph を glyph 単位で切り出し、そのまま SVG 出力へ埋め込む」方針です。`text2commands()` / `shape()` / `FontFamily` fallback でも SVG glyph layer を保持しますが、SVG を path command へ完全変換する実装ではありません。
 
 ## examples
 

@@ -30,6 +30,21 @@ The old low-level parser surface still exists behind `features = ["raw"]`.
 
 Default features include `layout` and `cff`.
 
+## Features
+
+- `layout`
+  - GSUB / GPOS shaping
+  - Vertical flow, RTL, locale, and variant selection
+- `cff`
+  - OpenType / CFF outlines
+- `raw`
+  - Legacy low-level parser API
+- `svg-fonts`
+  - Provisional support for OpenType `SVG ` glyphs through `GlyphLayer::Svg`
+  - Currently regression-tested mainly against `EmojiOneColor.otf` and `NotoColorEmoji-Regular.ttf`
+  - `FontEngine::render_svg()` and `FontFamily::text2svg()` emit nested SVG fragments
+  - Full path conversion and CSS / text interpretation are not implemented yet
+
 ## Install
 
 ```toml
@@ -42,6 +57,13 @@ If you need the low-level parser API:
 ```toml
 [dependencies]
 fontloader = { version = "0.0.10", features = ["raw"] }
+```
+
+If you also want provisional SVG emoji font support:
+
+```toml
+[dependencies]
+fontloader = { version = "0.0.10", features = ["svg-fonts"] }
 ```
 
 ## Quick Start
@@ -87,6 +109,12 @@ println!("{}", engine.shape("Hello")?.glyphs.len());
   - `engine.with_variation("wght", 700.0)`
 
 More runnable examples live in [doc/api-recipes.md](doc/api-recipes.md).
+
+## About SVG Color Fonts
+
+`sbix` is exposed as raster layers, `COLR/CPAL` as path layers, and the OpenType `SVG ` table as `Svg` layers only when `svg-fonts` is enabled.
+
+The current `svg-fonts` implementation extracts glyph-local SVG payloads and embeds them back into SVG output. `text2commands()`, `shape()`, and `FontFamily` fallback keep those SVG glyph layers intact, but the crate does not yet convert SVG glyphs into path commands.
 
 ## Examples
 

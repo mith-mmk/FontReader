@@ -18,6 +18,7 @@ encoding = ["iconv"]
 layout = []
 cff = []
 cff2 = []
+svg-fonts = []
 
 [dependencies]
 # MUST
