@@ -94,12 +94,20 @@ pub enum FillRule {
     EvenOdd,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PathPaintMode {
+    Fill,
+    Stroke,
+}
+
 /// Vector glyph layer.
 #[derive(Debug, Clone)]
 pub struct PathGlyphLayer {
     pub commands: Vec<Command>,
     pub paint: GlyphPaint,
+    pub paint_mode: PathPaintMode,
     pub fill_rule: FillRule,
+    pub stroke_width: f32,
     pub offset_x: f32,
     pub offset_y: f32,
 }
@@ -109,7 +117,21 @@ impl PathGlyphLayer {
         Self {
             commands,
             paint,
+            paint_mode: PathPaintMode::Fill,
             fill_rule: FillRule::NonZero,
+            stroke_width: 1.0,
+            offset_x: 0.0,
+            offset_y: 0.0,
+        }
+    }
+
+    pub fn stroke(commands: Vec<Command>, paint: GlyphPaint, stroke_width: f32) -> Self {
+        Self {
+            commands,
+            paint,
+            paint_mode: PathPaintMode::Stroke,
+            fill_rule: FillRule::NonZero,
+            stroke_width,
             offset_x: 0.0,
             offset_y: 0.0,
         }

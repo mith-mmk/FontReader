@@ -16,20 +16,77 @@ struct SvgElement {
 
 #[derive(Debug, Clone, Copy)]
 struct RenderState {
-    offset_x: f32,
-    offset_y: f32,
+    transform: Transform2D,
     fill: Option<GlyphPaint>,
     fill_rule: FillRule,
+    stroke: Option<GlyphPaint>,
+    stroke_width: f32,
 }
 
 impl Default for RenderState {
     fn default() -> Self {
         Self {
-            offset_x: 0.0,
-            offset_y: 0.0,
-            fill: None,
+            transform: Transform2D::IDENTITY,
+            fill: Some(GlyphPaint::CurrentColor),
             fill_rule: FillRule::NonZero,
+            stroke: None,
+            stroke_width: 1.0,
         }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct Transform2D {
+    a: f32,
+    b: f32,
+    c: f32,
+    d: f32,
+    e: f32,
+    f: f32,
+}
+
+impl Transform2D {
+    const IDENTITY: Self = Self {
+        a: 1.0,
+        b: 0.0,
+        c: 0.0,
+        d: 1.0,
+        e: 0.0,
+        f: 0.0,
+    };
+
+    fn multiply(self, next: Self) -> Self {
+        Self {
+            a: self.a * next.a + self.c * next.b,
+            b: self.b * next.a + self.d * next.b,
+            c: self.a * next.c + self.c * next.d,
+            d: self.b * next.c + self.d * next.d,
+            e: self.a * next.e + self.c * next.f + self.e,
+            f: self.b * next.e + self.d * next.f + self.f,
+        }
+    }
+
+    fn translate(x: f32, y: f32) -> Self {
+        Self {
+            e: x,
+            f: y,
+            ..Self::IDENTITY
+        }
+    }
+
+    fn scale(x: f32, y: f32) -> Self {
+        Self {
+            a: x,
+            d: y,
+            ..Self::IDENTITY
+        }
+    }
+
+    fn apply(self, x: f32, y: f32) -> (f32, f32) {
+        (
+            self.a * x + self.c * y + self.e,
+            self.b * x + self.d * y + self.f,
+        )
     }
 }
 
@@ -197,22 +254,42 @@ fn flatten_node(
     }
 
     let style = element.attrs.get("style").map(|value| parse_style(value));
-    let local_fill = style
-        .as_ref()
-        .and_then(|style| style.get("fill"))
-        .or_else(|| element.attrs.get("fill"))
-        .and_then(|value| parse_fill(value));
+    let local_fill = resolve_paint(
+        style.as_ref().and_then(|style| style.get("fill")),
+        element.attrs.get("fill"),
+        state.fill,
+    );
     let local_fill_rule = style
         .as_ref()
         .and_then(|style| style.get("fill-rule"))
         .or_else(|| element.attrs.get("fill-rule"))
         .map(|value| parse_fill_rule(value))
         .unwrap_or(state.fill_rule);
+    let local_stroke = resolve_paint(
+        style.as_ref().and_then(|style| style.get("stroke")),
+        element.attrs.get("stroke"),
+        state.stroke,
+    );
+    let local_stroke_width = style
+        .as_ref()
+        .and_then(|style| style.get("stroke-width"))
+        .or_else(|| element.attrs.get("stroke-width"))
+        .and_then(|value| parse_number(value))
+        .map(|value| value * scale_x.abs().max(scale_y.abs()))
+        .unwrap_or(state.stroke_width);
     let next_state = RenderState {
-        offset_x: state.offset_x,
-        offset_y: state.offset_y,
-        fill: local_fill.or(state.fill),
+        transform: state.transform.multiply(parse_transform(
+            style
+                .as_ref()
+                .and_then(|style| style.get("transform"))
+                .or_else(|| element.attrs.get("transform")),
+            scale_x,
+            scale_y,
+        )),
+        fill: local_fill,
         fill_rule: local_fill_rule,
+        stroke: local_stroke,
+        stroke_width: local_stroke_width,
     };
 
     match element.name.as_str() {
@@ -223,9 +300,7 @@ fn flatten_node(
         }
         "use" => flatten_use(element, defs, next_state, scale_x, scale_y, out),
         "path" | "rect" | "circle" | "ellipse" | "line" | "polyline" | "polygon" => {
-            if let Some(layer) = element_to_path_layer(element, next_state, scale_x, scale_y) {
-                out.push(layer);
-            }
+            out.extend(element_to_path_layers(element, next_state, scale_x, scale_y));
         }
         _ => {}
     }
@@ -250,15 +325,25 @@ fn flatten_use(
     let Some(referenced) = defs.get(reference) else {
         return;
     };
+    let mut referenced = referenced.clone();
+    for key in ["fill", "fill-rule", "stroke", "stroke-width"] {
+        if let Some(value) = element.attrs.get(key) {
+            referenced.attrs.insert(key.to_string(), value.clone());
+        }
+    }
 
     let use_state = RenderState {
-        offset_x: state.offset_x + parse_attr_f32(&element.attrs, "x").unwrap_or(0.0) * scale_x,
-        offset_y: state.offset_y + parse_attr_f32(&element.attrs, "y").unwrap_or(0.0) * scale_y,
+        transform: state.transform.multiply(Transform2D::translate(
+            parse_attr_f32(&element.attrs, "x").unwrap_or(0.0) * scale_x,
+            parse_attr_f32(&element.attrs, "y").unwrap_or(0.0) * scale_y,
+        )),
         fill: state.fill,
         fill_rule: state.fill_rule,
+        stroke: state.stroke,
+        stroke_width: state.stroke_width,
     };
     flatten_node(
-        &SvgNode::Element(referenced.clone()),
+        &SvgNode::Element(referenced),
         defs,
         use_state,
         scale_x,
@@ -267,33 +352,50 @@ fn flatten_use(
     );
 }
 
-fn element_to_path_layer(
+fn element_to_path_layers(
     element: &SvgElement,
     state: RenderState,
     scale_x: f32,
     scale_y: f32,
-) -> Option<PathGlyphLayer> {
+) -> Vec<PathGlyphLayer> {
     let commands = match element.name.as_str() {
         "path" => element
             .attrs
             .get("d")
-            .and_then(|d| parse_path_data(d, scale_x, scale_y))?,
-        "rect" => rect_to_commands(&element.attrs, scale_x, scale_y)?,
-        "circle" => circle_to_commands(&element.attrs, scale_x, scale_y)?,
-        "ellipse" => ellipse_to_commands(&element.attrs, scale_x, scale_y)?,
-        "line" => line_to_commands(&element.attrs, scale_x, scale_y)?,
-        "polyline" => poly_points_to_commands(&element.attrs, false, scale_x, scale_y)?,
-        "polygon" => poly_points_to_commands(&element.attrs, true, scale_x, scale_y)?,
-        _ => return None,
+            .and_then(|d| parse_path_data(d, scale_x, scale_y)),
+        "rect" => rect_to_commands(&element.attrs, scale_x, scale_y),
+        "circle" => circle_to_commands(&element.attrs, scale_x, scale_y),
+        "ellipse" => ellipse_to_commands(&element.attrs, scale_x, scale_y),
+        "line" => line_to_commands(&element.attrs, scale_x, scale_y),
+        "polyline" => poly_points_to_commands(&element.attrs, false, scale_x, scale_y),
+        "polygon" => poly_points_to_commands(&element.attrs, true, scale_x, scale_y),
+        _ => return Vec::new(),
+    };
+    let Some(commands) = commands else {
+        return Vec::new();
     };
     if commands.is_empty() {
-        return None;
+        return Vec::new();
     }
-    let mut layer = PathGlyphLayer::new(commands, state.fill.unwrap_or(GlyphPaint::CurrentColor));
-    layer.fill_rule = state.fill_rule;
-    layer.offset_x = state.offset_x;
-    layer.offset_y = state.offset_y;
-    Some(layer)
+    let transformed = transform_commands(&commands, state.transform);
+    let mut layers = Vec::new();
+    let supports_fill = !matches!(element.name.as_str(), "line");
+
+    if supports_fill {
+        if let Some(paint) = state.fill {
+            let mut layer = PathGlyphLayer::new(transformed.clone(), paint);
+            layer.fill_rule = state.fill_rule;
+            layers.push(layer);
+        }
+    }
+
+    if let Some(paint) = state.stroke {
+        if state.stroke_width > 0.0 {
+            layers.push(PathGlyphLayer::stroke(transformed, paint, state.stroke_width));
+        }
+    }
+
+    layers
 }
 
 fn tag_name(tag: &str) -> Option<&str> {
@@ -386,9 +488,6 @@ fn parse_style(style: &str) -> HashMap<String, String> {
 
 fn parse_fill(value: &str) -> Option<GlyphPaint> {
     let value = value.trim();
-    if value.eq_ignore_ascii_case("none") {
-        return None;
-    }
     if value.eq_ignore_ascii_case("currentcolor") {
         return Some(GlyphPaint::CurrentColor);
     }
@@ -396,6 +495,22 @@ fn parse_fill(value: &str) -> Option<GlyphPaint> {
         return parse_hex_color(hex).map(GlyphPaint::Solid);
     }
     None
+}
+
+fn resolve_paint(
+    style_value: Option<&String>,
+    attr_value: Option<&String>,
+    inherited: Option<GlyphPaint>,
+) -> Option<GlyphPaint> {
+    let Some(value) = style_value.or(attr_value) else {
+        return inherited;
+    };
+    let value = value.trim();
+    if value.eq_ignore_ascii_case("none") {
+        None
+    } else {
+        parse_fill(value)
+    }
 }
 
 fn parse_hex_color(hex: &str) -> Option<u32> {
@@ -428,6 +543,72 @@ fn parse_fill_rule(value: &str) -> FillRule {
     } else {
         FillRule::NonZero
     }
+}
+
+fn parse_transform(transform: Option<&String>, scale_x: f32, scale_y: f32) -> Transform2D {
+    let Some(transform) = transform else {
+        return Transform2D::IDENTITY;
+    };
+
+    let mut current = Transform2D::IDENTITY;
+    let mut source = transform.as_str();
+    while let Some(open) = source.find('(') {
+        let name = source[..open].trim().to_ascii_lowercase();
+        let Some(close) = source[open + 1..].find(')') else {
+            break;
+        };
+        let values = parse_numbers(&source[open + 1..open + 1 + close]);
+        let next = match name.as_str() {
+            "translate" if !values.is_empty() => Transform2D::translate(
+                values[0] * scale_x,
+                values.get(1).copied().unwrap_or(0.0) * scale_y,
+            ),
+            "scale" if !values.is_empty() => {
+                Transform2D::scale(values[0], values.get(1).copied().unwrap_or(values[0]))
+            }
+            "matrix" if values.len() == 6 => Transform2D {
+                a: values[0],
+                b: values[1],
+                c: values[2],
+                d: values[3],
+                e: values[4] * scale_x,
+                f: values[5] * scale_y,
+            },
+            _ => Transform2D::IDENTITY,
+        };
+        current = current.multiply(next);
+        source = &source[open + 1 + close + 1..];
+    }
+
+    current
+}
+
+fn transform_commands(commands: &[Command], transform: Transform2D) -> Vec<Command> {
+    commands
+        .iter()
+        .map(|command| match command {
+            Command::MoveTo(x, y) => {
+                let (x, y) = transform.apply(*x, *y);
+                Command::MoveTo(x, y)
+            }
+            Command::Line(x, y) => {
+                let (x, y) = transform.apply(*x, *y);
+                Command::Line(x, y)
+            }
+            Command::Bezier((cx, cy), (x, y)) => {
+                let (cx, cy) = transform.apply(*cx, *cy);
+                let (x, y) = transform.apply(*x, *y);
+                Command::Bezier((cx, cy), (x, y))
+            }
+            Command::CubicBezier((x1, y1), (x2, y2), (x, y)) => {
+                let (x1, y1) = transform.apply(*x1, *y1);
+                let (x2, y2) = transform.apply(*x2, *y2);
+                let (x, y) = transform.apply(*x, *y);
+                Command::CubicBezier((x1, y1), (x2, y2), (x, y))
+            }
+            Command::Close => Command::Close,
+        })
+        .collect()
 }
 
 fn rect_to_commands(
@@ -851,9 +1032,8 @@ mod tests {
         let layers = svg_to_path_layers(document, 2.0, 3.0);
         assert_eq!(layers.len(), 1);
         assert!(matches!(layers[0].paint, GlyphPaint::Solid(_)));
-        assert_eq!(layers[0].offset_x, 20.0);
-        assert_eq!(layers[0].offset_y, 60.0);
-        assert!(matches!(layers[0].commands[1], Command::Line(8.0, 0.0)));
+        assert!(matches!(layers[0].commands[0], Command::MoveTo(20.0, 60.0)));
+        assert!(matches!(layers[0].commands[1], Command::Line(28.0, 60.0)));
     }
 
     #[test]
@@ -867,5 +1047,68 @@ mod tests {
         let layers = svg_to_path_layers(document, 1.0, 1.0);
         assert_eq!(layers.len(), 1);
         assert!(matches!(layers[0].paint, GlyphPaint::CurrentColor));
+    }
+
+    #[test]
+    fn svg_to_path_layers_applies_parent_translate_transform() {
+        let document = concat!(
+            "<svg>",
+            "<g transform=\"translate(10,20)\">",
+            "<path d=\"M1 2 L3 4\"/>",
+            "</g>",
+            "</svg>"
+        );
+        let layers = svg_to_path_layers(document, 2.0, 3.0);
+        assert_eq!(layers.len(), 1);
+        assert!(matches!(layers[0].commands[0], Command::MoveTo(22.0, 66.0)));
+        assert!(matches!(layers[0].commands[1], Command::Line(26.0, 72.0)));
+    }
+
+    #[test]
+    fn svg_to_path_layers_applies_element_scale_transform() {
+        let document = "<svg><path d=\"M1 2 L3 4\" transform=\"scale(2,3)\"/></svg>";
+        let layers = svg_to_path_layers(document, 1.0, 1.0);
+        assert_eq!(layers.len(), 1);
+        assert!(matches!(layers[0].commands[0], Command::MoveTo(2.0, 6.0)));
+        assert!(matches!(layers[0].commands[1], Command::Line(6.0, 12.0)));
+    }
+
+    #[test]
+    fn svg_to_path_layers_applies_use_and_transform_together() {
+        let document = concat!(
+            "<svg>",
+            "<defs><path id=\"dot\" d=\"M1 1 L2 1\"/></defs>",
+            "<g transform=\"translate(5,6)\"><use href=\"#dot\" x=\"7\" y=\"8\"/></g>",
+            "</svg>"
+        );
+        let layers = svg_to_path_layers(document, 2.0, 3.0);
+        assert_eq!(layers.len(), 1);
+        assert!(matches!(layers[0].commands[0], Command::MoveTo(26.0, 45.0)));
+        assert!(matches!(layers[0].commands[1], Command::Line(28.0, 45.0)));
+    }
+
+    #[test]
+    fn svg_to_path_layers_emits_fill_and_stroke_layers() {
+        let document = concat!(
+            "<svg>",
+            "<rect x=\"1\" y=\"2\" width=\"3\" height=\"4\" fill=\"#123456\" stroke=\"#abcdef\" stroke-width=\"2\"/>",
+            "</svg>"
+        );
+        let layers = svg_to_path_layers(document, 2.0, 3.0);
+
+        assert_eq!(layers.len(), 2);
+        assert!(matches!(layers[0].paint, GlyphPaint::Solid(_)));
+        assert!(matches!(layers[1].paint, GlyphPaint::Solid(_)));
+        assert_eq!(layers[1].stroke_width, 6.0);
+    }
+
+    #[test]
+    fn svg_to_path_layers_keeps_line_as_stroke_only() {
+        let document = "<svg><line x1=\"1\" y1=\"2\" x2=\"3\" y2=\"4\" stroke=\"#123456\" stroke-width=\"2\"/></svg>";
+        let layers = svg_to_path_layers(document, 1.0, 1.0);
+
+        assert_eq!(layers.len(), 1);
+        assert!(matches!(layers[0].paint_mode, crate::commands::PathPaintMode::Stroke));
+        assert_eq!(layers[0].stroke_width, 2.0);
     }
 }

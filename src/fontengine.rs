@@ -4,7 +4,8 @@
 use crate::commands::SvgGlyphLayer;
 use crate::commands::{
     Command, FillRule, FontOptions, FontVariant, FontVariationSetting, GlyphBounds, GlyphLayer,
-    GlyphPaint, GlyphRun, PositionedGlyph, RasterGlyphLayer, RasterGlyphSource, TextDirection,
+    GlyphPaint, GlyphRun, PathPaintMode, PositionedGlyph, RasterGlyphLayer, RasterGlyphSource,
+    TextDirection,
 };
 use crate::fontface::FontFace;
 use crate::util;
@@ -267,6 +268,25 @@ mod tests {
         assert_eq!(engine.options().font_variant, FontVariant::Jis78);
         assert_eq!(engine.options().text_direction, TextDirection::TopToBottom);
     }
+
+    #[test]
+    fn glyph_run_to_svg_writes_stroke_path_attributes() {
+        let run = GlyphRun::new(vec![PositionedGlyph::new(
+            crate::Glyph::new(vec![GlyphLayer::Path(crate::PathGlyphLayer::stroke(
+                vec![Command::MoveTo(1.0, 2.0), Command::Line(3.0, 4.0)],
+                GlyphPaint::Solid(0xff11_2233),
+                2.5,
+            ))]),
+            0.0,
+            0.0,
+        )]);
+
+        let svg = glyph_run_to_svg(&run, "px").expect("svg export");
+
+        assert!(svg.contains("fill=\"none\""));
+        assert!(svg.contains("stroke=\"#112233\""));
+        assert!(svg.contains("stroke-width=\"2.5\""));
+    }
 }
 
 pub(crate) fn glyph_run_to_svg(run: &GlyphRun, fontunit: &str) -> Result<String, Error> {
@@ -302,12 +322,7 @@ pub(crate) fn glyph_run_to_svg(run: &GlyphRun, fontunit: &str) -> Result<String,
                     if d.is_empty() {
                         continue;
                     }
-                    svg += &format!(
-                        "<path d=\"{}\" {}{} />",
-                        d,
-                        paint_to_svg_attributes(path.paint),
-                        fill_rule_to_svg_attribute(path.fill_rule),
-                    );
+                    svg += &format!("<path d=\"{}\" {} />", d, path_to_svg_attributes(path));
                 }
                 GlyphLayer::Raster(raster) => {
                     svg += &raster_layer_to_svg_image(raster, glyph.x, glyph.y)?;
@@ -353,40 +368,53 @@ fn glyph_layer_bounds(glyph: &PositionedGlyph) -> Result<Option<GlyphBounds>, Er
     for layer in &glyph.glyph.layers {
         match layer {
             GlyphLayer::Path(path) => {
+                let stroke_padding = if matches!(path.paint_mode, PathPaintMode::Stroke) {
+                    path.stroke_width / 2.0
+                } else {
+                    0.0
+                };
                 for command in &path.commands {
                     match command {
-                        Command::MoveTo(x, y) | Command::Line(x, y) => extend_point(
-                            &mut bounds,
-                            glyph.x + path.offset_x + *x,
-                            glyph.y + path.offset_y + *y,
-                        ),
-                        Command::Bezier((cx, cy), (x, y)) => {
-                            extend_point(
-                                &mut bounds,
-                                glyph.x + path.offset_x + *cx,
-                                glyph.y + path.offset_y + *cy,
-                            );
-                            extend_point(
+                        Command::MoveTo(x, y) | Command::Line(x, y) => {
+                            extend_path_point(
                                 &mut bounds,
                                 glyph.x + path.offset_x + *x,
                                 glyph.y + path.offset_y + *y,
+                                stroke_padding,
+                            );
+                        }
+                        Command::Bezier((cx, cy), (x, y)) => {
+                            extend_path_point(
+                                &mut bounds,
+                                glyph.x + path.offset_x + *cx,
+                                glyph.y + path.offset_y + *cy,
+                                stroke_padding,
+                            );
+                            extend_path_point(
+                                &mut bounds,
+                                glyph.x + path.offset_x + *x,
+                                glyph.y + path.offset_y + *y,
+                                stroke_padding,
                             );
                         }
                         Command::CubicBezier((xa, ya), (xb, yb), (xc, yc)) => {
-                            extend_point(
+                            extend_path_point(
                                 &mut bounds,
                                 glyph.x + path.offset_x + *xa,
                                 glyph.y + path.offset_y + *ya,
+                                stroke_padding,
                             );
-                            extend_point(
+                            extend_path_point(
                                 &mut bounds,
                                 glyph.x + path.offset_x + *xb,
                                 glyph.y + path.offset_y + *yb,
+                                stroke_padding,
                             );
-                            extend_point(
+                            extend_path_point(
                                 &mut bounds,
                                 glyph.x + path.offset_x + *xc,
                                 glyph.y + path.offset_y + *yc,
+                                stroke_padding,
                             );
                         }
                         Command::Close => {}
@@ -453,6 +481,13 @@ fn extend_point(bounds: &mut Option<GlyphBounds>, x: f32, y: f32) {
     }
 }
 
+fn extend_path_point(bounds: &mut Option<GlyphBounds>, x: f32, y: f32, stroke_padding: f32) {
+    extend_point(bounds, x - stroke_padding, y - stroke_padding);
+    if stroke_padding > 0.0 {
+        extend_point(bounds, x + stroke_padding, y + stroke_padding);
+    }
+}
+
 fn draw_commands_to_svg_path(commands: &[Command], origin_x: f32, origin_y: f32) -> String {
     let mut d = String::new();
     for command in commands {
@@ -514,6 +549,19 @@ fn paint_to_svg_attributes(paint: GlyphPaint) -> String {
                 )
             }
         }
+    }
+}
+
+fn path_to_svg_attributes(path: &crate::commands::PathGlyphLayer) -> String {
+    let paint = paint_to_svg_attributes(path.paint);
+    match path.paint_mode {
+        PathPaintMode::Fill => format!("{}{}", paint, fill_rule_to_svg_attribute(path.fill_rule)),
+        PathPaintMode::Stroke => format!(
+            "fill=\"none\" {} stroke-width=\"{}\"",
+            paint.replacen("fill=", "stroke=", 1)
+                .replacen(" fill-opacity=", " stroke-opacity=", 1),
+            path.stroke_width
+        ),
     }
 }
 

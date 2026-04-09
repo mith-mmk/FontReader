@@ -114,7 +114,9 @@ More runnable examples live in [doc/api-recipes.md](doc/api-recipes.md).
 
 `sbix` is exposed as raster layers, `COLR/CPAL` as path layers, and the OpenType `SVG ` table as `Svg` layers only when `svg-fonts` is enabled.
 
-The current `svg-fonts` implementation extracts glyph-local SVG payloads and embeds them back into SVG output. `text2commands()`, `shape()`, and `FontFamily` fallback keep those SVG glyph layers intact, but the crate does not yet convert SVG glyphs into path commands.
+The current `svg-fonts` implementation still preserves glyph-local SVG payloads, but it now also converts simple `path`, `rect`, `circle`, `ellipse`, `line`, `polyline`, and `polygon` elements into `PathGlyphLayer` values. It includes minimal `defs` / `use`, `fill` / `fill-rule` / `stroke` / `stroke-width`, and `translate` / `scale` / `matrix` support.
+
+See [doc/svg-fonts-spec.md](doc/svg-fonts-spec.md) for the exact current scope and limitations.
 
 ## Examples
 

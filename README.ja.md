@@ -114,7 +114,9 @@ println!("{}", engine.shape("Hello")?.glyphs.len());
 
 `sbix` は raster layer、`COLR/CPAL` は path layer、`SVG ` テーブルは `svg-fonts` 有効時のみ `Svg` layer として扱います。
 
-現状の `svg-fonts` は「SVG glyph を glyph 単位で切り出し、そのまま SVG 出力へ埋め込む」方針です。`text2commands()` / `shape()` / `FontFamily` fallback でも SVG glyph layer を保持しますが、SVG を path command へ完全変換する実装ではありません。
+現状の `svg-fonts` は「SVG glyph を glyph 単位で切り出し、そのまま保持する」ことを基本にしつつ、単純な `path` / `rect` / `circle` / `ellipse` / `line` / `polyline` / `polygon` は `PathGlyphLayer` にも変換します。`defs` / `use`、`fill` / `fill-rule` / `stroke` / `stroke-width`、`translate` / `scale` / `matrix` の最小対応まで入っています。
+
+詳細仕様と未対応範囲は [doc/svg-fonts-spec.ja.md](doc/svg-fonts-spec.ja.md) にまとめています。
 
 ## examples
 

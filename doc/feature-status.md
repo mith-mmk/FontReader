@@ -68,6 +68,8 @@ The README now focuses on the public API and runnable examples.
 - CFF2 outlines now load through the shared `cff.rs` path, including `vsindex` / `blend` evaluation and real-fixture SVG smoke coverage
 - CFF2 variation support now covers both outline charstrings and Private DICT `vsindex` / `blend` parsing
 - The current local corpus does not contain a confirmed real CFF2 font; coverage is therefore synthetic/unit-test heavy until a true CFF2 fixture is added
-- SVG glyph layers still return `ErrorKind::Unsupported`
+- With `svg-fonts`, OpenType `SVG ` glyphs are preserved as `GlyphLayer::Svg`, and simple shapes are also converted into `GlyphLayer::Path`
+- The current supported SVG subset covers `path`, `rect`, `circle`, `ellipse`, `line`, `polyline`, `polygon`, `defs` / `use`, `fill` / `fill-rule` / `stroke` / `stroke-width`, and `translate` / `scale` / `matrix`
+- Gradients, richer stroke styles, and actual stroke rasterization in `paintcore` are still unsupported
 - WOFF2 still requires the complete byte stream before decoding
 - CFF2 planning notes live in `cff2-investigation.md`

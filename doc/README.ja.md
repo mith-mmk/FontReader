@@ -7,6 +7,7 @@
 - まず使い始めたい場合は [../README.ja.md](../README.ja.md)
 - 用途別の公開API例を見たい場合は [api-recipes.ja.md](api-recipes.ja.md)
 - 実装状況や制限事項を見たい場合は [feature-status.ja.md](feature-status.ja.md)
+- `svg-fonts` の現在仕様を見たい場合は [svg-fonts-spec.ja.md](svg-fonts-spec.ja.md)
 - CFF2 まわりの調査メモは [cff2-investigation.ja.md](cff2-investigation.ja.md)
 
 ## おすすめの読む順
@@ -14,6 +15,7 @@
 1. [../README.ja.md](../README.ja.md)
 2. [api-recipes.ja.md](api-recipes.ja.md)
 3. [feature-status.ja.md](feature-status.ja.md)
+4. [svg-fonts-spec.ja.md](svg-fonts-spec.ja.md)
 
 ## `cargo doc` について
 

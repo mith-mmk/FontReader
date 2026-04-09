@@ -51,8 +51,8 @@ pub use commands::SvgGlyphLayer;
 pub use commands::{
     text2commands, Command, FillRule, FontMetrics, FontOptions, FontRef, FontStretch, FontStyle,
     FontVariant, FontVariationSetting, FontWeight, Glyph, GlyphBounds, GlyphFlow, GlyphLayer,
-    GlyphMetrics, GlyphPaint, GlyphRun, PathGlyphLayer, PositionedGlyph, RasterGlyphLayer,
-    RasterGlyphSource, TextDirection,
+    GlyphMetrics, GlyphPaint, GlyphRun, PathGlyphLayer, PathPaintMode, PositionedGlyph,
+    RasterGlyphLayer, RasterGlyphSource, TextDirection,
 };
 pub use fontengine::{FontEngine, ShapingPolicy};
 pub use fontface::{FontFace, FontFaceDescriptor, FontFamily, FontVariationAxis};

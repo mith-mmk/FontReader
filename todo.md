@@ -22,11 +22,13 @@
     - [+] `EmojiOneColor.otf` / `NotoColorEmoji-Regular.ttf` の単体 emoji glyph を回帰テスト
     - [+] `EmojiOneColor.otf` / `NotoColorEmoji-Regular.ttf` の ZWJ / variation sequence を回帰テスト
     - [+] `FontFamily` fallback でも `EmojiOneColor.otf` / `NotoColorEmoji-Regular.ttf` の SVG cluster 維持を回帰テスト
-    - [ ] svg表示に必要な`commands.rs`の`pub enum Command`のファンクションの拡張(Cirle, Rect, Line, Fillなど)
+    - [*] svg表示に必要な`commands.rs`の`pub enum Command`/`PathGlyphLayer`の拡張(Cirle, Rect, Line, Fill, Strokeなど)
     - [*] 上記に必要なsvg_to_command()の実装
         - [x] `path` / `rect` / `circle` / `ellipse` / `line` / `polyline` / `polygon` と `fill` / `fill-rule` の最小変換
         - [x] `defs` / `use` の最小展開
-        - [ ] gradient / transform / stroke など複雑な SVG 要素の追従
+        - [x] `translate` / `scale` / `matrix` の最小 transform 適用
+        - [*] `stroke` / `stroke-width` の最小追従
+        - [ ] gradient など複雑な SVG 要素の追従
  
 # APIの大幅破壊的変更
 
