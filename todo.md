@@ -22,7 +22,9 @@
     - [+] `EmojiOneColor.otf` / `NotoColorEmoji-Regular.ttf` の単体 emoji glyph を回帰テスト
     - [+] `EmojiOneColor.otf` / `NotoColorEmoji-Regular.ttf` の ZWJ / variation sequence を回帰テスト
     - [+] `FontFamily` fallback でも `EmojiOneColor.otf` / `NotoColorEmoji-Regular.ttf` の SVG cluster 維持を回帰テスト
-
+    - [ ] svg表示に必要な`commands.rs`の`pub enum Command`のファンクションの拡張(Cirle, Rect, Line, Fillなど)
+    - [ ] 上記に必要なsvg_to_command()の実装 
+ 
 # APIの大幅破壊的変更
 
 [+]　現在FontReaderのAPIに、責務が混在しています。
