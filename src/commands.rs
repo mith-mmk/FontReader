@@ -82,10 +82,6 @@ impl Default for GlyphMetrics {
 ///
 /// `Solid(u32)` uses packed `0xAARRGGBB`, which matches `paintcore::path::draw_glyphs`.
 /// `CurrentColor` maps to the default color passed into the renderer.
-///
-/// Note that the current public `fontloader` / `FontReader` 0.0.10 bridge consumed by
-/// `paintcore` is still narrower than this internal model. `paintcore` can already render
-/// gradients, but the published bridge still forwards only the paint variants exposed there.
 #[derive(Debug, Clone, PartialEq)]
 pub enum GlyphPaint {
     Solid(u32),
@@ -152,10 +148,7 @@ pub enum PathPaintMode {
 
 /// Vector glyph layer.
 ///
-/// This is the internal path-layer contract used by `fontloader` itself and by
-/// `doc/SVFONTSPEC.md`. The currently published `paintcore <- fontloader` bridge is still
-/// temporarily lossy: `clip_commands` are not forwarded until the public `FontReader` types
-/// catch up.
+/// This matches the layer contract documented in `doc/SVFONTSPEC.md`.
 #[derive(Debug, Clone)]
 pub struct PathGlyphLayer {
     pub commands: Vec<Command>,

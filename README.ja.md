@@ -114,9 +114,9 @@ println!("{}", engine.shape("Hello")?.glyphs.len());
 
 `sbix` は raster layer、`COLR/CPAL` は path layer、`SVG ` テーブルは `svg-fonts` 有効時のみ path layer 化を優先し、必要な場合だけ `Svg` layer を保持します。
 
-現状の `svg-fonts` は、単純な `path` / `rect` / `circle` / `ellipse` / `line` / `polyline` / `polygon` を `PathGlyphLayer` に変換し、`defs` / `use`、`fill` / `fill-rule` / `stroke` / `stroke-width`、`clipPath` / `clip-path`、`translate` / `scale` / `matrix`、`linearGradient` / `radialGradient` / `stop`、`gradientUnits` / `gradientTransform` の最小保持まで入っています。path 化できない payload だけを `GlyphLayer::Svg` として残します。
+現状の `svg-fonts` は、単純な `path` / `rect` / `circle` / `ellipse` / `line` / `polyline` / `polygon` を `PathGlyphLayer` に変換し、`defs` / `use`、`fill` / `fill-rule` / `stroke` / `stroke-width`、`clipPath` / `clip-path`、単純な `mask`、`translate` / `scale` / `rotate` / `skewX` / `skewY` / `matrix`、`linearGradient` / `radialGradient` / `stop`、`gradientUnits` / `gradientTransform` の最小保持まで入っています。path 化できない payload だけでなく、`pattern` / 複雑な `mask` / `filter` など未対応構文を含む payload も `GlyphLayer::Svg` fallback を併置します。
 
-ただし、現在 `paintcore` が参照している `fontloader` / `FontReader` 0.0.10 公開型には `clip_commands` と gradient paint variant がまだ出ていません。`paintcore` 自体は clip / gradient renderer を持ちますが、現行の `fontloader -> paintcore` 変換は安全側に倒しており、`clip_commands = []`、gradient 変換なしで橋渡ししています。
+`paintcore` 側の renderer は 0.0.11 系の公開型に追随し、`clip_commands` と gradient paint も `fontloader -> paintcore` 変換で保持される前提です。
 
 詳細仕様と `paintcore` への受け渡し境界は [doc/SVFONTSPEC.md](doc/SVFONTSPEC.md) にまとめています。
 

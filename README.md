@@ -114,9 +114,9 @@ More runnable examples live in [doc/api-recipes.md](doc/api-recipes.md).
 
 `sbix` is exposed as raster layers, `COLR/CPAL` as path layers, and the OpenType `SVG ` table is pathified first under `svg-fonts`, falling back to `Svg` layers only when needed.
 
-The current `svg-fonts` implementation converts simple `path`, `rect`, `circle`, `ellipse`, `line`, `polyline`, and `polygon` elements into `PathGlyphLayer` values. It includes minimal `defs` / `use`, `fill` / `fill-rule` / `stroke` / `stroke-width`, `clipPath` / `clip-path`, `translate` / `scale` / `matrix`, `linearGradient` / `radialGradient` / `stop`, and preserved `gradientUnits` / `gradientTransform` support, and keeps `GlyphLayer::Svg` only for payloads that cannot be pathified.
+The current `svg-fonts` implementation converts simple `path`, `rect`, `circle`, `ellipse`, `line`, `polyline`, and `polygon` elements into `PathGlyphLayer` values. It includes minimal `defs` / `use`, `fill` / `fill-rule` / `stroke` / `stroke-width`, `clipPath` / `clip-path`, simple `mask`, `translate` / `scale` / `rotate` / `skewX` / `skewY` / `matrix`, `linearGradient` / `radialGradient` / `stop`, and preserved `gradientUnits` / `gradientTransform` support, and keeps a `GlyphLayer::Svg` fallback not only for payloads that cannot be pathified, but also for payloads that still contain unsupported constructs such as `pattern`, complex `mask`, or `filter`.
 
-However, the `fontloader` / `FontReader` 0.0.10 public types currently consumed by `paintcore` still do not expose `clip_commands` or gradient paint variants. `paintcore` already has native clip/gradient renderers, but the current `fontloader -> paintcore` conversion remains intentionally lossy for safety: `clip_commands = []`, and no gradient conversion is performed yet.
+On the 0.0.11 line, the `paintcore` renderer tracks the public `fontloader` / `FontReader` layer model closely enough to preserve `clip_commands` and gradient paint values across the `fontloader -> paintcore` conversion.
 
 See [doc/SVFONTSPEC.md](doc/SVFONTSPEC.md) for the exact current scope, limitations, and the `paintcore` handoff contract.
 

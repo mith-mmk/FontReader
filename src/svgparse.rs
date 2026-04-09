@@ -25,6 +25,7 @@ struct RenderState {
     stroke: Option<GlyphPaint>,
     stroke_width: f32,
     clip_path: Option<ClipPathSpec>,
+    mask_path: Option<ClipPathSpec>,
 }
 
 impl Default for RenderState {
@@ -36,6 +37,7 @@ impl Default for RenderState {
             stroke: None,
             stroke_width: 1.0,
             clip_path: None,
+            mask_path: None,
         }
     }
 }
@@ -99,6 +101,31 @@ impl Transform2D {
         }
     }
 
+    fn rotate_radians(angle: f32) -> Self {
+        let (sin, cos) = angle.sin_cos();
+        Self {
+            a: cos,
+            b: sin,
+            c: -sin,
+            d: cos,
+            ..Self::IDENTITY
+        }
+    }
+
+    fn skew_x_radians(angle: f32) -> Self {
+        Self {
+            c: angle.tan(),
+            ..Self::IDENTITY
+        }
+    }
+
+    fn skew_y_radians(angle: f32) -> Self {
+        Self {
+            b: angle.tan(),
+            ..Self::IDENTITY
+        }
+    }
+
     fn apply(self, x: f32, y: f32) -> (f32, f32) {
         (
             self.a * x + self.c * y + self.e,
@@ -130,6 +157,20 @@ pub(crate) fn svg_to_path_layers(
         &mut layers,
     );
     layers
+}
+
+pub(crate) fn svg_requires_svg_fallback(document: &str) -> bool {
+    let lowered = document.to_ascii_lowercase();
+    lowered.contains("<pattern")
+        || lowered.contains("<mask")
+        || lowered.contains("<filter")
+        || lowered.contains("patternunits=")
+        || lowered.contains("maskunits=")
+        || lowered.contains("maskcontentunits=")
+        || lowered.contains(" filter=")
+        || lowered.contains("filter=\"")
+        || lowered.contains("mask=\"")
+        || lowered.contains("mask:")
 }
 
 fn parse_svg_document(document: &str) -> Result<SvgNode, ()> {
@@ -309,6 +350,14 @@ fn flatten_node(
         scale_x,
         scale_y,
     );
+    let local_mask_path = resolve_mask_path(
+        style.as_ref().and_then(|style| style.get("mask")),
+        element.attrs.get("mask"),
+        state.mask_path.as_ref(),
+        defs,
+        scale_x,
+        scale_y,
+    );
     let next_state = RenderState {
         transform: state.transform.multiply(parse_transform(
             style
@@ -323,6 +372,7 @@ fn flatten_node(
         stroke: local_stroke,
         stroke_width: local_stroke_width,
         clip_path: local_clip_path,
+        mask_path: local_mask_path,
     };
 
     match element.name.as_str() {
@@ -375,6 +425,7 @@ fn flatten_use(
         stroke: state.stroke,
         stroke_width: state.stroke_width,
         clip_path: state.clip_path,
+        mask_path: state.mask_path,
     };
     flatten_node(
         &SvgNode::Element(referenced),
@@ -422,7 +473,12 @@ fn element_to_path_layers(
                 transformed.clone(),
                 resolve_gradient_paint(paint, bounds, state.transform),
             );
-            layer.clip_commands = resolve_clip_commands(state.clip_path.as_ref(), bounds, state.transform);
+            layer.clip_commands = resolve_combined_clip_commands(
+                state.clip_path.as_ref(),
+                state.mask_path.as_ref(),
+                bounds,
+                state.transform,
+            );
             layer.fill_rule = state.fill_rule;
             layers.push(layer);
         }
@@ -435,7 +491,12 @@ fn element_to_path_layers(
                 resolve_gradient_paint(paint, bounds, state.transform),
                 state.stroke_width,
             );
-            layer.clip_commands = resolve_clip_commands(state.clip_path.as_ref(), bounds, state.transform);
+            layer.clip_commands = resolve_combined_clip_commands(
+                state.clip_path.as_ref(),
+                state.mask_path.as_ref(),
+                bounds,
+                state.transform,
+            );
             layers.push(layer);
         }
     }
@@ -459,15 +520,28 @@ fn resolve_gradient_paint(
     }
 }
 
-fn resolve_clip_commands(
+fn resolve_combined_clip_commands(
     clip_path: Option<&ClipPathSpec>,
+    mask_path: Option<&ClipPathSpec>,
     bounds: Option<(f32, f32, f32, f32)>,
     element_transform: Transform2D,
 ) -> Vec<Command> {
-    let Some(clip_path) = clip_path else {
-        return Vec::new();
-    };
-    let commands = if matches!(clip_path.units, ClipPathUnits::ObjectBoundingBox) {
+    let mut commands = Vec::new();
+    if let Some(clip_path) = clip_path {
+        commands.extend(resolve_clip_spec_commands(clip_path, bounds, element_transform));
+    }
+    if let Some(mask_path) = mask_path {
+        commands.extend(resolve_clip_spec_commands(mask_path, bounds, element_transform));
+    }
+    commands
+}
+
+fn resolve_clip_spec_commands(
+    clip_path: &ClipPathSpec,
+    bounds: Option<(f32, f32, f32, f32)>,
+    element_transform: Transform2D,
+) -> Vec<Command> {
+    if matches!(clip_path.units, ClipPathUnits::ObjectBoundingBox) {
         let (min_x, min_y, max_x, max_y) = bounds.unwrap_or((0.0, 0.0, 0.0, 0.0));
         let width = max_x - min_x;
         let height = max_y - min_y;
@@ -482,8 +556,7 @@ fn resolve_clip_commands(
         transform_commands(&clip_path.commands, transform)
     } else {
         transform_commands(&clip_path.commands, element_transform)
-    };
-    commands
+    }
 }
 
 fn resolve_linear_gradient(
@@ -1082,6 +1155,26 @@ fn resolve_clip_path(
     parse_clip_path_spec(element, defs, scale_x, scale_y).or_else(|| inherited.cloned())
 }
 
+fn resolve_mask_path(
+    style_value: Option<&String>,
+    attr_value: Option<&String>,
+    inherited: Option<&ClipPathSpec>,
+    defs: &HashMap<String, SvgElement>,
+    scale_x: f32,
+    scale_y: f32,
+) -> Option<ClipPathSpec> {
+    let Some(value) = style_value.or(attr_value) else {
+        return inherited.cloned();
+    };
+    let value = value.trim();
+    if value.eq_ignore_ascii_case("none") {
+        return None;
+    }
+    let reference = parse_url_reference(value)?;
+    let element = defs.get(reference)?;
+    parse_mask_spec(element, defs, scale_x, scale_y).or_else(|| inherited.cloned())
+}
+
 fn parse_clip_path_spec(
     element: &SvgElement,
     defs: &HashMap<String, SvgElement>,
@@ -1094,6 +1187,42 @@ fn parse_clip_path_spec(
     let units = match element
         .attrs
         .get("clippathunits")
+        .map(|value| value.trim().to_ascii_lowercase())
+    {
+        Some(value) if value == "objectboundingbox" => ClipPathUnits::ObjectBoundingBox,
+        _ => ClipPathUnits::UserSpaceOnUse,
+    };
+    let mut commands = Vec::new();
+    for child in &element.children {
+        collect_clip_commands(
+            child,
+            defs,
+            Transform2D::IDENTITY,
+            scale_x,
+            scale_y,
+            &mut commands,
+        );
+    }
+    if commands.is_empty() {
+        None
+    } else {
+        Some(ClipPathSpec { commands, units })
+    }
+}
+
+fn parse_mask_spec(
+    element: &SvgElement,
+    defs: &HashMap<String, SvgElement>,
+    scale_x: f32,
+    scale_y: f32,
+) -> Option<ClipPathSpec> {
+    if element.name != "mask" {
+        return None;
+    }
+    let units = match element
+        .attrs
+        .get("maskcontentunits")
+        .or_else(|| element.attrs.get("maskunits"))
         .map(|value| value.trim().to_ascii_lowercase())
     {
         Some(value) if value == "objectboundingbox" => ClipPathUnits::ObjectBoundingBox,
@@ -1252,6 +1381,20 @@ fn parse_transform(transform: Option<&String>, scale_x: f32, scale_y: f32) -> Tr
             "scale" if !values.is_empty() => {
                 Transform2D::scale(values[0], values.get(1).copied().unwrap_or(values[0]))
             }
+            "rotate" if !values.is_empty() => {
+                let angle = values[0].to_radians();
+                if values.len() >= 3 {
+                    let cx = values[1] * scale_x;
+                    let cy = values[2] * scale_y;
+                    Transform2D::translate(cx, cy)
+                        .multiply(Transform2D::rotate_radians(angle))
+                        .multiply(Transform2D::translate(-cx, -cy))
+                } else {
+                    Transform2D::rotate_radians(angle)
+                }
+            }
+            "skewx" if !values.is_empty() => Transform2D::skew_x_radians(values[0].to_radians()),
+            "skewy" if !values.is_empty() => Transform2D::skew_y_radians(values[0].to_radians()),
             "matrix" if values.len() == 6 => Transform2D {
                 a: values[0],
                 b: values[1],
@@ -1590,6 +1733,34 @@ fn parse_path_data(d: &str, scale_x: f32, scale_y: f32) -> Option<Vec<Command>> 
                     }
                 }
             }
+            'A' | 'a' => {
+                let absolute = command == 'A';
+                while let Some(rx) = read_number(&tokens, &mut index) {
+                    let ry = read_number(&tokens, &mut index)?;
+                    let axis_rotation = read_number(&tokens, &mut index)?;
+                    let large_arc = read_number(&tokens, &mut index)? != 0.0;
+                    let sweep = read_number(&tokens, &mut index)? != 0.0;
+                    let (x, y) = read_pair(&tokens, &mut index)?;
+                    let target = if absolute {
+                        (x * scale_x, y * scale_y)
+                    } else {
+                        (current.0 + x * scale_x, current.1 + y * scale_y)
+                    };
+                    commands.extend(arc_to_cubic_beziers(
+                        current,
+                        target,
+                        rx.abs() * scale_x.abs(),
+                        ry.abs() * scale_y.abs(),
+                        axis_rotation,
+                        large_arc,
+                        sweep,
+                    ));
+                    current = target;
+                    if index < tokens.len() && matches!(tokens[index], PathToken::Command(_)) {
+                        break;
+                    }
+                }
+            }
             'Z' | 'z' => {
                 commands.push(Command::Close);
                 current = subpath_start;
@@ -1599,6 +1770,131 @@ fn parse_path_data(d: &str, scale_x: f32, scale_y: f32) -> Option<Vec<Command>> 
     }
 
     Some(commands)
+}
+
+fn arc_to_cubic_beziers(
+    start: (f32, f32),
+    end: (f32, f32),
+    mut rx: f32,
+    mut ry: f32,
+    x_axis_rotation_degrees: f32,
+    large_arc: bool,
+    sweep: bool,
+) -> Vec<Command> {
+    if nearly_equal_points(start, end) {
+        return Vec::new();
+    }
+    if rx <= f32::EPSILON || ry <= f32::EPSILON {
+        return vec![Command::Line(end.0, end.1)];
+    }
+
+    let phi = x_axis_rotation_degrees.to_radians();
+    let cos_phi = phi.cos();
+    let sin_phi = phi.sin();
+    let dx = (start.0 - end.0) * 0.5;
+    let dy = (start.1 - end.1) * 0.5;
+    let x1p = cos_phi * dx + sin_phi * dy;
+    let y1p = -sin_phi * dx + cos_phi * dy;
+
+    let mut rx_sq = rx * rx;
+    let mut ry_sq = ry * ry;
+    let x1p_sq = x1p * x1p;
+    let y1p_sq = y1p * y1p;
+
+    let radius_scale = x1p_sq / rx_sq + y1p_sq / ry_sq;
+    if radius_scale > 1.0 {
+        let scale = radius_scale.sqrt();
+        rx *= scale;
+        ry *= scale;
+        rx_sq = rx * rx;
+        ry_sq = ry * ry;
+    }
+
+    let numerator = (rx_sq * ry_sq) - (rx_sq * y1p_sq) - (ry_sq * x1p_sq);
+    let denominator = (rx_sq * y1p_sq) + (ry_sq * x1p_sq);
+    let factor = if denominator <= f32::EPSILON {
+        0.0
+    } else {
+        let sign = if large_arc == sweep { -1.0 } else { 1.0 };
+        sign * (numerator / denominator).max(0.0).sqrt()
+    };
+
+    let cxp = factor * (rx * y1p / ry);
+    let cyp = factor * (-ry * x1p / rx);
+    let center = (
+        cos_phi * cxp - sin_phi * cyp + (start.0 + end.0) * 0.5,
+        sin_phi * cxp + cos_phi * cyp + (start.1 + end.1) * 0.5,
+    );
+
+    let start_vector = ((x1p - cxp) / rx, (y1p - cyp) / ry);
+    let end_vector = ((-x1p - cxp) / rx, (-y1p - cyp) / ry);
+    let start_angle = start_vector.1.atan2(start_vector.0);
+    let mut delta_angle = vector_angle(start_vector, end_vector);
+    if !sweep && delta_angle > 0.0 {
+        delta_angle -= std::f32::consts::TAU;
+    } else if sweep && delta_angle < 0.0 {
+        delta_angle += std::f32::consts::TAU;
+    }
+
+    let segments = (delta_angle.abs() / (std::f32::consts::FRAC_PI_2)).ceil() as usize;
+    let segments = segments.max(1);
+    let step = delta_angle / segments as f32;
+    let mut commands = Vec::with_capacity(segments);
+
+    for index in 0..segments {
+        let theta1 = start_angle + step * index as f32;
+        let theta2 = theta1 + step;
+        let alpha = (4.0 / 3.0) * ((theta2 - theta1) * 0.25).tan();
+        let (sin1, cos1) = theta1.sin_cos();
+        let (sin2, cos2) = theta2.sin_cos();
+        let control1 = map_arc_point(
+            center,
+            rx,
+            ry,
+            cos_phi,
+            sin_phi,
+            cos1 - alpha * sin1,
+            sin1 + alpha * cos1,
+        );
+        let control2 = map_arc_point(
+            center,
+            rx,
+            ry,
+            cos_phi,
+            sin_phi,
+            cos2 + alpha * sin2,
+            sin2 - alpha * cos2,
+        );
+        let target = map_arc_point(center, rx, ry, cos_phi, sin_phi, cos2, sin2);
+        commands.push(Command::CubicBezier(control1, control2, target));
+    }
+
+    commands
+}
+
+fn map_arc_point(
+    center: (f32, f32),
+    rx: f32,
+    ry: f32,
+    cos_phi: f32,
+    sin_phi: f32,
+    x: f32,
+    y: f32,
+) -> (f32, f32) {
+    (
+        center.0 + cos_phi * rx * x - sin_phi * ry * y,
+        center.1 + sin_phi * rx * x + cos_phi * ry * y,
+    )
+}
+
+fn vector_angle(start: (f32, f32), end: (f32, f32)) -> f32 {
+    let cross = start.0 * end.1 - start.1 * end.0;
+    let dot = start.0 * end.0 + start.1 * end.1;
+    cross.atan2(dot)
+}
+
+fn nearly_equal_points(left: (f32, f32), right: (f32, f32)) -> bool {
+    (left.0 - right.0).abs() <= 0.001 && (left.1 - right.1).abs() <= 0.001
 }
 
 #[derive(Clone, Copy)]
@@ -1760,6 +2056,42 @@ mod tests {
     }
 
     #[test]
+    fn svg_to_path_layers_applies_rotate_transform() {
+        let document = "<svg><path d=\"M1 0 L3 0\" transform=\"rotate(90)\"/></svg>";
+        let layers = svg_to_path_layers(document, 1.0, 1.0);
+        assert_eq!(layers.len(), 1);
+        assert!(matches!(layers[0].commands[0], Command::MoveTo(x, y) if x.abs() < 0.01 && (y - 1.0).abs() < 0.01));
+        assert!(matches!(layers[0].commands[1], Command::Line(x, y) if x.abs() < 0.01 && (y - 3.0).abs() < 0.01));
+    }
+
+    #[test]
+    fn svg_to_path_layers_applies_rotate_about_center_transform() {
+        let document = "<svg><path d=\"M2 1 L4 1\" transform=\"rotate(90 2 1)\"/></svg>";
+        let layers = svg_to_path_layers(document, 1.0, 1.0);
+        assert_eq!(layers.len(), 1);
+        assert!(matches!(layers[0].commands[0], Command::MoveTo(x, y) if (x - 2.0).abs() < 0.01 && (y - 1.0).abs() < 0.01));
+        assert!(matches!(layers[0].commands[1], Command::Line(x, y) if (x - 2.0).abs() < 0.01 && (y - 3.0).abs() < 0.01));
+    }
+
+    #[test]
+    fn svg_to_path_layers_applies_skewx_transform() {
+        let document = "<svg><path d=\"M0 1 L0 3\" transform=\"skewX(45)\"/></svg>";
+        let layers = svg_to_path_layers(document, 1.0, 1.0);
+        assert_eq!(layers.len(), 1);
+        assert!(matches!(layers[0].commands[0], Command::MoveTo(x, y) if (x - 1.0).abs() < 0.01 && (y - 1.0).abs() < 0.01));
+        assert!(matches!(layers[0].commands[1], Command::Line(x, y) if (x - 3.0).abs() < 0.01 && (y - 3.0).abs() < 0.01));
+    }
+
+    #[test]
+    fn svg_to_path_layers_applies_skewy_transform() {
+        let document = "<svg><path d=\"M1 0 L3 0\" transform=\"skewY(45)\"/></svg>";
+        let layers = svg_to_path_layers(document, 1.0, 1.0);
+        assert_eq!(layers.len(), 1);
+        assert!(matches!(layers[0].commands[0], Command::MoveTo(x, y) if (x - 1.0).abs() < 0.01 && (y - 1.0).abs() < 0.01));
+        assert!(matches!(layers[0].commands[1], Command::Line(x, y) if (x - 3.0).abs() < 0.01 && (y - 3.0).abs() < 0.01));
+    }
+
+    #[test]
     fn svg_to_path_layers_applies_use_and_transform_together() {
         let document = concat!(
             "<svg>",
@@ -1898,6 +2230,40 @@ mod tests {
     }
 
     #[test]
+    fn svg_to_path_layers_parses_absolute_arc_path() {
+        let document = "<svg><path d=\"M10 10 A10 10 0 0 1 20 20\" fill=\"#000\"/></svg>";
+        let layers = svg_to_path_layers(document, 1.0, 1.0);
+        assert_eq!(layers.len(), 1);
+        assert!(matches!(layers[0].commands[0], Command::MoveTo(10.0, 10.0)));
+        assert!(
+            layers[0]
+                .commands
+                .iter()
+                .any(|command| matches!(command, Command::CubicBezier(_, _, _))),
+            "expected arc to expand into cubic segments"
+        );
+    }
+
+    #[test]
+    fn svg_to_path_layers_parses_relative_arc_path() {
+        let document = "<svg><path d=\"M10 10 a10 10 0 0 1 10 10\" fill=\"#000\"/></svg>";
+        let layers = svg_to_path_layers(document, 1.0, 1.0);
+        assert_eq!(layers.len(), 1);
+        assert!(
+            matches!(layers[0].commands.last(), Some(Command::CubicBezier(_, _, (x, y))) if (*x - 20.0).abs() < 0.01 && (*y - 20.0).abs() < 0.01),
+            "expected relative arc to end at the translated target"
+        );
+    }
+
+    #[test]
+    fn svg_requires_svg_fallback_detects_mask_pattern_and_filter() {
+        assert!(svg_requires_svg_fallback("<svg><mask id=\"m\"/></svg>"));
+        assert!(svg_requires_svg_fallback("<svg><pattern id=\"p\"/></svg>"));
+        assert!(svg_requires_svg_fallback("<svg><filter id=\"f\"/></svg>"));
+        assert!(!svg_requires_svg_fallback("<svg><path d=\"M0 0 L1 1\"/></svg>"));
+    }
+
+    #[test]
     fn svg_to_path_layers_resolves_simple_clip_path() {
         let document = concat!(
             "<svg>",
@@ -1927,5 +2293,32 @@ mod tests {
 
         assert_eq!(layers.len(), 1);
         assert!(matches!(layers[0].clip_commands[0], Command::MoveTo(4.0, 9.0)));
+    }
+
+    #[test]
+    fn svg_to_path_layers_resolves_simple_mask_as_clip_commands() {
+        let document = concat!(
+            "<svg>",
+            "<defs><mask id=\"m\"><rect x=\"2\" y=\"3\" width=\"4\" height=\"5\"/></mask></defs>",
+            "<rect x=\"0\" y=\"0\" width=\"10\" height=\"10\" fill=\"#123456\" mask=\"url(#m)\"/>",
+            "</svg>"
+        );
+        let layers = svg_to_path_layers(document, 1.0, 1.0);
+        assert_eq!(layers.len(), 1);
+        assert!(!layers[0].clip_commands.is_empty());
+        assert!(matches!(layers[0].clip_commands[0], Command::MoveTo(2.0, 3.0)));
+    }
+
+    #[test]
+    fn svg_to_path_layers_resolves_object_bounding_box_mask_as_clip_commands() {
+        let document = concat!(
+            "<svg>",
+            "<defs><mask id=\"m\" maskUnits=\"objectBoundingBox\"><rect x=\"0.25\" y=\"0.5\" width=\"0.5\" height=\"0.5\"/></mask></defs>",
+            "<rect x=\"10\" y=\"20\" width=\"8\" height=\"6\" fill=\"#123456\" mask=\"url(#m)\"/>",
+            "</svg>"
+        );
+        let layers = svg_to_path_layers(document, 1.0, 1.0);
+        assert_eq!(layers.len(), 1);
+        assert!(matches!(layers[0].clip_commands[0], Command::MoveTo(12.0, 23.0)));
     }
 }

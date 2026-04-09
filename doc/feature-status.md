@@ -69,9 +69,9 @@ The README now focuses on the public API and runnable examples.
 - CFF2 variation support now covers both outline charstrings and Private DICT `vsindex` / `blend` parsing
 - The current local corpus does not contain a confirmed real CFF2 font; coverage is therefore synthetic/unit-test heavy until a true CFF2 fixture is added
 - With `svg-fonts`, OpenType `SVG ` glyphs are pathified first, and simple shapes are emitted as `GlyphLayer::Path`
-- Payloads that cannot be pathified are kept as `GlyphLayer::Svg`
-- The current supported SVG subset covers `path`, `rect`, `circle`, `ellipse`, `line`, `polyline`, `polygon`, `defs` / `use`, `fill` / `fill-rule` / `stroke` / `stroke-width`, `clipPath` / `clip-path`, `translate` / `scale` / `matrix`, minimal `linearGradient` / `radialGradient` / `stop`, and preserved `gradientUnits` / `gradientTransform`
+- Payloads that cannot be pathified, and payloads that still contain unsupported constructs such as `pattern`, `mask`, or `filter`, are kept as `GlyphLayer::Svg` fallback layers
+- The current supported SVG subset covers `path`, `rect`, `circle`, `ellipse`, `line`, `polyline`, `polygon`, `defs` / `use`, `fill` / `fill-rule` / `stroke` / `stroke-width`, `clipPath` / `clip-path`, simple `mask`, `translate` / `scale` / `rotate` / `skewX` / `skewY` / `matrix`, minimal `linearGradient` / `radialGradient` / `stop`, and preserved `gradientUnits` / `gradientTransform`
 - Patterns, `mask`, `filter`, and richer stroke styles are still unsupported
-- `paintcore` itself already has clip/gradient renderers, but the current `fontloader` 0.0.10 public bridge still does not carry that data through
+- The `paintcore` bridge now preserves clip/gradient-capable layer data from the public 0.0.11 `fontloader` line
 - WOFF2 still requires the complete byte stream before decoding
 - CFF2 planning notes live in `cff2-investigation.md`

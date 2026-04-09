@@ -1798,8 +1798,23 @@ impl Font {
             .current_svg_table()?
             .get_glyph_document(glyph_id as u32, layout)?;
         let path_layers = crate::svgparse::svg_to_path_layers(&document.payload, scale_x, scale_y);
+        let keep_svg_fallback = crate::svgparse::svg_requires_svg_fallback(&document.payload);
         if !path_layers.is_empty() {
-            return Some(path_layers.into_iter().map(GlyphLayer::Path).collect());
+            let mut layers: Vec<GlyphLayer> = path_layers.into_iter().map(GlyphLayer::Path).collect();
+            if keep_svg_fallback {
+                layers.push(GlyphLayer::Svg(SvgGlyphLayer {
+                    document: document.payload,
+                    view_box_min_x: document.view_box_min_x * scale_x,
+                    view_box_min_y: document.view_box_min_y * scale_y,
+                    view_box_width: document.view_box_width * scale_x,
+                    view_box_height: document.view_box_height * scale_y,
+                    width: (document.view_box_width * scale_x).abs().max(1.0),
+                    height: (document.view_box_height * scale_y).abs().max(1.0),
+                    offset_x: 0.0,
+                    offset_y: 0.0,
+                }));
+            }
+            return Some(layers);
         }
         Some(vec![GlyphLayer::Svg(SvgGlyphLayer {
             document: document.payload,

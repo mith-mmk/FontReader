@@ -9,22 +9,9 @@
 
 この文書は `FontReader` 側の parser 実装仕様そのものではなく、`paintcore` が受け取るべき最終データ契約を定義します。
 
-## 重要: 現行ブリッジとの差分
+## 重要: 現行ブリッジ
 
-この文書には 2 種類の境界が混在します。
-
-- 将来的に `FontReader` が `paintcore` へ渡すべき理想契約
-- 現在の `paintcore` が参照している `fontloader` / `FontReader` 0.0.10 公開型との互換制約
-
-2026-04-09 時点では、`paintcore` 側の内部描画モデルには `clip_commands` と gradient paint variant がすでに存在します。しかし、現在参照している `fontloader` / `FontReader` 0.0.10 の公開型にはその 2 つがまだ露出していません。
-
-そのため、現行の `fontloader -> paintcore` 変換層は次の暫定互換動作を維持します。
-
-- `clip_commands` は常に空配列へ安全に落とす
-- gradient paint は変換せず、公開型で受け取れる paint だけを扱う
-- `GlyphLayer::Svg` は引き続き別実装用の raw payload として保持する
-
-つまり、`paintcore` 単体では clip / gradient renderer を持っていますが、現 dependency 経由ではまだその情報が流れてきません。この文書の「理想契約」節は先行仕様であり、現行ブリッジの挙動は後述の「現行 0.0.10 ブリッジ」節を正とします。
+`paintcore` は renderer、`fontloader` / `FontReader` は parser という責務分離を前提にします。0.0.11 系では、`paintcore` が参照する公開型もこの文書の layer 契約に追随し、clip / gradient を lossless に受け取れる前提です。
 
 ## 基本方針
 
@@ -149,7 +136,7 @@ raw SVG payload を保持したい場合は `SvgGlyphLayer` を渡す。
 - `offset_x`
 - `offset_y`
 
-`GlyphLayer::Svg` は「simple SVG を path 化できなかった時の生データ保持」および「別 renderer への委譲」のために存在する。path 化できる glyph について raw SVG を常に重ね持ちする必要はない。
+`GlyphLayer::Svg` は「simple SVG を path 化できなかった時の生データ保持」および「別 renderer への委譲」のために存在する。未対応構文を含む payload については、path layer を一部生成できても raw SVG fallback を併置してよい。
 
 ## `FontReader` が自前で解決しておくべき事項
 
@@ -197,20 +184,6 @@ raw SVG payload を保持したい場合は `SvgGlyphLayer` を渡す。
   - `translate(...)`
   - `scale(...)`
   - `matrix(a b c d e f)`
-
-## 現行 0.0.10 ブリッジ
-
-現時点の `paintcore <- fontloader` 変換層は、上記の理想契約をまだフルには使いません。互換性のため、次の制約を明示的に残します。
-
-- `fontloader::PathGlyphLayer` から `paintcore::PathGlyphLayer` への変換では `clip_commands = []`
-- `fontloader::GlyphPaint` から `paintcore::GlyphPaint` への変換では `Solid` と `CurrentColor` だけを受ける
-- `paintcore` 側に gradient / clip renderer があっても、現 dependency から流れてこない情報は使わない
-
-したがって、今の `paintcore` 側で保証されるのは次です。
-
-- `paintcore` ネイティブ layer を直接組み立てた場合は clip / gradient を描ける
-- `fontloader` 0.0.10 公開 API 経由の変換では clip / gradient は失われる
-- lossless な bridge は `fontloader` 側の公開型更新後に切り替える
 
 ## `paintcore` が担当する責務
 
@@ -327,12 +300,9 @@ stroke は `Command` ではなく `PathGlyphLayer` の責務とする。
 
 `fontloader` / `paintcore` 境界の現状未対応は次です。
 
-- 現行 0.0.10 bridge での gradient 受け渡し
 - pattern
-- 現行 0.0.10 bridge での `clipPath` 受け渡し
 - `mask`
 - filter
-- gradientTransform の厳密な互換 bridge
 - gradientUnits の shape bounds まで含む完全解決
 - `stroke-linecap`
 - `stroke-linejoin`

@@ -3495,6 +3495,112 @@ mod tests {
         None
     }
 
+    #[cfg(feature = "svg-fonts")]
+    fn payload_has_arc_path_command(payload: &str) -> bool {
+        let mut source = payload;
+        while let Some(path_start) = source.find("<path") {
+            source = &source[path_start + 5..];
+            let Some(d_start) = source.find("d=\"") else {
+                continue;
+            };
+            let d_source = &source[d_start + 3..];
+            let Some(d_end) = d_source.find('"') else {
+                break;
+            };
+            let d = &d_source[..d_end];
+            if d.chars().any(|ch| matches!(ch, 'A' | 'a')) {
+                return true;
+            }
+            source = &d_source[d_end..];
+        }
+        false
+    }
+
+    #[cfg(feature = "svg-fonts")]
+    fn first_svg_arc_payload(font_name: &str) -> Option<(String, String)> {
+        let path = direct_svg_emoji_font_path(font_name);
+        let font = crate::load_font_from_file(&path).ok()?;
+        let svg = font.font().svg.as_ref()?;
+        for sequence in emoji_ligature_sequence_candidates() {
+            let Ok(glyph_ids) = font.font().debug_shape_glyph_ids(sequence, None) else {
+                continue;
+            };
+            if glyph_ids.len() != 1 || glyph_ids[0] == 0 {
+                continue;
+            }
+            let layout = font.font().get_layout(glyph_ids[0], false);
+            let Some(document) = svg.get_glyph_document(glyph_ids[0] as u32, &layout) else {
+                continue;
+            };
+            if payload_has_arc_path_command(&document.payload) {
+                return Some((sequence.to_string(), document.payload));
+            }
+        }
+        None
+    }
+
+    #[cfg(feature = "svg-fonts")]
+    fn payload_has_transform(payload: &str) -> bool {
+        payload.contains("transform=\"")
+            && (payload.contains("rotate(")
+                || payload.contains("skewX(")
+                || payload.contains("skewY(")
+                || payload.contains("translate(")
+                || payload.contains("scale(")
+                || payload.contains("matrix("))
+    }
+
+    #[cfg(feature = "svg-fonts")]
+    fn first_svg_transform_payload(font_name: &str) -> Option<(String, String)> {
+        let path = direct_svg_emoji_font_path(font_name);
+        let font = crate::load_font_from_file(&path).ok()?;
+        let svg = font.font().svg.as_ref()?;
+        for sequence in emoji_ligature_sequence_candidates() {
+            let Ok(glyph_ids) = font.font().debug_shape_glyph_ids(sequence, None) else {
+                continue;
+            };
+            if glyph_ids.len() != 1 || glyph_ids[0] == 0 {
+                continue;
+            }
+            let layout = font.font().get_layout(glyph_ids[0], false);
+            let Some(document) = svg.get_glyph_document(glyph_ids[0] as u32, &layout) else {
+                continue;
+            };
+            if payload_has_transform(&document.payload) {
+                return Some((sequence.to_string(), document.payload));
+            }
+        }
+        None
+    }
+
+    #[cfg(feature = "svg-fonts")]
+    fn payload_has_unsupported_svg_constructs(payload: &str) -> bool {
+        crate::svgparse::svg_requires_svg_fallback(payload)
+    }
+
+    #[cfg(feature = "svg-fonts")]
+    fn first_svg_payload_requiring_fallback(font_name: &str) -> Option<(String, String)> {
+        let path = direct_svg_emoji_font_path(font_name);
+        let font = crate::load_font_from_file(&path).ok()?;
+        let svg = font.font().svg.as_ref()?;
+        for sequence in emoji_ligature_sequence_candidates() {
+            let Ok(glyph_ids) = font.font().debug_shape_glyph_ids(sequence, None) else {
+                continue;
+            };
+            if glyph_ids.len() != 1 || glyph_ids[0] == 0 {
+                continue;
+            }
+            let layout = font.font().get_layout(glyph_ids[0], false);
+            let Some(document) = svg.get_glyph_document(glyph_ids[0] as u32, &layout) else {
+                continue;
+            };
+            if payload_has_unsupported_svg_constructs(&document.payload) {
+                return Some((sequence.to_string(), document.payload));
+            }
+        }
+        None
+    }
+
     fn first_real_emoji_ligature() -> Option<(std::path::PathBuf, &'static str)> {
         for path in emoji_ligature_font_candidates() {
             if !path.exists() {
@@ -5592,6 +5698,115 @@ mod tests {
             );
             return;
         }
+    }
+
+    #[test]
+    #[cfg(feature = "svg-fonts")]
+    fn noto_color_emoji_exposes_arc_path_payload() {
+        let Some((sequence, payload)) = first_svg_arc_payload("NotoColorEmoji-Regular.ttf") else {
+            return;
+        };
+        assert!(
+            payload_has_arc_path_command(&payload),
+            "expected arc path payload in NotoColorEmoji-Regular.ttf for {sequence:?}"
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "svg-fonts")]
+    fn noto_color_emoji_arc_payload_shapes_path_layers() {
+        let Some((sequence, _)) = first_svg_arc_payload("NotoColorEmoji-Regular.ttf") else {
+            return;
+        };
+        let path = direct_svg_emoji_font_path("NotoColorEmoji-Regular.ttf");
+        let font = crate::load_font_from_file(&path)
+            .unwrap_or_else(|err| panic!("load NotoColorEmoji-Regular.ttf for arc payload: {err}"));
+        let run = crate::text2commands(&sequence, crate::FontOptions::new(&font).with_font_size(32.0))
+            .unwrap_or_else(|err| panic!("shape NotoColorEmoji-Regular.ttf {sequence:?}: {err}"));
+        assert_eq!(run.glyphs.len(), 1);
+        assert!(
+            run.glyphs[0].glyph.layers.iter().any(|layer| {
+                matches!(
+                    layer,
+                    crate::GlyphLayer::Path(path)
+                        if path.commands.iter().any(|command| matches!(command, crate::Command::CubicBezier(_, _, _)))
+                )
+            }),
+            "expected NotoColorEmoji arc payload {sequence:?} to shape into cubic path layers"
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "svg-fonts")]
+    fn noto_color_emoji_exposes_transform_payload() {
+        let Some((sequence, payload)) = first_svg_transform_payload("NotoColorEmoji-Regular.ttf") else {
+            return;
+        };
+        assert!(
+            payload_has_transform(&payload),
+            "expected transform payload in NotoColorEmoji-Regular.ttf for {sequence:?}"
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "svg-fonts")]
+    fn noto_color_emoji_transform_payload_shapes_path_layers() {
+        let Some((sequence, _)) = first_svg_transform_payload("NotoColorEmoji-Regular.ttf") else {
+            return;
+        };
+        let path = direct_svg_emoji_font_path("NotoColorEmoji-Regular.ttf");
+        let font = crate::load_font_from_file(&path)
+            .unwrap_or_else(|err| panic!("load NotoColorEmoji-Regular.ttf for transform payload: {err}"));
+        let run = crate::text2commands(&sequence, crate::FontOptions::new(&font).with_font_size(32.0))
+            .unwrap_or_else(|err| panic!("shape NotoColorEmoji-Regular.ttf {sequence:?}: {err}"));
+        assert_eq!(run.glyphs.len(), 1);
+        assert!(
+            run.glyphs[0]
+                .glyph
+                .layers
+                .iter()
+                .any(|layer| matches!(layer, crate::GlyphLayer::Path(path) if !path.commands.is_empty())),
+            "expected NotoColorEmoji transform payload {sequence:?} to shape into path layers"
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "svg-fonts")]
+    fn noto_color_emoji_exposes_payload_requiring_svg_fallback_when_present() {
+        let Some((sequence, payload)) =
+            first_svg_payload_requiring_fallback("NotoColorEmoji-Regular.ttf")
+        else {
+            return;
+        };
+        assert!(
+            payload_has_unsupported_svg_constructs(&payload),
+            "expected unsupported SVG constructs in NotoColorEmoji-Regular.ttf for {sequence:?}"
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "svg-fonts")]
+    fn noto_color_emoji_keeps_svg_layer_for_payload_requiring_fallback_when_present() {
+        let Some((sequence, _)) =
+            first_svg_payload_requiring_fallback("NotoColorEmoji-Regular.ttf")
+        else {
+            return;
+        };
+        let path = direct_svg_emoji_font_path("NotoColorEmoji-Regular.ttf");
+        let font = crate::load_font_from_file(&path).unwrap_or_else(|err| {
+            panic!("load NotoColorEmoji-Regular.ttf for fallback payload: {err}")
+        });
+        let run = crate::text2commands(&sequence, crate::FontOptions::new(&font).with_font_size(32.0))
+            .unwrap_or_else(|err| panic!("shape NotoColorEmoji-Regular.ttf {sequence:?}: {err}"));
+        assert_eq!(run.glyphs.len(), 1);
+        assert!(
+            run.glyphs[0]
+                .glyph
+                .layers
+                .iter()
+                .any(|layer| matches!(layer, crate::GlyphLayer::Svg(svg) if !svg.document.is_empty())),
+            "expected NotoColorEmoji payload {sequence:?} to keep raw Svg fallback layer"
+        );
     }
 
     #[test]
