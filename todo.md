@@ -35,6 +35,10 @@
         - [ ] pattern / mask / filter など複雑な SVG 要素の追従
     - [x] `EmojiOneColor.otf` / `NotoColorEmoji-Regular.ttf` の実 payload を比較し、gradient paint layer の回帰を追加
     - [x] path 化できる glyph は `GlyphLayer::Path` を優先し、path 化できない payload だけ `GlyphLayer::Svg` に残す
+    - [*] `paintcore` bridge は現行 `fontloader` 0.0.10 公開型に合わせて安全側互換を維持
+        - [x] `paintcore` 単体の clip / gradient renderer は先行実装済み
+        - [x] `fontloader -> paintcore` 変換では `clip_commands = []`、gradient 変換なしを明文化
+        - [ ] `fontloader` 公開型更新後に lossless bridge へ切り替える
  
 # APIの大幅破壊的変更
 

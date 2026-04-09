@@ -71,6 +71,7 @@ The README now focuses on the public API and runnable examples.
 - With `svg-fonts`, OpenType `SVG ` glyphs are pathified first, and simple shapes are emitted as `GlyphLayer::Path`
 - Payloads that cannot be pathified are kept as `GlyphLayer::Svg`
 - The current supported SVG subset covers `path`, `rect`, `circle`, `ellipse`, `line`, `polyline`, `polygon`, `defs` / `use`, `fill` / `fill-rule` / `stroke` / `stroke-width`, `clipPath` / `clip-path`, `translate` / `scale` / `matrix`, minimal `linearGradient` / `radialGradient` / `stop`, and preserved `gradientUnits` / `gradientTransform`
-- Patterns, `mask`, `filter`, richer stroke styles, and actual clip/stroke rasterization in `paintcore` are still unsupported
+- Patterns, `mask`, `filter`, and richer stroke styles are still unsupported
+- `paintcore` itself already has clip/gradient renderers, but the current `fontloader` 0.0.10 public bridge still does not carry that data through
 - WOFF2 still requires the complete byte stream before decoding
 - CFF2 planning notes live in `cff2-investigation.md`

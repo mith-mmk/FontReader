@@ -116,6 +116,8 @@ println!("{}", engine.shape("Hello")?.glyphs.len());
 
 現状の `svg-fonts` は、単純な `path` / `rect` / `circle` / `ellipse` / `line` / `polyline` / `polygon` を `PathGlyphLayer` に変換し、`defs` / `use`、`fill` / `fill-rule` / `stroke` / `stroke-width`、`clipPath` / `clip-path`、`translate` / `scale` / `matrix`、`linearGradient` / `radialGradient` / `stop`、`gradientUnits` / `gradientTransform` の最小保持まで入っています。path 化できない payload だけを `GlyphLayer::Svg` として残します。
 
+ただし、現在 `paintcore` が参照している `fontloader` / `FontReader` 0.0.10 公開型には `clip_commands` と gradient paint variant がまだ出ていません。`paintcore` 自体は clip / gradient renderer を持ちますが、現行の `fontloader -> paintcore` 変換は安全側に倒しており、`clip_commands = []`、gradient 変換なしで橋渡ししています。
+
 詳細仕様と `paintcore` への受け渡し境界は [doc/SVFONTSPEC.md](doc/SVFONTSPEC.md) にまとめています。
 
 ## examples

@@ -116,6 +116,8 @@ More runnable examples live in [doc/api-recipes.md](doc/api-recipes.md).
 
 The current `svg-fonts` implementation converts simple `path`, `rect`, `circle`, `ellipse`, `line`, `polyline`, and `polygon` elements into `PathGlyphLayer` values. It includes minimal `defs` / `use`, `fill` / `fill-rule` / `stroke` / `stroke-width`, `clipPath` / `clip-path`, `translate` / `scale` / `matrix`, `linearGradient` / `radialGradient` / `stop`, and preserved `gradientUnits` / `gradientTransform` support, and keeps `GlyphLayer::Svg` only for payloads that cannot be pathified.
 
+However, the `fontloader` / `FontReader` 0.0.10 public types currently consumed by `paintcore` still do not expose `clip_commands` or gradient paint variants. `paintcore` already has native clip/gradient renderers, but the current `fontloader -> paintcore` conversion remains intentionally lossy for safety: `clip_commands = []`, and no gradient conversion is performed yet.
+
 See [doc/SVFONTSPEC.md](doc/SVFONTSPEC.md) for the exact current scope, limitations, and the `paintcore` handoff contract.
 
 ## Examples

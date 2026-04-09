@@ -9,6 +9,23 @@
 
 この文書は `FontReader` 側の parser 実装仕様そのものではなく、`paintcore` が受け取るべき最終データ契約を定義します。
 
+## 重要: 現行ブリッジとの差分
+
+この文書には 2 種類の境界が混在します。
+
+- 将来的に `FontReader` が `paintcore` へ渡すべき理想契約
+- 現在の `paintcore` が参照している `fontloader` / `FontReader` 0.0.10 公開型との互換制約
+
+2026-04-09 時点では、`paintcore` 側の内部描画モデルには `clip_commands` と gradient paint variant がすでに存在します。しかし、現在参照している `fontloader` / `FontReader` 0.0.10 の公開型にはその 2 つがまだ露出していません。
+
+そのため、現行の `fontloader -> paintcore` 変換層は次の暫定互換動作を維持します。
+
+- `clip_commands` は常に空配列へ安全に落とす
+- gradient paint は変換せず、公開型で受け取れる paint だけを扱う
+- `GlyphLayer::Svg` は引き続き別実装用の raw payload として保持する
+
+つまり、`paintcore` 単体では clip / gradient renderer を持っていますが、現 dependency 経由ではまだその情報が流れてきません。この文書の「理想契約」節は先行仕様であり、現行ブリッジの挙動は後述の「現行 0.0.10 ブリッジ」節を正とします。
+
 ## 基本方針
 
 - SVG の解釈は原則として `FontReader` 側の責務
@@ -75,7 +92,7 @@ simple SVG を path 化できた場合は `PathGlyphLayer` を渡す。
 
 `FontReader` は path layer ごとに paint を確定して渡す。
 
-最低限:
+理想契約での最低限:
 
 - `GlyphPaint::CurrentColor`
 - `GlyphPaint::Solid(u32)`
@@ -96,7 +113,7 @@ SVG gradient を path layer として `paintcore` に描かせる場合は、次
 
 #### `clip_commands`
 
-`clip-path` の参照解決結果を layer ごとに `clip_commands` へ確定して渡す。
+理想契約では、`clip-path` の参照解決結果を layer ごとに `clip_commands` へ確定して渡す。
 
 - `clip_commands` は未解決の `url(#...)` や `clipPath` ノードではなく、解決済み path command 群であること
 - 最小対応では simple shape/path のみ解決すればよい
@@ -180,6 +197,20 @@ raw SVG payload を保持したい場合は `SvgGlyphLayer` を渡す。
   - `translate(...)`
   - `scale(...)`
   - `matrix(a b c d e f)`
+
+## 現行 0.0.10 ブリッジ
+
+現時点の `paintcore <- fontloader` 変換層は、上記の理想契約をまだフルには使いません。互換性のため、次の制約を明示的に残します。
+
+- `fontloader::PathGlyphLayer` から `paintcore::PathGlyphLayer` への変換では `clip_commands = []`
+- `fontloader::GlyphPaint` から `paintcore::GlyphPaint` への変換では `Solid` と `CurrentColor` だけを受ける
+- `paintcore` 側に gradient / clip renderer があっても、現 dependency から流れてこない情報は使わない
+
+したがって、今の `paintcore` 側で保証されるのは次です。
+
+- `paintcore` ネイティブ layer を直接組み立てた場合は clip / gradient を描ける
+- `fontloader` 0.0.10 公開 API 経由の変換では clip / gradient は失われる
+- lossless な bridge は `fontloader` 側の公開型更新後に切り替える
 
 ## `paintcore` が担当する責務
 
@@ -296,12 +327,12 @@ stroke は `Command` ではなく `PathGlyphLayer` の責務とする。
 
 `fontloader` / `paintcore` 境界の現状未対応は次です。
 
-- gradient
+- 現行 0.0.10 bridge での gradient 受け渡し
 - pattern
-- `clipPath`
+- 現行 0.0.10 bridge での `clipPath` 受け渡し
 - `mask`
 - filter
-- gradientTransform
+- gradientTransform の厳密な互換 bridge
 - gradientUnits の shape bounds まで含む完全解決
 - `stroke-linecap`
 - `stroke-linejoin`
