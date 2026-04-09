@@ -3,13 +3,15 @@
 #[cfg(feature = "svg-fonts")]
 use crate::commands::SvgGlyphLayer;
 use crate::commands::{
-    Command, FillRule, FontOptions, FontVariant, FontVariationSetting, GlyphBounds, GlyphLayer,
-    GlyphPaint, GlyphRun, PathPaintMode, PositionedGlyph, RasterGlyphLayer, RasterGlyphSource,
-    TextDirection,
+    Command, FillRule, FontOptions, FontVariant, FontVariationSetting, GlyphBounds,
+    GlyphGradientSpread, GlyphGradientUnits, GlyphLayer, GlyphLinearGradient, GlyphPaint,
+    GlyphRadialGradient, GlyphRun, PathPaintMode, PositionedGlyph, RasterGlyphLayer,
+    RasterGlyphSource, TextDirection,
 };
 use crate::fontface::FontFace;
 use crate::util;
 use base64::{engine::general_purpose, Engine as _};
+use std::fmt::Write as _;
 use std::io::{Error, ErrorKind};
 
 /// Public shaping direction used by [`FontEngine`].
@@ -287,6 +289,44 @@ mod tests {
         assert!(svg.contains("stroke=\"#112233\""));
         assert!(svg.contains("stroke-width=\"2.5\""));
     }
+
+    #[test]
+    fn glyph_run_to_svg_writes_gradient_defs() {
+        let run = GlyphRun::new(vec![PositionedGlyph::new(
+            crate::Glyph::new(vec![GlyphLayer::Path(crate::PathGlyphLayer::new(
+                vec![Command::MoveTo(0.0, 0.0), Command::Line(10.0, 0.0), Command::Close],
+                GlyphPaint::LinearGradient(crate::GlyphLinearGradient {
+                    x1: 0.0,
+                    y1: 0.0,
+                    x2: 10.0,
+                    y2: 0.0,
+                    units: crate::GlyphGradientUnits::UserSpaceOnUse,
+                    transform: [1.0, 0.0, 0.0, 1.0, 3.0, 4.0],
+                    spread: crate::GlyphGradientSpread::Pad,
+                    stops: vec![
+                        crate::GlyphGradientStop {
+                            offset: 0.0,
+                            color: 0xff11_2233,
+                        },
+                        crate::GlyphGradientStop {
+                            offset: 1.0,
+                            color: 0x8011_2233,
+                        },
+                    ],
+                }),
+            ))]),
+            0.0,
+            0.0,
+        )]);
+
+        let svg = glyph_run_to_svg(&run, "px").expect("svg export");
+
+        assert!(svg.contains("<defs><linearGradient"));
+        assert!(svg.contains("fill=\"url(#glyph-gradient-0)\""));
+        assert!(svg.contains("gradientUnits=\"userSpaceOnUse\""));
+        assert!(svg.contains("gradientTransform=\"matrix(1 0 0 1 3 4)\""));
+        assert!(svg.contains("stop-opacity=\""));
+    }
 }
 
 pub(crate) fn glyph_run_to_svg(run: &GlyphRun, fontunit: &str) -> Result<String, Error> {
@@ -309,6 +349,8 @@ pub(crate) fn glyph_run_to_svg(run: &GlyphRun, fontunit: &str) -> Result<String,
         "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{}{}\" height=\"{}{}\" viewBox=\"{} {} {} {}\" overflow=\"visible\">",
         width, fontunit, height, fontunit, min_x, min_y, view_width, view_height
     );
+    let mut gradient_registry = SvgGradientRegistry::default();
+    let mut body = String::new();
 
     for glyph in &run.glyphs {
         for layer in &glyph.glyph.layers {
@@ -322,19 +364,31 @@ pub(crate) fn glyph_run_to_svg(run: &GlyphRun, fontunit: &str) -> Result<String,
                     if d.is_empty() {
                         continue;
                     }
-                    svg += &format!("<path d=\"{}\" {} />", d, path_to_svg_attributes(path));
+                    body += &format!(
+                        "<path d=\"{}\" {} />",
+                        d,
+                        path_to_svg_attributes(path, &mut gradient_registry)
+                    );
                 }
                 GlyphLayer::Raster(raster) => {
-                    svg += &raster_layer_to_svg_image(raster, glyph.x, glyph.y)?;
+                    body += &raster_layer_to_svg_image(raster, glyph.x, glyph.y)?;
                 }
                 #[cfg(feature = "svg-fonts")]
                 GlyphLayer::Svg(layer) => {
-                    svg += &svg_layer_to_svg_fragment(layer, glyph.x, glyph.y);
+                    body += &svg_layer_to_svg_fragment(layer, glyph.x, glyph.y);
                 }
             }
         }
     }
 
+    if !gradient_registry.defs.is_empty() {
+        svg += "<defs>";
+        for definition in &gradient_registry.defs {
+            svg += definition;
+        }
+        svg += "</defs>";
+    }
+    svg += &body;
     svg += "</svg>";
     Ok(svg)
 }
@@ -528,20 +582,20 @@ fn normalize_svg_color(color: u32) -> u32 {
     }
 }
 
-fn paint_to_svg_attributes(paint: GlyphPaint) -> String {
+fn paint_to_svg_attributes(paint: &GlyphPaint, registry: &mut SvgGradientRegistry, attribute: &str) -> String {
     match paint {
-        GlyphPaint::CurrentColor => "fill=\"currentColor\"".to_string(),
+        GlyphPaint::CurrentColor => format!("{attribute}=\"currentColor\""),
         GlyphPaint::Solid(color) => {
-            let color = normalize_svg_color(color);
+            let color = normalize_svg_color(*color);
             let alpha = ((color >> 24) & 0xff) as u8;
             let red = ((color >> 16) & 0xff) as u8;
             let green = ((color >> 8) & 0xff) as u8;
             let blue = (color & 0xff) as u8;
             if alpha == 0xff {
-                format!("fill=\"#{:02x}{:02x}{:02x}\"", red, green, blue)
+                format!("{attribute}=\"#{:02x}{:02x}{:02x}\"", red, green, blue)
             } else {
                 format!(
-                    "fill=\"#{:02x}{:02x}{:02x}\" fill-opacity=\"{}\"",
+                    "{attribute}=\"#{:02x}{:02x}{:02x}\" {attribute}-opacity=\"{}\"",
                     red,
                     green,
                     blue,
@@ -549,20 +603,142 @@ fn paint_to_svg_attributes(paint: GlyphPaint) -> String {
                 )
             }
         }
+        GlyphPaint::LinearGradient(gradient) => {
+            let id = registry.register_linear_gradient(gradient);
+            format!("{attribute}=\"url(#{id})\"")
+        }
+        GlyphPaint::RadialGradient(gradient) => {
+            let id = registry.register_radial_gradient(gradient);
+            format!("{attribute}=\"url(#{id})\"")
+        }
     }
 }
 
-fn path_to_svg_attributes(path: &crate::commands::PathGlyphLayer) -> String {
-    let paint = paint_to_svg_attributes(path.paint);
+fn path_to_svg_attributes(
+    path: &crate::commands::PathGlyphLayer,
+    registry: &mut SvgGradientRegistry,
+) -> String {
     match path.paint_mode {
-        PathPaintMode::Fill => format!("{}{}", paint, fill_rule_to_svg_attribute(path.fill_rule)),
+        PathPaintMode::Fill => format!(
+            "{}{}",
+            paint_to_svg_attributes(&path.paint, registry, "fill"),
+            fill_rule_to_svg_attribute(path.fill_rule)
+        ),
         PathPaintMode::Stroke => format!(
             "fill=\"none\" {} stroke-width=\"{}\"",
-            paint.replacen("fill=", "stroke=", 1)
-                .replacen(" fill-opacity=", " stroke-opacity=", 1),
+            paint_to_svg_attributes(&path.paint, registry, "stroke"),
             path.stroke_width
         ),
     }
+}
+
+#[derive(Default)]
+struct SvgGradientRegistry {
+    defs: Vec<String>,
+    next_id: usize,
+}
+
+impl SvgGradientRegistry {
+    fn register_linear_gradient(&mut self, gradient: &GlyphLinearGradient) -> String {
+        let id = format!("glyph-gradient-{}", self.next_id);
+        self.next_id += 1;
+        self.defs.push(linear_gradient_to_svg_def(&id, gradient));
+        id
+    }
+
+    fn register_radial_gradient(&mut self, gradient: &GlyphRadialGradient) -> String {
+        let id = format!("glyph-gradient-{}", self.next_id);
+        self.next_id += 1;
+        self.defs.push(radial_gradient_to_svg_def(&id, gradient));
+        id
+    }
+}
+
+fn linear_gradient_to_svg_def(id: &str, gradient: &GlyphLinearGradient) -> String {
+    let mut definition = format!(
+        "<linearGradient id=\"{}\" x1=\"{}\" y1=\"{}\" x2=\"{}\" y2=\"{}\" gradientUnits=\"{}\" gradientTransform=\"{}\" spreadMethod=\"{}\">",
+        id,
+        gradient.x1,
+        gradient.y1,
+        gradient.x2,
+        gradient.y2,
+        gradient_units_to_svg(gradient.units),
+        gradient_transform_to_svg(&gradient.transform),
+        gradient_spread_to_svg(gradient.spread)
+    );
+    append_gradient_stops(&mut definition, &gradient.stops);
+    definition += "</linearGradient>";
+    definition
+}
+
+fn radial_gradient_to_svg_def(id: &str, gradient: &GlyphRadialGradient) -> String {
+    let mut definition = format!(
+        "<radialGradient id=\"{}\" cx=\"{}\" cy=\"{}\" r=\"{}\" fx=\"{}\" fy=\"{}\" gradientUnits=\"{}\" gradientTransform=\"{}\" spreadMethod=\"{}\">",
+        id,
+        gradient.cx,
+        gradient.cy,
+        gradient.r,
+        gradient.fx,
+        gradient.fy,
+        gradient_units_to_svg(gradient.units),
+        gradient_transform_to_svg(&gradient.transform),
+        gradient_spread_to_svg(gradient.spread)
+    );
+    append_gradient_stops(&mut definition, &gradient.stops);
+    definition += "</radialGradient>";
+    definition
+}
+
+fn append_gradient_stops(definition: &mut String, stops: &[crate::GlyphGradientStop]) {
+    for stop in stops {
+        let color = normalize_svg_color(stop.color);
+        let alpha = ((color >> 24) & 0xff) as u8;
+        let red = ((color >> 16) & 0xff) as u8;
+        let green = ((color >> 8) & 0xff) as u8;
+        let blue = (color & 0xff) as u8;
+        let _ = if alpha == 0xff {
+            write!(
+                definition,
+                "<stop offset=\"{}%\" stop-color=\"#{:02x}{:02x}{:02x}\"/>",
+                stop.offset * 100.0,
+                red,
+                green,
+                blue
+            )
+        } else {
+            write!(
+                definition,
+                "<stop offset=\"{}%\" stop-color=\"#{:02x}{:02x}{:02x}\" stop-opacity=\"{}\"/>",
+                stop.offset * 100.0,
+                red,
+                green,
+                blue,
+                alpha as f32 / 255.0
+            )
+        };
+    }
+}
+
+fn gradient_spread_to_svg(spread: GlyphGradientSpread) -> &'static str {
+    match spread {
+        GlyphGradientSpread::Pad => "pad",
+        GlyphGradientSpread::Reflect => "reflect",
+        GlyphGradientSpread::Repeat => "repeat",
+    }
+}
+
+fn gradient_units_to_svg(units: GlyphGradientUnits) -> &'static str {
+    match units {
+        GlyphGradientUnits::ObjectBoundingBox => "objectBoundingBox",
+        GlyphGradientUnits::UserSpaceOnUse => "userSpaceOnUse",
+    }
+}
+
+fn gradient_transform_to_svg(transform: &[f32; 6]) -> String {
+    format!(
+        "matrix({} {} {} {} {} {})",
+        transform[0], transform[1], transform[2], transform[3], transform[4], transform[5]
+    )
 }
 
 fn fill_rule_to_svg_attribute(fill_rule: FillRule) -> &'static str {

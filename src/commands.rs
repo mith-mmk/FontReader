@@ -82,10 +82,56 @@ impl Default for GlyphMetrics {
 ///
 /// `Solid(u32)` uses packed `0xAARRGGBB`, which matches `paintcore::path::draw_glyphs`.
 /// `CurrentColor` maps to the default color passed into the renderer.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum GlyphPaint {
     Solid(u32),
     CurrentColor,
+    LinearGradient(GlyphLinearGradient),
+    RadialGradient(GlyphRadialGradient),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct GlyphGradientStop {
+    pub offset: f32,
+    pub color: u32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GlyphGradientSpread {
+    Pad,
+    Reflect,
+    Repeat,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GlyphGradientUnits {
+    ObjectBoundingBox,
+    UserSpaceOnUse,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct GlyphLinearGradient {
+    pub x1: f32,
+    pub y1: f32,
+    pub x2: f32,
+    pub y2: f32,
+    pub units: GlyphGradientUnits,
+    pub transform: [f32; 6],
+    pub spread: GlyphGradientSpread,
+    pub stops: Vec<GlyphGradientStop>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct GlyphRadialGradient {
+    pub cx: f32,
+    pub cy: f32,
+    pub r: f32,
+    pub fx: f32,
+    pub fy: f32,
+    pub units: GlyphGradientUnits,
+    pub transform: [f32; 6],
+    pub spread: GlyphGradientSpread,
+    pub stops: Vec<GlyphGradientStop>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

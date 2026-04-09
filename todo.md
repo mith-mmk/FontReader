@@ -17,7 +17,7 @@
 - [+] mark-to-ligature を追加して複合字上の mark attachment を詰める
 - [x] script ごとの fallback 境界を増やすためArabic/Syriac/Hebrew 以外の fixture を追加する
 - [*] features `svg-fonts`
-    - [+] svg実装のためのCommand拡張
+    - [+] svg実装のためのCommand / PathGlyphLayer拡張
     - [+] svgフォントから必要な部分だけ切り出すパーサー
     - [+] `EmojiOneColor.otf` / `NotoColorEmoji-Regular.ttf` の単体 emoji glyph を回帰テスト
     - [+] `EmojiOneColor.otf` / `NotoColorEmoji-Regular.ttf` の ZWJ / variation sequence を回帰テスト
@@ -28,7 +28,10 @@
         - [x] `defs` / `use` の最小展開
         - [x] `translate` / `scale` / `matrix` の最小 transform 適用
         - [*] `stroke` / `stroke-width` の最小追従
-        - [ ] gradient など複雑な SVG 要素の追従
+        - [*] `linearGradient` / `radialGradient` / `stop` の最小追従
+        - [*] `gradientUnits` / `gradientTransform` の保持
+        - [ ] pattern / clipPath / mask / filter など複雑な SVG 要素の追従
+    - [x] path 化できる glyph は `GlyphLayer::Path` を優先し、path 化できない payload だけ `GlyphLayer::Svg` に残す
  
 # APIの大幅破壊的変更
 
@@ -216,6 +219,7 @@
 - features svg-font
   - [+] svg fontの暫定サポート (`svg-fonts`)
   - [+] svgのサポートに必要な最低限のファンクションを追加(css/textは無視)
+  - [+] `SVFONTSPEC.md` に合わせて、`paintcore` へ渡す layer 契約を `Path` 優先 / `Svg` fallback に整理
 - features ritchtext
   - [ ] font.ritchtext2command(&self, &str, size: Option<f32>) -> &FontCommand // ritch text(Unity Super Set)をコマンドにして返す
   - [ ] font.ritchtext2svg(&self, &str, size: Option<f32>) -> &FontCommand // ritch text(Unity Super Set)をコマンドにして返す
@@ -416,6 +420,7 @@
         - [x] getter
         - [x] svg divider
         - [+] `svg-fonts` feature で glyph payload を `GlyphLayer` に載せて SVG 出力
+        - [+] path 化できる payload は `GlyphLayer::Path`、未変換 payload は `GlyphLayer::Svg` として保持
   - OTHERS
     - [ ] DSIG	Digital signature
     - [ ] 'hdmx'	Horizontal device metrics

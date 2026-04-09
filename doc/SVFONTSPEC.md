@@ -16,6 +16,7 @@
 - `paintcore` は `GlyphLayer` 群を受け取り、それぞれを描画する
 - path 化できない、または別 backend に委譲したい場合だけ raw SVG payload を `GlyphLayer::Svg` として保持する
 - simple SVG の path 化は `FontReader` 側で完了していること
+- `linearGradient` / `radialGradient` / `stop` のような単純 gradient は `GlyphPaint` に解決してから渡すこと
 
 ## `Command` の責務
 
@@ -75,6 +76,8 @@ simple SVG を path 化できた場合は `PathGlyphLayer` を渡す。
 
 - `GlyphPaint::CurrentColor`
 - `GlyphPaint::Solid(u32)`
+- `GlyphPaint::LinearGradient(...)`
+- `GlyphPaint::RadialGradient(...)`
 
 SVG gradient を path layer として `paintcore` に描かせる場合は、次も渡す。
 
@@ -204,9 +207,11 @@ gradient は `Command` ではなく `GlyphPaint` の責務とする。
 - stroke/fill と同じく「描画スタイル」であり「形状」ではないため
 - raw SVG と path 化 SVG の両方で同じ paint モデルを共有しやすいため
 
-`FontReader` が gradient を path layer として渡す場合、少なくとも次を確定済みで渡すこと。
+現状の `fontloader` 実装では、少なくとも `linearGradient` / `radialGradient` / `stop` を path layer の paint として解決できる。`FontReader` が gradient を path layer として渡す場合、少なくとも次を確定済みで渡すこと。
 
 - gradient 種別
+- gradient units
+- gradient transform
 - endpoint / center / radius
 - spread mode
 - stop 一覧
@@ -279,6 +284,8 @@ stroke は `Command` ではなく `PathGlyphLayer` の責務とする。
 - `clipPath`
 - `mask`
 - filter
+- gradientTransform
+- gradientUnits の shape bounds まで含む完全解決
 - `stroke-linecap`
 - `stroke-linejoin`
 - `stroke-dasharray`

@@ -114,7 +114,7 @@ println!("{}", engine.shape("Hello")?.glyphs.len());
 
 `sbix` は raster layer、`COLR/CPAL` は path layer、`SVG ` テーブルは `svg-fonts` 有効時のみ path layer 化を優先し、必要な場合だけ `Svg` layer を保持します。
 
-現状の `svg-fonts` は、単純な `path` / `rect` / `circle` / `ellipse` / `line` / `polyline` / `polygon` を `PathGlyphLayer` に変換し、`defs` / `use`、`fill` / `fill-rule` / `stroke` / `stroke-width`、`translate` / `scale` / `matrix` の最小対応まで入っています。path 化できない payload だけを `GlyphLayer::Svg` として残します。
+現状の `svg-fonts` は、単純な `path` / `rect` / `circle` / `ellipse` / `line` / `polyline` / `polygon` を `PathGlyphLayer` に変換し、`defs` / `use`、`fill` / `fill-rule` / `stroke` / `stroke-width`、`translate` / `scale` / `matrix`、`linearGradient` / `radialGradient` / `stop`、`gradientUnits` / `gradientTransform` の最小保持まで入っています。path 化できない payload だけを `GlyphLayer::Svg` として残します。
 
 詳細仕様と `paintcore` への受け渡し境界は [doc/SVFONTSPEC.md](doc/SVFONTSPEC.md) にまとめています。
 

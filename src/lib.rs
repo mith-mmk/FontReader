@@ -50,9 +50,10 @@ pub use commands as commads;
 pub use commands::SvgGlyphLayer;
 pub use commands::{
     text2commands, Command, FillRule, FontMetrics, FontOptions, FontRef, FontStretch, FontStyle,
-    FontVariant, FontVariationSetting, FontWeight, Glyph, GlyphBounds, GlyphFlow, GlyphLayer,
-    GlyphMetrics, GlyphPaint, GlyphRun, PathGlyphLayer, PathPaintMode, PositionedGlyph,
-    RasterGlyphLayer, RasterGlyphSource, TextDirection,
+    FontVariant, FontVariationSetting, FontWeight, Glyph, GlyphBounds, GlyphFlow,
+    GlyphGradientSpread, GlyphGradientStop, GlyphGradientUnits, GlyphLayer, GlyphLinearGradient,
+    GlyphMetrics, GlyphPaint, GlyphRadialGradient, GlyphRun, PathGlyphLayer, PathPaintMode,
+    PositionedGlyph, RasterGlyphLayer, RasterGlyphSource, TextDirection,
 };
 pub use fontengine::{FontEngine, ShapingPolicy};
 pub use fontface::{FontFace, FontFaceDescriptor, FontFamily, FontVariationAxis};

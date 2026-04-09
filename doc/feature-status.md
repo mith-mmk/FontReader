@@ -70,7 +70,7 @@ The README now focuses on the public API and runnable examples.
 - The current local corpus does not contain a confirmed real CFF2 font; coverage is therefore synthetic/unit-test heavy until a true CFF2 fixture is added
 - With `svg-fonts`, OpenType `SVG ` glyphs are pathified first, and simple shapes are emitted as `GlyphLayer::Path`
 - Payloads that cannot be pathified are kept as `GlyphLayer::Svg`
-- The current supported SVG subset covers `path`, `rect`, `circle`, `ellipse`, `line`, `polyline`, `polygon`, `defs` / `use`, `fill` / `fill-rule` / `stroke` / `stroke-width`, and `translate` / `scale` / `matrix`
-- Gradients, richer stroke styles, and actual stroke rasterization in `paintcore` are still unsupported
+- The current supported SVG subset covers `path`, `rect`, `circle`, `ellipse`, `line`, `polyline`, `polygon`, `defs` / `use`, `fill` / `fill-rule` / `stroke` / `stroke-width`, `translate` / `scale` / `matrix`, minimal `linearGradient` / `radialGradient` / `stop`, and preserved `gradientUnits` / `gradientTransform`
+- Patterns, `clipPath`, `mask`, `filter`, richer stroke styles, and actual stroke rasterization in `paintcore` are still unsupported
 - WOFF2 still requires the complete byte stream before decoding
 - CFF2 planning notes live in `cff2-investigation.md`

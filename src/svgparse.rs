@@ -1,4 +1,7 @@
-use crate::commands::{Command, FillRule, GlyphPaint, PathGlyphLayer};
+use crate::commands::{
+    Command, FillRule, GlyphGradientSpread, GlyphGradientStop, GlyphGradientUnits,
+    GlyphLinearGradient, GlyphPaint, GlyphRadialGradient, PathGlyphLayer,
+};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
@@ -14,7 +17,7 @@ struct SvgElement {
     children: Vec<SvgNode>,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 struct RenderState {
     transform: Transform2D,
     fill: Option<GlyphPaint>,
@@ -103,10 +106,11 @@ pub(crate) fn svg_to_path_layers(
     collect_definitions(&root, &mut defs);
 
     let mut layers = Vec::new();
+    let state = RenderState::default();
     flatten_node(
         &root,
         &defs,
-        RenderState::default(),
+        &state,
         scale_x,
         scale_y,
         &mut layers,
@@ -160,7 +164,7 @@ fn parse_svg_document(document: &str) -> Result<SvgNode, ()> {
                 return Err(());
             };
             let element = stack.pop().ok_or(())?;
-            if element.name != name {
+            if element.name != name.to_ascii_lowercase() {
                 return Err(());
             }
             stack
@@ -177,7 +181,7 @@ fn parse_svg_document(document: &str) -> Result<SvgNode, ()> {
         let attrs = parse_attributes(tag);
         let self_closing = tag[..tag.len().saturating_sub(1)].trim_end().ends_with('/');
         let element = SvgElement {
-            name: name.to_string(),
+            name: name.to_ascii_lowercase(),
             attrs,
             children: Vec::new(),
         };
@@ -233,7 +237,7 @@ fn collect_id_elements(children: &[SvgNode], defs: &mut HashMap<String, SvgEleme
 fn flatten_node(
     node: &SvgNode,
     defs: &HashMap<String, SvgElement>,
-    state: RenderState,
+    state: &RenderState,
     scale_x: f32,
     scale_y: f32,
     out: &mut Vec<PathGlyphLayer>,
@@ -257,7 +261,10 @@ fn flatten_node(
     let local_fill = resolve_paint(
         style.as_ref().and_then(|style| style.get("fill")),
         element.attrs.get("fill"),
-        state.fill,
+        state.fill.as_ref(),
+        defs,
+        scale_x,
+        scale_y,
     );
     let local_fill_rule = style
         .as_ref()
@@ -268,7 +275,10 @@ fn flatten_node(
     let local_stroke = resolve_paint(
         style.as_ref().and_then(|style| style.get("stroke")),
         element.attrs.get("stroke"),
-        state.stroke,
+        state.stroke.as_ref(),
+        defs,
+        scale_x,
+        scale_y,
     );
     let local_stroke_width = style
         .as_ref()
@@ -295,12 +305,12 @@ fn flatten_node(
     match element.name.as_str() {
         "svg" | "g" | "symbol" => {
             for child in &element.children {
-                flatten_node(child, defs, next_state, scale_x, scale_y, out);
+                flatten_node(child, defs, &next_state, scale_x, scale_y, out);
             }
         }
         "use" => flatten_use(element, defs, next_state, scale_x, scale_y, out),
         "path" | "rect" | "circle" | "ellipse" | "line" | "polyline" | "polygon" => {
-            out.extend(element_to_path_layers(element, next_state, scale_x, scale_y));
+            out.extend(element_to_path_layers(element, &next_state, scale_x, scale_y));
         }
         _ => {}
     }
@@ -345,7 +355,7 @@ fn flatten_use(
     flatten_node(
         &SvgNode::Element(referenced),
         defs,
-        use_state,
+        &use_state,
         scale_x,
         scale_y,
         out,
@@ -354,7 +364,7 @@ fn flatten_use(
 
 fn element_to_path_layers(
     element: &SvgElement,
-    state: RenderState,
+    state: &RenderState,
     scale_x: f32,
     scale_y: f32,
 ) -> Vec<PathGlyphLayer> {
@@ -382,14 +392,14 @@ fn element_to_path_layers(
     let supports_fill = !matches!(element.name.as_str(), "line");
 
     if supports_fill {
-        if let Some(paint) = state.fill {
+        if let Some(paint) = state.fill.clone() {
             let mut layer = PathGlyphLayer::new(transformed.clone(), paint);
             layer.fill_rule = state.fill_rule;
             layers.push(layer);
         }
     }
 
-    if let Some(paint) = state.stroke {
+    if let Some(paint) = state.stroke.clone() {
         if state.stroke_width > 0.0 {
             layers.push(PathGlyphLayer::stroke(transformed, paint, state.stroke_width));
         }
@@ -486,7 +496,25 @@ fn parse_style(style: &str) -> HashMap<String, String> {
         .collect()
 }
 
-fn parse_fill(value: &str) -> Option<GlyphPaint> {
+fn parse_fill(
+    value: &str,
+    defs: &HashMap<String, SvgElement>,
+    scale_x: f32,
+    scale_y: f32,
+) -> Option<GlyphPaint> {
+    let value = value.trim();
+    if let Some(paint) = parse_basic_paint(value) {
+        return Some(paint);
+    }
+    if let Some(reference) = parse_url_reference(value) {
+        return defs
+            .get(reference)
+            .and_then(|element| parse_gradient(element, defs, scale_x, scale_y));
+    }
+    None
+}
+
+fn parse_basic_paint(value: &str) -> Option<GlyphPaint> {
     let value = value.trim();
     if value.eq_ignore_ascii_case("currentcolor") {
         return Some(GlyphPaint::CurrentColor);
@@ -497,19 +525,257 @@ fn parse_fill(value: &str) -> Option<GlyphPaint> {
     None
 }
 
+fn parse_url_reference(value: &str) -> Option<&str> {
+    value
+        .strip_prefix("url(")?
+        .strip_suffix(')')?
+        .trim()
+        .strip_prefix('#')
+}
+
+fn parse_gradient(
+    element: &SvgElement,
+    defs: &HashMap<String, SvgElement>,
+    scale_x: f32,
+    scale_y: f32,
+) -> Option<GlyphPaint> {
+    match element.name.as_str() {
+        "lineargradient" => parse_linear_gradient(element, defs, scale_x, scale_y)
+            .map(GlyphPaint::LinearGradient),
+        "radialgradient" => parse_radial_gradient(element, defs, scale_x, scale_y)
+            .map(GlyphPaint::RadialGradient),
+        _ => None,
+    }
+}
+
+fn parse_linear_gradient(
+    element: &SvgElement,
+    defs: &HashMap<String, SvgElement>,
+    scale_x: f32,
+    scale_y: f32,
+) -> Option<GlyphLinearGradient> {
+    let inherited = gradient_reference(element, defs);
+    let x1 = gradient_number(element, inherited, "x1").unwrap_or(0.0) * scale_x;
+    let y1 = gradient_number(element, inherited, "y1").unwrap_or(0.0) * scale_y;
+    let x2 = gradient_number(element, inherited, "x2").unwrap_or(1.0) * scale_x;
+    let y2 = gradient_number(element, inherited, "y2").unwrap_or(0.0) * scale_y;
+    let units = gradient_units(element, inherited);
+    let transform = gradient_transform(element, inherited, scale_x, scale_y);
+    let spread = gradient_spread(element, inherited);
+    let stops = gradient_stops(element, inherited, defs, scale_x, scale_y);
+    if stops.is_empty() {
+        return None;
+    }
+    Some(GlyphLinearGradient {
+        x1,
+        y1,
+        x2,
+        y2,
+        units,
+        transform,
+        spread,
+        stops,
+    })
+}
+
+fn parse_radial_gradient(
+    element: &SvgElement,
+    defs: &HashMap<String, SvgElement>,
+    scale_x: f32,
+    scale_y: f32,
+) -> Option<GlyphRadialGradient> {
+    let inherited = gradient_reference(element, defs);
+    let cx = gradient_number(element, inherited, "cx").unwrap_or(0.5) * scale_x;
+    let cy = gradient_number(element, inherited, "cy").unwrap_or(0.5) * scale_y;
+    let r = gradient_number(element, inherited, "r").unwrap_or(0.5) * scale_x.abs().max(scale_y.abs());
+    let fx = gradient_number(element, inherited, "fx")
+        .map(|value| value * scale_x)
+        .unwrap_or(cx);
+    let fy = gradient_number(element, inherited, "fy")
+        .map(|value| value * scale_y)
+        .unwrap_or(cy);
+    let units = gradient_units(element, inherited);
+    let transform = gradient_transform(element, inherited, scale_x, scale_y);
+    let spread = gradient_spread(element, inherited);
+    let stops = gradient_stops(element, inherited, defs, scale_x, scale_y);
+    if stops.is_empty() {
+        return None;
+    }
+    Some(GlyphRadialGradient {
+        cx,
+        cy,
+        r,
+        fx,
+        fy,
+        units,
+        transform,
+        spread,
+        stops,
+    })
+}
+
+fn gradient_reference<'a>(
+    element: &'a SvgElement,
+    defs: &'a HashMap<String, SvgElement>,
+) -> Option<&'a SvgElement> {
+    element
+        .attrs
+        .get("href")
+        .or_else(|| element.attrs.get("xlink:href"))
+        .and_then(|value| value.strip_prefix('#'))
+        .and_then(|reference| defs.get(reference))
+}
+
+fn gradient_number(element: &SvgElement, inherited: Option<&SvgElement>, key: &str) -> Option<f32> {
+    element
+        .attrs
+        .get(key)
+        .and_then(|value| parse_number_or_percent(value))
+        .or_else(|| {
+            inherited.and_then(|inherited| {
+                inherited
+                    .attrs
+                    .get(key)
+                    .and_then(|value| parse_number_or_percent(value))
+            })
+        })
+}
+
+fn gradient_spread(element: &SvgElement, inherited: Option<&SvgElement>) -> GlyphGradientSpread {
+    let value = element
+        .attrs
+        .get("spreadmethod")
+        .or_else(|| inherited.and_then(|gradient| gradient.attrs.get("spreadmethod")));
+    match value.map(|value| value.trim().to_ascii_lowercase()) {
+        Some(value) if value == "reflect" => GlyphGradientSpread::Reflect,
+        Some(value) if value == "repeat" => GlyphGradientSpread::Repeat,
+        _ => GlyphGradientSpread::Pad,
+    }
+}
+
+fn gradient_units(element: &SvgElement, inherited: Option<&SvgElement>) -> GlyphGradientUnits {
+    let value = element
+        .attrs
+        .get("gradientunits")
+        .or_else(|| inherited.and_then(|gradient| gradient.attrs.get("gradientunits")));
+    match value.map(|value| value.trim().to_ascii_lowercase()) {
+        Some(value) if value == "userspaceonuse" => GlyphGradientUnits::UserSpaceOnUse,
+        _ => GlyphGradientUnits::ObjectBoundingBox,
+    }
+}
+
+fn gradient_transform(
+    element: &SvgElement,
+    inherited: Option<&SvgElement>,
+    scale_x: f32,
+    scale_y: f32,
+) -> [f32; 6] {
+    let transform = element
+        .attrs
+        .get("gradienttransform")
+        .or_else(|| inherited.and_then(|gradient| gradient.attrs.get("gradienttransform")));
+    let transform = parse_transform(transform, scale_x, scale_y);
+    [
+        transform.a,
+        transform.b,
+        transform.c,
+        transform.d,
+        transform.e,
+        transform.f,
+    ]
+}
+
+fn gradient_stops(
+    element: &SvgElement,
+    inherited: Option<&SvgElement>,
+    _defs: &HashMap<String, SvgElement>,
+    _scale_x: f32,
+    _scale_y: f32,
+) -> Vec<GlyphGradientStop> {
+    let mut stops = collect_gradient_stops(element);
+    if stops.is_empty() {
+        if let Some(inherited) = inherited {
+            stops = collect_gradient_stops(inherited);
+            if stops.is_empty() {
+                stops = gradient_stops(
+                    inherited,
+                    gradient_reference(inherited, _defs),
+                    _defs,
+                    _scale_x,
+                    _scale_y,
+                );
+            }
+        }
+    }
+    stops
+}
+
+fn collect_gradient_stops(element: &SvgElement) -> Vec<GlyphGradientStop> {
+    let mut stops = Vec::new();
+    for child in &element.children {
+        let SvgNode::Element(stop) = child else {
+            continue;
+        };
+        if stop.name != "stop" {
+            continue;
+        }
+        let style = stop.attrs.get("style").map(|value| parse_style(value));
+        let offset = style
+            .as_ref()
+            .and_then(|style| style.get("offset"))
+            .or_else(|| stop.attrs.get("offset"))
+            .and_then(|value| parse_number_or_percent(value))
+            .unwrap_or(0.0)
+            .clamp(0.0, 1.0);
+        let color = style
+            .as_ref()
+            .and_then(|style| style.get("stop-color"))
+            .or_else(|| stop.attrs.get("stop-color"))
+            .and_then(|value| parse_basic_paint(value));
+        let opacity = style
+            .as_ref()
+            .and_then(|style| style.get("stop-opacity"))
+            .or_else(|| stop.attrs.get("stop-opacity"))
+            .and_then(|value| parse_number_or_percent(value))
+            .unwrap_or(1.0)
+            .clamp(0.0, 1.0);
+        let Some(color) = color else {
+            continue;
+        };
+        let argb = match color {
+            GlyphPaint::Solid(argb) => apply_alpha(argb, opacity),
+            GlyphPaint::CurrentColor => apply_alpha(0xff00_0000, opacity),
+            GlyphPaint::LinearGradient(_) | GlyphPaint::RadialGradient(_) => continue,
+        };
+        stops.push(GlyphGradientStop {
+            offset,
+            color: argb,
+        });
+    }
+    stops
+}
+
+fn apply_alpha(color: u32, opacity: f32) -> u32 {
+    let alpha = (((color >> 24) & 0xff) as f32 * opacity).round().clamp(0.0, 255.0) as u32;
+    (color & 0x00ff_ffff) | (alpha << 24)
+}
+
 fn resolve_paint(
     style_value: Option<&String>,
     attr_value: Option<&String>,
-    inherited: Option<GlyphPaint>,
+    inherited: Option<&GlyphPaint>,
+    defs: &HashMap<String, SvgElement>,
+    scale_x: f32,
+    scale_y: f32,
 ) -> Option<GlyphPaint> {
     let Some(value) = style_value.or(attr_value) else {
-        return inherited;
+        return inherited.cloned();
     };
     let value = value.trim();
     if value.eq_ignore_ascii_case("none") {
         None
     } else {
-        parse_fill(value)
+        parse_fill(value, defs, scale_x, scale_y).or_else(|| inherited.cloned())
     }
 }
 
@@ -535,6 +801,14 @@ fn parse_hex_color(hex: &str) -> Option<u32> {
             .map(|rgba| (rgba << 24) | (rgba >> 8)),
         _ => None,
     }
+}
+
+fn parse_number_or_percent(value: &str) -> Option<f32> {
+    let trimmed = value.trim();
+    if let Some(percent) = trimmed.strip_suffix('%') {
+        return percent.trim().parse::<f32>().ok().map(|value| value / 100.0);
+    }
+    parse_number(trimmed)
 }
 
 fn parse_fill_rule(value: &str) -> FillRule {
@@ -1110,5 +1384,77 @@ mod tests {
         assert_eq!(layers.len(), 1);
         assert!(matches!(layers[0].paint_mode, crate::commands::PathPaintMode::Stroke));
         assert_eq!(layers[0].stroke_width, 2.0);
+    }
+
+    #[test]
+    fn svg_to_path_layers_resolves_linear_gradient_fill() {
+        let document = concat!(
+            "<svg>",
+            "<defs>",
+            "<linearGradient id=\"grad\"><stop offset=\"0%\" stop-color=\"#112233\"/><stop offset=\"100%\" stop-color=\"#445566\" stop-opacity=\"0.5\"/></linearGradient>",
+            "</defs>",
+            "<rect x=\"0\" y=\"0\" width=\"10\" height=\"10\" fill=\"url(#grad)\"/>",
+            "</svg>"
+        );
+        let layers = svg_to_path_layers(document, 2.0, 3.0);
+
+        assert_eq!(layers.len(), 1);
+        match &layers[0].paint {
+            GlyphPaint::LinearGradient(gradient) => {
+                assert_eq!(gradient.units, GlyphGradientUnits::ObjectBoundingBox);
+                assert_eq!(gradient.x2, 2.0);
+                assert_eq!(gradient.y2, 0.0);
+                assert_eq!(gradient.stops.len(), 2);
+            }
+            other => panic!("expected linear gradient paint, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn svg_to_path_layers_resolves_radial_gradient_stroke() {
+        let document = concat!(
+            "<svg>",
+            "<defs>",
+            "<radialGradient id=\"grad\" cx=\"10\" cy=\"20\" r=\"5\"><stop offset=\"0\" stop-color=\"#abcdef\"/></radialGradient>",
+            "</defs>",
+            "<circle cx=\"5\" cy=\"6\" r=\"4\" stroke=\"url(#grad)\" stroke-width=\"2\" fill=\"none\"/>",
+            "</svg>"
+        );
+        let layers = svg_to_path_layers(document, 2.0, 3.0);
+
+        assert_eq!(layers.len(), 1);
+        match &layers[0].paint {
+            GlyphPaint::RadialGradient(gradient) => {
+                assert_eq!(gradient.units, GlyphGradientUnits::ObjectBoundingBox);
+                assert_eq!(gradient.cx, 20.0);
+                assert_eq!(gradient.cy, 60.0);
+                assert_eq!(gradient.r, 15.0);
+            }
+            other => panic!("expected radial gradient paint, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn svg_to_path_layers_keeps_gradient_units_and_transform() {
+        let document = concat!(
+            "<svg>",
+            "<defs>",
+            "<linearGradient id=\"grad\" gradientUnits=\"userSpaceOnUse\" gradientTransform=\"translate(3,4) scale(2,3)\">",
+            "<stop offset=\"0%\" stop-color=\"#112233\"/>",
+            "<stop offset=\"100%\" stop-color=\"#445566\"/>",
+            "</linearGradient>",
+            "</defs>",
+            "<rect x=\"0\" y=\"0\" width=\"10\" height=\"10\" fill=\"url(#grad)\"/>",
+            "</svg>"
+        );
+        let layers = svg_to_path_layers(document, 2.0, 3.0);
+
+        match &layers[0].paint {
+            GlyphPaint::LinearGradient(gradient) => {
+                assert_eq!(gradient.units, GlyphGradientUnits::UserSpaceOnUse);
+                assert_eq!(gradient.transform, [2.0, 0.0, 0.0, 3.0, 6.0, 12.0]);
+            }
+            other => panic!("expected linear gradient paint, got {other:?}"),
+        }
     }
 }

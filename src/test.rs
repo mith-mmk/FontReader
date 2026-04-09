@@ -3985,7 +3985,7 @@ mod tests {
             run.glyphs[1].glyph.layers.first(),
             Some(crate::GlyphLayer::Path(layer))
                 if !layer.commands.is_empty()
-                    && matches!(layer.paint, crate::GlyphPaint::Solid(_))
+                    && matches!(&layer.paint, crate::GlyphPaint::Solid(_))
         ));
     }
 
@@ -5532,10 +5532,13 @@ mod tests {
                 | color.blue as u32;
 
             match actual {
-                crate::GlyphLayer::Path(path) => match path.paint {
-                    crate::GlyphPaint::Solid(argb) => assert_eq!(argb, expected_argb),
+                crate::GlyphLayer::Path(path) => match &path.paint {
+                    crate::GlyphPaint::Solid(argb) => assert_eq!(*argb, expected_argb),
                     crate::GlyphPaint::CurrentColor => {
                         panic!("expected COLR glyph layer to keep CPAL color")
+                    }
+                    crate::GlyphPaint::LinearGradient(_) | crate::GlyphPaint::RadialGradient(_) => {
+                        panic!("expected COLR glyph layer to keep solid CPAL color")
                     }
                 },
                 crate::GlyphLayer::Raster(_) => {
