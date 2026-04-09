@@ -327,6 +327,30 @@ mod tests {
         assert!(svg.contains("gradientTransform=\"matrix(1 0 0 1 0 0)\""));
         assert!(svg.contains("stop-opacity=\""));
     }
+
+    #[test]
+    fn glyph_run_to_svg_writes_clip_path_defs() {
+        let mut layer = crate::PathGlyphLayer::new(
+            vec![Command::MoveTo(0.0, 0.0), Command::Line(10.0, 0.0), Command::Close],
+            GlyphPaint::Solid(0xff11_2233),
+        );
+        layer.clip_commands = vec![
+            Command::MoveTo(1.0, 2.0),
+            Command::Line(3.0, 2.0),
+            Command::Line(3.0, 4.0),
+            Command::Close,
+        ];
+        let run = GlyphRun::new(vec![PositionedGlyph::new(
+            crate::Glyph::new(vec![GlyphLayer::Path(layer)]),
+            0.0,
+            0.0,
+        )]);
+
+        let svg = glyph_run_to_svg(&run, "px").expect("svg export");
+
+        assert!(svg.contains("<clipPath id=\"glyph-clip-"));
+        assert!(svg.contains("clip-path=\"url(#glyph-clip-"));
+    }
 }
 
 pub(crate) fn glyph_run_to_svg(run: &GlyphRun, fontunit: &str) -> Result<String, Error> {
@@ -349,7 +373,7 @@ pub(crate) fn glyph_run_to_svg(run: &GlyphRun, fontunit: &str) -> Result<String,
         "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{}{}\" height=\"{}{}\" viewBox=\"{} {} {} {}\" overflow=\"visible\">",
         width, fontunit, height, fontunit, min_x, min_y, view_width, view_height
     );
-    let mut gradient_registry = SvgGradientRegistry::default();
+    let mut registry = SvgDefRegistry::default();
     let mut body = String::new();
 
     for glyph in &run.glyphs {
@@ -367,7 +391,7 @@ pub(crate) fn glyph_run_to_svg(run: &GlyphRun, fontunit: &str) -> Result<String,
                     body += &format!(
                         "<path d=\"{}\" {} />",
                         d,
-                        path_to_svg_attributes(path, &mut gradient_registry)
+                        path_to_svg_attributes(path, &mut registry)
                     );
                 }
                 GlyphLayer::Raster(raster) => {
@@ -381,9 +405,9 @@ pub(crate) fn glyph_run_to_svg(run: &GlyphRun, fontunit: &str) -> Result<String,
         }
     }
 
-    if !gradient_registry.defs.is_empty() {
+    if !registry.defs.is_empty() {
         svg += "<defs>";
-        for definition in &gradient_registry.defs {
+        for definition in &registry.defs {
             svg += definition;
         }
         svg += "</defs>";
@@ -582,7 +606,7 @@ fn normalize_svg_color(color: u32) -> u32 {
     }
 }
 
-fn paint_to_svg_attributes(paint: &GlyphPaint, registry: &mut SvgGradientRegistry, attribute: &str) -> String {
+fn paint_to_svg_attributes(paint: &GlyphPaint, registry: &mut SvgDefRegistry, attribute: &str) -> String {
     match paint {
         GlyphPaint::CurrentColor => format!("{attribute}=\"currentColor\""),
         GlyphPaint::Solid(color) => {
@@ -616,29 +640,37 @@ fn paint_to_svg_attributes(paint: &GlyphPaint, registry: &mut SvgGradientRegistr
 
 fn path_to_svg_attributes(
     path: &crate::commands::PathGlyphLayer,
-    registry: &mut SvgGradientRegistry,
+    registry: &mut SvgDefRegistry,
 ) -> String {
+    let clip = if path.clip_commands.is_empty() {
+        String::new()
+    } else {
+        let id = registry.register_clip_path(&path.clip_commands);
+        format!(" clip-path=\"url(#{id})\"")
+    };
     match path.paint_mode {
         PathPaintMode::Fill => format!(
-            "{}{}",
+            "{}{}{}",
             paint_to_svg_attributes(&path.paint, registry, "fill"),
-            fill_rule_to_svg_attribute(path.fill_rule)
+            fill_rule_to_svg_attribute(path.fill_rule),
+            clip
         ),
         PathPaintMode::Stroke => format!(
-            "fill=\"none\" {} stroke-width=\"{}\"",
+            "fill=\"none\" {} stroke-width=\"{}\"{}",
             paint_to_svg_attributes(&path.paint, registry, "stroke"),
-            path.stroke_width
+            path.stroke_width,
+            clip
         ),
     }
 }
 
 #[derive(Default)]
-struct SvgGradientRegistry {
+struct SvgDefRegistry {
     defs: Vec<String>,
     next_id: usize,
 }
 
-impl SvgGradientRegistry {
+impl SvgDefRegistry {
     fn register_linear_gradient(&mut self, gradient: &GlyphLinearGradient) -> String {
         let id = format!("glyph-gradient-{}", self.next_id);
         self.next_id += 1;
@@ -650,6 +682,13 @@ impl SvgGradientRegistry {
         let id = format!("glyph-gradient-{}", self.next_id);
         self.next_id += 1;
         self.defs.push(radial_gradient_to_svg_def(&id, gradient));
+        id
+    }
+
+    fn register_clip_path(&mut self, commands: &[Command]) -> String {
+        let id = format!("glyph-clip-{}", self.next_id);
+        self.next_id += 1;
+        self.defs.push(clip_path_to_svg_def(&id, commands));
         id
     }
 }
@@ -687,6 +726,14 @@ fn radial_gradient_to_svg_def(id: &str, gradient: &GlyphRadialGradient) -> Strin
     append_gradient_stops(&mut definition, &gradient.stops);
     definition += "</radialGradient>";
     definition
+}
+
+fn clip_path_to_svg_def(id: &str, commands: &[Command]) -> String {
+    format!(
+        "<clipPath id=\"{}\"><path d=\"{}\"/></clipPath>",
+        id,
+        draw_commands_to_svg_path(commands, 0.0, 0.0)
+    )
 }
 
 fn append_gradient_stops(definition: &mut String, stops: &[crate::GlyphGradientStop]) {

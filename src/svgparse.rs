@@ -24,6 +24,7 @@ struct RenderState {
     fill_rule: FillRule,
     stroke: Option<GlyphPaint>,
     stroke_width: f32,
+    clip_path: Option<ClipPathSpec>,
 }
 
 impl Default for RenderState {
@@ -34,8 +35,21 @@ impl Default for RenderState {
             fill_rule: FillRule::NonZero,
             stroke: None,
             stroke_width: 1.0,
+            clip_path: None,
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ClipPathUnits {
+    UserSpaceOnUse,
+    ObjectBoundingBox,
+}
+
+#[derive(Debug, Clone)]
+struct ClipPathSpec {
+    commands: Vec<Command>,
+    units: ClipPathUnits,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -287,6 +301,14 @@ fn flatten_node(
         .and_then(|value| parse_number(value))
         .map(|value| value * scale_x.abs().max(scale_y.abs()))
         .unwrap_or(state.stroke_width);
+    let local_clip_path = resolve_clip_path(
+        style.as_ref().and_then(|style| style.get("clip-path")),
+        element.attrs.get("clip-path"),
+        state.clip_path.as_ref(),
+        defs,
+        scale_x,
+        scale_y,
+    );
     let next_state = RenderState {
         transform: state.transform.multiply(parse_transform(
             style
@@ -300,6 +322,7 @@ fn flatten_node(
         fill_rule: local_fill_rule,
         stroke: local_stroke,
         stroke_width: local_stroke_width,
+        clip_path: local_clip_path,
     };
 
     match element.name.as_str() {
@@ -351,6 +374,7 @@ fn flatten_use(
         fill_rule: state.fill_rule,
         stroke: state.stroke,
         stroke_width: state.stroke_width,
+        clip_path: state.clip_path,
     };
     flatten_node(
         &SvgNode::Element(referenced),
@@ -398,6 +422,7 @@ fn element_to_path_layers(
                 transformed.clone(),
                 resolve_gradient_paint(paint, bounds, state.transform),
             );
+            layer.clip_commands = resolve_clip_commands(state.clip_path.as_ref(), bounds, state.transform);
             layer.fill_rule = state.fill_rule;
             layers.push(layer);
         }
@@ -405,11 +430,13 @@ fn element_to_path_layers(
 
     if let Some(paint) = state.stroke.clone() {
         if state.stroke_width > 0.0 {
-            layers.push(PathGlyphLayer::stroke(
+            let mut layer = PathGlyphLayer::stroke(
                 transformed,
                 resolve_gradient_paint(paint, bounds, state.transform),
                 state.stroke_width,
-            ));
+            );
+            layer.clip_commands = resolve_clip_commands(state.clip_path.as_ref(), bounds, state.transform);
+            layers.push(layer);
         }
     }
 
@@ -430,6 +457,33 @@ fn resolve_gradient_paint(
         }
         other => other,
     }
+}
+
+fn resolve_clip_commands(
+    clip_path: Option<&ClipPathSpec>,
+    bounds: Option<(f32, f32, f32, f32)>,
+    element_transform: Transform2D,
+) -> Vec<Command> {
+    let Some(clip_path) = clip_path else {
+        return Vec::new();
+    };
+    let commands = if matches!(clip_path.units, ClipPathUnits::ObjectBoundingBox) {
+        let (min_x, min_y, max_x, max_y) = bounds.unwrap_or((0.0, 0.0, 0.0, 0.0));
+        let width = max_x - min_x;
+        let height = max_y - min_y;
+        let transform = Transform2D {
+            a: width,
+            b: 0.0,
+            c: 0.0,
+            d: height,
+            e: min_x,
+            f: min_y,
+        };
+        transform_commands(&clip_path.commands, transform)
+    } else {
+        transform_commands(&clip_path.commands, element_transform)
+    };
+    commands
 }
 
 fn resolve_linear_gradient(
@@ -1005,6 +1059,135 @@ fn resolve_paint(
         None
     } else {
         parse_fill(value, defs, scale_x, scale_y).or_else(|| inherited.cloned())
+    }
+}
+
+fn resolve_clip_path(
+    style_value: Option<&String>,
+    attr_value: Option<&String>,
+    inherited: Option<&ClipPathSpec>,
+    defs: &HashMap<String, SvgElement>,
+    scale_x: f32,
+    scale_y: f32,
+) -> Option<ClipPathSpec> {
+    let Some(value) = style_value.or(attr_value) else {
+        return inherited.cloned();
+    };
+    let value = value.trim();
+    if value.eq_ignore_ascii_case("none") {
+        return None;
+    }
+    let reference = parse_url_reference(value)?;
+    let element = defs.get(reference)?;
+    parse_clip_path_spec(element, defs, scale_x, scale_y).or_else(|| inherited.cloned())
+}
+
+fn parse_clip_path_spec(
+    element: &SvgElement,
+    defs: &HashMap<String, SvgElement>,
+    scale_x: f32,
+    scale_y: f32,
+) -> Option<ClipPathSpec> {
+    if element.name != "clippath" {
+        return None;
+    }
+    let units = match element
+        .attrs
+        .get("clippathunits")
+        .map(|value| value.trim().to_ascii_lowercase())
+    {
+        Some(value) if value == "objectboundingbox" => ClipPathUnits::ObjectBoundingBox,
+        _ => ClipPathUnits::UserSpaceOnUse,
+    };
+    let mut commands = Vec::new();
+    for child in &element.children {
+        collect_clip_commands(
+            child,
+            defs,
+            Transform2D::IDENTITY,
+            scale_x,
+            scale_y,
+            &mut commands,
+        );
+    }
+    if commands.is_empty() {
+        None
+    } else {
+        Some(ClipPathSpec { commands, units })
+    }
+}
+
+fn collect_clip_commands(
+    node: &SvgNode,
+    defs: &HashMap<String, SvgElement>,
+    transform: Transform2D,
+    scale_x: f32,
+    scale_y: f32,
+    out: &mut Vec<Command>,
+) {
+    let SvgNode::Element(element) = node else {
+        return;
+    };
+    let style = element.attrs.get("style").map(|value| parse_style(value));
+    let next_transform = transform.multiply(parse_transform(
+        style
+            .as_ref()
+            .and_then(|style| style.get("transform"))
+            .or_else(|| element.attrs.get("transform")),
+        scale_x,
+        scale_y,
+    ));
+
+    match element.name.as_str() {
+        "g" | "svg" | "symbol" | "clippath" => {
+            for child in &element.children {
+                collect_clip_commands(child, defs, next_transform, scale_x, scale_y, out);
+            }
+        }
+        "use" => {
+            let Some(reference) = element
+                .attrs
+                .get("href")
+                .or_else(|| element.attrs.get("xlink:href"))
+                .and_then(|value| value.strip_prefix('#'))
+            else {
+                return;
+            };
+            let Some(referenced) = defs.get(reference) else {
+                return;
+            };
+            let translate = Transform2D::translate(
+                parse_attr_f32(&element.attrs, "x").unwrap_or(0.0) * scale_x,
+                parse_attr_f32(&element.attrs, "y").unwrap_or(0.0) * scale_y,
+            );
+            collect_clip_commands(
+                &SvgNode::Element(referenced.clone()),
+                defs,
+                next_transform.multiply(translate),
+                scale_x,
+                scale_y,
+                out,
+            );
+        }
+        "path" | "rect" | "circle" | "ellipse" | "line" | "polyline" | "polygon" => {
+            let commands = match element.name.as_str() {
+                "path" => element
+                    .attrs
+                    .get("d")
+                    .and_then(|d| parse_path_data(d, scale_x, scale_y)),
+                "rect" => rect_to_commands(&element.attrs, scale_x, scale_y),
+                "circle" => circle_to_commands(&element.attrs, scale_x, scale_y),
+                "ellipse" => ellipse_to_commands(&element.attrs, scale_x, scale_y),
+                "line" => line_to_commands(&element.attrs, scale_x, scale_y),
+                "polyline" => poly_points_to_commands(&element.attrs, false, scale_x, scale_y),
+                "polygon" => poly_points_to_commands(&element.attrs, true, scale_x, scale_y),
+                _ => None,
+            };
+            if let Some(commands) = commands {
+                out.extend(transform_commands(&commands, next_transform));
+            }
+        }
+        _ => {}
     }
 }
 
@@ -1712,5 +1895,37 @@ mod tests {
             }
             other => panic!("expected inherited linear gradient paint, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn svg_to_path_layers_resolves_simple_clip_path() {
+        let document = concat!(
+            "<svg>",
+            "<defs><clipPath id=\"clip\"><rect x=\"1\" y=\"2\" width=\"3\" height=\"4\"/></clipPath></defs>",
+            "<rect x=\"10\" y=\"20\" width=\"30\" height=\"40\" clip-path=\"url(#clip)\"/>",
+            "</svg>"
+        );
+        let layers = svg_to_path_layers(document, 2.0, 3.0);
+
+        assert_eq!(layers.len(), 1);
+        assert!(!layers[0].clip_commands.is_empty());
+        assert!(matches!(layers[0].clip_commands[0], Command::MoveTo(2.0, 6.0)));
+    }
+
+    #[test]
+    fn svg_to_path_layers_resolves_clip_path_use_reference() {
+        let document = concat!(
+            "<svg>",
+            "<defs>",
+            "<path id=\"shape\" d=\"M0 0 L1 0 L1 1 Z\"/>",
+            "<clipPath id=\"clip\"><use href=\"#shape\" x=\"2\" y=\"3\"/></clipPath>",
+            "</defs>",
+            "<rect x=\"0\" y=\"0\" width=\"10\" height=\"10\" clip-path=\"url(#clip)\"/>",
+            "</svg>"
+        );
+        let layers = svg_to_path_layers(document, 2.0, 3.0);
+
+        assert_eq!(layers.len(), 1);
+        assert!(matches!(layers[0].clip_commands[0], Command::MoveTo(4.0, 9.0)));
     }
 }

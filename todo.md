@@ -31,7 +31,8 @@
         - [*] `linearGradient` / `radialGradient` / `stop` の最小追従
         - [*] `gradientUnits` / `gradientTransform` の保持と最低限の座標解決
         - [*] gradient `href` / `xlink:href` 継承の最小追従
-        - [ ] pattern / clipPath / mask / filter など複雑な SVG 要素の追従
+        - [*] `clipPath` / `clip-path` の最小追従
+        - [ ] pattern / mask / filter など複雑な SVG 要素の追従
     - [x] `EmojiOneColor.otf` / `NotoColorEmoji-Regular.ttf` の実 payload を比較し、gradient paint layer の回帰を追加
     - [x] path 化できる glyph は `GlyphLayer::Path` を優先し、path 化できない payload だけ `GlyphLayer::Svg` に残す
  

@@ -150,6 +150,7 @@ pub enum PathPaintMode {
 #[derive(Debug, Clone)]
 pub struct PathGlyphLayer {
     pub commands: Vec<Command>,
+    pub clip_commands: Vec<Command>,
     pub paint: GlyphPaint,
     pub paint_mode: PathPaintMode,
     pub fill_rule: FillRule,
@@ -162,6 +163,7 @@ impl PathGlyphLayer {
     pub fn new(commands: Vec<Command>, paint: GlyphPaint) -> Self {
         Self {
             commands,
+            clip_commands: Vec::new(),
             paint,
             paint_mode: PathPaintMode::Fill,
             fill_rule: FillRule::NonZero,
@@ -174,6 +176,7 @@ impl PathGlyphLayer {
     pub fn stroke(commands: Vec<Command>, paint: GlyphPaint, stroke_width: f32) -> Self {
         Self {
             commands,
+            clip_commands: Vec::new(),
             paint,
             paint_mode: PathPaintMode::Stroke,
             fill_rule: FillRule::NonZero,

@@ -114,7 +114,7 @@ More runnable examples live in [doc/api-recipes.md](doc/api-recipes.md).
 
 `sbix` is exposed as raster layers, `COLR/CPAL` as path layers, and the OpenType `SVG ` table is pathified first under `svg-fonts`, falling back to `Svg` layers only when needed.
 
-The current `svg-fonts` implementation converts simple `path`, `rect`, `circle`, `ellipse`, `line`, `polyline`, and `polygon` elements into `PathGlyphLayer` values. It includes minimal `defs` / `use`, `fill` / `fill-rule` / `stroke` / `stroke-width`, `translate` / `scale` / `matrix`, `linearGradient` / `radialGradient` / `stop`, and preserved `gradientUnits` / `gradientTransform` support, and keeps `GlyphLayer::Svg` only for payloads that cannot be pathified.
+The current `svg-fonts` implementation converts simple `path`, `rect`, `circle`, `ellipse`, `line`, `polyline`, and `polygon` elements into `PathGlyphLayer` values. It includes minimal `defs` / `use`, `fill` / `fill-rule` / `stroke` / `stroke-width`, `clipPath` / `clip-path`, `translate` / `scale` / `matrix`, `linearGradient` / `radialGradient` / `stop`, and preserved `gradientUnits` / `gradientTransform` support, and keeps `GlyphLayer::Svg` only for payloads that cannot be pathified.
 
 See [doc/SVFONTSPEC.md](doc/SVFONTSPEC.md) for the exact current scope, limitations, and the `paintcore` handoff contract.
 

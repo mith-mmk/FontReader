@@ -54,6 +54,7 @@ simple SVG を path 化できた場合は `PathGlyphLayer` を渡す。
 `PathGlyphLayer` に必要な情報:
 
 - `commands`
+- `clip_commands`
 - `paint`
 - `paint_mode`
 - `fill_rule`
@@ -92,6 +93,14 @@ SVG gradient を path layer として `paintcore` に描かせる場合は、次
 
 - `NonZero`
 - `EvenOdd`
+
+#### `clip_commands`
+
+`clip-path` の参照解決結果を layer ごとに `clip_commands` へ確定して渡す。
+
+- `clip_commands` は未解決の `url(#...)` や `clipPath` ノードではなく、解決済み path command 群であること
+- 最小対応では simple shape/path のみ解決すればよい
+- `clipPathUnits="objectBoundingBox"` は対象 shape bounds を使って絶対座標へ解決してから渡すこと
 
 #### `stroke_width`
 
@@ -133,6 +142,8 @@ raw SVG payload を保持したい場合は `SvgGlyphLayer` を渡す。
 - `<use>` の参照解決
 - `href` / `xlink:href` の適用
 - `x` / `y` の合成
+- `<clipPath>` の収集
+- `clip-path: url(#...)` の解決
 - presentation attributes と `style` の統合
 - `fill` / `stroke` / `fill-rule` / `stroke-width` の継承
 - 対応 transform の適用結果
@@ -157,8 +168,9 @@ raw SVG payload を保持したい場合は `SvgGlyphLayer` を渡す。
 - 属性
   - `fill`
   - `fill-rule`
-  - `stroke`
-  - `stroke-width`
+- `stroke`
+- `stroke-width`
+- `clip-path`
   - `style`
   - `x`
   - `y`
@@ -175,6 +187,7 @@ raw SVG payload を保持したい場合は `SvgGlyphLayer` を渡す。
 
 - `PathGlyphLayer` の fill 描画
 - `PathGlyphLayer` の stroke 描画
+- `PathGlyphLayer` の clip 適用
 - gradient paint の rasterization
 - `RasterGlyphLayer` の描画
 - `SvgGlyphLayer` の renderer / adapter への委譲
@@ -184,6 +197,7 @@ raw SVG payload を保持したい場合は `SvgGlyphLayer` を渡す。
 次のような中途半端な情報は渡さないこと。
 
 - path はあるが fill/stroke の別が不明
+- clip-path の参照 ID だけあり、clip shape が未解決
 - gradient 参照 ID だけあり、stop 情報が未解決
 - `use` の参照先解決前のノード
 - 親からの継承が未適用の style
@@ -265,6 +279,7 @@ stroke は `Command` ではなく `PathGlyphLayer` の責務とする。
 
 - `GlyphLayer::Path`
   - `commands`
+  - `clip_commands`
   - `paint`
   - `paint_mode`
   - `fill_rule`
