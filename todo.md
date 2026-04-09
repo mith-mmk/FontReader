@@ -25,7 +25,8 @@
     - [ ] svg表示に必要な`commands.rs`の`pub enum Command`のファンクションの拡張(Cirle, Rect, Line, Fillなど)
     - [*] 上記に必要なsvg_to_command()の実装
         - [x] `path` / `rect` / `circle` / `ellipse` / `line` / `polyline` / `polygon` と `fill` / `fill-rule` の最小変換
-        - [ ] `defs` / `use` / gradient / transform / stroke など複雑な SVG 要素の追従
+        - [x] `defs` / `use` の最小展開
+        - [ ] gradient / transform / stroke など複雑な SVG 要素の追従
  
 # APIの大幅破壊的変更
 

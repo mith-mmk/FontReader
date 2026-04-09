@@ -1,68 +1,299 @@
 use crate::commands::{Command, FillRule, GlyphPaint, PathGlyphLayer};
+use std::collections::HashMap;
+
+#[derive(Debug, Clone)]
+enum SvgNode {
+    Element(SvgElement),
+    Text,
+}
+
+#[derive(Debug, Clone)]
+struct SvgElement {
+    name: String,
+    attrs: HashMap<String, String>,
+    children: Vec<SvgNode>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct RenderState {
+    offset_x: f32,
+    offset_y: f32,
+    fill: Option<GlyphPaint>,
+    fill_rule: FillRule,
+}
+
+impl Default for RenderState {
+    fn default() -> Self {
+        Self {
+            offset_x: 0.0,
+            offset_y: 0.0,
+            fill: None,
+            fill_rule: FillRule::NonZero,
+        }
+    }
+}
 
 pub(crate) fn svg_to_path_layers(
     document: &str,
     scale_x: f32,
     scale_y: f32,
 ) -> Vec<PathGlyphLayer> {
+    let Ok(root) = parse_svg_document(document) else {
+        return Vec::new();
+    };
+
+    let mut defs = HashMap::new();
+    collect_definitions(&root, &mut defs);
+
     let mut layers = Vec::new();
+    flatten_node(
+        &root,
+        &defs,
+        RenderState::default(),
+        scale_x,
+        scale_y,
+        &mut layers,
+    );
+    layers
+}
+
+fn parse_svg_document(document: &str) -> Result<SvgNode, ()> {
+    let mut stack: Vec<SvgElement> = vec![SvgElement {
+        name: "#document".to_string(),
+        attrs: HashMap::new(),
+        children: Vec::new(),
+    }];
     let mut cursor = 0usize;
 
-    while let Some(relative_start) = document[cursor..].find('<') {
-        let start = cursor + relative_start;
-        let Some(relative_end) = document[start..].find('>') else {
+    while cursor < document.len() {
+        let Some(relative_start) = document[cursor..].find('<') else {
+            let trailing = &document[cursor..];
+            if !trailing.trim().is_empty() {
+                stack
+                    .last_mut()
+                    .expect("document root")
+                    .children
+                    .push(SvgNode::Text);
+            }
             break;
+        };
+        let start = cursor + relative_start;
+        let text = &document[cursor..start];
+        if !text.trim().is_empty() {
+            stack
+                .last_mut()
+                .expect("document root")
+                .children
+                .push(SvgNode::Text);
+        }
+
+        let Some(relative_end) = document[start..].find('>') else {
+            return Err(());
         };
         let end = start + relative_end + 1;
         let tag = &document[start..end];
         cursor = end;
 
-        if tag.starts_with("</") || tag.starts_with("<?") || tag.starts_with("<!") {
+        if tag.starts_with("<?") || tag.starts_with("<!") {
+            continue;
+        }
+
+        if tag.starts_with("</") {
+            let Some(name) = closing_tag_name(tag) else {
+                return Err(());
+            };
+            let element = stack.pop().ok_or(())?;
+            if element.name != name {
+                return Err(());
+            }
+            stack
+                .last_mut()
+                .ok_or(())?
+                .children
+                .push(SvgNode::Element(element));
             continue;
         }
 
         let Some(name) = tag_name(tag) else {
-            continue;
+            return Err(());
         };
         let attrs = parse_attributes(tag);
-        let style = attrs.get("style").map(|value| parse_style(value));
-        let fill = style
-            .as_ref()
-            .and_then(|style| style.get("fill"))
-            .or_else(|| attrs.get("fill"))
-            .and_then(|value| parse_fill(value));
-        let fill_rule = style
-            .as_ref()
-            .and_then(|style| style.get("fill-rule"))
-            .or_else(|| attrs.get("fill-rule"))
-            .map(|value| parse_fill_rule(value))
-            .unwrap_or(FillRule::NonZero);
-
-        let Some(commands) = (match name {
-            "path" => attrs
-                .get("d")
-                .and_then(|d| parse_path_data(d, scale_x, scale_y)),
-            "rect" => rect_to_commands(&attrs, scale_x, scale_y),
-            "circle" => circle_to_commands(&attrs, scale_x, scale_y),
-            "ellipse" => ellipse_to_commands(&attrs, scale_x, scale_y),
-            "line" => line_to_commands(&attrs, scale_x, scale_y),
-            "polyline" => poly_points_to_commands(&attrs, false, scale_x, scale_y),
-            "polygon" => poly_points_to_commands(&attrs, true, scale_x, scale_y),
-            _ => None,
-        }) else {
-            continue;
+        let self_closing = tag[..tag.len().saturating_sub(1)].trim_end().ends_with('/');
+        let element = SvgElement {
+            name: name.to_string(),
+            attrs,
+            children: Vec::new(),
         };
-
-        if commands.is_empty() {
-            continue;
+        if self_closing {
+            stack
+                .last_mut()
+                .ok_or(())?
+                .children
+                .push(SvgNode::Element(element));
+        } else {
+            stack.push(element);
         }
-
-        let mut layer = PathGlyphLayer::new(commands, fill.unwrap_or(GlyphPaint::CurrentColor));
-        layer.fill_rule = fill_rule;
-        layers.push(layer);
     }
 
-    layers
+    while stack.len() > 1 {
+        let element = stack.pop().ok_or(())?;
+        stack
+            .last_mut()
+            .ok_or(())?
+            .children
+            .push(SvgNode::Element(element));
+    }
+
+    Ok(SvgNode::Element(stack.pop().ok_or(())?))
+}
+
+fn collect_definitions(node: &SvgNode, defs: &mut HashMap<String, SvgElement>) {
+    let SvgNode::Element(element) = node else {
+        return;
+    };
+
+    if element.name == "defs" {
+        collect_id_elements(&element.children, defs);
+    }
+
+    for child in &element.children {
+        collect_definitions(child, defs);
+    }
+}
+
+fn collect_id_elements(children: &[SvgNode], defs: &mut HashMap<String, SvgElement>) {
+    for child in children {
+        let SvgNode::Element(element) = child else {
+            continue;
+        };
+        if let Some(id) = element.attrs.get("id") {
+            defs.entry(id.clone()).or_insert_with(|| element.clone());
+        }
+        collect_id_elements(&element.children, defs);
+    }
+}
+
+fn flatten_node(
+    node: &SvgNode,
+    defs: &HashMap<String, SvgElement>,
+    state: RenderState,
+    scale_x: f32,
+    scale_y: f32,
+    out: &mut Vec<PathGlyphLayer>,
+) {
+    let SvgNode::Element(element) = node else {
+        return;
+    };
+
+    if element.name == "#document" {
+        for child in &element.children {
+            flatten_node(child, defs, state, scale_x, scale_y, out);
+        }
+        return;
+    }
+
+    if element.name == "defs" {
+        return;
+    }
+
+    let style = element.attrs.get("style").map(|value| parse_style(value));
+    let local_fill = style
+        .as_ref()
+        .and_then(|style| style.get("fill"))
+        .or_else(|| element.attrs.get("fill"))
+        .and_then(|value| parse_fill(value));
+    let local_fill_rule = style
+        .as_ref()
+        .and_then(|style| style.get("fill-rule"))
+        .or_else(|| element.attrs.get("fill-rule"))
+        .map(|value| parse_fill_rule(value))
+        .unwrap_or(state.fill_rule);
+    let next_state = RenderState {
+        offset_x: state.offset_x,
+        offset_y: state.offset_y,
+        fill: local_fill.or(state.fill),
+        fill_rule: local_fill_rule,
+    };
+
+    match element.name.as_str() {
+        "svg" | "g" | "symbol" => {
+            for child in &element.children {
+                flatten_node(child, defs, next_state, scale_x, scale_y, out);
+            }
+        }
+        "use" => flatten_use(element, defs, next_state, scale_x, scale_y, out),
+        "path" | "rect" | "circle" | "ellipse" | "line" | "polyline" | "polygon" => {
+            if let Some(layer) = element_to_path_layer(element, next_state, scale_x, scale_y) {
+                out.push(layer);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn flatten_use(
+    element: &SvgElement,
+    defs: &HashMap<String, SvgElement>,
+    state: RenderState,
+    scale_x: f32,
+    scale_y: f32,
+    out: &mut Vec<PathGlyphLayer>,
+) {
+    let Some(reference) = element
+        .attrs
+        .get("href")
+        .or_else(|| element.attrs.get("xlink:href"))
+        .and_then(|value| value.strip_prefix('#'))
+    else {
+        return;
+    };
+    let Some(referenced) = defs.get(reference) else {
+        return;
+    };
+
+    let use_state = RenderState {
+        offset_x: state.offset_x + parse_attr_f32(&element.attrs, "x").unwrap_or(0.0) * scale_x,
+        offset_y: state.offset_y + parse_attr_f32(&element.attrs, "y").unwrap_or(0.0) * scale_y,
+        fill: state.fill,
+        fill_rule: state.fill_rule,
+    };
+    flatten_node(
+        &SvgNode::Element(referenced.clone()),
+        defs,
+        use_state,
+        scale_x,
+        scale_y,
+        out,
+    );
+}
+
+fn element_to_path_layer(
+    element: &SvgElement,
+    state: RenderState,
+    scale_x: f32,
+    scale_y: f32,
+) -> Option<PathGlyphLayer> {
+    let commands = match element.name.as_str() {
+        "path" => element
+            .attrs
+            .get("d")
+            .and_then(|d| parse_path_data(d, scale_x, scale_y))?,
+        "rect" => rect_to_commands(&element.attrs, scale_x, scale_y)?,
+        "circle" => circle_to_commands(&element.attrs, scale_x, scale_y)?,
+        "ellipse" => ellipse_to_commands(&element.attrs, scale_x, scale_y)?,
+        "line" => line_to_commands(&element.attrs, scale_x, scale_y)?,
+        "polyline" => poly_points_to_commands(&element.attrs, false, scale_x, scale_y)?,
+        "polygon" => poly_points_to_commands(&element.attrs, true, scale_x, scale_y)?,
+        _ => return None,
+    };
+    if commands.is_empty() {
+        return None;
+    }
+    let mut layer = PathGlyphLayer::new(commands, state.fill.unwrap_or(GlyphPaint::CurrentColor));
+    layer.fill_rule = state.fill_rule;
+    layer.offset_x = state.offset_x;
+    layer.offset_y = state.offset_y;
+    Some(layer)
 }
 
 fn tag_name(tag: &str) -> Option<&str> {
@@ -73,8 +304,16 @@ fn tag_name(tag: &str) -> Option<&str> {
     Some(&tag[start..end])
 }
 
-fn parse_attributes(tag: &str) -> std::collections::HashMap<String, String> {
-    let mut attrs = std::collections::HashMap::new();
+fn closing_tag_name(tag: &str) -> Option<&str> {
+    let start = 2usize;
+    let end = tag[start..]
+        .find(|ch: char| ch.is_whitespace() || ch == '>')
+        .map(|offset| start + offset)?;
+    Some(&tag[start..end])
+}
+
+fn parse_attributes(tag: &str) -> HashMap<String, String> {
+    let mut attrs = HashMap::new();
     let Some(mut index) = tag.find(char::is_whitespace) else {
         return attrs;
     };
@@ -110,6 +349,7 @@ fn parse_attributes(tag: &str) -> std::collections::HashMap<String, String> {
             }
             continue;
         }
+
         let key = tag[key_start..index].trim().to_ascii_lowercase();
         index += 1;
         if index >= tag.len() {
@@ -134,7 +374,7 @@ fn parse_attributes(tag: &str) -> std::collections::HashMap<String, String> {
     attrs
 }
 
-fn parse_style(style: &str) -> std::collections::HashMap<String, String> {
+fn parse_style(style: &str) -> HashMap<String, String> {
     style
         .split(';')
         .filter_map(|entry| {
@@ -191,7 +431,7 @@ fn parse_fill_rule(value: &str) -> FillRule {
 }
 
 fn rect_to_commands(
-    attrs: &std::collections::HashMap<String, String>,
+    attrs: &HashMap<String, String>,
     scale_x: f32,
     scale_y: f32,
 ) -> Option<Vec<Command>> {
@@ -209,7 +449,7 @@ fn rect_to_commands(
 }
 
 fn line_to_commands(
-    attrs: &std::collections::HashMap<String, String>,
+    attrs: &HashMap<String, String>,
     scale_x: f32,
     scale_y: f32,
 ) -> Option<Vec<Command>> {
@@ -226,7 +466,7 @@ fn line_to_commands(
 }
 
 fn circle_to_commands(
-    attrs: &std::collections::HashMap<String, String>,
+    attrs: &HashMap<String, String>,
     scale_x: f32,
     scale_y: f32,
 ) -> Option<Vec<Command>> {
@@ -237,7 +477,7 @@ fn circle_to_commands(
 }
 
 fn ellipse_to_commands(
-    attrs: &std::collections::HashMap<String, String>,
+    attrs: &HashMap<String, String>,
     scale_x: f32,
     scale_y: f32,
 ) -> Option<Vec<Command>> {
@@ -281,7 +521,7 @@ fn ellipse_commands(cx: f32, cy: f32, rx: f32, ry: f32) -> Option<Vec<Command>> 
 }
 
 fn poly_points_to_commands(
-    attrs: &std::collections::HashMap<String, String>,
+    attrs: &HashMap<String, String>,
     close: bool,
     scale_x: f32,
     scale_y: f32,
@@ -307,7 +547,7 @@ fn poly_points_to_commands(
     Some(commands)
 }
 
-fn parse_attr_f32(attrs: &std::collections::HashMap<String, String>, key: &str) -> Option<f32> {
+fn parse_attr_f32(attrs: &HashMap<String, String>, key: &str) -> Option<f32> {
     attrs.get(key).and_then(|value| parse_number(value))
 }
 
@@ -554,6 +794,20 @@ mod tests {
     use super::*;
 
     #[test]
+    fn parse_svg_document_builds_nested_nodes() {
+        let root = parse_svg_document("<svg><g id=\"a\"><path d=\"M0 0\"/></g></svg>").unwrap();
+        let SvgNode::Element(document) = root else {
+            panic!("expected document root");
+        };
+        assert_eq!(document.children.len(), 1);
+        let SvgNode::Element(svg) = &document.children[0] else {
+            panic!("expected svg element");
+        };
+        assert_eq!(svg.name, "svg");
+        assert_eq!(svg.children.len(), 1);
+    }
+
+    #[test]
     fn svg_to_path_layers_parses_path_rect_and_fill_rule() {
         let document = concat!(
             "<svg>",
@@ -582,5 +836,36 @@ mod tests {
         assert!(matches!(layers[0].commands[0], Command::MoveTo(_, _)));
         assert!(matches!(layers[0].paint, GlyphPaint::CurrentColor));
         assert!(matches!(layers[1].commands[1], Command::Line(8.0, 12.0)));
+    }
+
+    #[test]
+    fn svg_to_path_layers_expands_defs_and_use_with_offsets() {
+        let document = concat!(
+            "<svg>",
+            "<defs>",
+            "<g id=\"shape\"><path d=\"M0 0 L4 0 L4 4 Z\" fill=\"#123456\"/></g>",
+            "</defs>",
+            "<use href=\"#shape\" x=\"10\" y=\"20\"/>",
+            "</svg>"
+        );
+        let layers = svg_to_path_layers(document, 2.0, 3.0);
+        assert_eq!(layers.len(), 1);
+        assert!(matches!(layers[0].paint, GlyphPaint::Solid(_)));
+        assert_eq!(layers[0].offset_x, 20.0);
+        assert_eq!(layers[0].offset_y, 60.0);
+        assert!(matches!(layers[0].commands[1], Command::Line(8.0, 0.0)));
+    }
+
+    #[test]
+    fn svg_to_path_layers_allows_use_to_override_fill() {
+        let document = concat!(
+            "<svg>",
+            "<defs><path id=\"dot\" d=\"M1 1 L2 1\" fill=\"#123456\"/></defs>",
+            "<use xlink:href=\"#dot\" fill=\"currentColor\"/>",
+            "</svg>"
+        );
+        let layers = svg_to_path_layers(document, 1.0, 1.0);
+        assert_eq!(layers.len(), 1);
+        assert!(matches!(layers[0].paint, GlyphPaint::CurrentColor));
     }
 }
