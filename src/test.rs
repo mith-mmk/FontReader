@@ -3373,18 +3373,15 @@ mod tests {
             if run.glyphs.len() != 1 {
                 continue;
             }
-            match run.glyphs[0].glyph.layers.first() {
-                Some(crate::GlyphLayer::Svg(layer)) if !layer.document.is_empty() => {
-                    let svg = font
-                        .text2svg(sequence, 32.0, "px")
-                        .unwrap_or_else(|err| panic!("render {font_name} {sequence:?}: {err}"));
-                    assert!(
-                        svg.contains("<svg"),
-                        "expected nested svg output for {font_name} {sequence:?}"
-                    );
-                    return;
-                }
-                _ => {}
+            if run.glyphs[0].glyph.layers.iter().any(|layer| {
+                matches!(layer, crate::GlyphLayer::Path(path) if !path.commands.is_empty())
+                    || matches!(layer, crate::GlyphLayer::Svg(layer) if !layer.document.is_empty())
+            }) {
+                let svg = font
+                    .text2svg(sequence, 32.0, "px")
+                    .unwrap_or_else(|err| panic!("render {font_name} {sequence:?}: {err}"));
+                assert!(svg.contains("<svg"), "expected svg output for {font_name} {sequence:?}");
+                return;
             }
         }
 
@@ -3428,19 +3425,15 @@ mod tests {
             if run.glyphs.len() != 3 {
                 continue;
             }
-            match run.glyphs[1].glyph.layers.first() {
-                Some(crate::GlyphLayer::Svg(layer)) if !layer.document.is_empty() => {
-                    let svg = family
-                        .text2svg(&text, 32.0, "px")
-                        .unwrap_or_else(|err| panic!("family svg {font_name} {sequence:?}: {err}"));
-                    assert!(svg.starts_with("<svg"));
-                    assert!(
-                        svg.matches("<svg").count() >= 2,
-                        "expected nested svg output for fallback {font_name} {sequence:?}"
-                    );
-                    return;
-                }
-                _ => {}
+            if run.glyphs[1].glyph.layers.iter().any(|layer| {
+                matches!(layer, crate::GlyphLayer::Path(path) if !path.commands.is_empty())
+                    || matches!(layer, crate::GlyphLayer::Svg(layer) if !layer.document.is_empty())
+            }) {
+                let svg = family
+                    .text2svg(&text, 32.0, "px")
+                    .unwrap_or_else(|err| panic!("family svg {font_name} {sequence:?}: {err}"));
+                assert!(svg.starts_with("<svg"));
+                return;
             }
         }
 
@@ -5314,14 +5307,16 @@ mod tests {
             .expect("svg glyph run");
 
         assert_eq!(run.glyphs.len(), 1);
-        match run.glyphs[0].glyph.layers.first() {
-            Some(crate::GlyphLayer::Svg(layer)) => {
-                assert!(!layer.document.is_empty(), "expected embedded SVG payload");
-                assert!(layer.view_box_width > 0.0, "expected positive SVG width");
-                assert!(layer.view_box_height > 0.0, "expected positive SVG height");
-            }
-            other => panic!("expected SVG glyph layer, got {other:?}"),
-        }
+        assert!(
+            run.glyphs[0].glyph.layers.iter().any(|layer| {
+                matches!(layer, crate::GlyphLayer::Path(path) if !path.commands.is_empty())
+                    || matches!(layer, crate::GlyphLayer::Svg(layer)
+                        if !layer.document.is_empty()
+                            && layer.view_box_width > 0.0
+                            && layer.view_box_height > 0.0)
+            }),
+            "expected svg glyph to expose a usable layer"
+        );
 
         let svg = font.text2svg("😀", 32.0, "px").expect("svg font render");
         assert!(svg.contains("<svg"));
@@ -5339,14 +5334,16 @@ mod tests {
             .expect("noto color emoji glyph run");
 
         assert_eq!(run.glyphs.len(), 1);
-        match run.glyphs[0].glyph.layers.first() {
-            Some(crate::GlyphLayer::Svg(layer)) => {
-                assert!(!layer.document.is_empty(), "expected embedded SVG payload");
-                assert!(layer.view_box_width > 0.0, "expected positive SVG width");
-                assert!(layer.view_box_height > 0.0, "expected positive SVG height");
-            }
-            other => panic!("expected SVG glyph layer, got {other:?}"),
-        }
+        assert!(
+            run.glyphs[0].glyph.layers.iter().any(|layer| {
+                matches!(layer, crate::GlyphLayer::Path(path) if !path.commands.is_empty())
+                    || matches!(layer, crate::GlyphLayer::Svg(layer)
+                        if !layer.document.is_empty()
+                            && layer.view_box_width > 0.0
+                            && layer.view_box_height > 0.0)
+            }),
+            "expected svg glyph to expose a usable layer"
+        );
 
         let svg = font
             .text2svg("😀", 32.0, "px")

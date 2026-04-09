@@ -40,9 +40,9 @@ Default features include `layout` and `cff`.
 - `raw`
   - Legacy low-level parser API
 - `svg-fonts`
-  - Provisional support for OpenType `SVG ` glyphs through `GlyphLayer::Svg`
+  - Provisional support for converting OpenType `SVG ` glyphs into glyph layers
   - Currently regression-tested mainly against `EmojiOneColor.otf` and `NotoColorEmoji-Regular.ttf`
-  - `FontEngine::render_svg()` and `FontFamily::text2svg()` emit nested SVG fragments
+  - Simple shapes are pathified, while payloads that cannot be pathified are kept as `GlyphLayer::Svg`
   - Full path conversion and CSS / text interpretation are not implemented yet
 
 ## Install
@@ -112,11 +112,11 @@ More runnable examples live in [doc/api-recipes.md](doc/api-recipes.md).
 
 ## About SVG Color Fonts
 
-`sbix` is exposed as raster layers, `COLR/CPAL` as path layers, and the OpenType `SVG ` table as `Svg` layers only when `svg-fonts` is enabled.
+`sbix` is exposed as raster layers, `COLR/CPAL` as path layers, and the OpenType `SVG ` table is pathified first under `svg-fonts`, falling back to `Svg` layers only when needed.
 
-The current `svg-fonts` implementation still preserves glyph-local SVG payloads, but it now also converts simple `path`, `rect`, `circle`, `ellipse`, `line`, `polyline`, and `polygon` elements into `PathGlyphLayer` values. It includes minimal `defs` / `use`, `fill` / `fill-rule` / `stroke` / `stroke-width`, and `translate` / `scale` / `matrix` support.
+The current `svg-fonts` implementation converts simple `path`, `rect`, `circle`, `ellipse`, `line`, `polyline`, and `polygon` elements into `PathGlyphLayer` values. It includes minimal `defs` / `use`, `fill` / `fill-rule` / `stroke` / `stroke-width`, and `translate` / `scale` / `matrix` support, and keeps `GlyphLayer::Svg` only for payloads that cannot be pathified.
 
-See [doc/svg-fonts-spec.md](doc/svg-fonts-spec.md) for the exact current scope and limitations.
+See [doc/SVFONTSPEC.md](doc/SVFONTSPEC.md) for the exact current scope, limitations, and the `paintcore` handoff contract.
 
 ## Examples
 

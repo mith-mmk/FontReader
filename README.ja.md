@@ -40,9 +40,9 @@ default feature には `layout` と `cff` が含まれます。
 - `raw`
   - 旧来の低レイヤ parser API
 - `svg-fonts`
-  - OpenType `SVG ` テーブルを `GlyphLayer::Svg` として扱う暫定サポート
+  - OpenType `SVG ` テーブルを glyph layer に変換する暫定サポート
   - 現状は `EmojiOneColor.otf` と `NotoColorEmoji-Regular.ttf` を主対象に回帰テスト済み
-  - `FontEngine::render_svg()` / `FontFamily::text2svg()` では nested SVG として出力
+  - 単純 shape は path 化し、path 化できない payload は `GlyphLayer::Svg` として保持
   - path への完全展開や CSS / text 解釈は未対応
 
 ## 導入
@@ -112,11 +112,11 @@ println!("{}", engine.shape("Hello")?.glyphs.len());
 
 ## SVG color font について
 
-`sbix` は raster layer、`COLR/CPAL` は path layer、`SVG ` テーブルは `svg-fonts` 有効時のみ `Svg` layer として扱います。
+`sbix` は raster layer、`COLR/CPAL` は path layer、`SVG ` テーブルは `svg-fonts` 有効時のみ path layer 化を優先し、必要な場合だけ `Svg` layer を保持します。
 
-現状の `svg-fonts` は「SVG glyph を glyph 単位で切り出し、そのまま保持する」ことを基本にしつつ、単純な `path` / `rect` / `circle` / `ellipse` / `line` / `polyline` / `polygon` は `PathGlyphLayer` にも変換します。`defs` / `use`、`fill` / `fill-rule` / `stroke` / `stroke-width`、`translate` / `scale` / `matrix` の最小対応まで入っています。
+現状の `svg-fonts` は、単純な `path` / `rect` / `circle` / `ellipse` / `line` / `polyline` / `polygon` を `PathGlyphLayer` に変換し、`defs` / `use`、`fill` / `fill-rule` / `stroke` / `stroke-width`、`translate` / `scale` / `matrix` の最小対応まで入っています。path 化できない payload だけを `GlyphLayer::Svg` として残します。
 
-詳細仕様と未対応範囲は [doc/svg-fonts-spec.ja.md](doc/svg-fonts-spec.ja.md) にまとめています。
+詳細仕様と `paintcore` への受け渡し境界は [doc/SVFONTSPEC.md](doc/SVFONTSPEC.md) にまとめています。
 
 ## examples
 

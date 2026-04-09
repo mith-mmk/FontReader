@@ -7,7 +7,7 @@ This directory keeps the longer documents that no longer fit well in the main RE
 - If you want to use the crate right away, begin with [../README.md](../README.md)
 - If you want API examples by task, read [api-recipes.md](api-recipes.md)
 - If you want current implementation notes and limitations, read [feature-status.md](feature-status.md)
-- If you want the current `svg-fonts` behavior, read [svg-fonts-spec.md](svg-fonts-spec.md)
+- If you want the current `svg-fonts` behavior and the `paintcore` handoff contract, read [SVFONTSPEC.md](SVFONTSPEC.md)
 - If you want CFF2-specific investigation notes, read [cff2-investigation.md](cff2-investigation.md)
 
 ## Recommended Reading Order
@@ -15,7 +15,7 @@ This directory keeps the longer documents that no longer fit well in the main RE
 1. [../README.md](../README.md)
 2. [api-recipes.md](api-recipes.md)
 3. [feature-status.md](feature-status.md)
-4. [svg-fonts-spec.md](svg-fonts-spec.md)
+4. [SVFONTSPEC.md](SVFONTSPEC.md)
 
 ## About `cargo doc`
 
