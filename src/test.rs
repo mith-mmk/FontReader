@@ -3601,6 +3601,29 @@ mod tests {
         None
     }
 
+    #[cfg(feature = "svg-fonts")]
+    fn first_svg_gid_requiring_fallback(font_name: &str) -> Option<(usize, String)> {
+        let path = direct_svg_emoji_font_path(font_name);
+        let font = crate::load_font_from_file(&path).ok()?;
+        let svg = font.font().svg.as_ref()?;
+        let max_glyphs = font.font().maxp.as_ref()?.num_glyphs as usize;
+
+        for glyph_id in 1..max_glyphs {
+            if !svg.has_glyph(glyph_id as u32) {
+                continue;
+            }
+            let layout = font.font().get_layout(glyph_id, false);
+            let Some(document) = svg.get_glyph_document(glyph_id as u32, &layout) else {
+                continue;
+            };
+            if payload_has_unsupported_svg_constructs(&document.payload) {
+                return Some((glyph_id, document.payload));
+            }
+        }
+
+        None
+    }
+
     fn first_real_emoji_ligature() -> Option<(std::path::PathBuf, &'static str)> {
         for path in emoji_ligature_font_candidates() {
             if !path.exists() {
@@ -5806,6 +5829,46 @@ mod tests {
                 .iter()
                 .any(|layer| matches!(layer, crate::GlyphLayer::Svg(svg) if !svg.document.is_empty())),
             "expected NotoColorEmoji payload {sequence:?} to keep raw Svg fallback layer"
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "svg-fonts")]
+    #[ignore = "diagnostic: scans all NotoColorEmoji SVG glyph ids for unsupported payloads"]
+    fn noto_color_emoji_glyph_id_requiring_fallback_when_present() {
+        let Some((glyph_id, payload)) =
+            first_svg_gid_requiring_fallback("NotoColorEmoji-Regular.ttf")
+        else {
+            return;
+        };
+        assert!(
+            payload_has_unsupported_svg_constructs(&payload),
+            "expected unsupported SVG constructs for glyph {glyph_id}"
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "svg-fonts")]
+    #[ignore = "diagnostic: scans all NotoColorEmoji SVG glyph ids for unsupported payloads"]
+    fn noto_color_emoji_glyph_id_keeps_svg_fallback_when_present() {
+        let Some((glyph_id, payload)) =
+            first_svg_gid_requiring_fallback("NotoColorEmoji-Regular.ttf")
+        else {
+            return;
+        };
+        let document = crate::opentype::color::svg::SvgGlyphDocument {
+            payload,
+            view_box_min_x: 0.0,
+            view_box_min_y: 0.0,
+            view_box_width: 32.0,
+            view_box_height: 32.0,
+        };
+        let layers = crate::fontreader::svg_document_to_glyph_layers(&document, 1.0, 1.0);
+        assert!(
+            layers
+                .iter()
+                .any(|layer| matches!(layer, crate::GlyphLayer::Svg(svg) if !svg.document.is_empty())),
+            "expected fallback payload for glyph {glyph_id} to keep raw Svg layer"
         );
     }
 
