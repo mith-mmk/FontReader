@@ -1131,7 +1131,7 @@ fn resolve_paint(
     if value.eq_ignore_ascii_case("none") {
         None
     } else {
-        parse_fill(value, defs, scale_x, scale_y).or_else(|| inherited.cloned())
+        parse_fill(value, defs, scale_x, scale_y)
     }
 }
 
@@ -2261,6 +2261,36 @@ mod tests {
         assert!(svg_requires_svg_fallback("<svg><pattern id=\"p\"/></svg>"));
         assert!(svg_requires_svg_fallback("<svg><filter id=\"f\"/></svg>"));
         assert!(!svg_requires_svg_fallback("<svg><path d=\"M0 0 L1 1\"/></svg>"));
+    }
+
+    #[test]
+    fn svg_to_path_layers_does_not_fallback_to_current_color_for_pattern_fill() {
+        let document = concat!(
+            "<svg>",
+            "<defs><pattern id=\"p\"><rect x=\"0\" y=\"0\" width=\"2\" height=\"2\"/></pattern></defs>",
+            "<rect x=\"0\" y=\"0\" width=\"10\" height=\"10\" fill=\"url(#p)\"/>",
+            "</svg>"
+        );
+        let layers = svg_to_path_layers(document, 1.0, 1.0);
+        assert!(
+            layers.is_empty(),
+            "unsupported pattern fill should not silently become a path paint"
+        );
+    }
+
+    #[test]
+    fn svg_to_path_layers_does_not_fallback_to_current_color_for_pattern_stroke() {
+        let document = concat!(
+            "<svg>",
+            "<defs><pattern id=\"p\"><rect x=\"0\" y=\"0\" width=\"2\" height=\"2\"/></pattern></defs>",
+            "<rect x=\"0\" y=\"0\" width=\"10\" height=\"10\" fill=\"none\" stroke=\"url(#p)\" stroke-width=\"2\"/>",
+            "</svg>"
+        );
+        let layers = svg_to_path_layers(document, 1.0, 1.0);
+        assert!(
+            layers.is_empty(),
+            "unsupported pattern stroke should not silently become a path paint"
+        );
     }
 
     #[test]

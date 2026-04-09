@@ -38,6 +38,45 @@ use crate::util::sniff_encoded_image_dimensions;
 #[cfg(debug_assertions)]
 use std::io::{BufWriter, Write};
 
+#[cfg(feature = "svg-fonts")]
+pub(crate) fn svg_document_to_glyph_layers(
+    document: &svg::SvgGlyphDocument,
+    scale_x: f32,
+    scale_y: f32,
+) -> Vec<GlyphLayer> {
+    let path_layers = crate::svgparse::svg_to_path_layers(&document.payload, scale_x, scale_y);
+    let keep_svg_fallback = crate::svgparse::svg_requires_svg_fallback(&document.payload);
+    if !path_layers.is_empty() {
+        let mut layers: Vec<GlyphLayer> = path_layers.into_iter().map(GlyphLayer::Path).collect();
+        if keep_svg_fallback {
+            layers.push(GlyphLayer::Svg(SvgGlyphLayer {
+                document: document.payload.clone(),
+                view_box_min_x: document.view_box_min_x * scale_x,
+                view_box_min_y: document.view_box_min_y * scale_y,
+                view_box_width: document.view_box_width * scale_x,
+                view_box_height: document.view_box_height * scale_y,
+                width: (document.view_box_width * scale_x).abs().max(1.0),
+                height: (document.view_box_height * scale_y).abs().max(1.0),
+                offset_x: 0.0,
+                offset_y: 0.0,
+            }));
+        }
+        return layers;
+    }
+
+    vec![GlyphLayer::Svg(SvgGlyphLayer {
+        document: document.payload.clone(),
+        view_box_min_x: document.view_box_min_x * scale_x,
+        view_box_min_y: document.view_box_min_y * scale_y,
+        view_box_width: document.view_box_width * scale_x,
+        view_box_height: document.view_box_height * scale_y,
+        width: (document.view_box_width * scale_x).abs().max(1.0),
+        height: (document.view_box_height * scale_y).abs().max(1.0),
+        offset_x: 0.0,
+        offset_y: 0.0,
+    })]
+}
+
 #[derive(Debug, Clone)]
 pub enum PathCommand {
     MoveTo { x: f64, y: f64 },
@@ -1797,36 +1836,7 @@ impl Font {
         let document = self
             .current_svg_table()?
             .get_glyph_document(glyph_id as u32, layout)?;
-        let path_layers = crate::svgparse::svg_to_path_layers(&document.payload, scale_x, scale_y);
-        let keep_svg_fallback = crate::svgparse::svg_requires_svg_fallback(&document.payload);
-        if !path_layers.is_empty() {
-            let mut layers: Vec<GlyphLayer> = path_layers.into_iter().map(GlyphLayer::Path).collect();
-            if keep_svg_fallback {
-                layers.push(GlyphLayer::Svg(SvgGlyphLayer {
-                    document: document.payload,
-                    view_box_min_x: document.view_box_min_x * scale_x,
-                    view_box_min_y: document.view_box_min_y * scale_y,
-                    view_box_width: document.view_box_width * scale_x,
-                    view_box_height: document.view_box_height * scale_y,
-                    width: (document.view_box_width * scale_x).abs().max(1.0),
-                    height: (document.view_box_height * scale_y).abs().max(1.0),
-                    offset_x: 0.0,
-                    offset_y: 0.0,
-                }));
-            }
-            return Some(layers);
-        }
-        Some(vec![GlyphLayer::Svg(SvgGlyphLayer {
-            document: document.payload,
-            view_box_min_x: document.view_box_min_x * scale_x,
-            view_box_min_y: document.view_box_min_y * scale_y,
-            view_box_width: document.view_box_width * scale_x,
-            view_box_height: document.view_box_height * scale_y,
-            width: (document.view_box_width * scale_x).abs().max(1.0),
-            height: (document.view_box_height * scale_y).abs().max(1.0),
-            offset_x: 0.0,
-            offset_y: 0.0,
-        })])
+        Some(svg_document_to_glyph_layers(&document, scale_x, scale_y))
     }
 
     fn pair_adjustment_for_index(

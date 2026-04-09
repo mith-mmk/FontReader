@@ -5810,6 +5810,53 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "svg-fonts")]
+    fn svg_document_to_glyph_layers_keeps_svg_fallback_for_pattern_payload() {
+        let document = crate::opentype::color::svg::SvgGlyphDocument {
+            payload: concat!(
+                "<svg>",
+                "<defs><pattern id=\"p\"><rect x=\"0\" y=\"0\" width=\"2\" height=\"2\"/></pattern></defs>",
+                "<rect x=\"0\" y=\"0\" width=\"10\" height=\"10\" fill=\"#123456\"/>",
+                "<rect x=\"1\" y=\"1\" width=\"8\" height=\"8\" fill=\"url(#p)\"/>",
+                "</svg>"
+            )
+            .to_string(),
+            view_box_min_x: 0.0,
+            view_box_min_y: 0.0,
+            view_box_width: 10.0,
+            view_box_height: 10.0,
+        };
+        let layers = crate::fontreader::svg_document_to_glyph_layers(&document, 1.0, 1.0);
+        assert!(
+            layers
+                .iter()
+                .any(|layer| matches!(layer, crate::GlyphLayer::Path(path) if !path.commands.is_empty())),
+            "expected supported shapes to keep path layers"
+        );
+        assert!(
+            layers
+                .iter()
+                .any(|layer| matches!(layer, crate::GlyphLayer::Svg(svg) if !svg.document.is_empty())),
+            "expected unsupported pattern payload to keep raw Svg fallback"
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "svg-fonts")]
+    fn svg_document_to_glyph_layers_uses_svg_only_when_no_path_layers_can_be_built() {
+        let document = crate::opentype::color::svg::SvgGlyphDocument {
+            payload: "<svg><defs><pattern id=\"p\"><rect x=\"0\" y=\"0\" width=\"2\" height=\"2\"/></pattern></defs><rect x=\"0\" y=\"0\" width=\"10\" height=\"10\" fill=\"url(#p)\"/></svg>".to_string(),
+            view_box_min_x: 0.0,
+            view_box_min_y: 0.0,
+            view_box_width: 10.0,
+            view_box_height: 10.0,
+        };
+        let layers = crate::fontreader::svg_document_to_glyph_layers(&document, 1.0, 1.0);
+        assert_eq!(layers.len(), 1);
+        assert!(matches!(layers[0], crate::GlyphLayer::Svg(_)));
+    }
+
+    #[test]
     fn fira_sans_black_i_and_j_have_outline_commands() {
         let font = crate::load_font_from_file(fira_sans_black_path()).expect("load fira sans");
 
