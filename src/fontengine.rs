@@ -301,7 +301,7 @@ mod tests {
                     x2: 10.0,
                     y2: 0.0,
                     units: crate::GlyphGradientUnits::UserSpaceOnUse,
-                    transform: [1.0, 0.0, 0.0, 1.0, 3.0, 4.0],
+                    transform: [1.0, 0.0, 0.0, 1.0, 0.0, 0.0],
                     spread: crate::GlyphGradientSpread::Pad,
                     stops: vec![
                         crate::GlyphGradientStop {
@@ -324,7 +324,7 @@ mod tests {
         assert!(svg.contains("<defs><linearGradient"));
         assert!(svg.contains("fill=\"url(#glyph-gradient-0)\""));
         assert!(svg.contains("gradientUnits=\"userSpaceOnUse\""));
-        assert!(svg.contains("gradientTransform=\"matrix(1 0 0 1 3 4)\""));
+        assert!(svg.contains("gradientTransform=\"matrix(1 0 0 1 0 0)\""));
         assert!(svg.contains("stop-opacity=\""));
     }
 }

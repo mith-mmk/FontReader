@@ -17,6 +17,8 @@
 - path 化できない、または別 backend に委譲したい場合だけ raw SVG payload を `GlyphLayer::Svg` として保持する
 - simple SVG の path 化は `FontReader` 側で完了していること
 - `linearGradient` / `radialGradient` / `stop` のような単純 gradient は `GlyphPaint` に解決してから渡すこと
+- `objectBoundingBox` は path 化後の shape bounds を使って最低限の絶対座標へ解決すること
+- gradient の `href` / `xlink:href` 継承は `FontReader` 側で stop と属性を解決してから渡すこと
 
 ## `Command` の責務
 

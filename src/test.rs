@@ -3443,6 +3443,31 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "svg-fonts")]
+    fn first_svg_gradient_payload(font_name: &str) -> Option<(String, String)> {
+        let path = direct_svg_emoji_font_path(font_name);
+        let font = crate::load_font_from_file(&path).ok()?;
+        let svg = font.font().svg.as_ref()?;
+        for sequence in emoji_ligature_sequence_candidates() {
+            let Ok(glyph_ids) = font.font().debug_shape_glyph_ids(sequence, None) else {
+                continue;
+            };
+            if glyph_ids.len() != 1 || glyph_ids[0] == 0 {
+                continue;
+            }
+            let layout = font.font().get_layout(glyph_ids[0], false);
+            let Some(document) = svg.get_glyph_document(glyph_ids[0] as u32, &layout) else {
+                continue;
+            };
+            if document.payload.contains("linearGradient")
+                || document.payload.contains("radialGradient")
+            {
+                return Some((sequence.to_string(), document.payload));
+            }
+        }
+        None
+    }
+
     fn first_real_emoji_ligature() -> Option<(std::path::PathBuf, &'static str)> {
         for path in emoji_ligature_font_candidates() {
             if !path.exists() {
@@ -5448,6 +5473,52 @@ mod tests {
         }
 
         panic!("expected at least one SVG emoji font to expose path layers");
+    }
+
+    #[test]
+    #[cfg(feature = "svg-fonts")]
+    fn emojione_and_noto_color_emoji_expose_real_gradient_payloads() {
+        for font_name in ["EmojiOneColor.otf", "NotoColorEmoji-Regular.ttf"] {
+            let Some((sequence, payload)) = first_svg_gradient_payload(font_name) else {
+                continue;
+            };
+            assert!(
+                payload.contains("Gradient") || payload.contains("gradient"),
+                "expected gradient payload in {font_name} for {sequence:?}"
+            );
+            return;
+        }
+        panic!("expected at least one real svg emoji font to expose a gradient payload");
+    }
+
+    #[test]
+    #[cfg(feature = "svg-fonts")]
+    fn emojione_or_noto_color_emoji_shapes_real_gradient_paint_layers() {
+        for font_name in ["EmojiOneColor.otf", "NotoColorEmoji-Regular.ttf"] {
+            let Some((sequence, _)) = first_svg_gradient_payload(font_name) else {
+                continue;
+            };
+            let path = direct_svg_emoji_font_path(font_name);
+            let font = crate::load_font_from_file(&path)
+                .unwrap_or_else(|err| panic!("load {font_name} for gradient paint: {err}"));
+            let run = crate::text2commands(&sequence, crate::FontOptions::new(&font).with_font_size(32.0))
+                .unwrap_or_else(|err| panic!("shape {font_name} {sequence:?}: {err}"));
+            assert_eq!(run.glyphs.len(), 1);
+            if run.glyphs[0].glyph.layers.iter().any(|layer| {
+                matches!(
+                    layer,
+                    crate::GlyphLayer::Path(path)
+                        if matches!(
+                            &path.paint,
+                            crate::GlyphPaint::LinearGradient(_)
+                                | crate::GlyphPaint::RadialGradient(_)
+                        )
+                )
+            }) {
+                return;
+            }
+        }
+        panic!("expected at least one real svg emoji font to produce gradient paint layers");
     }
 
     #[test]

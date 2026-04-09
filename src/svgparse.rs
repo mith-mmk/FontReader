@@ -388,12 +388,16 @@ fn element_to_path_layers(
         return Vec::new();
     }
     let transformed = transform_commands(&commands, state.transform);
+    let bounds = command_bounds(&transformed);
     let mut layers = Vec::new();
     let supports_fill = !matches!(element.name.as_str(), "line");
 
     if supports_fill {
         if let Some(paint) = state.fill.clone() {
-            let mut layer = PathGlyphLayer::new(transformed.clone(), paint);
+            let mut layer = PathGlyphLayer::new(
+                transformed.clone(),
+                resolve_gradient_paint(paint, bounds, state.transform),
+            );
             layer.fill_rule = state.fill_rule;
             layers.push(layer);
         }
@@ -401,11 +405,152 @@ fn element_to_path_layers(
 
     if let Some(paint) = state.stroke.clone() {
         if state.stroke_width > 0.0 {
-            layers.push(PathGlyphLayer::stroke(transformed, paint, state.stroke_width));
+            layers.push(PathGlyphLayer::stroke(
+                transformed,
+                resolve_gradient_paint(paint, bounds, state.transform),
+                state.stroke_width,
+            ));
         }
     }
 
     layers
+}
+
+fn resolve_gradient_paint(
+    paint: GlyphPaint,
+    bounds: Option<(f32, f32, f32, f32)>,
+    element_transform: Transform2D,
+) -> GlyphPaint {
+    match paint {
+        GlyphPaint::LinearGradient(gradient) => {
+            GlyphPaint::LinearGradient(resolve_linear_gradient(gradient, bounds, element_transform))
+        }
+        GlyphPaint::RadialGradient(gradient) => {
+            GlyphPaint::RadialGradient(resolve_radial_gradient(gradient, bounds, element_transform))
+        }
+        other => other,
+    }
+}
+
+fn resolve_linear_gradient(
+    mut gradient: GlyphLinearGradient,
+    bounds: Option<(f32, f32, f32, f32)>,
+    element_transform: Transform2D,
+) -> GlyphLinearGradient {
+    let matrix = matrix_from_array(gradient.transform);
+    let (x1, y1, x2, y2) = if matches!(gradient.units, GlyphGradientUnits::ObjectBoundingBox) {
+        let (min_x, min_y, max_x, max_y) = bounds.unwrap_or((0.0, 0.0, 0.0, 0.0));
+        let width = max_x - min_x;
+        let height = max_y - min_y;
+        (
+            min_x + gradient.x1 * width,
+            min_y + gradient.y1 * height,
+            min_x + gradient.x2 * width,
+            min_y + gradient.y2 * height,
+        )
+    } else {
+        let start = element_transform.apply(gradient.x1, gradient.y1);
+        let end = element_transform.apply(gradient.x2, gradient.y2);
+        (start.0, start.1, end.0, end.1)
+    };
+    let start = matrix.apply(x1, y1);
+    let end = matrix.apply(x2, y2);
+    gradient.x1 = start.0;
+    gradient.y1 = start.1;
+    gradient.x2 = end.0;
+    gradient.y2 = end.1;
+    gradient.units = GlyphGradientUnits::UserSpaceOnUse;
+    gradient.transform = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0];
+    gradient
+}
+
+fn resolve_radial_gradient(
+    mut gradient: GlyphRadialGradient,
+    bounds: Option<(f32, f32, f32, f32)>,
+    element_transform: Transform2D,
+) -> GlyphRadialGradient {
+    let matrix = matrix_from_array(gradient.transform);
+    let (cx, cy, fx, fy, radius) = if matches!(gradient.units, GlyphGradientUnits::ObjectBoundingBox) {
+        let (min_x, min_y, max_x, max_y) = bounds.unwrap_or((0.0, 0.0, 0.0, 0.0));
+        let width = max_x - min_x;
+        let height = max_y - min_y;
+        let scale = width.abs().max(height.abs());
+        (
+            min_x + gradient.cx * width,
+            min_y + gradient.cy * height,
+            min_x + gradient.fx * width,
+            min_y + gradient.fy * height,
+            gradient.r * scale,
+        )
+    } else {
+        let center = element_transform.apply(gradient.cx, gradient.cy);
+        let focus = element_transform.apply(gradient.fx, gradient.fy);
+        (
+            center.0,
+            center.1,
+            focus.0,
+            focus.1,
+            gradient.r * transform_max_scale(element_transform),
+        )
+    };
+    let center = matrix.apply(cx, cy);
+    let focus = matrix.apply(fx, fy);
+    gradient.cx = center.0;
+    gradient.cy = center.1;
+    gradient.fx = focus.0;
+    gradient.fy = focus.1;
+    gradient.r = radius * transform_max_scale(matrix);
+    gradient.units = GlyphGradientUnits::UserSpaceOnUse;
+    gradient.transform = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0];
+    gradient
+}
+
+fn matrix_from_array(values: [f32; 6]) -> Transform2D {
+    Transform2D {
+        a: values[0],
+        b: values[1],
+        c: values[2],
+        d: values[3],
+        e: values[4],
+        f: values[5],
+    }
+}
+
+fn transform_max_scale(transform: Transform2D) -> f32 {
+    let sx = (transform.a * transform.a + transform.b * transform.b).sqrt();
+    let sy = (transform.c * transform.c + transform.d * transform.d).sqrt();
+    sx.max(sy)
+}
+
+fn command_bounds(commands: &[Command]) -> Option<(f32, f32, f32, f32)> {
+    let mut bounds = None;
+    for command in commands {
+        match command {
+            Command::MoveTo(x, y) | Command::Line(x, y) => extend_command_bounds(&mut bounds, *x, *y),
+            Command::Bezier((cx, cy), (x, y)) => {
+                extend_command_bounds(&mut bounds, *cx, *cy);
+                extend_command_bounds(&mut bounds, *x, *y);
+            }
+            Command::CubicBezier((x1, y1), (x2, y2), (x, y)) => {
+                extend_command_bounds(&mut bounds, *x1, *y1);
+                extend_command_bounds(&mut bounds, *x2, *y2);
+                extend_command_bounds(&mut bounds, *x, *y);
+            }
+            Command::Close => {}
+        }
+    }
+    bounds
+}
+
+fn extend_command_bounds(bounds: &mut Option<(f32, f32, f32, f32)>, x: f32, y: f32) {
+    if let Some((min_x, min_y, max_x, max_y)) = bounds.as_mut() {
+        *min_x = min_x.min(x);
+        *min_y = min_y.min(y);
+        *max_x = max_x.max(x);
+        *max_y = max_y.max(y);
+    } else {
+        *bounds = Some((x, y, x, y));
+    }
 }
 
 fn tag_name(tag: &str) -> Option<&str> {
@@ -555,14 +700,54 @@ fn parse_linear_gradient(
     scale_y: f32,
 ) -> Option<GlyphLinearGradient> {
     let inherited = gradient_reference(element, defs);
-    let x1 = gradient_number(element, inherited, "x1").unwrap_or(0.0) * scale_x;
-    let y1 = gradient_number(element, inherited, "y1").unwrap_or(0.0) * scale_y;
-    let x2 = gradient_number(element, inherited, "x2").unwrap_or(1.0) * scale_x;
-    let y2 = gradient_number(element, inherited, "y2").unwrap_or(0.0) * scale_y;
-    let units = gradient_units(element, inherited);
-    let transform = gradient_transform(element, inherited, scale_x, scale_y);
-    let spread = gradient_spread(element, inherited);
-    let stops = gradient_stops(element, inherited, defs, scale_x, scale_y);
+    let inherited_gradient = inherited.and_then(|gradient| {
+        parse_linear_gradient(gradient, defs, scale_x, scale_y).or_else(|| {
+            parse_radial_gradient(gradient, defs, scale_x, scale_y).map(|gradient| {
+                let center_x = gradient.cx;
+                let center_y = gradient.cy;
+                GlyphLinearGradient {
+                    x1: center_x - gradient.r,
+                    y1: center_y,
+                    x2: center_x + gradient.r,
+                    y2: center_y,
+                    units: gradient.units,
+                    transform: gradient.transform,
+                    spread: gradient.spread,
+                    stops: gradient.stops,
+                }
+            })
+        })
+    });
+    let units = gradient_units(element, inherited, inherited_gradient.as_ref().map(|g| g.units));
+    let x1 = gradient_number(element, inherited, "x1").or_else(|| inherited_gradient.as_ref().map(|g| g.x1)).unwrap_or(0.0);
+    let y1 = gradient_number(element, inherited, "y1").or_else(|| inherited_gradient.as_ref().map(|g| g.y1)).unwrap_or(0.0);
+    let x2 = gradient_number(element, inherited, "x2").or_else(|| inherited_gradient.as_ref().map(|g| g.x2)).unwrap_or(1.0);
+    let y2 = gradient_number(element, inherited, "y2").or_else(|| inherited_gradient.as_ref().map(|g| g.y2)).unwrap_or(0.0);
+    let (x1, y1, x2, y2) = if matches!(units, GlyphGradientUnits::UserSpaceOnUse) {
+        (x1 * scale_x, y1 * scale_y, x2 * scale_x, y2 * scale_y)
+    } else {
+        (x1, y1, x2, y2)
+    };
+    let transform = gradient_transform(
+        element,
+        inherited,
+        inherited_gradient.as_ref().map(|g| g.transform),
+        scale_x,
+        scale_y,
+    );
+    let spread = gradient_spread(
+        element,
+        inherited,
+        inherited_gradient.as_ref().map(|g| g.spread),
+    );
+    let stops = gradient_stops(
+        element,
+        inherited,
+        inherited_gradient.as_ref().map(|g| g.stops.as_slice()),
+        defs,
+        scale_x,
+        scale_y,
+    );
     if stops.is_empty() {
         return None;
     }
@@ -585,19 +770,44 @@ fn parse_radial_gradient(
     scale_y: f32,
 ) -> Option<GlyphRadialGradient> {
     let inherited = gradient_reference(element, defs);
-    let cx = gradient_number(element, inherited, "cx").unwrap_or(0.5) * scale_x;
-    let cy = gradient_number(element, inherited, "cy").unwrap_or(0.5) * scale_y;
-    let r = gradient_number(element, inherited, "r").unwrap_or(0.5) * scale_x.abs().max(scale_y.abs());
-    let fx = gradient_number(element, inherited, "fx")
-        .map(|value| value * scale_x)
-        .unwrap_or(cx);
-    let fy = gradient_number(element, inherited, "fy")
-        .map(|value| value * scale_y)
-        .unwrap_or(cy);
-    let units = gradient_units(element, inherited);
-    let transform = gradient_transform(element, inherited, scale_x, scale_y);
-    let spread = gradient_spread(element, inherited);
-    let stops = gradient_stops(element, inherited, defs, scale_x, scale_y);
+    let inherited_gradient = inherited.and_then(|gradient| parse_radial_gradient(gradient, defs, scale_x, scale_y));
+    let units = gradient_units(element, inherited, inherited_gradient.as_ref().map(|g| g.units));
+    let cx = gradient_number(element, inherited, "cx").or_else(|| inherited_gradient.as_ref().map(|g| g.cx)).unwrap_or(0.5);
+    let cy = gradient_number(element, inherited, "cy").or_else(|| inherited_gradient.as_ref().map(|g| g.cy)).unwrap_or(0.5);
+    let r = gradient_number(element, inherited, "r").or_else(|| inherited_gradient.as_ref().map(|g| g.r)).unwrap_or(0.5);
+    let fx = gradient_number(element, inherited, "fx").or_else(|| inherited_gradient.as_ref().map(|g| g.fx)).unwrap_or(cx);
+    let fy = gradient_number(element, inherited, "fy").or_else(|| inherited_gradient.as_ref().map(|g| g.fy)).unwrap_or(cy);
+    let (cx, cy, fx, fy, r) = if matches!(units, GlyphGradientUnits::UserSpaceOnUse) {
+        (
+            cx * scale_x,
+            cy * scale_y,
+            fx * scale_x,
+            fy * scale_y,
+            r * scale_x.abs().max(scale_y.abs()),
+        )
+    } else {
+        (cx, cy, fx, fy, r)
+    };
+    let transform = gradient_transform(
+        element,
+        inherited,
+        inherited_gradient.as_ref().map(|g| g.transform),
+        scale_x,
+        scale_y,
+    );
+    let spread = gradient_spread(
+        element,
+        inherited,
+        inherited_gradient.as_ref().map(|g| g.spread),
+    );
+    let stops = gradient_stops(
+        element,
+        inherited,
+        inherited_gradient.as_ref().map(|g| g.stops.as_slice()),
+        defs,
+        scale_x,
+        scale_y,
+    );
     if stops.is_empty() {
         return None;
     }
@@ -641,7 +851,11 @@ fn gradient_number(element: &SvgElement, inherited: Option<&SvgElement>, key: &s
         })
 }
 
-fn gradient_spread(element: &SvgElement, inherited: Option<&SvgElement>) -> GlyphGradientSpread {
+fn gradient_spread(
+    element: &SvgElement,
+    inherited: Option<&SvgElement>,
+    inherited_value: Option<GlyphGradientSpread>,
+) -> GlyphGradientSpread {
     let value = element
         .attrs
         .get("spreadmethod")
@@ -649,24 +863,29 @@ fn gradient_spread(element: &SvgElement, inherited: Option<&SvgElement>) -> Glyp
     match value.map(|value| value.trim().to_ascii_lowercase()) {
         Some(value) if value == "reflect" => GlyphGradientSpread::Reflect,
         Some(value) if value == "repeat" => GlyphGradientSpread::Repeat,
-        _ => GlyphGradientSpread::Pad,
+        _ => inherited_value.unwrap_or(GlyphGradientSpread::Pad),
     }
 }
 
-fn gradient_units(element: &SvgElement, inherited: Option<&SvgElement>) -> GlyphGradientUnits {
+fn gradient_units(
+    element: &SvgElement,
+    inherited: Option<&SvgElement>,
+    inherited_value: Option<GlyphGradientUnits>,
+) -> GlyphGradientUnits {
     let value = element
         .attrs
         .get("gradientunits")
         .or_else(|| inherited.and_then(|gradient| gradient.attrs.get("gradientunits")));
     match value.map(|value| value.trim().to_ascii_lowercase()) {
         Some(value) if value == "userspaceonuse" => GlyphGradientUnits::UserSpaceOnUse,
-        _ => GlyphGradientUnits::ObjectBoundingBox,
+        _ => inherited_value.unwrap_or(GlyphGradientUnits::ObjectBoundingBox),
     }
 }
 
 fn gradient_transform(
     element: &SvgElement,
     inherited: Option<&SvgElement>,
+    inherited_value: Option<[f32; 6]>,
     scale_x: f32,
     scale_y: f32,
 ) -> [f32; 6] {
@@ -674,20 +893,25 @@ fn gradient_transform(
         .attrs
         .get("gradienttransform")
         .or_else(|| inherited.and_then(|gradient| gradient.attrs.get("gradienttransform")));
-    let transform = parse_transform(transform, scale_x, scale_y);
-    [
-        transform.a,
-        transform.b,
-        transform.c,
-        transform.d,
-        transform.e,
-        transform.f,
-    ]
+    if let Some(transform) = transform {
+        let transform = parse_transform(Some(transform), scale_x, scale_y);
+        [
+            transform.a,
+            transform.b,
+            transform.c,
+            transform.d,
+            transform.e,
+            transform.f,
+        ]
+    } else {
+        inherited_value.unwrap_or([1.0, 0.0, 0.0, 1.0, 0.0, 0.0])
+    }
 }
 
 fn gradient_stops(
     element: &SvgElement,
     inherited: Option<&SvgElement>,
+    inherited_stops: Option<&[GlyphGradientStop]>,
     _defs: &HashMap<String, SvgElement>,
     _scale_x: f32,
     _scale_y: f32,
@@ -700,6 +924,7 @@ fn gradient_stops(
                 stops = gradient_stops(
                     inherited,
                     gradient_reference(inherited, _defs),
+                    inherited_stops,
                     _defs,
                     _scale_x,
                     _scale_y,
@@ -707,7 +932,11 @@ fn gradient_stops(
             }
         }
     }
-    stops
+    if stops.is_empty() {
+        inherited_stops.unwrap_or(&[]).to_vec()
+    } else {
+        stops
+    }
 }
 
 fn collect_gradient_stops(element: &SvgElement) -> Vec<GlyphGradientStop> {
@@ -1401,8 +1630,10 @@ mod tests {
         assert_eq!(layers.len(), 1);
         match &layers[0].paint {
             GlyphPaint::LinearGradient(gradient) => {
-                assert_eq!(gradient.units, GlyphGradientUnits::ObjectBoundingBox);
-                assert_eq!(gradient.x2, 2.0);
+                assert_eq!(gradient.units, GlyphGradientUnits::UserSpaceOnUse);
+                assert_eq!(gradient.x1, 0.0);
+                assert_eq!(gradient.y1, 0.0);
+                assert_eq!(gradient.x2, 20.0);
                 assert_eq!(gradient.y2, 0.0);
                 assert_eq!(gradient.stops.len(), 2);
             }
@@ -1415,7 +1646,7 @@ mod tests {
         let document = concat!(
             "<svg>",
             "<defs>",
-            "<radialGradient id=\"grad\" cx=\"10\" cy=\"20\" r=\"5\"><stop offset=\"0\" stop-color=\"#abcdef\"/></radialGradient>",
+            "<radialGradient id=\"grad\" cx=\"50%\" cy=\"50%\" r=\"25%\"><stop offset=\"0\" stop-color=\"#abcdef\"/></radialGradient>",
             "</defs>",
             "<circle cx=\"5\" cy=\"6\" r=\"4\" stroke=\"url(#grad)\" stroke-width=\"2\" fill=\"none\"/>",
             "</svg>"
@@ -1425,10 +1656,10 @@ mod tests {
         assert_eq!(layers.len(), 1);
         match &layers[0].paint {
             GlyphPaint::RadialGradient(gradient) => {
-                assert_eq!(gradient.units, GlyphGradientUnits::ObjectBoundingBox);
-                assert_eq!(gradient.cx, 20.0);
-                assert_eq!(gradient.cy, 60.0);
-                assert_eq!(gradient.r, 15.0);
+                assert_eq!(gradient.units, GlyphGradientUnits::UserSpaceOnUse);
+                assert_eq!(gradient.cx, 10.0);
+                assert_eq!(gradient.cy, 18.0);
+                assert_eq!(gradient.r, 6.0);
             }
             other => panic!("expected radial gradient paint, got {other:?}"),
         }
@@ -1452,9 +1683,34 @@ mod tests {
         match &layers[0].paint {
             GlyphPaint::LinearGradient(gradient) => {
                 assert_eq!(gradient.units, GlyphGradientUnits::UserSpaceOnUse);
-                assert_eq!(gradient.transform, [2.0, 0.0, 0.0, 3.0, 6.0, 12.0]);
+                assert_eq!(gradient.transform, [1.0, 0.0, 0.0, 1.0, 0.0, 0.0]);
+                assert_eq!(gradient.x1, 6.0);
+                assert_eq!(gradient.y1, 12.0);
             }
             other => panic!("expected linear gradient paint, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn svg_to_path_layers_inherits_gradient_stops_via_href() {
+        let document = concat!(
+            "<svg>",
+            "<defs>",
+            "<linearGradient id=\"base\"><stop offset=\"0%\" stop-color=\"#112233\"/><stop offset=\"100%\" stop-color=\"#445566\"/></linearGradient>",
+            "<linearGradient id=\"derived\" href=\"#base\" x1=\"25%\" x2=\"75%\"/>",
+            "</defs>",
+            "<rect x=\"0\" y=\"0\" width=\"20\" height=\"10\" fill=\"url(#derived)\"/>",
+            "</svg>"
+        );
+        let layers = svg_to_path_layers(document, 1.0, 1.0);
+
+        match &layers[0].paint {
+            GlyphPaint::LinearGradient(gradient) => {
+                assert_eq!(gradient.stops.len(), 2);
+                assert_eq!(gradient.x1, 5.0);
+                assert_eq!(gradient.x2, 15.0);
+            }
+            other => panic!("expected inherited linear gradient paint, got {other:?}"),
         }
     }
 }
