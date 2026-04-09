@@ -6,13 +6,13 @@ use std::fs::File;
 use std::io::{Error, ErrorKind, SeekFrom};
 use std::path::PathBuf;
 
+#[cfg(feature = "svg-fonts")]
+use crate::commands::SvgGlyphLayer;
 use crate::commands::{
     Command as DrawCommand, FontMetrics as DrawFontMetrics, Glyph, GlyphBounds, GlyphFlow,
     GlyphLayer, GlyphMetrics as DrawGlyphMetrics, GlyphPaint, GlyphRun, PathGlyphLayer,
     PositionedGlyph, RasterGlyphLayer,
 };
-#[cfg(feature = "svg-fonts")]
-use crate::commands::SvgGlyphLayer;
 use crate::fontheader;
 use crate::opentype::color::sbix;
 use crate::opentype::color::svg;
@@ -1223,6 +1223,14 @@ impl Font {
                 | 0x0859..=0x085B
                 | 0x08D3..=0x08E1
                 | 0x08E3..=0x08FF
+                | 0x0F18..=0x0F19
+                | 0x0F35
+                | 0x0F37
+                | 0x0F39
+                | 0x0F71..=0x0F7E
+                | 0x0F80..=0x0F84
+                | 0x0F86..=0x0F87
+                | 0x0F8D..=0x0FBC
                 | 0x1AB0..=0x1AFF
                 | 0x1DC0..=0x1DFF
                 | 0x20D0..=0x20FF

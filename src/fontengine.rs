@@ -1,11 +1,11 @@
 //! High-level shaping and rendering engine bound to one [`crate::FontFace`].
 
+#[cfg(feature = "svg-fonts")]
+use crate::commands::SvgGlyphLayer;
 use crate::commands::{
     Command, FillRule, FontOptions, FontVariant, FontVariationSetting, GlyphBounds, GlyphLayer,
     GlyphPaint, GlyphRun, PositionedGlyph, RasterGlyphLayer, RasterGlyphSource, TextDirection,
 };
-#[cfg(feature = "svg-fonts")]
-use crate::commands::SvgGlyphLayer;
 use crate::fontface::FontFace;
 use crate::util;
 use base64::{engine::general_purpose, Engine as _};

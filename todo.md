@@ -15,7 +15,7 @@
 
 # next
 - [+] mark-to-ligature を追加して複合字上の mark attachment を詰める
-- [ ] script ごとの fallback 境界を増やすためArabic/Syriac/Hebrew 以外の fixture を追加する
+- [x] script ごとの fallback 境界を増やすためArabic/Syriac/Hebrew 以外の fixture を追加する
 - [ ] features `svg-fonts`
     - [+] svg実装のためのCommand拡張
     - [+] svgフォントから必要な部分だけ切り出すパーサー
@@ -439,6 +439,7 @@
     - [x] RTL contextual script では同一 face を優先して segment continuity を維持
     - [x] Arabic / Syriac の real font fixture で face 切替境界の回帰テストを追加
     - [x] Arabic / Syriac / Hebrew の複数フォント候補を走査する境界チェックを追加
+    - [x] Tibetan real font fixture を追加し、LTR script の mark cluster fallback 境界を回帰テスト化
     - [ ] 実フォントで script ごとの face 切替境界をさらに詰める
 
 ## examples / ドキュメント

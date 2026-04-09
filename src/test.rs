@@ -2112,7 +2112,13 @@ mod tests {
     }
 
     fn test_fonts_dir() -> std::path::PathBuf {
-        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("_test_fonts")
+        let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let dot_dir = manifest_dir.join(".test_fonts");
+        if dot_dir.exists() {
+            dot_dir
+        } else {
+            manifest_dir.join("_test_fonts")
+        }
     }
 
     fn sample_font_path() -> std::path::PathBuf {
@@ -2658,6 +2664,18 @@ mod tests {
     }
 
     #[cfg(feature = "layout")]
+    fn tibetan_boundary_font_paths() -> Vec<std::path::PathBuf> {
+        existing_paths(vec![
+            test_fonts_dir()
+                .join("Tibetan")
+                .join("BabelStoneTibetan.ttf"),
+            test_fonts_dir()
+                .join("Tibetan")
+                .join("BabelStoneTibetanSlim.ttf"),
+        ])
+    }
+
+    #[cfg(feature = "layout")]
     fn rtl_contextual_font_paths() -> Vec<std::path::PathBuf> {
         existing_paths(vec![
             rtl_font_path(),
@@ -2930,6 +2948,7 @@ mod tests {
     fn count_mark_boundary_successes(
         paths: &[std::path::PathBuf],
         locale: &str,
+        is_right_to_left: bool,
         detector: fn(&crate::LoadedFont) -> Option<String>,
     ) -> usize {
         let mut successes = 0usize;
@@ -2953,14 +2972,11 @@ mod tests {
             let text = format!("A{cluster}B");
             let Ok(Ok(face_indices)) =
                 std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                    family.debug_face_indices_for_text(
-                        &text,
-                        family
-                            .options()
-                            .with_font_size(32.0)
-                            .with_locale(locale)
-                            .with_right_to_left(),
-                    )
+                    let mut options = family.options().with_font_size(32.0).with_locale(locale);
+                    if is_right_to_left {
+                        options = options.with_right_to_left();
+                    }
+                    family.debug_face_indices_for_text(&text, options)
                 }))
             else {
                 continue;
@@ -3106,6 +3122,43 @@ mod tests {
     fn detect_syriac_mark_stack_cluster(font: &crate::LoadedFont) -> Option<String> {
         first_real_gpos_mark_stack_cluster(font, "syr-Syrc", 0x0710..=0x072C, 0x0730..=0x074A)
             .map(|(cluster, _, _)| cluster)
+    }
+
+    #[cfg(feature = "layout")]
+    fn detect_tibetan_mark_cluster(font: &crate::LoadedFont) -> Option<String> {
+        let cmap = font.font().cmap.as_ref()?;
+
+        for base in 0x0F40..=0x0F6C {
+            let Some(base_char) = char::from_u32(base) else {
+                continue;
+            };
+            if cmap.get_glyph_position(base) == 0 {
+                continue;
+            }
+
+            for mark in 0x0F00..=0x0FFF {
+                let Some(mark_char) = char::from_u32(mark) else {
+                    continue;
+                };
+                if cmap.get_glyph_position(mark) == 0 {
+                    continue;
+                }
+
+                let text = format!("{base_char}{mark_char}");
+                let units = crate::fontreader::Font::parse_text_units_for_fallback(&text);
+                if units.len() != 1 {
+                    continue;
+                }
+
+                if let crate::fontreader::ParsedTextUnit::Glyph { text: parsed, .. } = &units[0] {
+                    if parsed == &text {
+                        return Some(text);
+                    }
+                }
+            }
+        }
+
+        None
     }
 
     #[cfg(feature = "layout")]
@@ -3303,11 +3356,7 @@ mod tests {
     }
 
     #[cfg(feature = "svg-fonts")]
-    fn assert_svg_font_supports_any_sequence(
-        font_name: &str,
-        sequences: &[&str],
-        label: &str,
-    ) {
+    fn assert_svg_font_supports_any_sequence(font_name: &str, sequences: &[&str], label: &str) {
         let path = direct_svg_emoji_font_path(font_name);
         let bytes = std::fs::read(&path)
             .unwrap_or_else(|err| panic!("read {font_name} for {label}: {err}"));
@@ -4896,7 +4945,7 @@ mod tests {
 
     #[test]
     fn parse_text_units_for_fallback_keeps_combining_mark_clusters_together() {
-        for text in ["e\u{0301}", "は\u{3099}", "ب\u{0650}"] {
+        for text in ["e\u{0301}", "は\u{3099}", "ب\u{0650}", "\u{0F40}\u{0F72}"] {
             let units = crate::fontreader::Font::parse_text_units_for_fallback(text);
             assert_eq!(
                 units.len(),
@@ -5299,7 +5348,9 @@ mod tests {
             other => panic!("expected SVG glyph layer, got {other:?}"),
         }
 
-        let svg = font.text2svg("😀", 32.0, "px").expect("noto color emoji svg");
+        let svg = font
+            .text2svg("😀", 32.0, "px")
+            .expect("noto color emoji svg");
         assert!(svg.contains("<svg"));
     }
 
@@ -6411,6 +6462,7 @@ mod tests {
         let successes = count_mark_boundary_successes(
             &arabic_boundary_font_paths(),
             "ar",
+            true,
             detect_arabic_mark_cluster,
         );
         assert!(
@@ -6425,6 +6477,7 @@ mod tests {
         let successes = count_mark_boundary_successes(
             &arabic_boundary_font_paths(),
             "ar",
+            true,
             detect_arabic_mark_stack_cluster,
         );
         assert!(
@@ -6439,6 +6492,7 @@ mod tests {
         let successes = count_mark_boundary_successes(
             &syriac_boundary_font_paths(),
             "syr-Syrc",
+            true,
             detect_syriac_mark_attachment_cluster,
         );
         assert!(
@@ -6453,6 +6507,7 @@ mod tests {
         let successes = count_mark_boundary_successes(
             &syriac_boundary_font_paths(),
             "syr-Syrc",
+            true,
             detect_syriac_mark_stack_cluster,
         );
         assert!(
@@ -6467,11 +6522,55 @@ mod tests {
         let successes = count_mark_boundary_successes(
             &hebrew_boundary_font_paths(),
             "he-Hebr",
+            true,
             detect_hebrew_mark_cluster,
         );
         assert!(
             successes >= 1,
             "expected at least one Hebrew mark font to pass boundary checks"
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn font_family_fallback_checks_tibetan_mark_boundaries_across_real_fonts() {
+        let regular = crate::load_font_from_file(rtl_font_path()).expect("load latin base font");
+        let mut successes = 0usize;
+        let mut diagnostics = Vec::new();
+
+        for path in tibetan_boundary_font_paths() {
+            let font = crate::load_font_from_file(&path)
+                .unwrap_or_else(|err| panic!("load tibetan font {}: {err}", path.display()));
+            let Some(cluster) = detect_tibetan_mark_cluster(&font) else {
+                diagnostics.push(format!("{}: no cluster", path.display()));
+                continue;
+            };
+
+            let mut family = crate::FontFamily::new("Fira Sans");
+            family.add_loaded_font(regular.clone());
+            family.add_loaded_font(font);
+
+            let text = format!("A{cluster}B");
+            match family.debug_face_indices_for_text(
+                &text,
+                family.options().with_font_size(32.0).with_locale("bo-Tibt"),
+            ) {
+                Ok(face_indices) if face_indices == vec![0, 1, 0] => successes += 1,
+                Ok(face_indices) => diagnostics.push(format!(
+                    "{}: cluster={cluster:?} face_indices={face_indices:?}",
+                    path.display()
+                )),
+                Err(err) => diagnostics.push(format!(
+                    "{}: cluster={cluster:?} error={err}",
+                    path.display()
+                )),
+            }
+        }
+
+        assert!(
+            successes >= 1,
+            "expected at least one Tibetan mark font to pass boundary checks: {}",
+            diagnostics.join(" | ")
         );
     }
 
