@@ -39,6 +39,8 @@ pub mod commands;
 pub mod fontengine;
 pub mod fontface;
 pub mod fontfile;
+#[cfg(feature = "svg-fonts")]
+pub(crate) mod svgparse;
 pub(crate) mod util;
 pub mod woff;
 

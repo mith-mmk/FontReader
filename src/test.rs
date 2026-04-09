@@ -5431,6 +5431,29 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "svg-fonts")]
+    fn svg_glyph_run_exposes_some_path_layers_when_svg_payload_is_simple_enough() {
+        for font_name in ["EmojiOneColor.otf", "NotoColorEmoji-Regular.ttf"] {
+            let path = direct_svg_emoji_font_path(font_name);
+            let bytes = std::fs::read(&path)
+                .unwrap_or_else(|err| panic!("read {font_name} for svg path layers: {err}"));
+            let font = crate::load_font_from_buffer(&bytes)
+                .unwrap_or_else(|err| panic!("load {font_name} for svg path layers: {err}"));
+            let run =
+                crate::text2commands("😀", crate::FontOptions::new(&font).with_font_size(32.0))
+                    .unwrap_or_else(|err| panic!("shape {font_name} for svg path layers: {err}"));
+
+            if run.glyphs[0].glyph.layers.iter().any(
+                |layer| matches!(layer, crate::GlyphLayer::Path(path) if !path.commands.is_empty()),
+            ) {
+                return;
+            }
+        }
+
+        panic!("expected at least one SVG emoji font to expose path layers");
+    }
+
+    #[test]
     fn fira_sans_black_i_and_j_have_outline_commands() {
         let font = crate::load_font_from_file(fira_sans_black_path()).expect("load fira sans");
 

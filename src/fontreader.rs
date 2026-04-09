@@ -1797,7 +1797,7 @@ impl Font {
         let document = self
             .current_svg_table()?
             .get_glyph_document(glyph_id as u32, layout)?;
-        Some(vec![GlyphLayer::Svg(SvgGlyphLayer {
+        let mut layers = vec![GlyphLayer::Svg(SvgGlyphLayer {
             document: document.payload,
             view_box_min_x: document.view_box_min_x * scale_x,
             view_box_min_y: document.view_box_min_y * scale_y,
@@ -1807,7 +1807,15 @@ impl Font {
             height: (document.view_box_height * scale_y).abs().max(1.0),
             offset_x: 0.0,
             offset_y: 0.0,
-        })])
+        })];
+        if let GlyphLayer::Svg(svg_layer) = &layers[0] {
+            layers.extend(
+                crate::svgparse::svg_to_path_layers(&svg_layer.document, scale_x, scale_y)
+                    .into_iter()
+                    .map(GlyphLayer::Path),
+            );
+        }
+        Some(layers)
     }
 
     fn pair_adjustment_for_index(

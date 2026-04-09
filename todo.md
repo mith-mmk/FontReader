@@ -16,14 +16,16 @@
 # next
 - [+] mark-to-ligature を追加して複合字上の mark attachment を詰める
 - [x] script ごとの fallback 境界を増やすためArabic/Syriac/Hebrew 以外の fixture を追加する
-- [ ] features `svg-fonts`
+- [*] features `svg-fonts`
     - [+] svg実装のためのCommand拡張
     - [+] svgフォントから必要な部分だけ切り出すパーサー
     - [+] `EmojiOneColor.otf` / `NotoColorEmoji-Regular.ttf` の単体 emoji glyph を回帰テスト
     - [+] `EmojiOneColor.otf` / `NotoColorEmoji-Regular.ttf` の ZWJ / variation sequence を回帰テスト
     - [+] `FontFamily` fallback でも `EmojiOneColor.otf` / `NotoColorEmoji-Regular.ttf` の SVG cluster 維持を回帰テスト
     - [ ] svg表示に必要な`commands.rs`の`pub enum Command`のファンクションの拡張(Cirle, Rect, Line, Fillなど)
-    - [ ] 上記に必要なsvg_to_command()の実装 
+    - [*] 上記に必要なsvg_to_command()の実装
+        - [x] `path` / `rect` / `circle` / `ellipse` / `line` / `polyline` / `polygon` と `fill` / `fill-rule` の最小変換
+        - [ ] `defs` / `use` / gradient / transform / stroke など複雑な SVG 要素の追従
  
 # APIの大幅破壊的変更
 
