@@ -154,7 +154,12 @@ impl LookupList {
             let lookup_raw = LookupRaw::new(reader, offset)?;
             lookups.push(lookup_raw);
         }
-        let lookup_raw = lookups.get(number).unwrap();
+        let lookup_raw = lookups.get(number).ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("lookup index {} out of bounds {}", number, lookups.len()),
+            )
+        })?;
         Lookup::new(reader, lookup_raw)
     }
 
@@ -902,7 +907,8 @@ impl LookupList {
         let extension_offset = reader.read_u32_be()?;
 
         let offset = offset + extension_offset as u64;
-        let lookup_type = num_traits::FromPrimitive::from_u16(extension_lookup_type).unwrap();
+        let lookup_type = num_traits::FromPrimitive::from_u16(extension_lookup_type)
+            .unwrap_or(LookupType::Unknown);
         let subtable = Self::parse_subtable(reader, lookup_type, offset)?;
         Ok(LookupSubstitution::ExtensionSubstitution(
             ExtensionSubstitutionFormat1 {
@@ -1011,6 +1017,12 @@ impl LookupSubstitution {
             Self::Alternate(alternate) => &alternate.coverage,
             Self::Ligature(ligature) => &ligature.coverage,
             Self::ContextSubstitution(context) => &context.coverage,
+            Self::ContextSubstitution2(context2) => &context2.coverage,
+            Self::ContextSubstitution3(context3) => {
+                context3.coverages.first().unwrap_or_else(|| {
+                    panic!("ContextSubstitutionFormat3 must contain at least one coverage")
+                })
+            }
             Self::ChainingContextSubstitution(chaining) => &chaining.coverage,
             Self::ChainingContextSubstitution2(chaining2) => &chaining2.coverage,
             Self::ChainingContextSubstitution3(chaining3) => &chaining3.backtrack_coverages[0],
@@ -1122,6 +1134,9 @@ impl LookupSubstitution {
                     LookupResult::None
                 }
             }
+            // Parsed but not expanded yet. Keep shaping alive without panicking.
+            Self::ContextSubstitution2(_context2) => LookupResult::None,
+            Self::ContextSubstitution3(_context3) => LookupResult::None,
             Self::ChainingContextSubstitution(chaining) => {
                 let coverage = &chaining.coverage;
                 let id = coverage.contains(gliph_id);
@@ -1157,9 +1172,7 @@ impl LookupSubstitution {
                 }
             }
 
-            _ => {
-                panic!("Unknown lookup type: {:?}", self);
-            }
+            _ => LookupResult::None,
         }
     }
 }

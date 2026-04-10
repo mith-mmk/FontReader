@@ -1,22 +1,35 @@
 [package]
 name = "fontloader"
-version = "0.0.4"
+version = "0.0.11"
 edition = "2021"
 authors = ["Mith@mmk"]
-description = "A font loader for Rust"
+description = "Load fonts, select faces, shape text, and export SVG in Rust."
 license = "MIT"
 repository = "https://github.com/mith-mmk/FontReader"
+documentation = "https://docs.rs/fontloader"
 readme = "README.md"
+keywords = ["font", "opentype", "woff", "svg", "text"]
+categories = ["graphics", "parser-implementations", "text-processing"]
+exclude = [
+    ".github/**",
+    ".test*/**",
+    "todo.md",
+]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[package.metadata.docs.rs]
+all-features = true
 
 [features]
 default = ["cff", "layout"]
 full = ["layout", "cff"]
-encoding = ["iconv"]
+raw = []
+encoding = []
 layout = []
 cff = []
 cff2 = []
+svg-fonts = []
 
 [dependencies]
 # MUST
@@ -27,6 +40,80 @@ num-derive = "0.4"
 miniz_oxide = {version = "0.7.1"}
 # for Woff2
 woff2 = { package = "woff2-no-std", version = "0.3.2" }
-# for name table and PlatformID is 1 
-iconv = {version = "0.1", optional = true}
 base64 = "0.21.4"
+
+[target.'cfg(all(not(windows), not(target_arch = "wasm32")))'.dependencies]
+# for legacy name-table encodings when `encoding` is enabled
+iconv = {version = "0.1"}
+
+[[example]]
+name = "api_overview"
+path = "examples/api_overview.rs"
+
+[[example]]
+name = "fontcmaps"
+path = "examples/fontcmaps.rs"
+required-features = ["raw"]
+
+[[example]]
+name = "fontcolor"
+path = "examples/fontcolor.rs"
+required-features = ["raw"]
+
+[[example]]
+name = "fontgkana"
+path = "examples/fontgkana.rs"
+required-features = ["raw"]
+
+[[example]]
+name = "fontgsub"
+path = "examples/fontgsub.rs"
+required-features = ["raw"]
+
+[[example]]
+name = "fontheader"
+path = "examples/fontheader.rs"
+required-features = ["raw"]
+
+[[example]]
+name = "fontload"
+path = "examples/fontload.rs"
+required-features = ["raw"]
+
+[[example]]
+name = "fontloader"
+path = "examples/fontloader.rs"
+
+[[example]]
+name = "fontmetadata"
+path = "examples/fontmetadata.rs"
+
+[[example]]
+name = "fontname"
+path = "examples/fontname.rs"
+required-features = ["raw"]
+
+[[example]]
+name = "fontsbix"
+path = "examples/fontsbix.rs"
+required-features = ["raw"]
+
+[[example]]
+name = "fontsvg"
+path = "examples/fontsvg.rs"
+required-features = ["raw"]
+
+[[example]]
+name = "fonttest"
+path = "examples/fonttest.rs"
+required-features = ["raw"]
+
+[[example]]
+name = "fonttype"
+path = "examples/fonttype.rs"
+required-features = ["raw"]
+
+[[example]]
+name = "tategaki"
+path = "examples/tategaki.rs"
+required-features = ["raw"]

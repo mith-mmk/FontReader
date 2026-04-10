@@ -27,18 +27,18 @@ pub struct OTFHeader {
 }
 
 impl OTFHeader {
-    pub(crate) fn new<R: BinaryReader>(file: &mut R) -> Self {
-        let sfnt_version = file.read_u32_be().unwrap();
-        let num_tables = file.read_u16_be().unwrap();
-        let search_range = file.read_u16_be().unwrap();
-        let entry_selector = file.read_u16_be().unwrap();
-        let range_shift = file.read_u16_be().unwrap();
+    pub(crate) fn new<R: BinaryReader>(file: &mut R) -> Result<Self, std::io::Error> {
+        let sfnt_version = file.read_u32_be()?;
+        let num_tables = file.read_u16_be()?;
+        let search_range = file.read_u16_be()?;
+        let entry_selector = file.read_u16_be()?;
+        let range_shift = file.read_u16_be()?;
         let mut table_records = Vec::new();
         for _ in 0..num_tables {
-            let table_tag = file.read_u32_be().unwrap();
-            let check_sum = file.read_u32_be().unwrap();
-            let offset = file.read_u32_be().unwrap();
-            let length = file.read_u32_be().unwrap();
+            let table_tag = file.read_u32_be()?;
+            let check_sum = file.read_u32_be()?;
+            let offset = file.read_u32_be()?;
+            let length = file.read_u32_be()?;
             table_records.push(TableRecord {
                 table_tag,
                 check_sum,
@@ -47,14 +47,14 @@ impl OTFHeader {
             });
         }
 
-        Self {
+        Ok(Self {
             sfnt_version,
             num_tables,
             search_range,
             entry_selector,
             range_shift,
             table_records: Box::new(table_records),
-        }
+        })
     }
 
     pub(crate) fn to_stirng(&self) -> String {
@@ -71,6 +71,18 @@ impl OTFHeader {
             string += &format!("length: {}\n", table_record.length);
         }
         string
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bin_rs::reader::BytesReader;
+
+    #[test]
+    fn otf_header_returns_error_on_truncated_input() {
+        let mut reader = BytesReader::new(&[0x00, 0x01, 0x00]);
+        assert!(OTFHeader::new(&mut reader).is_err());
     }
 }
 

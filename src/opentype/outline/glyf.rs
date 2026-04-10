@@ -94,23 +94,27 @@ impl fmt::Display for Glyph {
 }
 
 impl Glyph {
+    fn empty_parsed(&self) -> ParsedGlyph {
+        ParsedGlyph {
+            number_of_contours: 0,
+            x_min: 0,
+            y_min: 0,
+            x_max: 0,
+            y_max: 0,
+            offset: self.offset,
+            length: self.length,
+            end_pts_of_contours: Vec::new(),
+            instructions: Vec::new(),
+            flags: Vec::new(),
+            xs: Vec::new(),
+            ys: Vec::new(),
+            on_curves: Vec::new(),
+        }
+    }
+
     pub fn parse(&self) -> ParsedGlyph {
         if self.length < 10 {
-            return ParsedGlyph {
-                number_of_contours: 0,
-                x_min: 0,
-                y_min: 0,
-                x_max: 0,
-                y_max: 0,
-                offset: self.offset,
-                length: self.length,
-                end_pts_of_contours: Vec::new(),
-                instructions: Vec::new(),
-                flags: Vec::new(),
-                xs: Vec::new(),
-                ys: Vec::new(),
-                on_curves: Vec::new(),
-            };
+            return self.empty_parsed();
         }
         let buf = self.glyphs.clone();
         let mut offset = 0;
@@ -631,6 +635,22 @@ impl GLYF {
         self.griphs.get(index)
     }
 
+    #[allow(dead_code)]
+    pub(crate) fn parse_glyph(&self, index: usize) -> Option<ParsedGlyph> {
+        self.parse_glyph_recursive(index, 0)
+    }
+
+    pub(crate) fn parse_glyph_with_variation<F>(
+        &self,
+        index: usize,
+        vary: &F,
+    ) -> Option<ParsedGlyph>
+    where
+        F: Fn(usize, &ParsedGlyph) -> Option<ParsedGlyph>,
+    {
+        self.parse_glyph_recursive_with_variation(index, 0, vary)
+    }
+
     pub fn to_path_commands(
         &self,
         index: usize,
@@ -711,6 +731,141 @@ impl GLYF {
         }
 
         self.composite_to_path_commands(glyph, layout, depth)
+    }
+
+    #[allow(dead_code)]
+    fn parse_glyph_recursive(&self, index: usize, depth: usize) -> Option<ParsedGlyph> {
+        self.parse_glyph_recursive_with_variation(index, depth, &|_, _| None)
+    }
+
+    fn parse_glyph_recursive_with_variation<F>(
+        &self,
+        index: usize,
+        depth: usize,
+        vary: &F,
+    ) -> Option<ParsedGlyph>
+    where
+        F: Fn(usize, &ParsedGlyph) -> Option<ParsedGlyph>,
+    {
+        if depth > 16 {
+            return None;
+        }
+
+        let glyph = self.get_glyph(index)?;
+        let parsed = glyph.parse();
+        let parsed = if parsed.number_of_contours >= 0 {
+            parsed
+        } else {
+            self.parse_composite_glyph_with_variation(glyph, depth, vary)?
+        };
+
+        Some(vary(index, &parsed).unwrap_or(parsed))
+    }
+
+    fn parse_composite_glyph_with_variation<F>(
+        &self,
+        glyph: &Glyph,
+        depth: usize,
+        vary: &F,
+    ) -> Option<ParsedGlyph>
+    where
+        F: Fn(usize, &ParsedGlyph) -> Option<ParsedGlyph>,
+    {
+        let mut offset = 10usize;
+        let mut points = Vec::<(i16, i16, bool)>::new();
+        let mut end_pts_of_contours = Vec::new();
+        let mut instructions = Vec::new();
+
+        while offset + 4 <= glyph.glyphs.len() {
+            let flags = read_u16(&glyph.glyphs, &mut offset);
+            let component_index = read_u16(&glyph.glyphs, &mut offset) as usize;
+            let args_are_words = flags & ARG_1_AND_2_ARE_WORDS != 0;
+            let args_are_xy_values = flags & ARGS_ARE_XY_VALUES != 0;
+
+            let (arg1, arg2) = if args_are_words {
+                if offset + 4 > glyph.glyphs.len() {
+                    break;
+                }
+                (
+                    read_i16(&glyph.glyphs, &mut offset) as f64,
+                    read_i16(&glyph.glyphs, &mut offset) as f64,
+                )
+            } else {
+                if offset + 2 > glyph.glyphs.len() {
+                    break;
+                }
+                (
+                    read_i8(&glyph.glyphs, &mut offset) as f64,
+                    read_i8(&glyph.glyphs, &mut offset) as f64,
+                )
+            };
+
+            let mut transform = CompositeTransform::default();
+            if args_are_xy_values {
+                transform.dx = arg1;
+                transform.dy = arg2;
+            } else {
+                return None;
+            }
+
+            if flags & WE_HAVE_A_SCALE != 0 {
+                let scale = read_f2dot14(&glyph.glyphs, &mut offset);
+                transform.xx = scale;
+                transform.yy = scale;
+            } else if flags & WE_HAVE_AN_X_AND_Y_SCALE != 0 {
+                transform.xx = read_f2dot14(&glyph.glyphs, &mut offset);
+                transform.yy = read_f2dot14(&glyph.glyphs, &mut offset);
+            } else if flags & WE_HAVE_A_TWO_BY_TWO != 0 {
+                transform.xx = read_f2dot14(&glyph.glyphs, &mut offset);
+                transform.yx = read_f2dot14(&glyph.glyphs, &mut offset);
+                transform.xy = read_f2dot14(&glyph.glyphs, &mut offset);
+                transform.yy = read_f2dot14(&glyph.glyphs, &mut offset);
+            }
+
+            if flags & SCALED_COMPONENT_OFFSET != 0 {
+                let dx = transform.xx * transform.dx + transform.xy * transform.dy;
+                let dy = transform.yx * transform.dx + transform.yy * transform.dy;
+                transform.dx = dx;
+                transform.dy = dy;
+            }
+            if flags & ROUND_XY_TO_GRID != 0 {
+                transform.dx = transform.dx.round();
+                transform.dy = transform.dy.round();
+            }
+
+            let component =
+                self.parse_glyph_recursive_with_variation(component_index, depth + 1, vary)?;
+            for contour in Glyph::build_contours(&component) {
+                if contour.is_empty() {
+                    continue;
+                }
+
+                for (x, y, on_curve) in contour {
+                    let (x, y) = transform_outline_point(x as f64, y as f64, transform);
+                    points.push((round_f64_to_i16(x), round_f64_to_i16(y), on_curve));
+                }
+                end_pts_of_contours.push(points.len() - 1);
+            }
+
+            if flags & MORE_COMPONENTS == 0 {
+                if flags & WE_HAVE_INSTRUCTIONS != 0 && offset + 2 <= glyph.glyphs.len() {
+                    let instruction_len = read_u16(&glyph.glyphs, &mut offset) as usize;
+                    let end = offset
+                        .saturating_add(instruction_len)
+                        .min(glyph.glyphs.len());
+                    instructions.extend_from_slice(&glyph.glyphs[offset..end]);
+                }
+                break;
+            }
+        }
+
+        Some(parsed_glyph_from_points(
+            glyph.offset,
+            glyph.length,
+            instructions,
+            points,
+            end_pts_of_contours,
+        ))
     }
 
     fn composite_to_path_commands(
@@ -860,6 +1015,72 @@ fn transform_screen_point(x: f64, y: f64, y_max: f64, transform: CompositeTransf
     let transformed_x = transform.xx * x + transform.xy * raw_y + transform.dx;
     let transformed_y = transform.yx * x + transform.yy * raw_y + transform.dy;
     (transformed_x, y_max - transformed_y)
+}
+
+fn transform_outline_point(x: f64, y: f64, transform: CompositeTransform) -> (f64, f64) {
+    (
+        transform.xx * x + transform.xy * y + transform.dx,
+        transform.yx * x + transform.yy * y + transform.dy,
+    )
+}
+
+fn parsed_glyph_from_points(
+    offset: u32,
+    length: u32,
+    instructions: Vec<u8>,
+    points: Vec<(i16, i16, bool)>,
+    end_pts_of_contours: Vec<usize>,
+) -> ParsedGlyph {
+    let mut xs = Vec::with_capacity(points.len());
+    let mut ys = Vec::with_capacity(points.len());
+    let mut flags = Vec::with_capacity(points.len());
+    let mut on_curves = Vec::with_capacity(points.len());
+    let mut prev_x = 0i16;
+    let mut prev_y = 0i16;
+    let mut x_min = i16::MAX;
+    let mut y_min = i16::MAX;
+    let mut x_max = i16::MIN;
+    let mut y_max = i16::MIN;
+
+    for &(x, y, on_curve) in &points {
+        xs.push(x.wrapping_sub(prev_x));
+        ys.push(y.wrapping_sub(prev_y));
+        flags.push(if on_curve { 0x01 } else { 0x00 });
+        on_curves.push(on_curve);
+        prev_x = x;
+        prev_y = y;
+        x_min = x_min.min(x);
+        y_min = y_min.min(y);
+        x_max = x_max.max(x);
+        y_max = y_max.max(y);
+    }
+
+    if points.is_empty() {
+        x_min = 0;
+        y_min = 0;
+        x_max = 0;
+        y_max = 0;
+    }
+
+    ParsedGlyph {
+        number_of_contours: end_pts_of_contours.len() as i16,
+        x_min,
+        y_min,
+        x_max,
+        y_max,
+        offset,
+        length,
+        end_pts_of_contours,
+        instructions,
+        flags,
+        xs,
+        ys,
+        on_curves,
+    }
+}
+
+fn round_f64_to_i16(value: f64) -> i16 {
+    value.round().clamp(i16::MIN as f64, i16::MAX as f64) as i16
 }
 
 fn read_u16(buf: &[u8], offset: &mut usize) -> u16 {

@@ -2,9 +2,9 @@
 
 use std::io::SeekFrom;
 
+use crate::util::sniff_encoded_image_dimensions;
 use base64::{engine::general_purpose, Engine as _};
 use bin_rs::reader::BinaryReader;
-use crate::util::sniff_encoded_image_dimensions;
 
 #[derive(Debug, Clone)]
 pub(crate) struct SBIX {
@@ -59,7 +59,8 @@ impl SBIX {
             if target_gid == gid {
                 return None;
             }
-            let mut raster = Self::resolve_raster_glyph_in_strike(strike, target_gid, scale, depth + 1)?;
+            let mut raster =
+                Self::resolve_raster_glyph_in_strike(strike, target_gid, scale, depth + 1)?;
             raster.offset_x = glyph_data.original_offset_x as f32 * scale;
             raster.offset_y = glyph_data.original_offset_y as f32 * scale;
             return Some(raster);
@@ -105,10 +106,7 @@ impl SBIX {
             if *strike_offset as u64 >= length {
                 continue;
             }
-            let next_offset = strike_offsets
-                .get(index + 1)
-                .copied()
-                .unwrap_or(length) as u64;
+            let next_offset = strike_offsets.get(index + 1).copied().unwrap_or(length) as u64;
             if next_offset <= *strike_offset || next_offset > length {
                 continue;
             }
@@ -280,16 +278,18 @@ impl Strike {
         }
 
         let glyph_data_start = 4 + (num_glyphs as usize + 1) * 4;
-        if glyph_data_offsets
-            .iter()
-            .any(|glyph_data_offset| *glyph_data_offset < glyph_data_start || *glyph_data_offset > strike_length)
-        {
+        if glyph_data_offsets.iter().any(|glyph_data_offset| {
+            *glyph_data_offset < glyph_data_start || *glyph_data_offset > strike_length
+        }) {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
                 "sbix glyph offset is outside of the strike",
             ));
         }
-        if glyph_data_offsets.windows(2).any(|window| window[0] > window[1]) {
+        if glyph_data_offsets
+            .windows(2)
+            .any(|window| window[0] > window[1])
+        {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
                 "sbix glyph offsets are not sorted",

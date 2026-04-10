@@ -75,8 +75,8 @@ use std::{
 };
 
 use bin_rs::reader::BinaryReader;
-#[cfg(feature = "encoding")]
-use iconv::Iconv;
+//#[cfg(feature = "encoding")]
+//use iconv::Iconv;
 
 use crate::opentype::platforms::{get_locale_to_language_id, PlatformID};
 
@@ -372,6 +372,7 @@ fn get_names<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> Result
     31	Sindhi
     32	Uninterpreted
      */
+    #[cfg(all(feature = "encoding", not(windows)))]
     let mac_convert_table = [
         "ISO-8859-1", // Roman
         "SJIS",       // Japanese
@@ -447,7 +448,7 @@ fn get_names<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> Result
                     name_records[i].string = "this encoding is not support".to_string();
                 }
             }
-            #[cfg(feature = "encoding")]
+            #[cfg(all(feature = "encoding", not(windows)))]
             EncodingEngine::MacintoshLegcy => {
                 let bytes = file.read_bytes_as_vec(name_records[i].length as usize)?;
                 if mac_convert_table.len() > name_records[i].encoding_id as usize {
@@ -461,6 +462,11 @@ fn get_names<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> Result
                 } else {
                     name_records[i].string = "this encoding is not support".to_string();
                 }
+            }
+            #[cfg(any(not(feature = "encoding"), windows))]
+            EncodingEngine::MacintoshLegcy => {
+                let _ = file.read_bytes_as_vec(name_records[i].length as usize)?;
+                name_records[i].string = "this encoding is not support".to_string();
             }
             _ => {
                 name_records[i].string = "this encoding is not support".to_string();

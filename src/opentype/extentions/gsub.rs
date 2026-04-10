@@ -92,19 +92,17 @@ impl GSUB {
         let features = Box::new(FeatureList::new(
             reader,
             offset + feature_list_offset as u64,
-            length,
-        ));
+            offset + length as u64,
+        )?);
         let lookups = Box::new(LookupList::new(
             reader,
             offset + lookup_list_offset as u64,
             length,
         )?);
         let feature_variations = if feature_variations_offset > 0 {
-            Some(Box::new(FeatureVariationList::new(
-                reader,
-                offset + feature_variations_offset as u64,
-                length,
-            )))
+            FeatureVariationList::new(reader, offset + feature_variations_offset as u64, length)
+                .ok()
+                .map(Box::new)
         } else {
             None
         };

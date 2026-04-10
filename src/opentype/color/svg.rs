@@ -1,11 +1,20 @@
 #![allow(dead_code)]
 
-use miniz_oxide::inflate::decompress_to_vec_zlib;
+use miniz_oxide::inflate::decompress_to_vec;
 use std::io::SeekFrom;
 
 use bin_rs::reader::BinaryReader;
 
 use crate::fontreader::FontLayout;
+
+#[derive(Debug, Clone)]
+pub(crate) struct SvgGlyphDocument {
+    pub(crate) payload: String,
+    pub(crate) view_box_min_x: f32,
+    pub(crate) view_box_min_y: f32,
+    pub(crate) view_box_width: f32,
+    pub(crate) view_box_height: f32,
+}
 
 #[derive(Debug, Clone)]
 pub(crate) struct SVG {
@@ -75,6 +84,28 @@ impl SVG {
         _: f64,
         _: f64,
     ) -> Option<String> {
+        let document = self.get_glyph_document(gid, layout)?;
+        let mut string = format!(
+            "<svg width=\"{}{}\" height=\"{}{}\" viewBox=\"{} {} {} {}\">",
+            fonsize,
+            fontunit,
+            fonsize,
+            fontunit,
+            document.view_box_min_x,
+            document.view_box_min_y,
+            document.view_box_width,
+            document.view_box_height
+        );
+        string += &document.payload;
+        string += "</svg>";
+        Some(string)
+    }
+
+    pub(crate) fn get_glyph_document(
+        &self,
+        gid: u32,
+        layout: &FontLayout,
+    ) -> Option<SvgGlyphDocument> {
         let gid = gid as u16;
         let mut svg_document = None;
         for svg_document_record in self.svg_document_list.svg_document_records.iter() {
@@ -84,50 +115,79 @@ impl SVG {
                 break;
             }
         }
-        if svg_document.is_none() {
-            return None;
-        }
-        let svg = decode_svg_document(svg_document.unwrap())?;
-        let payload = extract_svg_payload_for_gid(&svg, gid as u16)?;
-        let mut string = format!(
-            "<svg width=\"{}{}\" height=\"{}{}\" ",
-            fonsize, fontunit, fonsize, fontunit
-        );
-        match layout {
-            FontLayout::Horizontal(layout) => {
-                string += &format!(
-                    " viewBox=\"{} {} {} {}\"",
-                    0,
-                    -layout.accender,
-                    layout.advance_width,
-                    layout.accender - layout.descender + layout.line_gap
-                );
-            }
-            FontLayout::Vertical(layout) => {
-                string += &format!(
-                    " viewBox=\"{} {} {} {}\"",
-                    0,
-                    -layout.accender,
-                    layout.advance_height,
-                    layout.accender - layout.descender + layout.line_gap,
-                );
-            }
-            _ => {}
-        }
-        string.push('>');
-        string += &payload;
-        string += "</svg>";
-        Some(string)
+        let svg = decode_svg_document(svg_document?)?;
+        let payload = extract_svg_payload_for_gid(&svg, gid)?;
+        let (view_box_min_x, view_box_min_y, view_box_width, view_box_height) =
+            layout_view_box(layout);
+        Some(SvgGlyphDocument {
+            payload,
+            view_box_min_x,
+            view_box_min_y,
+            view_box_width,
+            view_box_height,
+        })
+    }
+}
+
+fn layout_view_box(layout: &FontLayout) -> (f32, f32, f32, f32) {
+    match layout {
+        FontLayout::Horizontal(layout) => (
+            0.0,
+            -layout.accender as f32,
+            layout.advance_width as f32,
+            (layout.accender - layout.descender + layout.line_gap) as f32,
+        ),
+        FontLayout::Vertical(layout) => (
+            0.0,
+            -layout.accender as f32,
+            layout.advance_height as f32,
+            (layout.accender - layout.descender + layout.line_gap) as f32,
+        ),
+        FontLayout::Unknown => (0.0, 0.0, 0.0, 0.0),
     }
 }
 
 fn decode_svg_document(document: &[u8]) -> Option<String> {
     if document.len() >= 3 && document[0] == 0x1f && document[1] == 0x8b && document[2] == 0x08 {
-        let decompress = decompress_to_vec_zlib(document).ok()?;
+        let decompress = decompress_gzip(document)?;
         String::from_utf8(decompress).ok()
     } else {
         String::from_utf8(document.to_vec()).ok()
     }
+}
+
+fn decompress_gzip(document: &[u8]) -> Option<Vec<u8>> {
+    if document.len() < 18 {
+        return None;
+    }
+    let flags = document[3];
+    let mut cursor = 10usize;
+
+    if flags & 0x04 != 0 {
+        let extra_len = u16::from_le_bytes([*document.get(cursor)?, *document.get(cursor + 1)?]);
+        cursor += 2 + extra_len as usize;
+    }
+    if flags & 0x08 != 0 {
+        while *document.get(cursor)? != 0 {
+            cursor += 1;
+        }
+        cursor += 1;
+    }
+    if flags & 0x10 != 0 {
+        while *document.get(cursor)? != 0 {
+            cursor += 1;
+        }
+        cursor += 1;
+    }
+    if flags & 0x02 != 0 {
+        cursor += 2;
+    }
+
+    if cursor >= document.len().saturating_sub(8) {
+        return None;
+    }
+
+    decompress_to_vec(&document[cursor..document.len() - 8]).ok()
 }
 
 fn extract_svg_payload_for_gid(document: &str, gid: u16) -> Option<String> {

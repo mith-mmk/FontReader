@@ -273,18 +273,20 @@ pub fn get_font_type_from_file(filename: &PathBuf) -> Result<FontHeaders, std::i
 
 pub fn get_font_type<B: BinaryReader>(file: &mut B) -> Result<FontHeaders, std::io::Error> {
     file.set_endian(Endian::BigEndian);
-    let buffer = file.read_bytes_no_move(4).unwrap();
-    let buffer: [u8; 4] = buffer.try_into().unwrap();
+    let buffer = file.read_bytes_no_move(4)?;
+    let buffer: [u8; 4] = buffer
+        .try_into()
+        .map_err(|_| std::io::Error::new(std::io::ErrorKind::UnexpectedEof, "short font header"))?;
     let sfnt_version: u32 = u32::from_be_bytes(buffer);
 
     match &buffer {
         b"ttcf" => {
-            let fontheader = TTCHeader::new(file);
+            let fontheader = TTCHeader::new(file)?;
             Ok(FontHeaders::TTC(fontheader))
         }
         // if 0x00010000 -> OTF
         b"\x00\x01\x00\x00" | b"OTTO" => {
-            let fontheader = OTFHeader::new(file);
+            let fontheader = OTFHeader::new(file)?;
             Ok(FontHeaders::OTF(fontheader))
         }
         // 0
@@ -330,4 +332,16 @@ pub fn get_font_type<B: BinaryReader>(file: &mut B) -> Result<FontHeaders, std::
 pub fn get_font_type_from_buffer(fontdata: &[u8]) -> Result<FontHeaders, std::io::Error> {
     let file = &mut BytesReader::new(fontdata);
     get_font_type(file)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bin_rs::reader::BytesReader;
+
+    #[test]
+    fn get_font_type_returns_error_on_short_buffer() {
+        let mut reader = BytesReader::new(b"OT");
+        assert!(get_font_type(&mut reader).is_err());
+    }
 }

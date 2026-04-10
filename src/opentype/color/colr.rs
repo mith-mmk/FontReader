@@ -22,15 +22,13 @@ pub(crate) struct COLR {
 
 impl COLR {
     pub(crate) fn new<R: BinaryReader>(reader: &mut R, offset: u32, _: u32) -> Result<Self, Error> {
-        reader.seek(SeekFrom::Start(offset as u64)).unwrap();
-        let version = reader.read_u16_be().unwrap();
-        let num_base_glyphs = reader.read_u16_be().unwrap();
-        let base_glyph_records_offset = reader.read_u32_be().unwrap();
-        let layer_records_offset = reader.read_u32_be().unwrap();
-        let num_layers = reader.read_u16_be().unwrap();
-        reader
-            .seek(SeekFrom::Start((offset + base_glyph_records_offset) as u64))
-            .unwrap();
+        reader.seek(SeekFrom::Start(offset as u64))?;
+        let version = reader.read_u16_be()?;
+        let num_base_glyphs = reader.read_u16_be()?;
+        let base_glyph_records_offset = reader.read_u32_be()?;
+        let layer_records_offset = reader.read_u32_be()?;
+        let num_layers = reader.read_u16_be()?;
+        reader.seek(SeekFrom::Start((offset + base_glyph_records_offset) as u64))?;
         let mut base_glyph_records = Vec::new();
         for _ in 0..num_base_glyphs {
             let base_glyph_record = BaseGlyphRecord {
@@ -40,9 +38,7 @@ impl COLR {
             };
             base_glyph_records.push(base_glyph_record);
         }
-        reader
-            .seek(SeekFrom::Start((offset + layer_records_offset) as u64))
-            .unwrap();
+        reader.seek(SeekFrom::Start((offset + layer_records_offset) as u64))?;
         let mut layer_records = Vec::new();
         for _ in 0..num_layers {
             let layer_record = LayerRecord {
@@ -93,17 +89,22 @@ impl COLR {
 
     pub(crate) fn get_layer_record(&self, glyph_id: u16) -> Vec<LayerRecord> {
         let mut layer_records = Vec::new();
-        let index = self
+        let index = match self
             .base_glyph_records
-            .binary_search_by_key(&glyph_id, |base| base.base_glyph);
-        if index.is_err() {
-            return layer_records;
-        }
-        let base_glyph_record = &self.base_glyph_records[index.unwrap()];
+            .binary_search_by_key(&glyph_id, |base| base.base_glyph)
+        {
+            Ok(index) => index,
+            Err(_) => return layer_records,
+        };
+        let base_glyph_record = &self.base_glyph_records[index];
         let num_layers = base_glyph_record.num_layers;
         let first_layer_index = base_glyph_record.first_layer_index;
         for i in 0..num_layers {
-            layer_records.push(self.layer_records[(first_layer_index + i) as usize].clone());
+            let layer_index = (first_layer_index + i) as usize;
+            let Some(layer) = self.layer_records.get(layer_index) else {
+                break;
+            };
+            layer_records.push(layer.clone());
         }
         layer_records
     }
@@ -122,4 +123,36 @@ pub(crate) struct BaseGlyphRecord {
 pub(crate) struct LayerRecord {
     pub(crate) glyph_id: u16,
     pub(crate) palette_index: u16, // see CPAL
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bin_rs::reader::BytesReader;
+
+    #[test]
+    fn colr_returns_error_on_truncated_input() {
+        let mut reader = BytesReader::new(&[0x00, 0x00, 0x00]);
+        assert!(COLR::new(&mut reader, 0, 3).is_err());
+    }
+
+    #[test]
+    fn colr_get_layer_record_stops_at_available_layers() {
+        let colr = COLR {
+            version: 0,
+            num_base_glyphs: 1,
+            base_glyph_records: vec![BaseGlyphRecord {
+                base_glyph: 7,
+                first_layer_index: 1,
+                num_layers: 3,
+            }],
+            layer_records: vec![LayerRecord {
+                glyph_id: 100,
+                palette_index: 0,
+            }],
+            num_layers: 1,
+        };
+
+        assert!(colr.get_layer_record(7).is_empty());
+    }
 }

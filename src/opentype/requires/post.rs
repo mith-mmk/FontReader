@@ -107,9 +107,8 @@ fn get_post<R: BinaryReader>(file: &mut R, offest: u32, length: u32) -> Result<P
             let index = file.read_u16_be()?;
             glyph_name_index.push(index);
         }
-        let remain = length
-            .saturating_sub(34u32.saturating_add(number_of_glyphs as u32 * 2))
-            as usize;
+        let remain =
+            length.saturating_sub(34u32.saturating_add(number_of_glyphs as u32 * 2)) as usize;
         let buf = file.read_bytes_as_vec(remain)?;
         let mut offset: usize = 0;
         while offset < buf.len() {

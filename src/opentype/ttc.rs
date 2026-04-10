@@ -18,7 +18,7 @@ pub struct TTCHeader {
 }
 
 impl TTCHeader {
-    pub(crate) fn new<R: BinaryReader>(reader: &mut R) -> Self {
+    pub(crate) fn new<R: BinaryReader>(reader: &mut R) -> Result<Self, std::io::Error> {
         let mut header = TTCHeader {
             sfnt_version: 0,
             major_version: 0,
@@ -30,29 +30,27 @@ impl TTCHeader {
             ul_dsig_offset: 0,
             font_collection: Box::<Vec<OTFHeader>>::default(),
         };
-        header.sfnt_version = reader.read_u32_be().unwrap();
-        header.major_version = reader.read_u16_be().unwrap();
-        header.minor_version = reader.read_u16_be().unwrap();
-        header.num_fonts = reader.read_u32_be().unwrap();
+        header.sfnt_version = reader.read_u32_be()?;
+        header.major_version = reader.read_u16_be()?;
+        header.minor_version = reader.read_u16_be()?;
+        header.num_fonts = reader.read_u32_be()?;
         for _ in 0..header.num_fonts {
-            header.table_directory.push(reader.read_u32_be().unwrap());
+            header.table_directory.push(reader.read_u32_be()?);
         }
         // Version2
         if header.major_version == 2 {
-            header.ul_dsig_tag = reader.read_u32_be().unwrap();
-            header.ul_dsig_length = reader.read_u32_be().unwrap();
-            header.ul_dsig_offset = reader.read_u32_be().unwrap();
+            header.ul_dsig_tag = reader.read_u32_be()?;
+            header.ul_dsig_length = reader.read_u32_be()?;
+            header.ul_dsig_offset = reader.read_u32_be()?;
         }
         let mut font_collection = Vec::new();
 
         for i in 0..header.num_fonts {
-            reader
-                .seek(SeekFrom::Start(header.table_directory[i as usize] as u64))
-                .unwrap();
-            font_collection.push(OTFHeader::new(reader));
+            reader.seek(SeekFrom::Start(header.table_directory[i as usize] as u64))?;
+            font_collection.push(OTFHeader::new(reader)?);
         }
         header.font_collection = Box::new(font_collection);
-        header
+        Ok(header)
     }
 
     pub(crate) fn to_string(&self) -> String {
@@ -74,5 +72,17 @@ impl TTCHeader {
             string += &format!("\nfont[{}]:\n {}\n", i, font.to_stirng());
         }
         string
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bin_rs::reader::BytesReader;
+
+    #[test]
+    fn ttc_header_returns_error_on_truncated_input() {
+        let mut reader = BytesReader::new(b"ttc");
+        assert!(TTCHeader::new(&mut reader).is_err());
     }
 }

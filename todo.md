@@ -1,13 +1,124 @@
 # todo
-_test* が作業用フォルダ
-_test_fonts/* がテスト用フォント
+- .test* が作業用フォルダ
+- .test_fonts/* がテスト用フォント
+
+```
 - [+] 実装済み
 - [x] 動作確認済み
 - [*] 実装済みだが動作に不具合あり
 - [-] 実装遅延
 - [ ] 未処理、未確認タスク
+```
+- `todo.md`でタスク管理
+- `issue.md`でイシュー管理
+- `readme`と書いた場合はreadme.ja.mdが正本でread.mdが英語版である
 
-# 最優先
+# next
+- [+] mark-to-ligature を追加して複合字上の mark attachment を詰める
+- [x] script ごとの fallback 境界を増やすためArabic/Syriac/Hebrew 以外の fixture を追加する
+- [*] features `svg-fonts`
+    - [+] svg実装のためのCommand / PathGlyphLayer拡張
+    - [+] svgフォントから必要な部分だけ切り出すパーサー
+    - [+] `EmojiOneColor.otf` / `NotoColorEmoji-Regular.ttf` の単体 emoji glyph を回帰テスト
+    - [+] `EmojiOneColor.otf` / `NotoColorEmoji-Regular.ttf` の ZWJ / variation sequence を回帰テスト
+    - [+] `FontFamily` fallback でも `EmojiOneColor.otf` / `NotoColorEmoji-Regular.ttf` の SVG cluster 維持を回帰テスト
+    - [*] svg表示に必要な`commands.rs`の`pub enum Command`/`PathGlyphLayer`の拡張(Cirle, Rect, Line, Fill, Strokeなど)
+    - [*] 上記に必要なsvg_to_command()の実装
+        - [x] `path` / `rect` / `circle` / `ellipse` / `line` / `polyline` / `polygon` と `fill` / `fill-rule` の最小変換
+        - [x] `defs` / `use` の最小展開
+        - [x] `translate` / `scale` / `rotate` / `skewX` / `skewY` / `matrix` の最小 transform 適用
+        - [*] `stroke` / `stroke-width` の最小追従
+        - [*] `linearGradient` / `radialGradient` / `stop` の最小追従
+        - [*] `gradientUnits` / `gradientTransform` の保持と最低限の座標解決
+        - [*] gradient `href` / `xlink:href` 継承の最小追従
+        - [*] `clipPath` / `clip-path` の最小追従
+        - [*] 単純な `mask` を clip 相当として最小追従
+        - [x] SVG path arc (`A` / `a`) を NotoColorEmoji 優先で path 化
+        - [ ] pattern / mask / filter など複雑な SVG 要素の追従
+    - [x] `EmojiOneColor.otf` / `NotoColorEmoji-Regular.ttf` の実 payload を比較し、gradient paint layer の回帰を追加
+    - [x] path 化できる glyph は `GlyphLayer::Path` を優先し、path 化できない payload だけ `GlyphLayer::Svg` に残す
+    - [x] `pattern` / `mask` / `filter` など未対応構文を含む payload は raw `GlyphLayer::Svg` fallback も残す
+    - [x] `paintcore` bridge は `fontloader` 0.0.11 公開型に追随
+        - [x] `paintcore` 単体の clip / gradient renderer は先行実装済み
+        - [x] `fontloader -> paintcore` 変換で `GlyphPaint` の gradient variant を保持
+        - [x] `fontloader -> paintcore` 変換で `PathGlyphLayer.clip_commands` を保持
+        - [x] README / `SVFONTSPEC.md` / feature-status の bridge 表現を 0.0.11 前提へ整理
+ 
+# APIの大幅破壊的変更
+
+[+]　現在FontReaderのAPIに、責務が混在しています。
+これを「使いやすい公開API」として再設計する。
+
+　これに伴いバージョンをを0.0.4から0.0.10にアップデート
+
+## 要件
+
+### 1. レイヤ分離
+- [x] FontFile（ファイル / TTC管理）
+- [x] FontFace（1フォント単位）
+  - [x] metadata
+  - [x] to_stringはdumpに変更
+- [x] FontEngine（shaping / rendering）
+  - [x] text2glyph_run
+  - [x] text2svg
+  - [x] text2commands
+  - [x] shaping
+  - [x] gsub/gpos
+
+これに伴い lib.rsなどに置いてあるコードを
+  - [x] fontface.rs
+  - [x] fontengine.rs
+  - [x] fontfile.rs
+に分散させる
+
+### 2. API方針
+- [x] フォーマット差（TTF/OTF/WOFF）を外に出さない( すべて metadata関数で取得)
+  - [x] 必要な以外はpub(crate)にする
+- [x] Optionやunwrapを公開APIに出さない
+- [x] NameIDなど低レイヤは隠蔽
+- [x] 低レイヤの情報は features=raw に移動
+
+### 3. 必須API
+- [x] face.family()
+- [x] face.full_name()
+- [x] face.weight()
+- [x] face.is_italic()
+
+- [x] engine.shape(text)
+- [x] engine.measure(text)
+- [x] engine.render_svg(text)
+
+## 4. 制約
+- 既存の内部構造はなるべく流用
+- ゼロコピーを維持
+- backward compatibilityは不要
+
+## 5. 出力形式
+- 最終的なRustコード（struct + impl）
+- 変更理由の説明
+- API設計の意図
+
+## 対象コード
+- lib.rs
+- fontheader.rs
+- fontreader.rs
+- util.rs
+- リファクタリングの影響が出るコード 
+
+## examples
+- [x] 新API変更に対応できるように新規examplesを作成する
+- [x] 旧examplesも対応できるようにする(ただしfeatures=rawに分離)
+
+# リファクタリング後のタスク
+- [*] dead codeの削除隔離(woff2.rsなど)
+- [*] examplesのテスト コードの修正ですむか --features rawがいるかいないか判定 `readme`にも反映 パス、ファイル名をハードコーディングしている部分は、引数に変える
+- [x] readmeの整理。説明が技術資料すぎるので、APIとsample中心んしいてわかりやすく書き直す。 今の細かい仕様はdoc/の下に移動
+- [x] github workflows(CI/CD)の作成 exampleのbuild(Windows x86/arm, Linux x64/arm, Mac x64/arm) タグがpushされたら起動
+- [*] FontFamilyのフォールバック/GPOS/GDEF/GSUB適応順序の整理
+- [ ] アラビア語フォントの対応 LTR RTLの責務は分離して持たせる
+- [ ] スクリプト文字対応
+- [-] cff2対応を進める
+
 - [+] web assemblyでもコンパイル出来るようにする
 - [+] fontをbufferからloadする機能
 - [*] commands.rsを利用し、pub fn text2commands(&text, FontOptions) -> Result<GlyphRun, Error>を実装
@@ -117,7 +228,14 @@ _test_fonts/* がテスト用フォント
   - font.get_fontsize() -> f32
   - font.set_line_spacing(f32)
   - font.get_line_spacing() -> 32
-
+- features svg-font
+  - [+] svg fontの暫定サポート (`svg-fonts`)
+  - [+] svgのサポートに必要な最低限のファンクションを追加(css/textは無視)
+  - [+] `SVFONTSPEC.md` に合わせて、`paintcore` へ渡す layer 契約を `Path` 優先 / `Svg` fallback に整理
+- features ritchtext
+  - [ ] font.ritchtext2command(&self, &str, size: Option<f32>) -> &FontCommand // ritch text(Unity Super Set)をコマンドにして返す
+  - [ ] font.ritchtext2svg(&self, &str, size: Option<f32>) -> &FontCommand // ritch text(Unity Super Set)をコマンドにして返す
+  - Unity Super SetはRubyをサポートする
 
 ## APIの破壊的変更
 - [+] load_font フォントロード from any
@@ -150,7 +268,20 @@ _test_fonts/* がテスト用フォント
 # format
 - [+] woff2対応
 - [+] CID-keyed CFF / FDSelect
-- [ ] 境界条件をチェックしpanic!を回避
+- [*] 境界条件をチェックしpanic!を回避
+  - [x] optional raw table dump は欠損時に placeholder を返し panic しない
+  - [x] `SourceSerif4-BlackIt.otf` の GSUB/GPOS `FeatureParams` 境界超過で panic しないよう修正
+  - [x] GPOS 1.1 の壊れた optional `FeatureVariationList` は無視して続行する
+  - [x] `hmtx` / `vmtx` の 0-metric edge case で panic しないよう修正
+  - [x] lookup index out-of-bounds は panic ではなく `InvalidData` を返す
+  - [x] `opentype::mod` / `ttc` / `colr` の constructor 系 `unwrap()` を `Result` / safe fallback に置き換え
+  - [x] `get_font_type()` は short buffer で panic せず `UnexpectedEof` を返す
+  - [x] `COLR::get_layer_record()` は壊れた layer range でも panic しない
+  - [x] GSUB の未展開 contextual lookup は shaping 継続のため `LookupResult::None` に倒し、panic しないよう修正
+  - [*] `fontreader.rs` の load/shaping 系 `unwrap()` を段階的に減らす
+    - [x] `get_name_list()` / metrics getter / layout getter の `unwrap()` を fallback 化
+    - [x] `font_load()` 終盤の mandatory table 参照を `ok_or_else()` に置き換え
+    - [ ] SVG / raw debug 系の古い `unwrap()` はさらに整理が必要
 - [x] svg svgのサイズが巨大なので文字毎にsvgを切り出す
 # Layout 対応状況
 
@@ -175,7 +306,7 @@ _test_fonts/* がテスト用フォント
 # opentype
 - [x] True Type
 - [x] cff
-- [ ] cff2
+- [-] cff2
 - [x] color true type
 - [+] sbix
 - [ ] svg  # svgパーサーがいる
@@ -184,8 +315,12 @@ _test_fonts/* がテスト用フォント
 # GPOS
 - [*] 実装
 - [x] pair adjustment (Format 1 / 2)
+- [x] mark-to-base positioning (Type 4 Format 1)
+- [x] mark-to-mark positioning (Type 6 Format 1)
 - [x] extension positioning (Type 9 経由の pair adjustment)
 - [x] text2command / text2commands / measure への `kern` 反映
+- [x] text2glyph_run で `GPOS mark-to-base` anchor を優先し、無い場合だけ `GDEF` fallback にする
+- [x] text2glyph_run で `GPOS mark-to-mark` を前の mark glyph に適用
 - [x] locale に応じて script を優先し、required feature を含めて `kern` lookup を選ぶ
 - [ ] palt
 - [ ] vpal
@@ -296,6 +431,8 @@ _test_fonts/* がテスト用フォント
     - [ ] SVG **SHOULD**
         - [x] getter
         - [x] svg divider
+        - [+] `svg-fonts` feature で glyph payload を `GlyphLayer` に載せて SVG 出力
+        - [+] path 化できる payload は `GlyphLayer::Path`、未変換 payload は `GlyphLayer::Svg` として保持
   - OTHERS
     - [ ] DSIG	Digital signature
     - [ ] 'hdmx'	Horizontal device metrics
@@ -309,8 +446,78 @@ _test_fonts/* がテスト用フォント
 
 # todo.mdの更新
 
+# 追加バックログ
 
-# 終了したIssues一覧
-- [x] Fira_Sans/FiraSans-Blackで 小文字 [i] [j] が表示されない(複合グリフ展開対応とテスト追加で解消)
-- [x] カラーemojiの一部が欠落している レイヤーが1つ足りていない(複合グリフ展開対応とCOLR回帰テストで解消)
-- [+] issue: OS2 Headerのoutbound
+## メンテナンス / 整理
+- [*] dead codeの削除または隔離（`src/woff/woff2.rs` など）
+  - [x] 未参照だった `src/woff/woff2.rs` を削除
+  - [x] default build で不要な低レイヤ dead code を feature 境界の内側へ隔離
+- [*] `FontFamily` のフォールバック / GPOS / GDEF / GSUB の適用順序を整理
+  - [x] GSUB sequence stage と ligature stage を分離して順序を明示
+  - [x] GPOS pair positioning の前後 glyph 探索に GDEF mark skip を導入
+  - [x] fallback face 選択に text direction / locale / font variant を反映
+  - [*] fallback face をまたぐ script / language / mark attachment の扱いを整理
+    - [x] combining mark を fallback text unit として分断しない
+    - [x] RTL contextual script では同一 face を優先して segment continuity を維持
+    - [x] Arabic / Syriac の real font fixture で face 切替境界の回帰テストを追加
+    - [x] Arabic / Syriac / Hebrew の複数フォント候補を走査する境界チェックを追加
+    - [x] Tibetan real font fixture を追加し、LTR script の mark cluster fallback 境界を回帰テスト化
+    - [ ] 実フォントで script ごとの face 切替境界をさらに詰める
+
+## examples / ドキュメント
+- [*] examplesのテスト
+  - [x] 修正だけで済むか確認
+  - [x] `--features raw` が必要か不要かを example ごとに判定
+  - [x] 判定結果を `README.md` / `README.ja.md` に反映
+  - [x] 既存 common helper ベースで、主要なパス / ファイル名指定が引数化されていることを確認
+  - [x] public API の corpus smoke test を追加して metadata / shape / render_svg を実フォント群で確認
+- [x] `fontmetadata.rs` を追加して metadata 表示用 example を用意
+- [x] READMEの整理
+  - [x] APIとsample中心に書き直す
+  - [x] 今の技術資料寄りの細かい仕様は `doc/` 配下へ移動
+  - [x] `cargo doc` 向けに公開APIの rustdoc を追加
+  - [x] README を「導入と公開APIの入口」へ寄せ直した
+  - [x] `doc/README*.md` を追加して文書索引を用意した
+  - [x] `api-recipes*.md` を用途別レシピとして整理した
+
+## CI / CD
+- [x] GitHub Workflows を作成
+  - [x] examplesのbuildを含める
+  - [x] 対象: Windows x86 / arm
+  - [x] 対象: Linux x64 / arm
+  - [x] 対象: Mac x64 / arm
+  - [x] tag push時に起動
+
+## shaping / script
+- [ ] アラビア語フォントの対応を進める
+  - [x] `FontEngine::with_shaping_policy()` と `ShapingPolicy` で LTR / RTL / vertical を公開APIに明示
+  - [*] Arabic / Syriac の mark attachment を詰める
+    - [x] `mark_attachment_class()` / `attach_point_indices()` を GDEF に追加
+    - [x] attachable mark では前の base に重ねる fallback 位置決めを導入
+    - [x] boundary test を複数フォント候補へ拡張
+    - [x] `GPOS mark-to-base` を parser / shaping に統合し、Syriac real-font regression を追加
+    - [x] `GPOS mark-to-mark` を parser / shaping に統合し、Syriac stacked-mark regression を追加
+    - [x] Arabic / Syriac の stacked-mark fallback 境界 test を追加
+- [ ] スクリプト文字対応
+
+## format
+- [ ] CFF2対応を進める
+  - [x] CFF INDEX の `count + 1` overflow を修正して大規模 CFF collection を通せるようにした
+  - [x] `CFF2` table を outline format として認識し、未対応時は panic ではなく unsupported へ倒すようにした
+  - [x] CFF2 本体の実装前に、CFF / TTC / WOFF / WOFF2 をまたぐ corpus smoke test を追加
+  - [x] `fvar` / `avar` / `HVAR` / `VVAR` / `MVAR` を読み込み、variable font の public API metadata と metrics variation を通した
+  - [x] `FontEngine::with_variation()` と `FontFace::variation_axes()` を追加
+  - [x] 実フォント fixture で variable axis metadata と `wdth` による measure 変化を回帰テスト化
+  - [x] `Invalid delta format` だった variable font fixture は skip 前提を外した
+  - [x] `gvar` simple glyph の outline delta を実装し、`FontEngine::shape()` の outline に反映
+  - [x] real variable-font fixture で outline signature の変化を回帰テスト化
+  - [x] CFF2 実装前の共有化調査を `doc/cff2-investigation*.md` に追加
+  - [x] composite glyph の `gvar` delta は再帰 flatten + component variation 適用で対応
+  - [*] phantom point 由来の outline / metrics 補正を進める
+    - [x] `gvar` phantom point deltas を horizontal / vertical metrics に反映
+    - [x] `get_layout_with_options()` と shaping 経路の glyph metrics に反映
+    - [x] synthetic unit test と Source Serif real-font regression を追加
+    - [ ] phantom point 起点の残差をさらに corpus 全体で確認
+  - [x] CFF2 charstring / variation store / blend operator 本体を `cff.rs` 共有経路に実装
+  - [*] local corpus に true CFF2 実フォントがまだ無く、現状の CFF2 coverage は synthetic test 中心。実フォント fixture 入手後に `shape()` / `render_svg()` smoke を増やしたい
+  - [x] CFF2 の Private DICT `vsindex` / `blend` は parser 側に実装済み
