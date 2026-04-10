@@ -11,7 +11,7 @@
 
 ## 重要: 現行ブリッジ
 
-`paintcore` は renderer、`fontcore` は parser という責務分離を前提にします。0.0.11 系では、`paintcore` が参照する公開型もこの文書の layer 契約に追随し、clip / gradient を lossless に受け取れる前提です。
+`paintcore` は renderer、`fontcore` は parser という責務分離を前提にします。0.0.12 系では、`paintcore` が参照する公開型もこの文書の layer 契約に追随し、clip / gradient を lossless に受け取れる前提です。
 
 ## 基本方針
 
