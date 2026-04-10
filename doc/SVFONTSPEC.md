@@ -1,28 +1,28 @@
 # SVFONTSPEC
 
-この文書は、`FontReader` が `paintcore` に渡すべき SVG glyph 情報を固定するための受け渡し仕様です。あわせて、`fontcore` 側で `features = ["svg-fonts"]` 有効時にどこまで解決してから渡すかも定義します。
+この文書は、`fontcore` が `paintcore` に渡すべき SVG glyph 情報を固定するための受け渡し仕様です。あわせて、`fontcore` 側で `features = ["svg-fonts"]` 有効時にどこまで解決してから渡すかも定義します。
 
 目的は 2 つです。
 
-1. `FontReader` と `paintcore` の責務境界を明確にする
+1. `fontcore` と `paintcore` の責務境界を明確にする
 2. SVG glyph 対応を `Command` の拡張ではなく layer / paint モデルで扱う
 
-この文書は `FontReader` 側の parser 実装仕様そのものではなく、`paintcore` が受け取るべき最終データ契約を定義します。
+この文書は `fontcore` 側の parser 実装仕様そのものではなく、`paintcore` が受け取るべき最終データ契約を定義します。
 
 ## 重要: 現行ブリッジ
 
-`paintcore` は renderer、`fontcore` / `FontReader` は parser という責務分離を前提にします。0.0.11 系では、`paintcore` が参照する公開型もこの文書の layer 契約に追随し、clip / gradient を lossless に受け取れる前提です。
+`paintcore` は renderer、`fontcore` は parser という責務分離を前提にします。0.0.11 系では、`paintcore` が参照する公開型もこの文書の layer 契約に追随し、clip / gradient を lossless に受け取れる前提です。
 
 ## 基本方針
 
-- SVG の解釈は原則として `FontReader` 側の責務
+- SVG の解釈は原則として `fontcore` 側の責務
 - `paintcore` は parser ではなく renderer として振る舞う
 - `paintcore` は `GlyphLayer` 群を受け取り、それぞれを描画する
 - path 化できない、または別 backend に委譲したい場合だけ raw SVG payload を `GlyphLayer::Svg` として保持する
-- simple SVG の path 化は `FontReader` 側で完了していること
+- simple SVG の path 化は `fontcore` 側で完了していること
 - `linearGradient` / `radialGradient` / `stop` のような単純 gradient は `GlyphPaint` に解決してから渡すこと
 - `objectBoundingBox` は path 化後の shape bounds を使って最低限の絶対座標へ解決すること
-- gradient の `href` / `xlink:href` 継承は `FontReader` 側で stop と属性を解決してから渡すこと
+- gradient の `href` / `xlink:href` 継承は `fontcore` 側で stop と属性を解決してから渡すこと
 
 ## `Command` の責務
 
@@ -47,9 +47,9 @@
 
 つまり、`Command` は「何を描くか」の形状だけを持ち、「どう塗るか」は持たない。
 
-## `FontReader` が解決してから渡すべき情報
+## `fontcore` が解決してから渡すべき情報
 
-`FontReader` は SVG glyph を解釈した後、少なくとも次のいずれかを `paintcore` に渡すこと。
+`fontcore` は SVG glyph を解釈した後、少なくとも次のいずれかを `paintcore` に渡すこと。
 
 ### 1. `GlyphLayer::Path`
 
@@ -68,7 +68,7 @@ simple SVG を path 化できた場合は `PathGlyphLayer` を渡す。
 
 #### `paint_mode`
 
-`FontReader` は path layer ごとに paint mode を確定して渡す。
+`fontcore` は path layer ごとに paint mode を確定して渡す。
 
 - `PathPaintMode::Fill`
 - `PathPaintMode::Stroke`
@@ -77,7 +77,7 @@ simple SVG を path 化できた場合は `PathGlyphLayer` を渡す。
 
 #### `paint`
 
-`FontReader` は path layer ごとに paint を確定して渡す。
+`fontcore` は path layer ごとに paint を確定して渡す。
 
 理想契約での最低限:
 
@@ -112,7 +112,7 @@ stroke layer の見た目に必要な線幅を layer ごとに確定して渡す
 
 ### 2. `GlyphLayer::Raster`
 
-SVG を `FontReader` 側で rasterize した場合は `RasterGlyphLayer` を渡す。
+SVG を `fontcore` 側で rasterize した場合は `RasterGlyphLayer` を渡す。
 
 必要な情報:
 
@@ -138,9 +138,9 @@ raw SVG payload を保持したい場合は `SvgGlyphLayer` を渡す。
 
 `GlyphLayer::Svg` は「simple SVG を path 化できなかった時の生データ保持」および「別 renderer への委譲」のために存在する。未対応構文を含む payload については、path layer を一部生成できても raw SVG fallback を併置してよい。
 
-## `FontReader` が自前で解決しておくべき事項
+## `fontcore` が自前で解決しておくべき事項
 
-`paintcore` に渡す前に、`FontReader` は次を解決済みであること。
+`paintcore` に渡す前に、`fontcore` は次を解決済みであること。
 
 - `<defs>` の収集
 - `<use>` の参照解決
@@ -211,8 +211,8 @@ raw SVG payload を保持したい場合は `SvgGlyphLayer` を渡す。
 
 ## 推奨データフロー
 
-1. `FontReader` が OpenType `SVG ` テーブルから glyph payload を抽出する
-2. `FontReader` が SVG を解釈し、simple SVG を `GlyphLayer::Path` に落とす
+1. `fontcore` が OpenType `SVG ` テーブルから glyph payload を抽出する
+2. `fontcore` が SVG を解釈し、simple SVG を `GlyphLayer::Path` に落とす
 3. path 化できない、または保持が必要な payload は `GlyphLayer::Svg` で残す
 4. `paintcore` は `GlyphLayer::Path` を直接描画する
 5. `paintcore` は `GlyphLayer::Svg` を必要に応じて rasterizer adapter に委譲する
@@ -227,7 +227,7 @@ gradient は `Command` ではなく `GlyphPaint` の責務とする。
 - stroke/fill と同じく「描画スタイル」であり「形状」ではないため
 - raw SVG と path 化 SVG の両方で同じ paint モデルを共有しやすいため
 
-現状の `fontcore` 実装では、少なくとも `linearGradient` / `radialGradient` / `stop` を path layer の paint として解決できる。`FontReader` が gradient を path layer として渡す場合、少なくとも次を確定済みで渡すこと。
+現状の `fontcore` 実装では、少なくとも `linearGradient` / `radialGradient` / `stop` を path layer の paint として解決できる。`fontcore` が gradient を path layer として渡す場合、少なくとも次を確定済みで渡すこと。
 
 - gradient 種別
 - gradient units
@@ -248,7 +248,7 @@ stroke は `Command` ではなく `PathGlyphLayer` の責務とする。
 - line width は geometry そのものではないため
 - renderer 側の antialias / rasterization 実装と直結するため
 
-従って `FontReader` は stroke を見つけたら:
+従って `fontcore` は stroke を見つけたら:
 
 - `paint_mode = Stroke`
 - `stroke_width = resolved width`
@@ -273,11 +273,11 @@ stroke は `Command` ではなく `PathGlyphLayer` の責務とする。
 
 - SVG 対応のために `Command` を style 情報込みで肥大化させる
 - `paintcore` 本体に `defs` / `use` / style 継承付きの SVG parser を持ち込む
-- `FontReader` と `paintcore` の両方で同じ SVG 解釈ロジックを重複実装する
+- `fontcore` と `paintcore` の両方で同じ SVG 解釈ロジックを重複実装する
 
 ## まとめ
 
-`FontReader` が本来 `paintcore` に渡すべき情報は、SVG の未解決ノード列ではなく、描画可能な layer 群である。
+`fontcore` が本来 `paintcore` に渡すべき情報は、SVG の未解決ノード列ではなく、描画可能な layer 群である。
 
 最小構成では次が必要。
 
@@ -294,7 +294,7 @@ stroke は `Command` ではなく `PathGlyphLayer` の責務とする。
 - `GlyphLayer::Svg`
   - raw payload と viewBox 情報
 
-この境界を守ることで、`FontReader` は parser、`paintcore` は renderer として責務を分離できる。
+この境界を守ることで、`fontcore` は parser、`paintcore` は renderer として責務を分離できる。
 
 ## 現状の未対応
 

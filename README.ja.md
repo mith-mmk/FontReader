@@ -49,21 +49,21 @@ default feature には `layout` と `cff` が含まれます。
 
 ```toml
 [dependencies]
-fontcore = "0.0.11"
+fontcore = "0.0.12"
 ```
 
 低レイヤ parser API も必要な場合:
 
 ```toml
 [dependencies]
-fontcore = { version = "0.0.11", features = ["raw"] }
+fontcore = { version = "0.0.12", features = ["raw"] }
 ```
 
 SVG emoji font の暫定サポートも使う場合:
 
 ```toml
 [dependencies]
-fontcore = { version = "0.0.11", features = ["svg-fonts"] }
+fontcore = { version = "0.0.12", features = ["svg-fonts"] }
 ```
 
 ## 最小サンプル
@@ -116,7 +116,7 @@ println!("{}", engine.shape("Hello")?.glyphs.len());
 
 現状の `svg-fonts` は、単純な `path` / `rect` / `circle` / `ellipse` / `line` / `polyline` / `polygon` を `PathGlyphLayer` に変換し、`defs` / `use`、`fill` / `fill-rule` / `stroke` / `stroke-width`、`clipPath` / `clip-path`、単純な `mask`、`translate` / `scale` / `rotate` / `skewX` / `skewY` / `matrix`、`linearGradient` / `radialGradient` / `stop`、`gradientUnits` / `gradientTransform` の最小保持まで入っています。path 化できない payload だけでなく、`pattern` / 複雑な `mask` / `filter` など未対応構文を含む payload も `GlyphLayer::Svg` fallback を併置します。
 
-`paintcore` 側の renderer は 0.0.11 系の公開型に追随し、`clip_commands` と gradient paint も `fontcore -> paintcore` 変換で保持される前提です。
+`paintcore` 側の renderer は 0.0.12 系の公開型に追随し、`clip_commands` と gradient paint も `fontcore -> paintcore` 変換で保持される前提です。
 
 詳細仕様と `paintcore` への受け渡し境界は [doc/SVFONTSPEC.md](doc/SVFONTSPEC.md) にまとめています。
 
