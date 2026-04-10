@@ -1,3 +1,5 @@
+[![crates.io](https://img.shields.io/crates/v/fontcore)](https://crates.io/crates/fontcore) ![license](https://img.shields.io/crates/l/fontcore)
+
 # fontcore for Rust
 
 fontcore is a Rust library for loading fonts, selecting a face, shaping text, and exporting SVG.

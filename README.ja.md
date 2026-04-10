@@ -1,3 +1,5 @@
+[![crates.io](https://img.shields.io/crates/v/fontcore)](https://crates.io/crates/fontcore) ![license](https://img.shields.io/crates/l/fontcore)
+
 # Rust向け fontcore
 
 fontcore は、フォントを読み込み、face を選び、文字列を shaping し、SVG を出力するための Rust ライブラリです。
