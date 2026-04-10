@@ -1,5 +1,5 @@
 [package]
-name = "fontloader"
+name = "fontcore"
 version = "0.0.11"
 edition = "2021"
 authors = ["Mith@mmk"]

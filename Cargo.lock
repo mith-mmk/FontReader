@@ -64,7 +64,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "74c57ab96715773d9cb9789b38eb7cbf04b3c6f5624a9d98f51761603376767c"
 
 [[package]]
-name = "fontloader"
+name = "fontcore"
 version = "0.0.11"
 dependencies = [
  "base64",
