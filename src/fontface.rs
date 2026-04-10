@@ -889,18 +889,29 @@ impl FontFamily {
         candidates: &[usize],
         options: &FontOptions<'_>,
     ) -> usize {
+        let prefer_color = text_unit_prefers_color_glyph(unit);
+        let mut best_face = None;
+        let mut best_rank = 0u8;
+
         for &index in candidates {
-            if self.faces[index].font.font().supports_text_unit(
+            let support = self.faces[index].font.font().text_unit_support(
                 unit,
                 options.text_direction,
                 options.locale,
                 options.font_variant,
-            ) {
-                return index;
+            );
+            if !support.is_supported() {
+                continue;
+            }
+
+            let rank = face_support_rank(support, prefer_color);
+            if best_face.is_none() || rank > best_rank {
+                best_face = Some(index);
+                best_rank = rank;
             }
         }
 
-        candidates[0]
+        best_face.unwrap_or(candidates[0])
     }
 }
 
@@ -922,6 +933,35 @@ fn unit_prefers_face_continuity(
 
     text_contains_combining_mark(text)
         || (options.text_direction.is_right_to_left() && text_contains_contextual_rtl_script(text))
+}
+
+fn text_unit_prefers_color_glyph(unit: &fontreader::ParsedTextUnit) -> bool {
+    let fontreader::ParsedTextUnit::Glyph { text, .. } = unit else {
+        return false;
+    };
+
+    text.chars().any(|ch| {
+        matches!(ch as u32, 0xFE00..=0xFE0F | 0xE0100..=0xE01EF)
+            || matches!(ch as u32, 0x1F3FB..=0x1F3FF)
+            || ch == '\u{200D}'
+            || ch == '\u{20E3}'
+            || matches!(ch as u32, 0x1F1E6..=0x1F1FF)
+            || matches!(ch as u32, 0xE0020..=0xE007E)
+            || ch == '\u{E007F}'
+            || matches!(ch as u32, 0x1F000..=0x1FAFF | 0x2600..=0x27BF)
+    })
+}
+
+fn face_support_rank(support: fontreader::TextUnitSupport, prefer_color: bool) -> u8 {
+    match (prefer_color, support.has_outline, support.has_color) {
+        (true, true, true) => 4,
+        (true, false, true) => 3,
+        (true, true, false) => 2,
+        (false, true, false) => 4,
+        (false, true, true) => 3,
+        (false, false, true) => 2,
+        _ => 0,
+    }
 }
 
 fn text_contains_combining_mark(text: &str) -> bool {

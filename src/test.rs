@@ -4222,6 +4222,70 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "svg-fonts")]
+    fn font_family_prefers_outline_face_for_plain_digits_over_svg_fallback_even_if_svg_face_is_first() {
+        let regular =
+            crate::load_font_from_file(fira_sans_regular_path()).expect("load regular fira sans");
+        let bytes = std::fs::read(noto_color_emoji_font_path()).expect("read noto color emoji");
+        let svg_emoji = crate::load_font_from_buffer(&bytes).expect("load noto color emoji");
+
+        let mut family = crate::FontFamily::new("Mixed");
+        family.add_loaded_font(svg_emoji);
+        family.add_loaded_font(regular);
+
+        let options = crate::FontOptions::from_family(&family).with_font_size(32.0);
+        let face_indices = family
+            .debug_face_indices_for_text("123", options.clone())
+            .expect("resolve face indices");
+        assert_eq!(face_indices, vec![1, 1, 1]);
+
+        let run = crate::text2commands("123", options).expect("render plain digits with svg fallback family");
+        assert_eq!(run.glyphs.len(), 3);
+        for glyph in &run.glyphs {
+            match glyph.glyph.layers.first() {
+                Some(crate::GlyphLayer::Path(layer)) => assert!(!layer.commands.is_empty()),
+                Some(crate::GlyphLayer::Raster(_)) => {
+                    panic!("plain digits should not fall back to raster glyph layers")
+                }
+                #[cfg(feature = "svg-fonts")]
+                Some(crate::GlyphLayer::Svg(_)) => {
+                    panic!("plain digits should not fall back to SVG glyph layers")
+                }
+                None => panic!("expected digit layer"),
+            }
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "svg-fonts")]
+    fn font_family_prefers_svg_face_for_keycap_cluster_even_if_outline_face_is_available() {
+        let regular =
+            crate::load_font_from_file(fira_sans_regular_path()).expect("load regular fira sans");
+        let bytes = std::fs::read(noto_color_emoji_font_path()).expect("read noto color emoji");
+        let svg_emoji = crate::load_font_from_buffer(&bytes).expect("load noto color emoji");
+
+        let mut family = crate::FontFamily::new("Mixed");
+        family.add_loaded_font(svg_emoji);
+        family.add_loaded_font(regular);
+
+        let options = crate::FontOptions::from_family(&family).with_font_size(32.0);
+        let face_indices = family
+            .debug_face_indices_for_text("1️⃣", options.clone())
+            .expect("resolve keycap face indices");
+        assert_eq!(face_indices, vec![0]);
+
+        let run = crate::text2commands("1️⃣", options).expect("render keycap with svg fallback family");
+        assert_eq!(run.glyphs.len(), 1);
+        assert!(
+            run.glyphs[0].glyph.layers.iter().any(|layer| {
+                matches!(layer, crate::GlyphLayer::Path(path) if !path.commands.is_empty())
+                    || matches!(layer, crate::GlyphLayer::Svg(svg) if !svg.document.is_empty())
+            }),
+            "expected keycap cluster to use svg emoji face"
+        );
+    }
+
+    #[test]
     fn sbix_font_prefers_outline_for_plain_digit() {
         let font = crate::load_font_from_file(twemoji_sbix_font_path()).expect("load twemoji sbix");
 
@@ -5530,6 +5594,37 @@ mod tests {
             .text2svg("😀", 32.0, "px")
             .expect("noto color emoji svg");
         assert!(svg.contains("<svg"));
+    }
+
+    #[test]
+    #[cfg(feature = "svg-fonts")]
+    fn svg_font_plain_digit_no_longer_errors_when_svg_table_is_present() {
+        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join(".test_fonts")
+            .join("NotoColorEmoji-Regular.ttf");
+        let bytes = std::fs::read(path).expect("read noto color emoji");
+        let font = crate::load_font_from_buffer(&bytes).expect("load noto color emoji");
+        let run = crate::text2commands("1", crate::FontOptions::new(&font).with_font_size(32.0))
+            .expect("plain digit glyph run");
+
+        assert_eq!(run.glyphs.len(), 1);
+    }
+
+    #[test]
+    #[cfg(feature = "svg-fonts")]
+    fn svg_font_zero_does_not_return_legacy_unsupported_error() {
+        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join(".test_fonts")
+            .join("NotoColorEmoji-Regular.ttf");
+        let bytes = std::fs::read(path).expect("read noto color emoji");
+        let face = crate::load_font_from_buffer(&bytes).expect("load noto color emoji");
+
+        let run = face
+            .engine()
+            .with_font_size(32.0)
+            .shape("0")
+            .expect("shape zero");
+        assert_eq!(run.glyphs.len(), 1);
     }
 
     #[test]

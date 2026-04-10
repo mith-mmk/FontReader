@@ -237,6 +237,19 @@ struct GlyphAttachmentPlacement {
     adjustment: GlyphPositionAdjustment,
 }
 
+#[derive(Debug, Clone, Copy, Default)]
+pub(crate) struct TextUnitSupport {
+    pub(crate) has_glyph: bool,
+    pub(crate) has_outline: bool,
+    pub(crate) has_color: bool,
+}
+
+impl TextUnitSupport {
+    pub(crate) fn is_supported(self) -> bool {
+        self.has_glyph && (self.has_outline || self.has_color)
+    }
+}
+
 impl Font {
     fn empty() -> Self {
         Self {
@@ -1620,54 +1633,96 @@ impl Font {
         locale: Option<&str>,
         font_variant: crate::commands::FontVariant,
     ) -> bool {
+        self.text_unit_support(unit, text_direction, locale, font_variant)
+            .is_supported()
+    }
+
+    pub(crate) fn text_unit_support(
+        &self,
+        unit: &ParsedTextUnit,
+        text_direction: crate::commands::TextDirection,
+        locale: Option<&str>,
+        font_variant: crate::commands::FontVariant,
+    ) -> TextUnitSupport {
         #[cfg(not(feature = "layout"))]
         let _ = (locale, font_variant);
 
         match unit {
-            ParsedTextUnit::Newline | ParsedTextUnit::Tab => true,
+            ParsedTextUnit::Newline | ParsedTextUnit::Tab => TextUnitSupport {
+                has_glyph: true,
+                has_outline: true,
+                has_color: false,
+            },
             ParsedTextUnit::Glyph { text, .. } => {
                 let is_vert = text_direction.is_vertical();
                 let is_right_to_left = text_direction.is_right_to_left();
                 let Ok(shaped_units) =
                     self.shape_text_units(text, is_vert, is_right_to_left, locale, font_variant)
                 else {
-                    return false;
+                    return TextUnitSupport::default();
                 };
 
                 if !shaped_units
                     .iter()
                     .any(|unit| matches!(unit, ResolvedTextUnit::Glyph(_)))
                 {
-                    return false;
+                    return TextUnitSupport::default();
                 }
 
-                shaped_units.into_iter().all(|unit| match unit {
-                    ResolvedTextUnit::Glyph(glyph) => {
-                        if glyph.glyph_id == 0 {
-                            return false;
-                        }
-
-                        #[cfg(feature = "cff")]
-                        if self.current_cff().is_some() {
-                            return true;
-                        }
-
-                        self.current_glyf()
-                            .and_then(|glyf| glyf.get_glyph(glyph.glyph_id))
-                            .is_some()
-                            || self
-                                .current_sbix()
-                                .and_then(|sbix| {
-                                    sbix.get_raster_glyph(glyph.glyph_id as u32, 16.0, "px")
-                                })
-                                .is_some()
-                            || self
-                                .current_svg_table()
-                                .map(|svg| svg.has_glyph(glyph.glyph_id as u32))
-                                .unwrap_or(false)
+                let mut support = TextUnitSupport::default();
+                for unit in shaped_units {
+                    let ResolvedTextUnit::Glyph(glyph) = unit else {
+                        continue;
+                    };
+                    if glyph.glyph_id == 0 {
+                        return TextUnitSupport::default();
                     }
-                    _ => true,
-                })
+
+                    support.has_glyph = true;
+
+                    #[cfg(feature = "cff")]
+                    if self.current_cff().is_some() {
+                        support.has_outline = true;
+                    }
+
+                    if self
+                        .current_glyf()
+                        .and_then(|glyf| glyf.get_glyph(glyph.glyph_id))
+                        .is_some()
+                    {
+                        support.has_outline = true;
+                    }
+
+                    if self
+                        .current_colr()
+                        .map(|colr| !colr.get_layer_record(glyph.glyph_id as u16).is_empty())
+                        .unwrap_or(false)
+                    {
+                        support.has_color = true;
+                    }
+
+                    if self
+                        .current_sbix()
+                        .and_then(|sbix| sbix.get_raster_glyph(glyph.glyph_id as u32, 16.0, "px"))
+                        .is_some()
+                    {
+                        support.has_color = true;
+                    }
+
+                    if self
+                        .current_svg_table()
+                        .map(|svg| svg.has_glyph(glyph.glyph_id as u32))
+                        .unwrap_or(false)
+                    {
+                        support.has_color = true;
+                    }
+
+                    if !support.has_outline && !support.has_color {
+                        return TextUnitSupport::default();
+                    }
+                }
+
+                support
             }
         }
     }
@@ -2347,19 +2402,8 @@ impl Font {
         open_type_glyph: &OpenTypeGlyph,
         scale_x: f32,
         scale_y: f32,
-        ch: char,
+        _ch: char,
     ) -> Result<Vec<GlyphLayer>, Error> {
-        if self
-            .current_svg_table()
-            .map(|svg| svg.has_glyph(glyph_id as u32))
-            .unwrap_or(false)
-        {
-            return Err(Error::new(
-                ErrorKind::Unsupported,
-                format!("SVG glyph layers are not supported yet for {:?}", ch),
-            ));
-        }
-
         let color_layers =
             self.build_colr_layers(glyph_id, &open_type_glyph.layout, scale_x, scale_y);
         if !color_layers.is_empty() {
