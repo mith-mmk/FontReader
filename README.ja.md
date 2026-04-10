@@ -49,21 +49,21 @@ default feature には `layout` と `cff` が含まれます。
 
 ```toml
 [dependencies]
-fontloader = "0.0.10"
+fontloader = "0.0.11"
 ```
 
 低レイヤ parser API も必要な場合:
 
 ```toml
 [dependencies]
-fontloader = { version = "0.0.10", features = ["raw"] }
+fontloader = { version = "0.0.11", features = ["raw"] }
 ```
 
 SVG emoji font の暫定サポートも使う場合:
 
 ```toml
 [dependencies]
-fontloader = { version = "0.0.10", features = ["svg-fonts"] }
+fontloader = { version = "0.0.11", features = ["svg-fonts"] }
 ```
 
 ## 最小サンプル

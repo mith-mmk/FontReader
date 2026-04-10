@@ -3,12 +3,23 @@ name = "fontloader"
 version = "0.0.11"
 edition = "2021"
 authors = ["Mith@mmk"]
-description = "A font loader for Rust"
+description = "Load fonts, select faces, shape text, and export SVG in Rust."
 license = "MIT"
 repository = "https://github.com/mith-mmk/FontReader"
+documentation = "https://docs.rs/fontloader"
 readme = "README.md"
+keywords = ["font", "opentype", "woff", "svg", "text"]
+categories = ["graphics", "parser-implementations", "text-processing"]
+exclude = [
+    ".github/**",
+    ".test*/**",
+    "todo.md",
+]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[package.metadata.docs.rs]
+all-features = true
 
 [features]
 default = ["cff", "layout"]

@@ -40,6 +40,7 @@ Default features include `layout` and `cff`.
 - `raw`
   - Legacy low-level parser API
 - `svg-fonts`
+  - OpenType-SVG fonts are limited implementation
   - Provisional support for converting OpenType `SVG ` glyphs into glyph layers
   - Currently regression-tested mainly against `EmojiOneColor.otf` and `NotoColorEmoji-Regular.ttf`
   - Simple shapes are pathified, while payloads that cannot be pathified are kept as `GlyphLayer::Svg`
@@ -49,21 +50,21 @@ Default features include `layout` and `cff`.
 
 ```toml
 [dependencies]
-fontloader = "0.0.10"
+fontloader = "0.0.11"
 ```
 
 If you need the low-level parser API:
 
 ```toml
 [dependencies]
-fontloader = { version = "0.0.10", features = ["raw"] }
+fontloader = { version = "0.0.11", features = ["raw"] }
 ```
 
 If you also want provisional SVG emoji font support:
 
 ```toml
 [dependencies]
-fontloader = { version = "0.0.10", features = ["svg-fonts"] }
+fontloader = { version = "0.0.11", features = ["svg-fonts"] }
 ```
 
 ## Quick Start
