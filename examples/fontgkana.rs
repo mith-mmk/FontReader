@@ -1,7 +1,7 @@
 mod common;
 
 use common::font_path;
-use fontloader::Font;
+use fontcore::Font;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();

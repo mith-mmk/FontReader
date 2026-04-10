@@ -1,12 +1,12 @@
 mod common;
 
 use common::{font_path, output_path, text_content, variant_name, vertical_enabled};
-use fontloader::{FontFile, FontVariant, GlyphLayer, ShapingPolicy};
+use fontcore::{FontFile, FontVariant, GlyphLayer, ShapingPolicy};
 
 fn apply_variant(
-    engine: fontloader::FontEngine<'_>,
+    engine: fontcore::FontEngine<'_>,
     variant: Option<String>,
-) -> fontloader::FontEngine<'_> {
+) -> fontcore::FontEngine<'_> {
     match variant.as_deref() {
         Some("jp78") => engine.with_font_variant(FontVariant::Jis78),
         Some("jp90") => engine.with_font_variant(FontVariant::Jis90),
@@ -48,7 +48,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let width = engine.measure(&text)?;
 
     let mut html = String::from(
-        "<html>\n<head>\n<meta charset=\"UTF-8\">\n<title>fontloader</title>\n</head>\n<body>\n",
+        "<html>\n<head>\n<meta charset=\"UTF-8\">\n<title>fontcore</title>\n</head>\n<body>\n",
     );
     html.push_str(&format!("<pre>{}</pre>\n", face.dump()));
     html.push_str(&format!(

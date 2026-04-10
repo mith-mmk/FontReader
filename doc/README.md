@@ -27,9 +27,9 @@ cargo doc --no-deps
 
 Good entry points inside rustdoc:
 
-- `fontloader::FontFile`
-- `fontloader::FontFace`
-- `fontloader::FontEngine`
-- `fontloader::FontFamily`
-- `fontloader::FontVariant`
-- `fontloader::ShapingPolicy`
+- `fontcore::FontFile`
+- `fontcore::FontFace`
+- `fontcore::FontEngine`
+- `fontcore::FontFamily`
+- `fontcore::FontVariant`
+- `fontcore::ShapingPolicy`

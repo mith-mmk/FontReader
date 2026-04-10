@@ -7,7 +7,7 @@
 //! 3. Shape or render through [`FontEngine`]
 //!
 //! ```no_run
-//! use fontloader::FontFile;
+//! use fontcore::FontFile;
 //!
 //! let face = FontFile::from_file("fonts/YourFont.ttf")?.current_face()?;
 //! let svg = face.engine().with_font_size(32.0).render_svg("Hello")?;
@@ -44,7 +44,7 @@ pub(crate) mod svgparse;
 pub(crate) mod util;
 pub mod woff;
 
-#[deprecated(note = "use `fontloader::commands` instead")]
+#[deprecated(note = "use `fontcore::commands` instead")]
 pub use commands as commads;
 #[cfg(feature = "svg-fonts")]
 pub use commands::SvgGlyphLayer;

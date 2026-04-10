@@ -38,10 +38,10 @@
     - [x] `EmojiOneColor.otf` / `NotoColorEmoji-Regular.ttf` の実 payload を比較し、gradient paint layer の回帰を追加
     - [x] path 化できる glyph は `GlyphLayer::Path` を優先し、path 化できない payload だけ `GlyphLayer::Svg` に残す
     - [x] `pattern` / `mask` / `filter` など未対応構文を含む payload は raw `GlyphLayer::Svg` fallback も残す
-    - [x] `paintcore` bridge は `fontloader` 0.0.11 公開型に追随
+    - [x] `paintcore` bridge は `fontcore` 0.0.11 公開型に追随
         - [x] `paintcore` 単体の clip / gradient renderer は先行実装済み
-        - [x] `fontloader -> paintcore` 変換で `GlyphPaint` の gradient variant を保持
-        - [x] `fontloader -> paintcore` 変換で `PathGlyphLayer.clip_commands` を保持
+        - [x] `fontcore -> paintcore` 変換で `GlyphPaint` の gradient variant を保持
+        - [x] `fontcore -> paintcore` 変換で `PathGlyphLayer.clip_commands` を保持
         - [x] README / `SVFONTSPEC.md` / feature-status の bridge 表現を 0.0.11 前提へ整理
  
 # APIの大幅破壊的変更
@@ -247,7 +247,7 @@
 - [+] 重複していた旧 API に `#[deprecated]` を付与
     - [x] `fontload*` 系 alias
     - [x] `LoadedFont::text2command()` / `LoadedFont::text2commands()`
-    - [x] `fontloader::commads`
+    - [x] `fontcore::commads`
  - [+] `full` feature から `encoding` を分離
     - [x] `full = ["layout", "cff"]`
     - [x] `encoding` は古い name table 互換として明示 opt-in に維持

@@ -6,7 +6,7 @@ authors = ["Mith@mmk"]
 description = "Load fonts, select faces, shape text, and export SVG in Rust."
 license = "MIT"
 repository = "https://github.com/mith-mmk/FontReader"
-documentation = "https://docs.rs/fontloader"
+documentation = "https://docs.rs/fontcore"
 readme = "README.md"
 keywords = ["font", "opentype", "woff", "svg", "text"]
 categories = ["graphics", "parser-implementations", "text-processing"]
@@ -81,8 +81,8 @@ path = "examples/fontload.rs"
 required-features = ["raw"]
 
 [[example]]
-name = "fontloader"
-path = "examples/fontloader.rs"
+name = "fontcore"
+path = "examples/fontcore.rs"
 
 [[example]]
 name = "fontmetadata"

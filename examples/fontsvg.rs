@@ -1,7 +1,7 @@
 mod common;
 
 use common::font_path;
-use fontloader::{opentype::NameID, Font};
+use fontcore::{opentype::NameID, Font};
 /*
     一つのSVGファイルに複数のSVGが含まれている。
 

@@ -1,6 +1,6 @@
-# Fontloader for Rust
+# fontcore for Rust
 
-Fontloader is a Rust library for loading fonts, selecting a face, shaping text, and exporting SVG.
+fontcore is a Rust library for loading fonts, selecting a face, shaping text, and exporting SVG.
 
 Japanese: [README.ja.md](README.ja.md)
 
@@ -50,27 +50,27 @@ Default features include `layout` and `cff`.
 
 ```toml
 [dependencies]
-fontloader = "0.0.11"
+fontcore = "0.0.11"
 ```
 
 If you need the low-level parser API:
 
 ```toml
 [dependencies]
-fontloader = { version = "0.0.11", features = ["raw"] }
+fontcore = { version = "0.0.11", features = ["raw"] }
 ```
 
 If you also want provisional SVG emoji font support:
 
 ```toml
 [dependencies]
-fontloader = { version = "0.0.11", features = ["svg-fonts"] }
+fontcore = { version = "0.0.11", features = ["svg-fonts"] }
 ```
 
 ## Quick Start
 
 ```rust
-use fontloader::{FontFile, ShapingPolicy};
+use fontcore::{FontFile, ShapingPolicy};
 
 let face = FontFile::from_file("fonts/YourFont.ttf")?.current_face()?;
 let engine = face
@@ -117,7 +117,7 @@ More runnable examples live in [doc/api-recipes.md](doc/api-recipes.md).
 
 The current `svg-fonts` implementation converts simple `path`, `rect`, `circle`, `ellipse`, `line`, `polyline`, and `polygon` elements into `PathGlyphLayer` values. It includes minimal `defs` / `use`, `fill` / `fill-rule` / `stroke` / `stroke-width`, `clipPath` / `clip-path`, simple `mask`, `translate` / `scale` / `rotate` / `skewX` / `skewY` / `matrix`, `linearGradient` / `radialGradient` / `stop`, and preserved `gradientUnits` / `gradientTransform` support, and keeps a `GlyphLayer::Svg` fallback not only for payloads that cannot be pathified, but also for payloads that still contain unsupported constructs such as `pattern`, complex `mask`, or `filter`.
 
-On the 0.0.11 line, the `paintcore` renderer tracks the public `fontloader` / `FontReader` layer model closely enough to preserve `clip_commands` and gradient paint values across the `fontloader -> paintcore` conversion.
+On the 0.0.11 line, the `paintcore` renderer tracks the public `fontcore` / `FontReader` layer model closely enough to preserve `clip_commands` and gradient paint values across the `fontcore -> paintcore` conversion.
 
 See [doc/SVFONTSPEC.md](doc/SVFONTSPEC.md) for the exact current scope, limitations, and the `paintcore` handoff contract.
 
@@ -127,7 +127,7 @@ High-level examples that work without `raw`:
 
 - `api_overview`
 - `fontmetadata`
-- `fontloader`
+- `fontcore`
 
 Low-level inspection examples that require `--features raw`:
 

@@ -1,7 +1,7 @@
 mod common;
 
 use common::font_folder;
-use fontloader::fontheader;
+use fontcore::fontheader;
 
 fn get_font_type(folder: &std::path::Path) {
     let dir = folder.read_dir().unwrap();

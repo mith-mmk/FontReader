@@ -72,6 +72,6 @@ The README now focuses on the public API and runnable examples.
 - Payloads that cannot be pathified, and payloads that still contain unsupported constructs such as `pattern`, `mask`, or `filter`, are kept as `GlyphLayer::Svg` fallback layers
 - The current supported SVG subset covers `path`, `rect`, `circle`, `ellipse`, `line`, `polyline`, `polygon`, `defs` / `use`, `fill` / `fill-rule` / `stroke` / `stroke-width`, `clipPath` / `clip-path`, simple `mask`, `translate` / `scale` / `rotate` / `skewX` / `skewY` / `matrix`, minimal `linearGradient` / `radialGradient` / `stop`, and preserved `gradientUnits` / `gradientTransform`
 - Patterns, `mask`, `filter`, and richer stroke styles are still unsupported
-- The `paintcore` bridge now preserves clip/gradient-capable layer data from the public 0.0.11 `fontloader` line
+- The `paintcore` bridge now preserves clip/gradient-capable layer data from the public 0.0.11 `fontcore` line
 - WOFF2 still requires the complete byte stream before decoding
 - CFF2 planning notes live in `cff2-investigation.md`

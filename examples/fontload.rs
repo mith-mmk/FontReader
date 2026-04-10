@@ -1,7 +1,7 @@
 mod common;
 
 use common::{font_index, font_path, output_path};
-use fontloader::Font;
+use fontcore::Font;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();

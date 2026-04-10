@@ -5,7 +5,7 @@
 ## Metadata を読む
 
 ```rust
-use fontloader::FontFile;
+use fontcore::FontFile;
 
 let face = FontFile::from_file("fonts/YourFont.ttf")?.current_face()?;
 println!("{}", face.family());
@@ -18,7 +18,7 @@ println!("{}", face.is_italic());
 ## 基本の shaping
 
 ```rust
-use fontloader::FontFile;
+use fontcore::FontFile;
 
 let face = FontFile::from_file("fonts/YourFont.ttf")?.current_face()?;
 let run = face.engine().with_font_size(32.0).shape("Hello")?;
@@ -29,7 +29,7 @@ assert!(!run.glyphs.is_empty());
 ## 文字幅を測る
 
 ```rust
-use fontloader::FontFile;
+use fontcore::FontFile;
 
 let face = FontFile::from_file("fonts/YourFont.ttf")?.current_face()?;
 let width = face.engine().with_font_size(32.0).measure("Hello")?;
@@ -40,7 +40,7 @@ assert!(width > 0.0);
 ## 縦書き SVG 出力
 
 ```rust
-use fontloader::FontFile;
+use fontcore::FontFile;
 
 let face = FontFile::from_file("fonts/YourFont.otf")?.current_face()?;
 let svg = face
@@ -55,7 +55,7 @@ assert!(svg.contains("<svg"));
 ## RTL shaping
 
 ```rust
-use fontloader::FontFile;
+use fontcore::FontFile;
 
 let face = FontFile::from_file("fonts/YourFont.ttf")?.current_face()?;
 let run = face
@@ -70,7 +70,7 @@ assert!(!run.glyphs.is_empty());
 ## GSUB variant 切り替え
 
 ```rust
-use fontloader::{FontFile, FontVariant};
+use fontcore::{FontFile, FontVariant};
 
 let face = FontFile::from_file("fonts/YourFont.otf")?.current_face()?;
 let run = face
@@ -86,7 +86,7 @@ assert!(!run.glyphs.is_empty());
 ## Variable font axis 指定
 
 ```rust
-use fontloader::FontFile;
+use fontcore::FontFile;
 
 let face = FontFile::from_file("fonts/VariableFont.ttf")?.current_face()?;
 for axis in face.variation_axes() {
@@ -108,7 +108,7 @@ assert!(width > 0.0);
 ## TTC / collection の face 選択
 
 ```rust
-use fontloader::FontFile;
+use fontcore::FontFile;
 
 let file = FontFile::from_file("fonts/YourCollection.ttc")?;
 let face = file.face(1)?;
@@ -119,7 +119,7 @@ println!("{}", face.full_name());
 ## FontFamily fallback
 
 ```rust
-use fontloader::{FontFamily, FontFile, FontWeight};
+use fontcore::{FontFamily, FontFile, FontWeight};
 
 let regular = FontFile::from_file("fonts/FiraSans-Regular.ttf")?.current_face()?;
 let bold = FontFile::from_file("fonts/FiraSans-Bold.ttf")?.current_face()?;
@@ -139,7 +139,7 @@ assert!(!run.glyphs.is_empty());
 ## 分割 WOFF2 読み込み
 
 ```rust
-use fontloader::ChunkedFontBuffer;
+use fontcore::ChunkedFontBuffer;
 
 let mut buffer = ChunkedFontBuffer::new(total_size)?;
 buffer.append(0, first_chunk)?;
