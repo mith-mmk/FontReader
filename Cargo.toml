@@ -1,6 +1,6 @@
 [package]
 name = "fontcore"
-version = "0.0.12"
+version = "0.0.13"
 edition = "2021"
 authors = ["Mith@mmk"]
 description = "Load fonts, select faces, shape text, and export SVG in Rust."
