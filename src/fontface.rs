@@ -5,7 +5,7 @@ use crate::commands::{
     TextDirection,
 };
 use crate::fontengine::{glyph_run_to_svg, FontEngine};
-use crate::{fontreader, ChunkedFontBuffer};
+use crate::{fontreader, ChunkedFontBuffer, FontFile};
 use std::collections::HashMap;
 use std::io::{Error, ErrorKind};
 
@@ -235,10 +235,18 @@ impl FontFace {
     pub fn measure_with_options<'a>(
         &'a self,
         text: &str,
-        mut options: FontOptions<'a>,
+        options: FontOptions<'a>,
     ) -> Result<f64, Error> {
-        options.font = Some(FontRef::Loaded(self));
-        self.font.measure_with_options(text, &options)
+        self.engine().with_options(options).measure(text)
+    }
+
+    /// Measures logical and ink extents from one shaped run.
+    pub fn measure_layout<'a>(
+        &'a self,
+        text: &str,
+        options: FontOptions<'a>,
+    ) -> Result<crate::LayoutMetrics, Error> {
+        self.engine().with_options(options).measure_layout(text)
     }
 
     pub(crate) fn font(&self) -> &fontreader::Font {
@@ -300,8 +308,9 @@ impl FontFamily {
 
     /// Adds a face together with an explicit descriptor.
     pub fn add_face(&mut self, descriptor: FontFaceDescriptor, font: FontFace) -> &FontFace {
+        let index = self.faces.len();
         self.faces.push(CachedFontFace { descriptor, font });
-        &self.faces.last().expect("face inserted").font
+        &self.faces[index].font
     }
 
     /// Adds one face and derives its descriptor automatically.
@@ -316,6 +325,7 @@ impl FontFamily {
         let current_face = font.font().get_font_number();
         let start_index = self.faces.len();
 
+        let mut selected_index = None;
         for face_index in 0..face_count {
             let mut face_font = font.clone();
             if face_font.font.set_font(face_index).is_err() {
@@ -326,9 +336,18 @@ impl FontFamily {
                 descriptor,
                 font: face_font,
             });
+            if face_index == current_face {
+                selected_index = self.faces.len().checked_sub(1);
+            }
         }
 
-        &self.faces[start_index + current_face].font
+        if selected_index.is_none() {
+            let descriptor = FontFaceDescriptor::from_face(&font);
+            self.faces.push(CachedFontFace { descriptor, font });
+            selected_index = self.faces.len().checked_sub(1);
+        }
+
+        &self.faces[selected_index.unwrap_or(start_index)].font
     }
 
     /// Returns descriptors for all cached faces.
@@ -349,6 +368,12 @@ impl FontFamily {
         total_size: usize,
     ) -> Result<(), Error> {
         let face_id = face_id.into();
+        if self.pending_faces.contains_key(&face_id) {
+            return Err(Error::new(
+                ErrorKind::AlreadyExists,
+                format!("pending font face already exists: {face_id}"),
+            ));
+        }
         let buffer = ChunkedFontBuffer::new(total_size)?;
         self.pending_faces
             .insert(face_id, PendingFontFace { descriptor, buffer });
@@ -385,14 +410,17 @@ impl FontFamily {
 
     /// Finalizes a chunked face and moves it into the cache.
     pub fn finalize_chunked_face(&mut self, face_id: &str) -> Result<&FontFace, Error> {
-        let pending = self.pending_faces.remove(face_id).ok_or_else(|| {
+        let pending = self.pending_faces.get(face_id).ok_or_else(|| {
             Error::new(
                 ErrorKind::NotFound,
                 format!("unknown pending font face: {face_id}"),
             )
         })?;
-        let font = pending.buffer.into_font_face()?;
-        Ok(self.add_face(pending.descriptor, font))
+        let descriptor = pending.descriptor.clone();
+        let bytes = pending.buffer.to_vec()?;
+        let font = FontFile::from_buffer(&bytes)?.current_face()?;
+        self.pending_faces.remove(face_id);
+        Ok(self.add_face(descriptor, font))
     }
 
     /// Resolves the best face for the requested descriptor fields.

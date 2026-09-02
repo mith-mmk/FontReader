@@ -79,7 +79,7 @@ impl GSUB {
         let feature_list_offset = reader.read_u16_be()?;
         let lookup_list_offset = reader.read_u16_be()?;
         let feature_variations_offset = if major_version == 1 && minor_version == 1 {
-            reader.read_u16_be()?
+            reader.read_u32_be()?
         } else {
             0
         };
@@ -605,6 +605,41 @@ impl GSUB {
             ) => {
                 return Self::apply_subtable_at(&extension.subtable, glyphs, index);
             }
+            crate::opentype::layouts::lookup::LookupSubstitution::ReverseChainSingle(reverse) => {
+                let Some(coverage_index) = reverse.coverage.contains(glyph_id) else {
+                    return false;
+                };
+                if reverse.backtrack_coverages.len() > index
+                    || index.saturating_add(1).saturating_add(reverse.lookahead_coverages.len())
+                        > glyphs.len()
+                {
+                    return false;
+                }
+                let backtrack_matches = reverse
+                    .backtrack_coverages
+                    .iter()
+                    .enumerate()
+                    .all(|(offset, coverage)| {
+                        coverage.contains(glyphs[index - 1 - offset].0).is_some()
+                    });
+                let lookahead_matches = reverse
+                    .lookahead_coverages
+                    .iter()
+                    .enumerate()
+                    .all(|(offset, coverage)| {
+                        coverage
+                            .contains(glyphs[index.saturating_add(1) + offset].0)
+                            .is_some()
+                    });
+                if !(backtrack_matches && lookahead_matches) {
+                    return false;
+                }
+                let Some(&replacement) = reverse.substitute_glyph_ids.get(coverage_index) else {
+                    return false;
+                };
+                glyphs[index].0 = replacement as usize;
+                return true;
+            }
             _ => {}
         }
 
@@ -716,7 +751,9 @@ impl GSUB {
                 };
 
                 for rule in &rule_set.rules {
-                    if index + rule.input_sequence.len() >= glyphs.len() + 1 {
+                    if rule.input_sequence.len()
+                        > glyphs.len().saturating_sub(index.saturating_add(1))
+                    {
                         continue;
                     }
                     let matches =
@@ -752,7 +789,9 @@ impl GSUB {
                 };
 
                 for rule in &rule_set.class_seq_rules {
-                    if index + rule.input_sequences.len() >= glyphs.len() + 1 {
+                    if rule.input_sequences.len()
+                        > glyphs.len().saturating_sub(index.saturating_add(1))
+                    {
                         continue;
                     }
                     let matches =
@@ -794,8 +833,15 @@ impl GSUB {
                     if rule.backtrack_glyph_ids.len() > index {
                         continue;
                     }
-                    if index + rule.input_glyph_ids.len() + rule.lookahead_glyph_ids.len()
-                        >= glyphs.len() + 1
+                    let required_following = rule
+                        .input_glyph_ids
+                        .len()
+                        .checked_add(rule.lookahead_glyph_ids.len());
+                    if required_following
+                        .map(|required| {
+                            required > glyphs.len().saturating_sub(index.saturating_add(1))
+                        })
+                        .unwrap_or(true)
                     {
                         continue;
                     }
@@ -855,8 +901,15 @@ impl GSUB {
                     if rule.backtrack_sequences.len() > index {
                         continue;
                     }
-                    if index + rule.input_sequences.len() + rule.lookahead_class_ids.len()
-                        >= glyphs.len() + 1
+                    let required_following = rule
+                        .input_sequences
+                        .len()
+                        .checked_add(rule.lookahead_class_ids.len());
+                    if required_following
+                        .map(|required| {
+                            required > glyphs.len().saturating_sub(index.saturating_add(1))
+                        })
+                        .unwrap_or(true)
                     {
                         continue;
                     }

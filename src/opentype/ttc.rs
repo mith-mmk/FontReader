@@ -34,6 +34,12 @@ impl TTCHeader {
         header.major_version = reader.read_u16_be()?;
         header.minor_version = reader.read_u16_be()?;
         header.num_fonts = reader.read_u32_be()?;
+        if header.num_fonts > 256 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "TTC face count exceeds supported limit",
+            ));
+        }
         for _ in 0..header.num_fonts {
             header.table_directory.push(reader.read_u32_be()?);
         }

@@ -2,6 +2,7 @@
 
 use crate::fontface::FontFace;
 use crate::fontreader;
+use crate::limits::DecodeLimits;
 #[cfg(not(target_arch = "wasm32"))]
 use std::io::Read;
 #[cfg(not(target_arch = "wasm32"))]
@@ -28,13 +29,32 @@ pub struct FontFile {
 impl FontFile {
     /// Opens a font file from disk.
     pub fn from_file(path: impl AsRef<Path>) -> Result<Self, Error> {
-        let font = fontreader::Font::get_font_from_file(&path.as_ref().to_path_buf())?;
+        Self::from_file_with_limits(path, DecodeLimits::default())
+    }
+
+    /// Opens a font file from disk with explicit resource limits.
+    pub fn from_file_with_limits(
+        path: impl AsRef<Path>,
+        limits: DecodeLimits,
+    ) -> Result<Self, Error> {
+        let font = fontreader::Font::get_font_from_file_with_limits(
+            &path.as_ref().to_path_buf(),
+            &limits,
+        )?;
         Ok(Self { font })
     }
 
     /// Opens a font from bytes already loaded in memory.
     pub fn from_buffer(buffer: &[u8]) -> Result<Self, Error> {
-        let font = fontreader::Font::get_font_from_buffer(buffer)?;
+        Self::from_buffer_with_limits(buffer, DecodeLimits::default())
+    }
+
+    /// Opens a font from bytes with explicit resource limits.
+    pub fn from_buffer_with_limits(
+        buffer: &[u8],
+        limits: DecodeLimits,
+    ) -> Result<Self, Error> {
+        let font = fontreader::Font::get_font_from_buffer_with_limits(buffer, &limits)?;
         Ok(Self { font })
     }
 
@@ -43,6 +63,31 @@ impl FontFile {
         match source {
             FontSource::File(path) => Self::from_file(path),
             FontSource::Buffer(buffer) => Self::from_buffer(buffer),
+        }
+    }
+
+    /// Opens a font from a source with explicit resource limits.
+    pub fn from_source_with_limits(
+        source: FontSource<'_>,
+        limits: DecodeLimits,
+    ) -> Result<Self, Error> {
+        match source {
+            FontSource::File(path) => {
+                #[cfg(target_arch = "wasm32")]
+                {
+                    let _ = path;
+                    Err(Error::new(
+                        ErrorKind::Unsupported,
+                        "file font loading is not supported on wasm32",
+                    ))
+                }
+                #[cfg(not(target_arch = "wasm32"))]
+                {
+                    let bytes = std::fs::read(path)?;
+                    Self::from_buffer_with_limits(&bytes, limits)
+                }
+            }
+            FontSource::Buffer(buffer) => Self::from_buffer_with_limits(buffer, limits),
         }
     }
 
@@ -115,9 +160,25 @@ pub fn open_font_from_file(path: impl AsRef<Path>) -> Result<FontFile, Error> {
     FontFile::from_file(path)
 }
 
+/// Opens a font file from disk with explicit resource limits.
+pub fn open_font_from_file_with_limits(
+    path: impl AsRef<Path>,
+    limits: DecodeLimits,
+) -> Result<FontFile, Error> {
+    FontFile::from_file_with_limits(path, limits)
+}
+
 /// Opens a [`FontFile`] from memory.
 pub fn open_font_from_buffer(buffer: &[u8]) -> Result<FontFile, Error> {
     FontFile::from_buffer(buffer)
+}
+
+/// Opens a font from memory with explicit resource limits.
+pub fn open_font_from_buffer_with_limits(
+    buffer: &[u8],
+    limits: DecodeLimits,
+) -> Result<FontFile, Error> {
+    FontFile::from_buffer_with_limits(buffer, limits)
 }
 
 /// Opens a [`FontFile`] from plain `http://`.
@@ -135,9 +196,25 @@ pub fn load_font_from_file(path: impl AsRef<Path>) -> Result<FontFace, Error> {
     FontFile::from_file(path)?.current_face()
 }
 
+/// Loads the current face from a file with explicit resource limits.
+pub fn load_font_from_file_with_limits(
+    path: impl AsRef<Path>,
+    limits: DecodeLimits,
+) -> Result<FontFace, Error> {
+    FontFile::from_file_with_limits(path, limits)?.current_face()
+}
+
 /// Loads the current face from an in-memory buffer.
 pub fn load_font_from_buffer(buffer: &[u8]) -> Result<FontFace, Error> {
     FontFile::from_buffer(buffer)?.current_face()
+}
+
+/// Loads the current face from memory with explicit resource limits.
+pub fn load_font_from_buffer_with_limits(
+    buffer: &[u8],
+    limits: DecodeLimits,
+) -> Result<FontFace, Error> {
+    FontFile::from_buffer_with_limits(buffer, limits)?.current_face()
 }
 
 /// Loads the current face from plain `http://`.
@@ -185,10 +262,22 @@ pub struct ChunkedFontBuffer {
 impl ChunkedFontBuffer {
     /// Creates an empty buffer for a known final font size.
     pub fn new(total_size: usize) -> Result<Self, Error> {
+        Self::new_with_limits(total_size, DecodeLimits::default())
+    }
+
+    /// Creates an empty buffer while enforcing an allocation limit.
+    pub fn new_with_limits(total_size: usize, limits: DecodeLimits) -> Result<Self, Error> {
         if total_size == 0 {
             return Err(Error::new(
                 ErrorKind::InvalidInput,
                 "chunked font buffer size must be greater than zero",
+            ));
+        }
+        if total_size > limits.max_input_bytes {
+            return Err(crate::limits::resource_limit(
+                "chunked font buffer",
+                total_size,
+                limits.max_input_bytes,
             ));
         }
 

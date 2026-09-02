@@ -1,10 +1,11 @@
 #![allow(dead_code, non_local_definitions)]
 
-use super::{classdef::ClassDef, *};
+use super::{classdef::ClassDef, coverage::CoverageFormat1, *};
 use bin_rs::reader::BinaryReader;
 use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits;
 use std::io::SeekFrom;
+use std::sync::OnceLock;
 
 #[derive(Debug, Clone)]
 
@@ -100,6 +101,17 @@ pub enum LookupType {
     ExtensionSubstitution = 7,
     ReverseChainingContextualSingleSubstitution = 8,
     Unknown = 0xFFFF,
+}
+
+fn empty_coverage() -> &'static Coverage {
+    static EMPTY_COVERAGE: OnceLock<Coverage> = OnceLock::new();
+    EMPTY_COVERAGE.get_or_init(|| {
+        Coverage::Format1(CoverageFormat1 {
+            coverage_format: 1,
+            glyph_count: 0,
+            glyph_ids: Vec::new(),
+        })
+    })
 }
 
 #[derive(Debug, Clone)]
@@ -326,8 +338,7 @@ impl LookupList {
                 let ligature_glyph = reader.read_u16_be()?;
                 let component_count = reader.read_u16_be()?;
                 let mut component_glyph_ids = Vec::new();
-                for _ in 0..(component_count - 1) {
-                    // ???
+                for _ in 0..component_count.saturating_sub(1) {
                     component_glyph_ids.push(reader.read_u16_be()?);
                 }
                 ligature_table.push(LigatureTable {
@@ -477,7 +488,7 @@ impl LookupList {
         let glyph_count = reader.read_u16_be()?;
         let seq_lookup_count = reader.read_u16_be()?;
         let mut input_sequences = Vec::new();
-        for _ in 0..glyph_count as i32 - 1 {
+        for _ in 0..glyph_count.saturating_sub(1) {
             let input_sequence = reader.read_u16_be()?;
             input_sequences.push(input_sequence);
         }
@@ -607,7 +618,7 @@ impl LookupList {
         let glyph_count = reader.read_u16_be()?;
         let lookup_count = reader.read_u16_be()?;
         let mut input_sequence = Vec::new();
-        for _ in 0..glyph_count - 1 {
+        for _ in 0..glyph_count.saturating_sub(1) {
             input_sequence.push(reader.read_u16_be()?);
         }
         let mut lookup_indexes = Vec::new();
@@ -693,7 +704,9 @@ impl LookupList {
                         }
                         let input_glyph_count = reader.read_u16_be()?;
                         let mut input_glyph_ids = Vec::new();
-                        for _ in 0..input_glyph_count {
+                        // The first input glyph is the coverage glyph.  The
+                        // rule stores only the remaining input sequence.
+                        for _ in 0..input_glyph_count.saturating_sub(1) {
                             input_glyph_ids.push(reader.read_u16_be()?);
                         }
                         let lookahead_glyph_count = reader.read_u16_be()?;
@@ -928,33 +941,46 @@ impl LookupList {
         let subst_format = reader.read_u16_be()?;
         let coverage_offset = reader.read_u16_be()?;
         let backtrack_glyph_count = reader.read_u16_be()?;
-        let mut backtrack_glyph_ids = Vec::new();
+        let mut backtrack_coverage_offsets = Vec::new();
         for _ in 0..backtrack_glyph_count {
-            backtrack_glyph_ids.push(reader.read_u16_be()?);
-        }
-        let input_glyph_count = reader.read_u16_be()?;
-        let mut input_glyph_ids = Vec::new();
-        for _ in 0..input_glyph_count {
-            input_glyph_ids.push(reader.read_u16_be()?);
+            backtrack_coverage_offsets.push(reader.read_u16_be()?);
         }
         let lookahead_glyph_count = reader.read_u16_be()?;
-        let mut lookahead_glyph_ids = Vec::new();
+        let mut lookahead_coverage_offsets = Vec::new();
         for _ in 0..lookahead_glyph_count {
-            lookahead_glyph_ids.push(reader.read_u16_be()?);
+            lookahead_coverage_offsets.push(reader.read_u16_be()?);
         }
-        let substitute_glyph_id = reader.read_u16_be()?;
+        let glyph_count = reader.read_u16_be()?;
+        let mut substitute_glyph_ids = Vec::new();
+        for _ in 0..glyph_count {
+            substitute_glyph_ids.push(reader.read_u16_be()?);
+        }
+
         let coverage = Self::get_coverage(reader, offset + coverage_offset as u64)?;
+        let mut backtrack_coverages = Vec::new();
+        for coverage_offset in backtrack_coverage_offsets {
+            backtrack_coverages.push(Self::get_coverage(
+                reader,
+                offset + coverage_offset as u64,
+            )?);
+        }
+        let mut lookahead_coverages = Vec::new();
+        for coverage_offset in lookahead_coverage_offsets {
+            lookahead_coverages.push(Self::get_coverage(
+                reader,
+                offset + coverage_offset as u64,
+            )?);
+        }
         Ok(LookupSubstitution::ReverseChainSingle(
             ReverseChainSingleSubstitutionFormat1 {
                 subst_format,
                 coverage,
                 backtrack_glyph_count,
-                backtrack_glyph_ids,
-                input_glyph_count,
-                input_glyph_ids,
+                backtrack_coverages,
                 lookahead_glyph_count,
-                lookahead_glyph_ids,
-                substitute_glyph_id,
+                lookahead_coverages,
+                glyph_count,
+                substitute_glyph_ids,
             },
         ))
     }
@@ -1019,21 +1045,31 @@ impl LookupSubstitution {
             Self::ContextSubstitution(context) => &context.coverage,
             Self::ContextSubstitution2(context2) => &context2.coverage,
             Self::ContextSubstitution3(context3) => {
-                context3.coverages.first().unwrap_or_else(|| {
-                    panic!("ContextSubstitutionFormat3 must contain at least one coverage")
-                })
+                if let Some(coverage) = context3.coverages.first() {
+                    coverage
+                } else {
+                    empty_coverage()
+                }
             }
             Self::ChainingContextSubstitution(chaining) => &chaining.coverage,
             Self::ChainingContextSubstitution2(chaining2) => &chaining2.coverage,
-            Self::ChainingContextSubstitution3(chaining3) => &chaining3.backtrack_coverages[0],
+            Self::ChainingContextSubstitution3(chaining3) => {
+                if let Some(coverage) = chaining3.backtrack_coverages.first() {
+                    coverage
+                } else if let Some(coverage) = chaining3.input_coverages.first() {
+                    coverage
+                } else if let Some(coverage) = chaining3.lookahead_coverages.first() {
+                    coverage
+                } else {
+                    empty_coverage()
+                }
+            }
             Self::ExtensionSubstitution(extension) => {
                 let (coverage, _) = extension.subtable.get_coverage();
                 coverage
             }
             Self::ReverseChainSingle(reverse) => &reverse.coverage,
-            _ => {
-                panic!("Unknown lookup type: {:?}", self);
-            }
+            _ => empty_coverage(),
         };
 
         let mut coverages = None;
@@ -1060,7 +1096,11 @@ impl LookupSubstitution {
             LookupSubstitution::Single2(subtable) => {
                 let coverage = &subtable.coverage;
                 if let Some(id) = coverage.contains(glyph_id as usize) {
-                    return Some(subtable.substitute_glyph_ids[id as usize] as u16);
+                    return subtable
+                        .substitute_glyph_ids
+                        .get(id)
+                        .copied()
+                        .map(|glyph_id| glyph_id as u16);
                 }
             }
             _ => {}
@@ -1084,8 +1124,12 @@ impl LookupSubstitution {
                 let coverage = &single.coverage;
                 let id = coverage.contains(gliph_id);
                 if let Some(id) = id {
-                    let return_gliph = single.substitute_glyph_ids[id];
-                    LookupResult::Single(return_gliph)
+                    single
+                        .substitute_glyph_ids
+                        .get(id)
+                        .copied()
+                        .map(LookupResult::Single)
+                        .unwrap_or(LookupResult::None)
                 } else {
                     LookupResult::None
                 }
@@ -1094,7 +1138,9 @@ impl LookupSubstitution {
                 let coverage = &multiple.coverage;
                 let id = coverage.contains(gliph_id);
                 if let Some(id) = id {
-                    let sequence_table = &multiple.sequence_tables[id];
+                    let Some(sequence_table) = multiple.sequence_tables.get(id) else {
+                        return LookupResult::None;
+                    };
                     let result = sequence_table.substitute_glyph_ids.clone();
                     LookupResult::Multiple(result)
                 } else {
@@ -1105,7 +1151,9 @@ impl LookupSubstitution {
                 let coverage = &alternate.coverage;
                 let id = coverage.contains(gliph_id);
                 if let Some(id) = id {
-                    let alternate_set = &alternate.alternate_set[id];
+                    let Some(alternate_set) = alternate.alternate_set.get(id) else {
+                        return LookupResult::None;
+                    };
                     let result = alternate_set.alternate_glyph_ids.clone();
                     LookupResult::Multiple(result)
                 } else {
@@ -1116,7 +1164,9 @@ impl LookupSubstitution {
                 let coverage = &ligature.coverage;
                 let id = coverage.contains(gliph_id);
                 if let Some(id) = id {
-                    let ligature_set = &ligature.ligature_set[id];
+                    let Some(ligature_set) = ligature.ligature_set.get(id) else {
+                        return LookupResult::None;
+                    };
                     let result = ligature_set.ligature_table.clone();
                     LookupResult::Ligature(result)
                 } else {
@@ -1127,7 +1177,9 @@ impl LookupSubstitution {
                 let coverage = &context.coverage;
                 let id = coverage.contains(gliph_id);
                 if let Some(id) = id {
-                    let rule_set = &context.rule_sets[id];
+                    let Some(rule_set) = context.rule_sets.get(id) else {
+                        return LookupResult::None;
+                    };
                     let result = rule_set.rules.clone();
                     LookupResult::Context(result)
                 } else {
@@ -1141,7 +1193,9 @@ impl LookupSubstitution {
                 let coverage = &chaining.coverage;
                 let id = coverage.contains(gliph_id);
                 if let Some(id) = id {
-                    let chain_sub_rule_set = &chaining.chain_sub_rule_set[id];
+                    let Some(chain_sub_rule_set) = chaining.chain_sub_rule_set.get(id) else {
+                        return LookupResult::None;
+                    };
                     let result = chain_sub_rule_set.chain_sub_rule.clone();
                     LookupResult::Chaining(result)
                 } else {
@@ -1152,7 +1206,9 @@ impl LookupSubstitution {
                 let coverage = &chaining2.coverage;
                 let id = coverage.contains(gliph_id);
                 if let Some(id) = id {
-                    let class_range_record = &chaining2.class_range_records[id];
+                    let Some(class_range_record) = chaining2.class_range_records.get(id) else {
+                        return LookupResult::None;
+                    };
                     let class = class_range_record.class;
                     let result = vec![class];
                     LookupResult::Multiple(result)
@@ -1165,8 +1221,13 @@ impl LookupSubstitution {
             Self::ExtensionSubstitution(extension) => extension.subtable.get_lookup(gliph_id),
             Self::ReverseChainSingle(reverse) => {
                 let coverage = &reverse.coverage;
-                if let Some(_) = coverage.contains(gliph_id) {
-                    LookupResult::Single(reverse.substitute_glyph_id)
+                if let Some(index) = coverage.contains(gliph_id) {
+                    reverse
+                        .substitute_glyph_ids
+                        .get(index)
+                        .copied()
+                        .map(LookupResult::Single)
+                        .unwrap_or(LookupResult::None)
                 } else {
                     LookupResult::None
                 }
@@ -1393,10 +1454,9 @@ pub(crate) struct ReverseChainSingleSubstitutionFormat1 {
     pub(crate) subst_format: u16,
     pub(crate) coverage: Coverage,
     pub(crate) backtrack_glyph_count: u16,
-    pub(crate) backtrack_glyph_ids: Vec<u16>,
-    pub(crate) input_glyph_count: u16,
-    pub(crate) input_glyph_ids: Vec<u16>,
+    pub(crate) backtrack_coverages: Vec<Coverage>,
     pub(crate) lookahead_glyph_count: u16,
-    pub(crate) lookahead_glyph_ids: Vec<u16>,
-    pub(crate) substitute_glyph_id: u16,
+    pub(crate) lookahead_coverages: Vec<Coverage>,
+    pub(crate) glyph_count: u16,
+    pub(crate) substitute_glyph_ids: Vec<u16>,
 }

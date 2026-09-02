@@ -14,6 +14,7 @@ use crate::commands::{
     PositionedGlyph, RasterGlyphLayer,
 };
 use crate::fontheader;
+use crate::limits::DecodeLimits;
 use crate::opentype::color::sbix;
 use crate::opentype::color::svg;
 use crate::opentype::color::{colr, cpal};
@@ -311,12 +312,41 @@ impl Font {
     }
 
     pub fn get_font_from_file(filename: &PathBuf) -> Result<Self, Error> {
-        font_load_from_file(filename)
+        Self::get_font_from_file_with_limits(filename, &DecodeLimits::default())
+    }
+
+    pub fn get_font_from_file_with_limits(
+        filename: &PathBuf,
+        limits: &DecodeLimits,
+    ) -> Result<Self, Error> {
+        font_load_from_file_with_limits(filename, limits)
     }
 
     pub fn get_font_from_buffer(fontdata: &[u8]) -> Result<Self, Error> {
+        Self::get_font_from_buffer_with_limits(fontdata, &DecodeLimits::default())
+    }
+
+    pub fn get_font_from_buffer_with_limits(
+        fontdata: &[u8],
+        limits: &DecodeLimits,
+    ) -> Result<Self, Error> {
+        limits.validate_input(fontdata.len())?;
         let mut reader = BytesReader::new(fontdata);
         let font_type = fontheader::get_font_type(&mut reader)?;
+        match &font_type {
+            fontheader::FontHeaders::OTF(header) => {
+                validate_sfnt_table_records(fontdata, header, limits)?;
+            }
+            fontheader::FontHeaders::TTC(header) => {
+                for face in header.font_collection.iter() {
+                    validate_sfnt_table_records(fontdata, face, limits)?;
+                }
+            }
+            _ => {}
+        }
+        if let fontheader::FontHeaders::WOFF(header) = &font_type {
+            validate_woff_buffer(fontdata, header, limits)?;
+        }
         if let fontheader::FontHeaders::WOFF2(header) = font_type {
             let declared_length = header.length as usize;
             if declared_length > fontdata.len() {
@@ -329,6 +359,13 @@ impl Font {
                     ),
                 ));
             }
+            if header.total_sfnt_size as usize > limits.max_total_decompressed_bytes {
+                return Err(crate::limits::resource_limit(
+                    "WOFF2 decoded font",
+                    header.total_sfnt_size as usize,
+                    limits.max_total_decompressed_bytes,
+                ));
+            }
             let mut input = &fontdata[..declared_length];
             let ttf = woff2::decode::convert_woff2_to_ttf(&mut input).map_err(|err| {
                 Error::new(
@@ -336,11 +373,12 @@ impl Font {
                     format!("Failed to decode WOFF2 font: {err}"),
                 )
             })?;
-            return Self::get_font_from_buffer(&ttf);
+            limits.validate_input(ttf.len())?;
+            return Self::get_font_from_buffer_with_limits(&ttf, limits);
         }
 
         reader.seek(SeekFrom::Start(0))?;
-        font_load(&mut reader)
+        font_load(&mut reader, limits)
     }
 
     pub(crate) fn get_h_metrix_with_coords(&self, id: usize, coordinates: &[f32]) -> LongHorMetric {
@@ -649,7 +687,14 @@ impl Font {
                     let Some(cpal) = cpal.as_ref() else {
                         return Ok(glyf.to_svg(glyph_id, fontsize, fontunit, &layout, 0.0, 0.0));
                     };
-                    let pallet = cpal.get_pallet(layer.palette_index as usize);
+                    let Some(pallet) = cpal.get_palette_color(0, layer.palette_index) else {
+                        if layer.palette_index == 0xffff {
+                            string += "<g fill=\"currentColor\">\n";
+                            string += &glyf.get_svg_path(glyf_id as usize, &layout, 0.0, 0.0);
+                            string += "</g>\n";
+                        }
+                        continue;
+                    };
                     #[cfg(debug_assertions)]
                     {
                         string += &format!("<!-- pallet index {} -->\n", layer.palette_index);
@@ -790,7 +835,14 @@ impl Font {
                         let Some(cpal) = cpal.as_ref() else {
                             return Ok(glyf.to_svg(glyph_id, fontsize, fontunit, &layout, 0.0, 0.0));
                         };
-                        let pallet = cpal.get_pallet(layer.palette_index as usize);
+                        let Some(pallet) = cpal.get_palette_color(0, layer.palette_index) else {
+                            if layer.palette_index == 0xffff {
+                                string += "<g fill=\"currentColor\">\n";
+                                string += &glyf.get_svg_path(glyf_id as usize, &layout, 0.0, 0.0);
+                                string += "</g>\n";
+                            }
+                            continue;
+                        };
                         #[cfg(debug_assertions)]
                         {
                             string += &format!("<!-- pallet index {} -->\n", layer.palette_index);
@@ -1085,12 +1137,18 @@ impl Font {
 
         let open_type_glyph = match self.current_outline_format() {
             GlyphFormat::OpenTypeGlyph => {
-                let glyf = self
-                    .current_glyf()
-                    .expect("glyf outline format should expose glyf table");
-                let glyph = glyf
-                    .get_glyph(glyph_id)
-                    .expect("glyph id should resolve inside glyf table");
+                let Some(glyf) = self.current_glyf() else {
+                    return GriphData {
+                        glyph_id,
+                        open_type_glyf: None,
+                    };
+                };
+                let Some(glyph) = glyf.get_glyph(glyph_id) else {
+                    return GriphData {
+                        glyph_id,
+                        open_type_glyf: None,
+                    };
+                };
                 let glyph =
                     if let Some(variation) = self.current_gvar_variation(glyph_id, &coordinates) {
                         Self::apply_varied_metrics_to_layout(
@@ -2077,6 +2135,16 @@ impl Font {
         }
     }
 
+    #[cfg(not(feature = "layout"))]
+    fn find_previous_spacing_glyph_index(
+        &self,
+        units: &[ResolvedTextUnit],
+        index: usize,
+    ) -> Option<usize> {
+        let _ = (units, index);
+        None
+    }
+
     #[cfg(feature = "layout")]
     fn find_next_spacing_glyph_index(
         &self,
@@ -2141,6 +2209,12 @@ impl Font {
             return Err(Error::new(
                 ErrorKind::InvalidInput,
                 "font_size must be a positive finite value",
+            ));
+        }
+        if !options.font_stretch.0.is_finite() || options.font_stretch.0 < 0.0 {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "font_stretch must be a finite non-negative value",
             ));
         }
 
@@ -2343,13 +2417,15 @@ impl Font {
                     };
                     let uses_gdef_mark_attachment =
                         !uses_gpos_mark_attachment && gdef_attach_glyph_index.is_some();
-                    let uses_mark_attachment =
-                        uses_gpos_mark_attachment || uses_gdef_mark_attachment;
                     let attach_glyph_index = mark_attachment
                         .map(|attachment| attachment.glyph_index)
                         .or(gdef_attach_glyph_index);
-                    let origin_x = if uses_mark_attachment {
-                        let base_x = glyphs[attach_glyph_index.expect("checked some")].x;
+                    let attachment_base = attach_glyph_index.and_then(|index| glyphs.get(index));
+                    let uses_mark_attachment =
+                        (uses_gpos_mark_attachment || uses_gdef_mark_attachment)
+                            && attachment_base.is_some();
+                    let origin_x = if let Some(base_glyph) = attachment_base {
+                        let base_x = base_glyph.x;
                         let placement_x = mark_attachment
                             .map(|mark| mark.adjustment.placement_x)
                             .unwrap_or(0.0)
@@ -2360,8 +2436,8 @@ impl Font {
                     } else {
                         cursor_x + adjustment.placement_x
                     };
-                    let origin_y = if uses_mark_attachment {
-                        let base_y = glyphs[attach_glyph_index.expect("checked some")].y;
+                    let origin_y = if let Some(base_glyph) = attachment_base {
+                        let base_y = base_glyph.y;
                         let placement_y = mark_attachment
                             .map(|mark| mark.adjustment.placement_y)
                             .unwrap_or(0.0)
@@ -2488,14 +2564,21 @@ impl Font {
             }
             let commands = glyf.to_path_commands(layer.glyph_id as usize, layout, 0.0, 0.0);
             let commands = transform_glyf_commands(&commands, layout, scale_x, scale_y);
-            let color = cpal.get_pallet(layer.palette_index as usize);
-            let argb = ((color.alpha as u32) << 24)
-                | ((color.red as u32) << 16)
-                | ((color.green as u32) << 8)
-                | color.blue as u32;
+            let paint = if layer.palette_index == 0xffff {
+                GlyphPaint::CurrentColor
+            } else {
+                let Some(color) = cpal.get_palette_color(0, layer.palette_index) else {
+                    continue;
+                };
+                let argb = ((color.alpha as u32) << 24)
+                    | ((color.red as u32) << 16)
+                    | ((color.green as u32) << 8)
+                    | color.blue as u32;
+                GlyphPaint::Solid(argb)
+            };
             layers.push(GlyphLayer::Path(PathGlyphLayer::new(
                 commands,
-                GlyphPaint::Solid(argb),
+                paint,
             )));
         }
 
@@ -2712,88 +2795,19 @@ impl Font {
         text: &str,
         options: &crate::commands::FontOptions<'_>,
     ) -> Result<f64, Error> {
-        let mut cursor_x = 0.0;
-        let mut cursor_y = 0.0;
-        let mut max_line_width: f64 = 0.0;
-        let line_height = self.default_line_height_with_options(options)?;
-        let tab_advance = line_height;
-        let is_vertical = options.text_direction.is_vertical();
-        let is_right_to_left = options.text_direction.is_right_to_left();
-        let shaped_units = self.shape_text_units(
-            text,
-            is_vertical,
-            is_right_to_left,
-            options.locale,
-            options.font_variant,
-        )?;
-
-        for (index, unit) in shaped_units.iter().enumerate() {
-            match *unit {
-                ResolvedTextUnit::Newline => {
-                    max_line_width = if is_vertical {
-                        max_line_width.max(cursor_y)
-                    } else if is_right_to_left {
-                        max_line_width.max(-cursor_x)
-                    } else {
-                        max_line_width.max(cursor_x)
-                    };
-                    if is_vertical {
-                        cursor_x -= line_height;
-                        cursor_y = 0.0;
-                    } else {
-                        cursor_x = 0.0;
-                    }
-                }
-                ResolvedTextUnit::Tab => {
-                    if is_vertical {
-                        cursor_y += tab_advance * 4.0;
-                    } else if is_right_to_left {
-                        cursor_x -= tab_advance * 4.0;
-                    } else {
-                        cursor_x += tab_advance * 4.0;
-                    }
-                }
-                ResolvedTextUnit::Glyph(resolved) => {
-                    let glyph_data = self.get_glyph_from_id_with_options(
-                        resolved.glyph_id,
-                        is_vertical,
-                        options,
-                    );
-                    let open_type_glyph = glyph_data
-                        .open_type_glyf
-                        .as_ref()
-                        .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "glyph is none"))?;
-
-                    let adjustment = self.pair_adjustment_for_index(
-                        &shaped_units,
-                        index,
-                        options.locale,
-                        is_vertical,
-                        1.0,
-                        1.0,
-                    );
-                    let (advance_x, advance_y) = match &open_type_glyph.layout {
-                        FontLayout::Horizontal(layout) => (layout.advance_width as f64, 0.0),
-                        FontLayout::Vertical(layout) => (0.0, layout.advance_height as f64),
-                        FontLayout::Unknown => (0.0, 0.0),
-                    };
-                    if is_right_to_left && !is_vertical {
-                        cursor_x -= advance_x + adjustment.advance_x as f64;
-                    } else {
-                        cursor_x += advance_x + adjustment.advance_x as f64;
-                    }
-                    cursor_y += advance_y + adjustment.advance_y as f64;
-                }
-            }
-        }
-
-        Ok(if is_vertical {
-            max_line_width.max(cursor_y)
-        } else if is_right_to_left {
-            max_line_width.max(-cursor_x)
+        let run = self.text2glyph_run(text, options)?;
+        let inline_advance: f32 = if options.text_direction.is_vertical() {
+            run.glyphs
+                .iter()
+                .map(|glyph| glyph.glyph.metrics.advance_y)
+                .sum()
         } else {
-            max_line_width.max(cursor_x)
-        })
+            run.glyphs
+                .iter()
+                .map(|glyph| glyph.glyph.metrics.advance_x)
+                .sum()
+        };
+        Ok(inline_advance.abs() as f64)
     }
 
     pub(crate) fn text2svg(
@@ -3264,6 +3278,164 @@ impl Font {
     }
 }
 
+fn validate_woff_buffer(
+    data: &[u8],
+    header: &crate::woff::woff::WOFFHeader,
+    limits: &DecodeLimits,
+) -> Result<(), Error> {
+    let declared_length = header.length as usize;
+    if declared_length > data.len() || declared_length < 44 {
+        return Err(Error::new(
+            ErrorKind::UnexpectedEof,
+            "WOFF declared length is outside the input buffer",
+        ));
+    }
+    let directory_length = 44usize
+        .checked_add(
+            (header.num_tables as usize)
+                .checked_mul(20)
+                .ok_or_else(|| Error::new(ErrorKind::InvalidData, "WOFF directory overflow"))?,
+        )
+        .ok_or_else(|| Error::new(ErrorKind::InvalidData, "WOFF directory overflow"))?;
+    if directory_length > declared_length {
+        return Err(Error::new(
+            ErrorKind::UnexpectedEof,
+            "WOFF table directory exceeds declared length",
+        ));
+    }
+
+    let mut ranges = Vec::with_capacity(header.num_tables as usize + 2);
+    for index in 0..header.num_tables as usize {
+        let record = 44 + index * 20;
+        let offset = read_u32_be(data, record + 4)? as usize;
+        let compressed_length = read_u32_be(data, record + 8)? as usize;
+        let original_length = read_u32_be(data, record + 12)? as usize;
+        if compressed_length > limits.max_table_bytes || original_length > limits.max_table_bytes {
+            return Err(crate::limits::resource_limit(
+                "WOFF table",
+                compressed_length.max(original_length),
+                limits.max_table_bytes,
+            ));
+        }
+        let end = offset
+            .checked_add(compressed_length)
+            .ok_or_else(|| Error::new(ErrorKind::InvalidData, "WOFF table range overflow"))?;
+        if offset < directory_length || end > declared_length {
+            return Err(Error::new(
+                ErrorKind::UnexpectedEof,
+                "WOFF table range exceeds declared length",
+            ));
+        }
+        ranges.push((offset, end));
+    }
+
+    for (index, &(start, end)) in ranges.iter().enumerate() {
+        if ranges
+            .iter()
+            .skip(index + 1)
+            .any(|&(other_start, other_end)| start < other_end && other_start < end)
+        {
+            return Err(Error::new(
+                ErrorKind::InvalidData,
+                "WOFF table ranges overlap",
+            ));
+        }
+    }
+
+    for (offset, length, name) in [
+        (header.meta_offset as usize, header.meta_length as usize, "metadata"),
+        (header.priv_offset as usize, header.priv_length as usize, "private data"),
+    ] {
+        if length == 0 {
+            continue;
+        }
+        let limit = if name == "metadata" {
+            limits.max_metadata_bytes
+        } else {
+            limits.max_table_bytes
+        };
+        if length > limit {
+            return Err(crate::limits::resource_limit(
+                &format!("WOFF {name}"),
+                length,
+                limit,
+            ));
+        }
+        let end = offset
+            .checked_add(length)
+            .ok_or_else(|| Error::new(ErrorKind::InvalidData, "WOFF auxiliary range overflow"))?;
+        if end > declared_length {
+            return Err(Error::new(
+                ErrorKind::UnexpectedEof,
+                format!("WOFF {name} exceeds declared length"),
+            ));
+        }
+        if ranges.iter().any(|&(start, table_end)| start < end && offset < table_end) {
+            return Err(Error::new(
+                ErrorKind::InvalidData,
+                format!("WOFF {name} overlaps a table"),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_sfnt_table_records(
+    data: &[u8],
+    header: &OTFHeader,
+    limits: &DecodeLimits,
+) -> Result<(), Error> {
+    let mut ranges = Vec::with_capacity(header.table_records.len());
+    for record in header.table_records.iter() {
+        let length = record.length as usize;
+        if length > limits.max_table_bytes {
+            return Err(crate::limits::resource_limit(
+                "OpenType table",
+                length,
+                limits.max_table_bytes,
+            ));
+        }
+        let start = record.offset as usize;
+        let end = start
+            .checked_add(length)
+            .ok_or_else(|| Error::new(ErrorKind::InvalidData, "OpenType table range overflow"))?;
+        if end > data.len() {
+            return Err(Error::new(
+                ErrorKind::UnexpectedEof,
+                "OpenType table exceeds input buffer",
+            ));
+        }
+        ranges.push((start, end));
+    }
+
+    for (index, &(start, end)) in ranges.iter().enumerate() {
+        if ranges
+            .iter()
+            .skip(index + 1)
+            .any(|&(other_start, other_end)| start < other_end && other_start < end)
+        {
+            return Err(Error::new(
+                ErrorKind::InvalidData,
+                "OpenType table ranges overlap",
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn read_u32_be(data: &[u8], offset: usize) -> Result<u32, Error> {
+    let bytes = data
+        .get(offset..offset.checked_add(4).ok_or_else(|| {
+            Error::new(ErrorKind::InvalidData, "integer offset overflow")
+        })?)
+        .ok_or_else(|| Error::new(ErrorKind::UnexpectedEof, "truncated integer"))?;
+    Ok(u32::from_be_bytes(
+        bytes
+            .try_into()
+            .map_err(|_| Error::new(ErrorKind::InvalidData, "invalid integer width"))?,
+    ))
+}
+
 #[derive(Debug, Clone)]
 pub struct HorizontalLayout {
     pub lsb: isize,
@@ -3292,10 +3464,13 @@ struct Pointer {
     pub(crate) length: u32,
 }
 
-fn font_load_from_file(filename: &PathBuf) -> Result<Font, Error> {
+fn font_load_from_file_with_limits(
+    filename: &PathBuf,
+    limits: &DecodeLimits,
+) -> Result<Font, Error> {
     #[cfg(target_arch = "wasm32")]
     {
-        let _ = filename;
+        let _ = (filename, limits);
         return Err(Error::new(
             ErrorKind::Unsupported,
             "file font loading is not supported on wasm32",
@@ -3305,7 +3480,7 @@ fn font_load_from_file(filename: &PathBuf) -> Result<Font, Error> {
     #[cfg(not(target_arch = "wasm32"))]
     {
         let fontdata = std::fs::read(filename)?;
-        Font::get_font_from_buffer(&fontdata)
+        Font::get_font_from_buffer_with_limits(&fontdata, limits)
     }
 }
 
@@ -3667,10 +3842,10 @@ fn tag4(tag: &str) -> u32 {
     u32::from_be_bytes(bytes)
 }
 
-fn font_load<R: BinaryReader>(file: &mut R) -> Result<Font, Error> {
+fn font_load<R: BinaryReader>(file: &mut R, limits: &DecodeLimits) -> Result<Font, Error> {
     match fontheader::get_font_type(file)? {
         fontheader::FontHeaders::OTF(header) => {
-            let font = from_opentype(file, &header);
+            let font = from_opentype(file, &header, limits);
             #[cfg(debug_assertions)]
             {
                 // font_debug(font.as_ref().unwrap());
@@ -3681,7 +3856,7 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Result<Font, Error> {
             let num_fonts = header.num_fonts;
             let font_collection = header.font_collection.as_ref();
             let table = &font_collection[0];
-            let mut font = from_opentype(file, table);
+            let mut font = from_opentype(file, table, limits);
             #[cfg(debug_assertions)]
             {
                 // font_debug(font.as_ref().unwrap());
@@ -3690,7 +3865,7 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Result<Font, Error> {
             let mut fonts = Vec::new();
             for i in 1..num_fonts {
                 let table = &font_collection[i as usize];
-                if let Ok(font) = from_opentype(file, table) {
+                if let Ok(font) = from_opentype(file, table, limits) {
                     fonts.push(font);
                 }
             }
@@ -3706,7 +3881,7 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Result<Font, Error> {
         fontheader::FontHeaders::WOFF(header) => {
             let mut font = Font::empty();
             font.font_type = fontheader::FontHeaders::WOFF(header.clone());
-            let woff = crate::woff::WOFF::from(file, header)?;
+            let woff = crate::woff::WOFF::from_with_limits(file, header, limits)?;
 
             let mut hmtx_table = None;
             let mut loca_table = None;
@@ -3948,13 +4123,24 @@ fn font_load<R: BinaryReader>(file: &mut R) -> Result<Font, Error> {
     }
 }
 
-fn from_opentype<R: BinaryReader>(file: &mut R, header: &OTFHeader) -> Result<Font, Error> {
+fn from_opentype<R: BinaryReader>(
+    file: &mut R,
+    header: &OTFHeader,
+    limits: &DecodeLimits,
+) -> Result<Font, Error> {
     let mut font = Font::empty();
     font.font_type = fontheader::FontHeaders::OTF(header.clone());
 
     let records = header.table_records.as_ref();
 
     for record in records.iter() {
+        if record.length as usize > limits.max_table_bytes {
+            return Err(crate::limits::resource_limit(
+                "OpenType table",
+                record.length as usize,
+                limits.max_table_bytes,
+            ));
+        }
         let tag: [u8; 4] = record.table_tag.to_be_bytes();
         match &tag {
             b"cmap" => {

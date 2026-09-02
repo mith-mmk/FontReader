@@ -1,0 +1,43 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  checks:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: fmt
+            command: cargo fmt --all -- --check
+          - name: clippy
+            command: cargo clippy --all-targets --all-features -- -D warnings
+          - name: test-no-default-features
+            command: cargo test --no-default-features
+          - name: test-default-features
+            command: cargo test
+          - name: test-layout-and-cff
+            command: cargo test --features "layout,cff"
+          - name: check-all-features
+            command: cargo check --all-features
+          - name: docs
+            command: cargo doc --all-features --no-deps
+          - name: wasm-check
+            command: cargo check --target wasm32-unknown-unknown --all-features
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Run check
+        shell: bash
+        run: ${{ matrix.command }}

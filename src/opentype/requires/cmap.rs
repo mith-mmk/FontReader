@@ -181,77 +181,68 @@ impl CmapEncodings {
     }
 
     pub(crate) fn get_glyph_position_from_uvs(&self, code_number: u32, vs: u32) -> u32 {
-        let cmap_encodings = &self.cmap_encodings;
-        let mut current_encoding = -1;
-        for i in 0..cmap_encodings.len() {
-            if cmap_encodings[i].cmap_subtable.get_format() == 14 {
-                current_encoding = i as isize;
-                break;
-            }
-        }
-        if current_encoding == -1 {
+        let Some(format14) = self
+            .cmap_encodings
+            .iter()
+            .find_map(|encoding| match encoding.cmap_subtable.as_ref() {
+                CmapSubtable::Format14(format14) => Some(format14),
+                _ => None,
+            })
+        else {
             return self.get_glyph_position(code_number);
-        }
-        let current_encoding = current_encoding as usize;
-        let cmap_encoding = &cmap_encodings[current_encoding];
-        let cmap_subtable = &cmap_encoding.cmap_subtable;
-        let mut position = 0;
+        };
 
-        match cmap_subtable.as_ref() {
-            CmapSubtable::Format14(format14) => {
-                'outer: for i in 0..format14.num_var_selector_records {
-                    let var_selector_record = &format14.var_selector_records[i as usize];
-                    if var_selector_record.var_selector == vs {
-                        let non_default_uvs = &var_selector_record.non_default_uvs;
-                        // let num_unicode_value_ranges = non_default_uvs.num_unicode_value_ranges;
-                        let i = non_default_uvs.unicode_value_ranges.binary_search_by(|x| {
-                            if x.unicode_value == code_number {
-                                std::cmp::Ordering::Equal
-                            } else if x.unicode_value < code_number {
-                                std::cmp::Ordering::Less
-                            } else {
-                                std::cmp::Ordering::Greater
-                            }
-                        });
-                        if let Ok(i) = i {
-                            position = non_default_uvs.unicode_value_ranges[i].glyph_id as u32;
-                            break 'outer;
-                        }
-                        /*
-                        for i in 0..num_unicode_value_ranges {
-                            let code = non_default_uvs.unicode_value_ranges[i as usize].unicode_value;
-                            if code == code_number {
-                                position =  non_default_uvs.unicode_value_ranges[i as usize].glyph_id as u32;
-                                break 'outer;
-                            }
-                        } */
-                        break;
-                    }
-                }
-            }
-            _ => {
-                print!("{:?}", cmap_subtable);
-            }
+        let Some(record) = format14
+            .var_selector_records
+            .iter()
+            .find(|record| record.var_selector == vs)
+        else {
+            return self.get_glyph_position(code_number);
+        };
+
+        if let Some(mapping) = record
+            .non_default_uvs
+            .unicode_value_ranges
+            .iter()
+            .find(|mapping| mapping.unicode_value == code_number)
+        {
+            return mapping.glyph_id;
         }
-        if position == 0 {
-            position = self.get_glyph_position(code_number);
+
+        let is_default = record.default_uvs.unicode_value_ranges.iter().any(|range| {
+            range.start_unicode_value <= code_number
+                && code_number
+                    <= range
+                        .start_unicode_value
+                        .saturating_add(range.additional_count as u32)
+        });
+        if is_default {
+            self.get_glyph_position(code_number)
+        } else {
+            0
         }
-        position
     }
 
     pub(crate) fn get_glyph_position(&self, code_number: u32) -> u32 {
         let cmap_encodings = &self.cmap_encodings;
-        let mut current_encoding = 0;
-        for i in 0..cmap_encodings.len() {
-            if cmap_encodings[i].cmap_subtable.get_format() == 12 {
-                current_encoding = i;
-                break;
-            }
-            if cmap_encodings[i].cmap_subtable.get_format() == 4 {
-                current_encoding = i;
-            }
-        }
-        let cmap_encoding = &cmap_encodings[current_encoding];
+        let cmap_encoding = if let Some(encoding) = cmap_encodings
+            .iter()
+            .find(|encoding| encoding.cmap_subtable.get_format() == 12)
+        {
+            encoding
+        } else if let Some(encoding) = cmap_encodings
+            .iter()
+            .find(|encoding| encoding.cmap_subtable.get_format() == 4)
+        {
+            encoding
+        } else if let Some(encoding) = cmap_encodings
+            .iter()
+            .find(|encoding| encoding.cmap_subtable.get_format() == 13)
+        {
+            encoding
+        } else {
+            return 0;
+        };
         let cmap_subtable = &cmap_encoding.cmap_subtable;
         let mut position = 0;
 
@@ -282,7 +273,9 @@ impl CmapEncodings {
                 */
             }
             CmapSubtable::Format4(format4) => {
-                let code_number = code_number as u16;
+                let Some(code_number) = u16::try_from(code_number).ok() else {
+                    return 0;
+                };
                 let i = format4.codes.binary_search_by(|x| {
                     if x.0 <= code_number && code_number <= x.1 {
                         std::cmp::Ordering::Equal
@@ -294,15 +287,29 @@ impl CmapEncodings {
                 });
 
                 let i = if let Ok(i) = i { i } else { return 0 };
-                let id_range_offset = format4.id_range_offset[i] as u32;
+                let Some(&id_range_offset_value) = format4.id_range_offset.get(i) else {
+                    return 0;
+                };
+                let id_range_offset = id_range_offset_value as u32;
                 let gid = if id_range_offset == 0 {
                     ((code_number as i32 + format4.id_delta[i] as i32) & 0xffff) as u32
                 } else {
-                    let mut offset =
-                        id_range_offset / 2 + i as u32 - format4.seg_count_x2 as u32 / 2;
-                    // reverce calculation
-                    offset += code_number as u32 - format4.codes[i].0 as u32;
-                    format4.glyph_id_array[offset as usize] as u32
+                    let Some(offset) = (id_range_offset / 2)
+                        .checked_add(i as u32)
+                        .and_then(|value| value.checked_sub(format4.seg_count_x2 as u32 / 2))
+                        .and_then(|value| value.checked_add(code_number as u32))
+                        .and_then(|value| value.checked_sub(format4.codes[i].0 as u32))
+                    else {
+                        return 0;
+                    };
+                    let Some(&glyph_id) = format4.glyph_id_array.get(offset as usize) else {
+                        return 0;
+                    };
+                    if glyph_id == 0 {
+                        0
+                    } else {
+                        ((glyph_id as i32 + format4.id_delta[i] as i32) & 0xffff) as u32
+                    }
                 };
                 position = gid;
 

@@ -372,7 +372,7 @@ fn get_names<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> Result
     31	Sindhi
     32	Uninterpreted
      */
-    #[cfg(all(feature = "encoding", not(windows)))]
+    #[cfg(all(feature = "encoding", not(windows), not(target_arch = "wasm32")))]
     let mac_convert_table = [
         "ISO-8859-1", // Roman
         "SJIS",       // Japanese
@@ -448,7 +448,7 @@ fn get_names<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> Result
                     name_records[i].string = "this encoding is not support".to_string();
                 }
             }
-            #[cfg(all(feature = "encoding", not(windows)))]
+            #[cfg(all(feature = "encoding", not(windows), not(target_arch = "wasm32")))]
             EncodingEngine::MacintoshLegcy => {
                 let bytes = file.read_bytes_as_vec(name_records[i].length as usize)?;
                 if mac_convert_table.len() > name_records[i].encoding_id as usize {
@@ -463,7 +463,11 @@ fn get_names<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> Result
                     name_records[i].string = "this encoding is not support".to_string();
                 }
             }
-            #[cfg(any(not(feature = "encoding"), windows))]
+            #[cfg(any(
+                not(feature = "encoding"),
+                windows,
+                target_arch = "wasm32"
+            ))]
             EncodingEngine::MacintoshLegcy => {
                 let _ = file.read_bytes_as_vec(name_records[i].length as usize)?;
                 name_records[i].string = "this encoding is not support".to_string();

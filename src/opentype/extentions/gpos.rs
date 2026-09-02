@@ -376,7 +376,7 @@ impl GPOS {
         let feature_list_offset = reader.read_u16_be()?;
         let lookup_list_offset = reader.read_u16_be()?;
         let feature_variations_offset = if major_version == 1 && minor_version == 1 {
-            reader.read_u16_be()?
+            reader.read_u32_be()?
         } else {
             0
         };

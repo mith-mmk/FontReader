@@ -39,6 +39,7 @@ pub mod commands;
 pub mod fontengine;
 pub mod fontface;
 pub mod fontfile;
+pub mod limits;
 #[cfg(feature = "svg-fonts")]
 pub(crate) mod svgparse;
 pub(crate) mod util;
@@ -55,13 +56,15 @@ pub use commands::{
     GlyphMetrics, GlyphPaint, GlyphRadialGradient, GlyphRun, PathGlyphLayer, PathPaintMode,
     PositionedGlyph, RasterGlyphLayer, RasterGlyphSource, TextDirection,
 };
-pub use fontengine::{FontEngine, ShapingPolicy};
+pub use fontengine::{FontEngine, LayoutMetrics, ShapingPolicy};
 pub use fontface::{FontFace, FontFaceDescriptor, FontFamily, FontVariationAxis};
 pub use fontfile::{
-    load_font, load_font_from_buffer, load_font_from_file, load_font_from_net, open_font,
-    open_font_from_buffer, open_font_from_file, open_font_from_net, ChunkedFontBuffer, FontFile,
-    FontSource,
+    load_font, load_font_from_buffer, load_font_from_buffer_with_limits,
+    load_font_from_file, load_font_from_file_with_limits, load_font_from_net, open_font,
+    open_font_from_buffer, open_font_from_buffer_with_limits, open_font_from_file,
+    open_font_from_file_with_limits, open_font_from_net, ChunkedFontBuffer, FontFile, FontSource,
 };
+pub use limits::DecodeLimits;
 
 #[cfg(feature = "raw")]
 #[allow(deprecated)]

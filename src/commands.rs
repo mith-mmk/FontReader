@@ -48,7 +48,7 @@ pub struct FontMetrics {
     pub flow: GlyphFlow,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct GlyphBounds {
     pub min_x: f32,
     pub min_y: f32,
@@ -352,13 +352,15 @@ impl FontVariant {
     #[cfg_attr(not(feature = "layout"), allow(dead_code))]
     pub(crate) fn gsub_feature_tags(self) -> &'static [[u8; 4]] {
         const EMPTY: &[[u8; 4]] = &[];
+        const SMALL_CAPS: &[[u8; 4]] = &[*b"c2sc", *b"smcp"];
         const JP78: &[[u8; 4]] = &[*b"jp78"];
         const JP90: &[[u8; 4]] = &[*b"jp90"];
         const TRAD: &[[u8; 4]] = &[*b"trad"];
         const NLCK: &[[u8; 4]] = &[*b"nlck"];
 
         match self {
-            Self::Normal | Self::SmallCaps => EMPTY,
+            Self::Normal => EMPTY,
+            Self::SmallCaps => SMALL_CAPS,
             Self::Jis78 => JP78,
             Self::Jis90 => JP90,
             Self::TraditionalForms => TRAD,

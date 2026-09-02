@@ -6,4 +6,6 @@ _test*
 .DS_Store
 /binary
 /test/**
+.test_data/
+test_data/
 .codex

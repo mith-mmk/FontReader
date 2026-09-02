@@ -1,0 +1,11 @@
+# Reproducible fixture manifest. Large or locally licensed fonts are not
+# committed here; point FONTCORE_TEST_FONTS at an external corpus instead.
+
+manifest_version = 1
+
+[[fixture]]
+id = "synthetic-tables"
+source = "inline byte builders in src/test.rs and table unit tests"
+license = "MIT (project test code)"
+sha256 = "not-applicable-inline-fixture"
+features = ["cmap", "layout", "color", "limits"]

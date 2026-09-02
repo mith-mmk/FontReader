@@ -33,6 +33,12 @@ impl OTFHeader {
         let search_range = file.read_u16_be()?;
         let entry_selector = file.read_u16_be()?;
         let range_shift = file.read_u16_be()?;
+        if num_tables > 4096 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "sfnt table count exceeds supported limit",
+            ));
+        }
         let mut table_records = Vec::new();
         for _ in 0..num_tables {
             let table_tag = file.read_u32_be()?;

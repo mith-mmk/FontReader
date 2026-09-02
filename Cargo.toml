@@ -28,7 +28,7 @@ raw = []
 encoding = []
 layout = []
 cff = []
-cff2 = []
+cff2 = ["cff"]
 svg-fonts = []
 
 [dependencies]

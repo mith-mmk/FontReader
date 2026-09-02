@@ -15,8 +15,7 @@ pub(crate) struct GDEF {
     // 1.2
     pub(crate) mark_glyph_sets_def: Option<MarkGlyphSetsDef>,
     // 1.3
-
-    // pub(crate) item_var_store: Option<VariationStore>,
+    pub(crate) item_var_store_offset: Option<u32>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -41,12 +40,12 @@ impl GDEF {
         let _lig_caret_list_offset = reader.read_u16_be()?;
         let _mark_attach_class_def_offset = reader.read_u16_be()?;
         let _mark_glyph_sets_def_offset = if minor_version >= 2 {
-            reader.read_u16_be()?
+            reader.read_u16_be()? as u32
         } else {
             0
         };
         let _item_var_store_offset = if minor_version >= 3 {
-            reader.read_u16_be()?
+            reader.read_u32_be()?
         } else {
             0
         };
@@ -100,7 +99,7 @@ impl GDEF {
             lig_caret_list,
             mark_attach_class_def,
             mark_glyph_sets_def,
-            // item_var_store: None,
+            item_var_store_offset: (_item_var_store_offset != 0).then_some(_item_var_store_offset),
         })
     }
 
@@ -175,18 +174,26 @@ pub(crate) struct AttachPointList {
 }
 
 impl AttachPointList {
-    fn new<R: BinaryReader>(reader: &mut R, offset: u64) -> Result<Self, std::io::Error> {
-        reader.seek(SeekFrom::Start(offset))?;
+    fn new<R: BinaryReader>(reader: &mut R, table_offset: u64) -> Result<Self, std::io::Error> {
+        reader.seek(SeekFrom::Start(table_offset))?;
         let coverage_offset = reader.read_u16_be()?;
         let glyph_count = reader.read_u16_be()?;
         let mut attach_point_offsets = Vec::with_capacity(glyph_count as usize);
         for _ in 0..glyph_count {
             attach_point_offsets.push(reader.read_u16_be()?);
         }
-        let coverage = Coverage::new(reader, offset + coverage_offset as u64)?;
+        let coverage = Coverage::new(reader, table_offset + coverage_offset as u64)?;
         let mut attach_point = Vec::with_capacity(glyph_count as usize);
-        for offset in attach_point_offsets {
-            attach_point.push(AttachPoint::new(reader, offset as u64)?);
+        for attach_point_relative_offset in attach_point_offsets {
+            let attach_point_offset = table_offset
+                .checked_add(attach_point_relative_offset as u64)
+                .ok_or_else(|| {
+                    std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "GDEF AttachPoint offset overflow",
+                    )
+                })?;
+            attach_point.push(AttachPoint::new(reader, attach_point_offset)?);
         }
         Ok(AttachPointList {
             coverage,
@@ -355,20 +362,27 @@ pub(crate) struct MarkGlyphSetsDef {
 impl MarkGlyphSetsDef {
     fn new<R: BinaryReader>(
         reader: &mut R,
-        offset: u64,
+        table_offset: u64,
         _length: u32,
     ) -> Result<Self, std::io::Error> {
-        reader.seek(SeekFrom::Start(offset))?;
+        reader.seek(SeekFrom::Start(table_offset))?;
         let mark_set_table_format = reader.read_u16_be()?;
         let mark_set_count = reader.read_u16_be()?;
         let mut coverage_offsets = Vec::with_capacity(mark_set_count as usize);
         for _ in 0..mark_set_count {
-            coverage_offsets.push(reader.read_u16_be()?);
+            coverage_offsets.push(reader.read_u32_be()?);
         }
         let mut coverages = Vec::with_capacity(mark_set_count as usize);
         for coverage_offset in coverage_offsets.iter() {
-            let offset = *coverage_offset as u64 + offset;
-            coverages.push(Coverage::new(reader, offset as u64)?);
+            let coverage_offset = table_offset
+                .checked_add(*coverage_offset as u64)
+                .ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "GDEF MarkGlyphSets coverage offset overflow",
+                )
+                })?;
+            coverages.push(Coverage::new(reader, coverage_offset)?);
         }
 
         Ok(Self {

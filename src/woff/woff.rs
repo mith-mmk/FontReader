@@ -1,7 +1,8 @@
 #![allow(dead_code)]
 
 use bin_rs::reader::BinaryReader;
-use miniz_oxide::inflate::decompress_to_vec_zlib;
+use miniz_oxide::inflate::decompress_to_vec_zlib_with_limit;
+use crate::limits::{resource_limit, DecodeLimits};
 
 #[derive(Debug, Clone)]
 pub struct WOFFHeader {
@@ -105,6 +106,20 @@ impl WOFF {
         reader: &mut B,
         header: WOFFHeader,
     ) -> Result<Self, std::io::Error> {
+        Self::from_with_limits(reader, header, &DecodeLimits::default())
+    }
+
+    pub(crate) fn from_with_limits<B: BinaryReader>(
+        reader: &mut B,
+        header: WOFFHeader,
+        limits: &DecodeLimits,
+    ) -> Result<Self, std::io::Error> {
+        if header.num_tables > 4096 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "WOFF table count exceeds supported limit",
+            ));
+        }
         let mut table_records = Vec::new();
         for _ in 0..header.num_tables {
             let mut table_record = WOFFTableRecord::new();
@@ -122,40 +137,94 @@ impl WOFF {
         // read metadata
         reader.seek(std::io::SeekFrom::Start(header.meta_offset as u64))?;
         let metadata = if header.meta_length > 0 {
-            let compress_metadata = reader.read_bytes_as_vec(header.meta_length as usize)?;
-            let metadata_bytes = decompress_to_vec_zlib(&compress_metadata);
-            if metadata_bytes.is_err() {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    "Failed to decompress metadata",
+            if header.meta_orig_length as usize > limits.max_metadata_bytes {
+                return Err(resource_limit(
+                    "WOFF metadata",
+                    header.meta_orig_length as usize,
+                    limits.max_metadata_bytes,
                 ));
             }
-            let metadata_bytes = metadata_bytes.unwrap();
-            String::from_utf8(metadata_bytes).unwrap()
+            let compress_metadata = reader.read_bytes_as_vec(header.meta_length as usize)?;
+            match decompress_to_vec_zlib_with_limit(
+                &compress_metadata,
+                limits.max_metadata_bytes,
+            ) {
+                Ok(metadata_bytes) if metadata_bytes.len() == header.meta_orig_length as usize => {
+                    String::from_utf8(metadata_bytes).unwrap_or_default()
+                }
+                _ => String::new(),
+            }
         } else {
             "".to_string()
         };
         // read private data
 
         reader.seek(std::io::SeekFrom::Start(header.priv_offset as u64))?;
+        if header.priv_length as usize > limits.max_table_bytes {
+            return Err(resource_limit(
+                "WOFF private data",
+                header.priv_length as usize,
+                limits.max_table_bytes,
+            ));
+        }
         let private_data = reader.read_bytes_as_vec(header.priv_length as usize)?;
 
         // read table data
         let mut tables = Vec::new();
+        let mut total_decompressed = 0usize;
         for table_record in table_records.iter() {
+            if table_record.comp_length as usize > limits.max_table_bytes {
+                return Err(resource_limit(
+                    "WOFF compressed table",
+                    table_record.comp_length as usize,
+                    limits.max_table_bytes,
+                ));
+            }
+            if table_record.orig_length as usize > limits.max_table_bytes {
+                return Err(resource_limit(
+                    "WOFF table",
+                    table_record.orig_length as usize,
+                    limits.max_table_bytes,
+                ));
+            }
             reader.seek(std::io::SeekFrom::Start(table_record.offset as u64))?;
             let mut table = WOFFTable::new();
             table.tag = table_record.tag;
             let mut table_data = reader.read_bytes_as_vec(table_record.comp_length as usize)?;
             if table_record.comp_length != table_record.orig_length {
-                let decompress = decompress_to_vec_zlib(&table_data);
-                if decompress.is_err() {
-                    return Err(std::io::Error::new(
-                        std::io::ErrorKind::InvalidData,
-                        "Failed to decompress table data",
-                    ));
-                }
-                table_data = decompress.unwrap();
+                table_data = decompress_to_vec_zlib_with_limit(
+                    &table_data,
+                    table_record.orig_length as usize,
+                )
+                .map_err(|_| {
+                    std::io::Error::new(std::io::ErrorKind::InvalidData, "invalid WOFF table")
+                })?;
+            }
+            if table_data.len() != table_record.orig_length as usize {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "WOFF table length does not match origLength",
+                ));
+            }
+            let actual_checksum = Self::checksum(table_record.tag, &table_data);
+            if actual_checksum != table_record.orig_checksum {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!(
+                        "WOFF table checksum does not match origChecksum for {:08x}: {:08x} != {:08x}",
+                        table_record.tag, actual_checksum, table_record.orig_checksum
+                    ),
+                ));
+            }
+            total_decompressed = total_decompressed
+                .checked_add(table_data.len())
+                .ok_or_else(|| resource_limit("WOFF decompressed data", usize::MAX, limits.max_total_decompressed_bytes))?;
+            if total_decompressed > limits.max_total_decompressed_bytes {
+                return Err(resource_limit(
+                    "WOFF decompressed data",
+                    total_decompressed,
+                    limits.max_total_decompressed_bytes,
+                ));
             }
             table.data = table_data;
             tables.push(table);
@@ -167,6 +236,23 @@ impl WOFF {
             metadata: Box::new(metadata),
             private_data: Box::new(private_data),
             tables,
+        })
+    }
+
+    fn checksum(tag: u32, data: &[u8]) -> u32 {
+        data.chunks(4).enumerate().fold(0u32, |sum, (index, chunk)| {
+            let mut word = [0u8; 4];
+            word[..chunk.len()].copy_from_slice(chunk);
+            if tag == u32::from_be_bytes(*b"head") {
+                let word_start = index * 4;
+                for byte in word.iter_mut().enumerate() {
+                    let position = word_start + byte.0;
+                    if (8..12).contains(&position) {
+                        *byte.1 = 0;
+                    }
+                }
+            }
+            sum.wrapping_add(u32::from_be_bytes(word))
         })
     }
 

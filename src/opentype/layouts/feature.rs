@@ -18,7 +18,7 @@ impl Feature {
         for i in 0..4 {
             bytes[3 - i] = (self.feature_tag >> (i * 8)) as u8;
         }
-        let tag = std::str::from_utf8(&bytes).unwrap();
+        let tag = String::from_utf8_lossy(&bytes);
         let mut string = format!("FeatureTag: {}\n", tag);
         string += &format!("FeatureParams: {:?}\n", self.feature_params);
         string += &format!("LookupListIndices: {:?}\n", self.lookup_list_indices);
@@ -133,8 +133,8 @@ pub(crate) struct FeatureVariation {
 
 #[derive(Debug, Clone)]
 pub(crate) struct FeatureVariationRecord {
-    pub(crate) condition_set_offset: u16,
-    pub(crate) feature_table_substitution_offset: u16,
+    pub(crate) condition_set_offset: u32,
+    pub(crate) feature_table_substitution_offset: u32,
 }
 
 #[derive(Debug, Clone)]
@@ -207,8 +207,8 @@ pub(crate) struct FeatureVariationRecordList {
 
 #[derive(Debug, Clone)]
 pub(crate) struct FeatureVariationList {
-    pub(crate) feature_variation_count: u16,
-    pub(crate) feature_variations: Vec<FeatureVariation>,
+    pub(crate) feature_variation_count: u32,
+    pub(crate) feature_variations: Vec<FeatureVariationRecord>,
 }
 impl FeatureVariationList {
     pub(crate) fn new<R: BinaryReader>(
@@ -217,25 +217,28 @@ impl FeatureVariationList {
         _length: u32,
     ) -> Result<Self, std::io::Error> {
         reader.seek(SeekFrom::Start(offset))?;
-        let feature_variation_count = reader.read_u16_be()?;
+        let major_version = reader.read_u16_be()?;
+        let minor_version = reader.read_u16_be()?;
+        if major_version != 1 || minor_version != 0 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "unsupported FeatureVariations version",
+            ));
+        }
+        let feature_variation_count = reader.read_u32_be()?;
+        if feature_variation_count > 4096 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "FeatureVariations count exceeds supported limit",
+            ));
+        }
         let mut feature_variations = Vec::new();
         for _ in 0..feature_variation_count {
-            let major_version = reader.read_u16_be()?;
-            let minor_version = reader.read_u16_be()?;
-            let feature_variation_record_count = reader.read_u16_be()?;
-            let mut feature_variation_records = Vec::new();
-            for _ in 0..feature_variation_record_count {
-                let condition_set_offset = reader.read_u16_be()?;
-                let feature_table_substitution_offset = reader.read_u16_be()?;
-                feature_variation_records.push(FeatureVariationRecord {
-                    condition_set_offset,
-                    feature_table_substitution_offset,
-                });
-            }
-            feature_variations.push(FeatureVariation {
-                major_version,
-                minor_version,
-                feature_variations: Box::new(feature_variation_records),
+            let condition_set_offset = reader.read_u32_be()?;
+            let feature_table_substitution_offset = reader.read_u32_be()?;
+            feature_variations.push(FeatureVariationRecord {
+                condition_set_offset,
+                feature_table_substitution_offset,
             });
         }
         Ok(Self {

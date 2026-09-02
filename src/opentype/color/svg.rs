@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use miniz_oxide::inflate::decompress_to_vec;
+use miniz_oxide::inflate::decompress_to_vec_with_limit;
 use std::io::SeekFrom;
 
 use bin_rs::reader::BinaryReader;
@@ -117,6 +117,7 @@ impl SVG {
         }
         let svg = decode_svg_document(svg_document?)?;
         let payload = extract_svg_payload_for_gid(&svg, gid)?;
+        let payload = sanitize_svg_payload(&payload)?;
         let (view_box_min_x, view_box_min_y, view_box_width, view_box_height) =
             layout_view_box(layout);
         Some(SvgGlyphDocument {
@@ -148,15 +149,19 @@ fn layout_view_box(layout: &FontLayout) -> (f32, f32, f32, f32) {
 }
 
 fn decode_svg_document(document: &[u8]) -> Option<String> {
+    const MAX_SVG_DOCUMENT_BYTES: usize = 32 * 1024 * 1024;
     if document.len() >= 3 && document[0] == 0x1f && document[1] == 0x8b && document[2] == 0x08 {
-        let decompress = decompress_gzip(document)?;
+        let decompress = decompress_gzip(document, MAX_SVG_DOCUMENT_BYTES)?;
         String::from_utf8(decompress).ok()
     } else {
+        if document.len() > MAX_SVG_DOCUMENT_BYTES {
+            return None;
+        }
         String::from_utf8(document.to_vec()).ok()
     }
 }
 
-fn decompress_gzip(document: &[u8]) -> Option<Vec<u8>> {
+fn decompress_gzip(document: &[u8], max_output: usize) -> Option<Vec<u8>> {
     if document.len() < 18 {
         return None;
     }
@@ -187,7 +192,83 @@ fn decompress_gzip(document: &[u8]) -> Option<Vec<u8>> {
         return None;
     }
 
-    decompress_to_vec(&document[cursor..document.len() - 8]).ok()
+    let expected_crc = u32::from_le_bytes([
+        *document.get(document.len() - 8)?,
+        *document.get(document.len() - 7)?,
+        *document.get(document.len() - 6)?,
+        *document.get(document.len() - 5)?,
+    ]);
+    let expected_size = u32::from_le_bytes([
+        *document.get(document.len() - 4)?,
+        *document.get(document.len() - 3)?,
+        *document.get(document.len() - 2)?,
+        *document.get(document.len() - 1)?,
+    ]) as usize;
+    if expected_size > max_output {
+        return None;
+    }
+    let decompressed = decompress_to_vec_with_limit(&document[cursor..document.len() - 8], max_output).ok()?;
+    if decompressed.len() != expected_size {
+        return None;
+    }
+    if crc32(&decompressed) != expected_crc {
+        return None;
+    }
+    Some(decompressed)
+}
+
+fn crc32(data: &[u8]) -> u32 {
+    let mut crc = 0xffff_ffffu32;
+    for byte in data {
+        crc ^= *byte as u32;
+        for _ in 0..8 {
+            let mask = 0u32.wrapping_sub(crc & 1);
+            crc = (crc >> 1) ^ (0xedb8_8320 & mask);
+        }
+    }
+    !crc
+}
+
+fn sanitize_svg_payload(payload: &str) -> Option<String> {
+    let lowered = payload.to_ascii_lowercase();
+    const FORBIDDEN_MARKERS: &[&str] = &[
+        "<script",
+        "<foreignobject",
+        "<iframe",
+        "<object",
+        "<embed",
+        "<a ",
+        "<a>",
+        "<!doctype",
+        "<!entity",
+        "url(http:",
+        "url(https:",
+        "url(//",
+        "href=\"http:",
+        "href=\"https:",
+        "href='http:",
+        "href='https:",
+        "xlink:href=\"http:",
+        "xlink:href=\"https:",
+        "xlink:href='http:",
+        "xlink:href='https:",
+    ];
+    if FORBIDDEN_MARKERS.iter().any(|marker| lowered.contains(marker)) {
+        return None;
+    }
+
+    let mut cursor = 0usize;
+    while let Some(relative) = lowered[cursor..].find(" on") {
+        let start = cursor + relative + 3;
+        let Some(attribute) = lowered.get(start..) else {
+            break;
+        };
+        if attribute.starts_with(|ch: char| ch.is_ascii_alphabetic()) {
+            return None;
+        }
+        cursor = start;
+    }
+    Some(payload.to_string())
 }
 
 fn extract_svg_payload_for_gid(document: &str, gid: u16) -> Option<String> {
@@ -487,5 +568,13 @@ mod tests {
         assert!(payload.contains("clipPath"));
         assert!(payload.contains("glyph4-shape"));
         assert!(!payload.contains("glyph3-shape"));
+    }
+
+    #[test]
+    fn svg_payload_rejects_active_content_and_external_references() {
+        assert!(sanitize_svg_payload("<path d=\"M0 0\"/>").is_some());
+        assert!(sanitize_svg_payload("<script>alert(1)</script>").is_none());
+        assert!(sanitize_svg_payload("<path onclick=\"alert(1)\"/>").is_none());
+        assert!(sanitize_svg_payload("<use href=\"https://example.test/x\"/>").is_none());
     }
 }

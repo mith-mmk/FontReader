@@ -1,7 +1,5 @@
 //! High-level shaping and rendering engine bound to one [`crate::FontFace`].
 
-#[cfg(feature = "svg-fonts")]
-use crate::commands::SvgGlyphLayer;
 use crate::commands::{
     Command, FillRule, FontOptions, FontVariant, FontVariationSetting, GlyphBounds,
     GlyphGradientSpread, GlyphGradientUnits, GlyphLayer, GlyphLinearGradient, GlyphPaint,
@@ -20,6 +18,15 @@ pub enum ShapingPolicy {
     LeftToRight,
     RightToLeft,
     TopToBottom,
+}
+
+/// Logical and ink extents produced from one shaped glyph run.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct LayoutMetrics {
+    pub inline_advance: f64,
+    pub block_extent: f64,
+    pub ink_bounds: Option<GlyphBounds>,
+    pub line_bounds: Option<GlyphBounds>,
 }
 
 impl Default for ShapingPolicy {
@@ -207,9 +214,72 @@ impl<'a> FontEngine<'a> {
 
     /// Measures the inline extent of shaped text.
     pub fn measure(&self, text: &str) -> Result<f64, Error> {
-        let mut options = self.options();
-        options.font = Some(crate::FontRef::Loaded(self.face));
-        self.face.font().measure_with_options(text, &options)
+        Ok(self.measure_layout(text)?.inline_advance)
+    }
+
+    /// Measures logical and ink extents from the same run returned by [`Self::shape`].
+    pub fn measure_layout(&self, text: &str) -> Result<LayoutMetrics, Error> {
+        let run = self.text2glyph_run(text)?;
+        let direction = self.options().text_direction;
+        let inline_advance: f32 = match direction {
+            TextDirection::TopToBottom => run
+                .glyphs
+                .iter()
+                .map(|glyph| glyph.glyph.metrics.advance_y)
+                .sum(),
+            TextDirection::RightToLeft => run
+                .glyphs
+                .iter()
+                .map(|glyph| glyph.glyph.metrics.advance_x)
+                .sum::<f32>()
+                .abs(),
+            TextDirection::LeftToRight => run
+                .glyphs
+                .iter()
+                .map(|glyph| glyph.glyph.metrics.advance_x)
+                .sum(),
+        };
+        let mut ink_bounds = None;
+        let mut line_bounds = None;
+        for positioned in &run.glyphs {
+            if let Some(bounds) = positioned.glyph.metrics.bounds {
+                extend_bounds(
+                    &mut ink_bounds,
+                    positioned.x + bounds.min_x,
+                    positioned.y + bounds.min_y,
+                );
+                extend_bounds(
+                    &mut ink_bounds,
+                    positioned.x + bounds.max_x,
+                    positioned.y + bounds.max_y,
+                );
+            }
+            let (end_x, end_y) = if direction.is_vertical() {
+                (positioned.x, positioned.y + positioned.glyph.metrics.advance_y)
+            } else {
+                (
+                    positioned.x + positioned.glyph.metrics.advance_x,
+                    positioned.y,
+                )
+            };
+            extend_bounds(&mut line_bounds, positioned.x, positioned.y);
+            extend_bounds(&mut line_bounds, end_x, end_y);
+        }
+        let block_extent = line_bounds
+            .map(|bounds| {
+                if direction.is_vertical() {
+                    (bounds.max_x - bounds.min_x).abs()
+                } else {
+                    (bounds.max_y - bounds.min_y).abs()
+                }
+            })
+            .unwrap_or(0.0);
+        Ok(LayoutMetrics {
+            inline_advance: inline_advance.abs() as f64,
+            block_extent: block_extent as f64,
+            ink_bounds,
+            line_bounds,
+        })
     }
 
     /// Renders shaped text to SVG.
@@ -226,6 +296,22 @@ impl<'a> FontEngine<'a> {
     pub fn text2svg(&self, text: &str) -> Result<String, Error> {
         let run = self.text2glyph_run(text)?;
         glyph_run_to_svg(&run, &self.svg_unit)
+    }
+}
+
+fn extend_bounds(bounds: &mut Option<GlyphBounds>, x: f32, y: f32) {
+    if let Some(bounds) = bounds.as_mut() {
+        bounds.min_x = bounds.min_x.min(x);
+        bounds.min_y = bounds.min_y.min(y);
+        bounds.max_x = bounds.max_x.max(x);
+        bounds.max_y = bounds.max_y.max(y);
+    } else {
+        *bounds = Some(GlyphBounds {
+            min_x: x,
+            min_y: y,
+            max_x: x,
+            max_y: y,
+        });
     }
 }
 
@@ -399,7 +485,11 @@ pub(crate) fn glyph_run_to_svg(run: &GlyphRun, fontunit: &str) -> Result<String,
                 }
                 #[cfg(feature = "svg-fonts")]
                 GlyphLayer::Svg(layer) => {
-                    body += &svg_layer_to_svg_fragment(layer, glyph.x, glyph.y);
+                    let _ = (layer, glyph);
+                    return Err(Error::new(
+                        ErrorKind::Unsupported,
+                        "unsafe or unsupported embedded SVG glyph layer",
+                    ));
                 }
             }
         }
@@ -851,20 +941,4 @@ fn raster_layer_dimensions(raster: &RasterGlyphLayer) -> Result<Option<(f32, f32
     }
 
     Ok(Some((width as f32, height as f32)))
-}
-
-#[cfg(feature = "svg-fonts")]
-fn svg_layer_to_svg_fragment(layer: &SvgGlyphLayer, glyph_x: f32, glyph_y: f32) -> String {
-    format!(
-        "<svg x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" viewBox=\"{} {} {} {}\" overflow=\"visible\">{}</svg>",
-        glyph_x + layer.offset_x,
-        glyph_y + layer.offset_y,
-        layer.width,
-        layer.height,
-        layer.view_box_min_x,
-        layer.view_box_min_y,
-        layer.view_box_width,
-        layer.view_box_height,
-        layer.document
-    )
 }
