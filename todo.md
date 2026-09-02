@@ -3,88 +3,153 @@
 更新日: 2026-09-02
 対象ブランチ: `codex-fontcore-remediation`
 基準コミット: `819f677a2363f9e21b71b77a1f5bcf3d2f31b600`
+直近実装コミット: `f3b6079`
 
-## 判定方法
+## このファイルの使い方
 
-- `[x]` 実装と合成回帰テストが完了
-- `[~]` 部分実装、外部コーパス依存、または既知の制限あり
+このファイルは、現時点の実装状態と次の作業だけを管理する。過去のレビュー指摘や完了済み作業を別の未完了項目として重複記載しない。
+
+- `[x]` 実装と回帰テストが完了
+- `[~]` 部分実装、既知の制限、または追加検証が必要
 - `[ ]` 未実装または延期
-- OpenType 1.9.1、WOFF File Format 1.0、UAX #9 / #29を基準にする
-- `todo.md`のチェック欄だけを実装状況の正本にしない。テスト名、対応規格、`doc/implementation-status.md`を根拠とする
+- 仕様判定はOpenType 1.9.1、WOFF File Format 1.0、UAX #9 / #29を基準にする
+- 完了判定の根拠はテスト名、対応規格、`doc/implementation-status.md`、fixture manifestとする
 
-## 完了
+## 実装済み
 
-- [x] `FontFile` / `FontFace`の公開読み込み入口と`*_with_limits`、`DecodeLimits`
-- [x] sfnt / TTCの表境界検証、空TTC拒否、TTC face選択時の安全なエラー処理
-- [x] WOFFの宣言長、表範囲・重複、圧縮後長、チェックサム、metadata/private data、展開量の検証
-- [x] WOFF2の入力長・復号後サイズに対する上限検証
-- [x] `cmap` Format 4 / 12 / 13 / 14のidDelta、補助平面、既定UVS、非既定UVS、未対応形式の回帰
-- [x] CPAL v0のパレット開始位置・範囲検証と`0xFFFF`のCurrentColor、COLR v0回帰
-- [x] GDEFの相対基点・Offset32読解修正と合成パーサーテスト
-- [x] `fvar`のhidden flag、軸・instance配列境界、`avar`の順序・必須点・軸数検証
-- [x] GSUB / GPOSのfeature・lookup indexの安全なスキップ
-- [x] GSUB Context / ChainingのSequenceLookupRecord保持、Multiple置換の上限、Reverse Chainingの右から左の適用
-- [x] 同一GPOS lookup内の重複サブテーブル適用を防ぐ制御
-- [x] SVG gzipのISIZE / CRC、呼び出し側の`max_svg_bytes`、構文ベースの保守的allowlist
-- [x] script、イベント属性、外部URL、危険な要素を含むSVG payloadのfail-closed回帰
-- [x] `shape()`由来の測定経路と既存のサイズ・stretch境界回帰
-- [x] `FONTCORE_TEST_FONTS`指定時だけ外部フォントコーパスをコンパイルするテスト分離
-- [x] push / pull request向けCIにtest、all-features、examples、doc、WASM checkを追加
+### 読み込みと安全性
+
+- [x] `FontFile` / `FontFace`の公開読み込み入口と`*_with_limits`
+- [x] `DecodeLimits`による入力、表、WOFF、WOFF2、SVG展開量の制限
+- [x] sfnt / TTCの表境界検証と空TTC・不正face選択の拒否
+- [x] WOFFの宣言長、表範囲・重複、圧縮後長、checksum、metadata/private data検証
+- [x] 外部入力由来の今回確認済みpanic経路（TTC、CPAL、GSUB/GPOS indexなど）の修正
+
+### OpenType表と整形の既存範囲
+
+- [x] `cmap` Format 4 / 12 / 13 / 14のidDelta、補助平面、既定・非既定UVS
+- [x] `fvar` / `avar`の境界、hidden flag、軸数、順序、必須map点の検証
+- [x] GDEFのAttachList、MarkGlyphSetsDef、ItemVariationStoreに関する相対基点・Offset32修正
+- [x] GSUB Context / ChainingのSequenceLookupRecord保持とFormat 1–3の既存適用経路
+- [x] GSUB Multiple置換の出力上限、自己参照防止、Reverse Chainingの右から左適用
+- [x] GPOS pair / mark系の既存適用と同一lookup内の重複サブテーブル適用防止
+- [x] GSUB / GPOSのlocale、script、required feature、無効indexの安全な処理
+- [x] CPAL v0のパレット相対indexと`0xFFFF` CurrentColor、COLR v0
+- [x] CFF2 charstringの`vsindex` / `blend`とPrivate DICTの既存実装
+- [x] OpenType SVGのgzip ISIZE / CRC、構文allowlist、危険要素・属性・外部参照の拒否
+- [x] `shape()`由来の既存測定経路、font size / stretch回帰
+
+### 検証基盤
+
+- [x] 通常push / pull request向けのtest、all-features、examples、doc、WASM check CI
+- [x] `FONTCORE_TEST_FONTS`指定時だけ外部フォントcorpusを有効化
+- [x] 合成fixture manifest（`tests/fixtures/manifest.toml`）
+- [x] HarfBuzzを開発時の差分比較器として利用する方針
 
 ## 部分実装・既知の制限
 
-- [~] CIのstrict fmt / Clippyは既存のリポジトリ全体のformat・lint負債により未緑化。CIジョブは追加済みだが完了扱いにしない
-- [~] 表単位の境界検証は導入済みだが、全表を統一`TableProvider` / readerへ移行する監査は未完了
-- [~] GSUB / GPOSのlookup flag、MarkFilteringSet、FeatureVariationsの実行時置換、全Type 1–8 / 1–9共通実行器
-- [~] GDEFのクラス・mark filteringの実行時結線、mark-to-ligatureのcomponent選択
-- [~] Reverse Chainingは方向制御を修正済みだが、複数の実フォント差分回帰は未完了
-- [~] `TextRun` / `GlyphBuffer`による完全なUAX #9 / #29 bidi・script itemizationは未導入
-- [~] `FontFamily`は距離ベース選択のままで、家族列・Last Resort・クラスタ単位のCSS相当fallbackは未完了
-- [~] SVGは安全な構文allowlistで拒否できる範囲を確保した段階。完全なscene化、ID・transform・clip・gradient座標の統一は未完了
-- [~] COLR v0 / CPAL v0は対象。COLR v1 / CPAL v1は未実装
-- [~] CFF2実装は存在するが、再配布可能な実フォントfixture、軸別outline署名、malformed corpus回帰が未完了
-- [~] HarfBuzz差分比較とファジングは開発用手順であり、CIの定期検査には未統合
+- [~] 表単位の境界検証は進んでいるが、全表を統一`TableProvider` / bounded readerへ移行する監査は未完了
+- [~] GSUB / GPOSの全Type 1–8 / 1–9共通実行器、lookup flag、MarkFilteringSet、FeatureVariations実行時置換
+- [~] GDEFのglyph class・mark filteringの実行時結線とmark-to-ligatureのcomponent選択
+- [~] GSUB Multipleの入力cursor・固定点反復・巨大出力に対するファジング／包括的回帰
+- [~] 公開API全体のcount・offset・index・確保量に対するpanic／resource-limit監査
+- [~] Reverse Chainingの複数実フォント差分検証
+- [~] CFF2の再配布可能な真の可変フォントfixture、軸別outline署名、malformed corpus回帰
+- [~] `shape()`、`measure()`、`render_svg()`が詳細な同一`GlyphRun`／レイアウト結果を共有するAPI統一
+- [~] CIのstrict fmt / Clippyは既存のリポジトリ全体のformat・lint負債により未緑化
 
-## Solレビューで確認した残件
+## 次の実装項目
 
-- [ ] GSUB Multiple置換で同一lookupを自己参照する入力を含む、固定点反復・入力cursor・出力上限の包括的検証
-- [ ] TTC / GSUB / GPOSの全公開経路について、任意のcount・index・offsetのパニック監査を完了
-- [ ] WOFF表数上限とソート済み範囲検査を、コンテナdecoder共通層へ統合
-- [ ] `DecodeLimits`をWOFF / SVG以外のすべての展開・確保経路へ接続
-- [ ] OpenType SVGをXML allowlistまたはsceneへ変換し、文字列ブラックリスト依存を完全に排除
-- [ ] fvar / avarのinstance範囲・map仕様を実フォントで追加検証
+### M1: 境界検証の共通化
 
-## 次の実装順
+- [ ] 共通bounded reader / `TableProvider`へ全loaderを移行する
+- [ ] すべてのcount、offset、加算、乗算、slice取得を共通境界APIへ集約する
+- [ ] `DecodeLimits`を全展開・確保経路へ接続する
+- [ ] `from_buffer`、face列挙、metadata、shape、measure、render_svg、raw dumpを対象にpanic・無限ループ・NaN/Infinityのファジングを追加する
 
-1. 境界reader / `DecodeLimits`の全表共通化と残存panic除去
-2. GSUB / GPOS共通lookup実行器とGDEF検索フラグの統合
-3. `TextRun` / `GlyphBuffer`、UAX #29 cluster、UAX #9 bidi、script / language itemization
-4. `shape()`・`measure()`・`render_svg()`の詳細結果共有とクラスタ単位fallback
-5. 安全なSVG scene、出力座標・bounds統一、COLR v1 / CPAL v1
-6. CFF2実フォント回帰、loader / feature / 文書の整理
+受入条件: 任意バイト列でpanicせず、上限超過は明示的なresource-limit errorで停止する。
 
-## テスト実行
+### M2: GSUB / GPOS共通実行器
 
-外部フォントなしの必須テスト:
+- [ ] `TextRun`、`GlyphInfo`、`GlyphPosition`、`GlyphBuffer`を導入する
+- [ ] lookup index順、lookup flag、MarkFilteringSet、GDEF classを共通実行器で扱う
+- [ ] GSUB Type 1–8とGPOS Type 1–9、Extension、Device / VariationIndexを統合する
+- [ ] Context / Chainingの指定`sequenceIndex`へ入れ子lookupを適用し、置換後もclusterを維持する
+- [ ] 同一lookupの適用回数・置換長に上限を設け、無条件の固定点反復を行わない
+
+受入条件: 合字・複数置換・文脈置換・位置調整のglyph ID、cluster、advance、offsetをfixtureで検証できる。
+
+### M3: Unicode itemizationとfallback
+
+- [ ] UAX #29拡張書記素cluster分割を整形入力へ導入する
+- [ ] UAX #9の段落、埋め込みlevel、視覚順を導入する
+- [ ] script / language / direction / face単位の`TextRun`分割を行う
+- [ ] Latin、日本語、Arabic、Syriac、Hebrew、Tibetan、Emoji/VS/ZWJのfixtureを整備する
+- [ ] `FontFamily`と家族列を分離し、`FontFallbackList` / `LastResortFace`を追加する
+- [ ] Unicode caseless matchingとcluster単位fallbackを実装する
+- [ ] `FontVariant::SmallCaps`を`smcp` / `c2sc`へ接続し、任意feature指定を追加する
+
+受入条件: 混在LTR / RTL、VS/ZWJ、mark clusterでface分割やcluster分断が発生しない。
+
+### M4: 測定・出力・色フォント
+
+- [ ] `shape()`、`measure()`、`render_svg()`を同一の詳細整形結果から生成する
+- [ ] logical advance、logical bounds、ink bounds、line boundsを分離する
+- [ ] size、stretch、variationの適用を一度に統一する
+- [ ] SVGを安全化済みsceneへ変換し、ID、transform、clip、gradient、mask座標を統一する
+- [ ] 実レイヤーからboundsを算出し、COLR v0 / SVG / sbixで描画範囲を一致させる
+- [ ] COLR v1 / CPAL v1を段階実装する
+
+受入条件: shape末尾cursorとmeasureが一致し、サイズ倍・stretch倍・色レイヤーboundsの回帰が通る。
+
+### M5: 整理と回帰拡充
+
+- [ ] sfnt / WOFF / WOFF2の表dispatchを共通化する
+- [ ] `cff2` featureを実コードとCI検証へ結線する
+- [ ] 実フォント回帰とHarfBuzz差分比較を定期検査へ移行する
+- [ ] `doc/feature-status*`の「パース済み」「実行可能」「実フォント回帰済み」を現行コードへ同期する
+- [ ] strict fmt / Clippyの既存負債を段階的に解消する
+
+## 保留する項目
+
+整形コア完成後に扱う。現在の残実装の完了条件には含めない。
+
+- [ ] TrueType hinting（`cvt `、`fpgm`、`prep`、`gasp`）
+- [ ] BASE / JSTF / MATH
+- [ ] EBDT / EBLC / EBSC、CBDT / CBLC
+- [ ] DSIG / PCLT / VDMX / LTSH / MERG
+- [ ] 複雑なSVG pattern / filterの完全描画
+- [ ] rich text、ruby、OS固有のインストール済みフォント探索
+
+## 検証コマンド
+
+必須テスト（外部フォント不要）:
 
 ```text
 cargo test --all-features --lib
 ```
 
-外部コーパスを明示的に使う場合:
+外部corpus（明示指定時のみ）:
 
 ```text
 FONTCORE_TEST_FONTS=<path> cargo test --all-features --lib
 ```
 
-外部コーパスはライセンス、出典、SHA-256、対象featureをfixture manifestで管理し、通常のclean cloneの必須依存にはしない。
+補助検証:
 
-## 2026-09-02 検証結果
+```text
+cargo test --no-default-features
+cargo test --no-default-features --features "layout,cff"
+cargo check --examples --all-features
+cargo check --target wasm32-unknown-unknown --all-features
+cargo doc --all-features --no-deps
+```
 
-- clean相当の`cargo test --all-features --lib`: 108 passed
-- `FONTCORE_TEST_FONTS`指定時の外部コーパス: 240 passed、3 ignored
-- `cargo test --no-default-features`: 32 passed
-- `cargo test --no-default-features --features "layout,cff"`: 39 passed
-- `cargo check --examples --all-features`、WASM check、all-feature doc生成: 成功
-- `cargo fmt --all -- --check`: 既存を含むformat差分により未成功
-- `cargo clippy --all-targets --all-features -- -D warnings`: 既存を含むlint負債により未成功
+直近の検証結果（2026-09-02）:
+
+- clean相当 all-feature: 108 passed
+- 外部corpus: 240 passed、3 ignored
+- no-default: 32 passed
+- layout/cff: 39 passed
+- examples、WASM check、doc生成: 成功
+- strict fmt / Clippy: 既存のformat・lint負債により未成功
