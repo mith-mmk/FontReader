@@ -1023,7 +1023,9 @@ impl GPOS {
                 for feature_index in
                     Self::collect_language_system_feature_indices(&language_system.language_system)
                 {
-                    let feature = &self.features.features[feature_index as usize];
+                    let Some(feature) = self.features.features.get(feature_index as usize) else {
+                        continue;
+                    };
                     if !feature_tags
                         .iter()
                         .any(|tag| feature.feature_tag == u32::from_be_bytes(*tag))
@@ -1176,6 +1178,10 @@ impl GPOS {
                 if let Some(found) = subtable.lookup_pair_adjustment(left, right) {
                     adjustment.add_assign(found);
                     matched = true;
+                    // A lookup is an ordered list of alternative subtables.
+                    // Once one subtable matches, the remaining subtables in
+                    // that lookup must not apply a second adjustment.
+                    break;
                 }
             }
         }

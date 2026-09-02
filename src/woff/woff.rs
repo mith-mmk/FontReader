@@ -264,3 +264,31 @@ impl WOFF {
         &self.private_data
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bin_rs::reader::BytesReader;
+
+    #[test]
+    fn rejects_excessive_table_count_before_reading_directory() {
+        let header = WOFFHeader {
+            sfnt_version: 0,
+            signature: 0,
+            flavor: 0,
+            length: 44,
+            num_tables: 4097,
+            reserved: 0,
+            total_sfnt_size: 0,
+            major_version: 0,
+            minor_version: 0,
+            meta_offset: 0,
+            meta_length: 0,
+            meta_orig_length: 0,
+            priv_offset: 0,
+            priv_length: 0,
+        };
+        let mut reader = BytesReader::new(&[]);
+        assert!(WOFF::from_with_limits(&mut reader, header, &DecodeLimits::default()).is_err());
+    }
+}

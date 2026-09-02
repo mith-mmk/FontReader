@@ -40,6 +40,12 @@ impl TTCHeader {
                 "TTC face count exceeds supported limit",
             ));
         }
+        if header.num_fonts == 0 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "TTC collection does not contain a face",
+            ));
+        }
         for _ in 0..header.num_fonts {
             header.table_directory.push(reader.read_u32_be()?);
         }
@@ -89,6 +95,17 @@ mod tests {
     #[test]
     fn ttc_header_returns_error_on_truncated_input() {
         let mut reader = BytesReader::new(b"ttc");
+        assert!(TTCHeader::new(&mut reader).is_err());
+    }
+
+    #[test]
+    fn ttc_header_rejects_empty_collections() {
+        let mut data = Vec::new();
+        data.extend_from_slice(&0x0001_0000u32.to_be_bytes());
+        data.extend_from_slice(&1u16.to_be_bytes());
+        data.extend_from_slice(&0u16.to_be_bytes());
+        data.extend_from_slice(&0u32.to_be_bytes());
+        let mut reader = BytesReader::new(&data);
         assert!(TTCHeader::new(&mut reader).is_err());
     }
 }

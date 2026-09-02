@@ -6,6 +6,7 @@ use std::io::SeekFrom;
 use bin_rs::reader::BinaryReader;
 
 use crate::fontreader::FontLayout;
+use crate::limits::DecodeLimits;
 
 #[derive(Debug, Clone)]
 pub(crate) struct SvgGlyphDocument {
@@ -20,6 +21,7 @@ pub(crate) struct SvgGlyphDocument {
 pub(crate) struct SVG {
     version: u16,
     svg_document_list: SVGDocumetList,
+    max_svg_bytes: usize,
     // reserved: u32,
 }
 
@@ -27,7 +29,16 @@ impl SVG {
     pub(crate) fn new<R: BinaryReader>(
         reader: &mut R,
         offset: u32,
-        _: u32,
+        length: u32,
+    ) -> Result<Self, std::io::Error> {
+        Self::new_with_limits(reader, offset, length, &DecodeLimits::default())
+    }
+
+    pub(crate) fn new_with_limits<R: BinaryReader>(
+        reader: &mut R,
+        offset: u32,
+        length: u32,
+        limits: &DecodeLimits,
     ) -> Result<Self, std::io::Error> {
         let offset = offset as u64;
         reader.seek(SeekFrom::Start(offset))?;
@@ -41,6 +52,7 @@ impl SVG {
         Ok(Self {
             version,
             svg_document_list,
+            max_svg_bytes: limits.max_svg_bytes.min(length as usize),
         })
     }
 
@@ -115,7 +127,7 @@ impl SVG {
                 break;
             }
         }
-        let svg = decode_svg_document(svg_document?)?;
+        let svg = decode_svg_document(svg_document?, self.max_svg_bytes)?;
         let payload = extract_svg_payload_for_gid(&svg, gid)?;
         let payload = sanitize_svg_payload(&payload)?;
         let (view_box_min_x, view_box_min_y, view_box_width, view_box_height) =
@@ -148,13 +160,12 @@ fn layout_view_box(layout: &FontLayout) -> (f32, f32, f32, f32) {
     }
 }
 
-fn decode_svg_document(document: &[u8]) -> Option<String> {
-    const MAX_SVG_DOCUMENT_BYTES: usize = 32 * 1024 * 1024;
+fn decode_svg_document(document: &[u8], max_svg_bytes: usize) -> Option<String> {
     if document.len() >= 3 && document[0] == 0x1f && document[1] == 0x8b && document[2] == 0x08 {
-        let decompress = decompress_gzip(document, MAX_SVG_DOCUMENT_BYTES)?;
+        let decompress = decompress_gzip(document, max_svg_bytes)?;
         String::from_utf8(decompress).ok()
     } else {
-        if document.len() > MAX_SVG_DOCUMENT_BYTES {
+        if document.len() > max_svg_bytes {
             return None;
         }
         String::from_utf8(document.to_vec()).ok()
@@ -230,45 +241,153 @@ fn crc32(data: &[u8]) -> u32 {
 }
 
 fn sanitize_svg_payload(payload: &str) -> Option<String> {
-    let lowered = payload.to_ascii_lowercase();
-    const FORBIDDEN_MARKERS: &[&str] = &[
-        "<script",
-        "<foreignobject",
-        "<iframe",
-        "<object",
-        "<embed",
-        "<a ",
-        "<a>",
-        "<!doctype",
-        "<!entity",
-        "url(http:",
-        "url(https:",
-        "url(//",
-        "href=\"http:",
-        "href=\"https:",
-        "href='http:",
-        "href='https:",
-        "xlink:href=\"http:",
-        "xlink:href=\"https:",
-        "xlink:href='http:",
-        "xlink:href='https:",
-    ];
-    if FORBIDDEN_MARKERS.iter().any(|marker| lowered.contains(marker)) {
+    let mut cursor = 0usize;
+    while let Some(relative) = payload.get(cursor..)?.find('<') {
+        let start = cursor + relative;
+        let end = find_svg_tag_end(payload, start)?;
+        validate_svg_tag(&payload[start + 1..end])?;
+        cursor = end;
+    }
+    if payload.get(cursor..)?.contains('>') {
         return None;
     }
+    Some(payload.to_string())
+}
 
+fn find_svg_tag_end(payload: &str, start: usize) -> Option<usize> {
+    let bytes = payload.as_bytes();
+    let mut quote = None;
+    for index in start + 1..bytes.len() {
+        match (quote, bytes[index]) {
+            (Some(expected), byte) if byte == expected => quote = None,
+            (None, b'\'' | b'\"') => quote = Some(bytes[index]),
+            (None, b'>') => return Some(index + 1),
+            _ => {}
+        }
+    }
+    None
+}
+
+fn validate_svg_tag(tag: &str) -> Option<()> {
+    const SAFE_ELEMENTS: &[&str] = &[
+        "svg", "g", "path", "rect", "circle", "ellipse", "line", "polyline", "polygon",
+        "defs", "lineargradient", "radialgradient", "stop", "clippath", "mask", "use",
+    ];
+    let bytes = tag.as_bytes();
     let mut cursor = 0usize;
-    while let Some(relative) = lowered[cursor..].find(" on") {
-        let start = cursor + relative + 3;
-        let Some(attribute) = lowered.get(start..) else {
-            break;
-        };
-        if attribute.starts_with(|ch: char| ch.is_ascii_alphabetic()) {
+    skip_svg_whitespace(bytes, &mut cursor);
+    if bytes.get(cursor).copied() == Some(b'!') || bytes.get(cursor).copied() == Some(b'?') {
+        return None;
+    }
+    let closing = bytes.get(cursor).copied() == Some(b'/');
+    if closing {
+        cursor += 1;
+        skip_svg_whitespace(bytes, &mut cursor);
+    }
+    let name_start = cursor;
+    while bytes
+        .get(cursor)
+        .is_some_and(|byte| byte.is_ascii_alphanumeric() || *byte == b':')
+    {
+        cursor += 1;
+    }
+    if name_start == cursor {
+        return None;
+    }
+    let name = tag.get(name_start..cursor)?.to_ascii_lowercase();
+    if !SAFE_ELEMENTS.contains(&name.as_str()) {
+        return None;
+    }
+    if closing {
+        skip_svg_whitespace(bytes, &mut cursor);
+        return (cursor == bytes.len() - 1).then_some(());
+    }
+
+    loop {
+        skip_svg_whitespace(bytes, &mut cursor);
+        if cursor >= bytes.len() - 1 {
+            return Some(());
+        }
+        if bytes[cursor] == b'/' {
+            cursor += 1;
+            skip_svg_whitespace(bytes, &mut cursor);
+            return (cursor == bytes.len() - 1).then_some(());
+        }
+
+        let attr_start = cursor;
+        while bytes
+            .get(cursor)
+            .is_some_and(|byte| !byte.is_ascii_whitespace() && !matches!(*byte, b'=' | b'>'))
+        {
+            cursor += 1;
+        }
+        if attr_start == cursor {
             return None;
         }
-        cursor = start;
+        let attribute = tag.get(attr_start..cursor)?.to_ascii_lowercase();
+        if attribute.starts_with("on")
+            || matches!(attribute.as_str(), "style" | "src" | "action" | "begin")
+        {
+            return None;
+        }
+        skip_svg_whitespace(bytes, &mut cursor);
+        if bytes.get(cursor).copied() != Some(b'=') {
+            return None;
+        }
+        cursor += 1;
+        skip_svg_whitespace(bytes, &mut cursor);
+        let quote = *bytes.get(cursor)?;
+        if quote != b'\'' && quote != b'\"' {
+            return None;
+        }
+        cursor += 1;
+        let value_start = cursor;
+        while bytes.get(cursor).copied() != Some(quote) {
+            cursor += 1;
+            if cursor >= bytes.len() {
+                return None;
+            }
+        }
+        let value = tag.get(value_start..cursor)?;
+        let compact = value
+            .chars()
+            .filter(|character| !character.is_ascii_whitespace())
+            .collect::<String>()
+            .to_ascii_lowercase();
+        if compact.contains("javascript:")
+            || compact.contains("vbscript:")
+            || compact.contains("data:")
+            || compact.contains("file:")
+            || compact.contains("http:")
+            || compact.contains("https:")
+            || compact.contains("//")
+        {
+            return None;
+        }
+        if attribute == "href" || attribute == "xlink:href" {
+            if !compact.starts_with("#") {
+                return None;
+            }
+        }
+        let mut url_cursor = 0usize;
+        while let Some(relative) = compact.get(url_cursor..)?.find("url(") {
+            let url_start = url_cursor + relative + 4;
+            if compact.get(url_start..)?.chars().next() != Some('#') {
+                return None;
+            }
+            url_cursor = url_start;
+        }
+        cursor += 1;
     }
-    Some(payload.to_string())
+}
+
+fn skip_svg_whitespace(bytes: &[u8], cursor: &mut usize) {
+    while bytes
+        .get(*cursor)
+        .is_some_and(|byte| byte.is_ascii_whitespace())
+    {
+        *cursor += 1;
+    }
 }
 
 fn extract_svg_payload_for_gid(document: &str, gid: u16) -> Option<String> {
@@ -576,5 +695,14 @@ mod tests {
         assert!(sanitize_svg_payload("<script>alert(1)</script>").is_none());
         assert!(sanitize_svg_payload("<path onclick=\"alert(1)\"/>").is_none());
         assert!(sanitize_svg_payload("<use href=\"https://example.test/x\"/>").is_none());
+        assert!(sanitize_svg_payload("<path\nonload = \"alert(1)\"/>").is_none());
+        assert!(sanitize_svg_payload("<use href = \" javascript:alert(1)\"/>").is_none());
+        assert!(sanitize_svg_payload("<style>@import url(https://example.test);</style>").is_none());
+    }
+
+    #[test]
+    fn svg_document_respects_caller_decode_limit() {
+        assert!(decode_svg_document(b"<svg/>", 5).is_none());
+        assert!(decode_svg_document(b"<svg/>", 6).is_some());
     }
 }

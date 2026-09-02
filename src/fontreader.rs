@@ -3283,6 +3283,12 @@ fn validate_woff_buffer(
     header: &crate::woff::woff::WOFFHeader,
     limits: &DecodeLimits,
 ) -> Result<(), Error> {
+    if header.num_tables > 4096 {
+        return Err(Error::new(
+            ErrorKind::InvalidData,
+            "WOFF table count exceeds supported limit",
+        ));
+    }
     let declared_length = header.length as usize;
     if declared_length > data.len() || declared_length < 44 {
         return Err(Error::new(
@@ -3329,16 +3335,15 @@ fn validate_woff_buffer(
         ranges.push((offset, end));
     }
 
-    for (index, &(start, end)) in ranges.iter().enumerate() {
-        if ranges
-            .iter()
-            .skip(index + 1)
-            .any(|&(other_start, other_end)| start < other_end && other_start < end)
-        {
-            return Err(Error::new(
-                ErrorKind::InvalidData,
-                "WOFF table ranges overlap",
-            ));
+    ranges.sort_unstable_by_key(|&(start, end)| (start, end));
+    for window in ranges.windows(2) {
+        if let [(start, end), (other_start, other_end)] = window {
+            if start < other_end && other_start < end {
+                return Err(Error::new(
+                    ErrorKind::InvalidData,
+                    "WOFF table ranges overlap",
+                ));
+            }
         }
     }
 
@@ -3855,7 +3860,12 @@ fn font_load<R: BinaryReader>(file: &mut R, limits: &DecodeLimits) -> Result<Fon
         fontheader::FontHeaders::TTC(header) => {
             let num_fonts = header.num_fonts;
             let font_collection = header.font_collection.as_ref();
-            let table = &font_collection[0];
+            let Some(table) = font_collection.first() else {
+                return Err(Error::new(
+                    ErrorKind::InvalidData,
+                    "TTC collection does not contain a face",
+                ));
+            };
             let mut font = from_opentype(file, table, limits);
             #[cfg(debug_assertions)]
             {
@@ -3864,7 +3874,9 @@ fn font_load<R: BinaryReader>(file: &mut R, limits: &DecodeLimits) -> Result<Fon
 
             let mut fonts = Vec::new();
             for i in 1..num_fonts {
-                let table = &font_collection[i as usize];
+                let Some(table) = font_collection.get(i as usize) else {
+                    break;
+                };
                 if let Ok(font) = from_opentype(file, table, limits) {
                     fonts.push(font);
                 }
@@ -3984,7 +3996,12 @@ fn font_load<R: BinaryReader>(file: &mut R, limits: &DecodeLimits) -> Result<Fon
                     }
                     b"SVG " => {
                         let mut reader = BytesReader::new(&table.data);
-                        let svg = svg::SVG::new(&mut reader, 0, table.data.len() as u32)?;
+                        let svg = svg::SVG::new_with_limits(
+                            &mut reader,
+                            0,
+                            table.data.len() as u32,
+                            limits,
+                        )?;
                         font.svg = Some(svg);
                     }
                     #[cfg(feature = "cff")]
@@ -4106,6 +4123,7 @@ fn font_load<R: BinaryReader>(file: &mut R, limits: &DecodeLimits) -> Result<Fon
                     sbix::SBIX::new(&mut reader, 0, sbix_table.data.len() as u32, num_glyphs)?;
                 font.sbix = Some(sbix);
             }
+            validate_variation_axis_counts(&font)?;
             #[cfg(debug_assertions)]
             {
                 // font_debug(&font);
@@ -4121,6 +4139,18 @@ fn font_load<R: BinaryReader>(file: &mut R, limits: &DecodeLimits) -> Result<Fon
             ))
         }
     }
+}
+
+fn validate_variation_axis_counts(font: &Font) -> Result<(), Error> {
+    if let (Some(fvar), Some(avar)) = (font.fvar.as_ref(), font.avar.as_ref()) {
+        if fvar.axes.len() != avar.axis_count() {
+            return Err(Error::new(
+                ErrorKind::InvalidData,
+                "fvar and avar axis counts do not match",
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn from_opentype<R: BinaryReader>(
@@ -4230,7 +4260,7 @@ fn from_opentype<R: BinaryReader>(
                 font.sbix_pos = Some(sbix_pos);
             }
             b"SVG " => {
-                let svg = svg::SVG::new(file, record.offset, record.length)?;
+                let svg = svg::SVG::new_with_limits(file, record.offset, record.length, limits)?;
                 font.svg = Some(svg);
             }
             #[cfg(feature = "cff")]
@@ -4356,6 +4386,8 @@ fn from_opentype<R: BinaryReader>(
         let sbix = sbix::SBIX::new(file, offset.offset, offset.length, num_glyphs as u32)?;
         font.sbix = Some(sbix);
     }
+
+    validate_variation_axis_counts(&font)?;
 
     if font.cmap.is_none() {
         debug_assert!(true, "No cmap table");

@@ -1,4 +1,4 @@
-#[allow(deprecated)]
+#[allow(deprecated, dead_code)]
 mod tests {
     #[cfg(feature = "layout")]
     use crate::opentype::layouts::{
@@ -14,6 +14,7 @@ mod tests {
             SingleSubstitutionFormat2,
         },
     };
+    #[cfg(fontcore_external_corpus)]
     use crate::opentype::outline::glyf::ParsedGlyph;
 
     #[cfg(feature = "layout")]
@@ -447,12 +448,26 @@ mod tests {
 
     #[cfg(feature = "layout")]
     fn build_lookup_record(lookup_type: u16, subtable: Vec<u8>) -> Vec<u8> {
+        build_lookup_record_with_subtables(lookup_type, vec![subtable])
+    }
+
+    #[cfg(feature = "layout")]
+    fn build_lookup_record_with_subtables(
+        lookup_type: u16,
+        subtables: Vec<Vec<u8>>,
+    ) -> Vec<u8> {
         let mut buffer = Vec::new();
         push_u16(&mut buffer, lookup_type);
         push_u16(&mut buffer, 0);
-        push_u16(&mut buffer, 1);
-        push_u16(&mut buffer, 8);
-        buffer.extend_from_slice(&subtable);
+        push_u16(&mut buffer, subtables.len() as u16);
+        let offsets_start = buffer.len();
+        buffer.resize(buffer.len() + subtables.len() * 2, 0);
+        for (index, subtable) in subtables.iter().enumerate() {
+            let offset = buffer.len() as u16;
+            buffer[offsets_start + index * 2..offsets_start + index * 2 + 2]
+                .copy_from_slice(&offset.to_be_bytes());
+            buffer.extend_from_slice(subtable);
+        }
         buffer
     }
 
@@ -473,30 +488,53 @@ mod tests {
         backtrack_glyph_id: u16,
         lookahead_glyph_id: u16,
     ) -> Vec<u8> {
+        build_lookup_record(
+            LookupType::ReverseChainingContextualSingleSubstitution as u16,
+            build_reverse_chain_subtable(
+                &[coverage_glyph_id],
+                substitute_glyph_id,
+                &[backtrack_glyph_id],
+                &[lookahead_glyph_id],
+            ),
+        )
+    }
+
+    #[cfg(feature = "layout")]
+    fn build_reverse_chain_subtable(
+        coverage_glyph_ids: &[u16],
+        substitute_glyph_id: u16,
+        backtrack_glyph_ids: &[u16],
+        lookahead_glyph_ids: &[u16],
+    ) -> Vec<u8> {
         let mut buffer = Vec::new();
         push_u16(&mut buffer, 1);
         push_u16(&mut buffer, 0);
-        push_u16(&mut buffer, 1);
-        push_u16(&mut buffer, 0);
-        push_u16(&mut buffer, 1);
-        push_u16(&mut buffer, 0);
-        push_u16(&mut buffer, 1);
+        push_u16(&mut buffer, backtrack_glyph_ids.len() as u16);
+        let backtrack_offsets_start = buffer.len();
+        buffer.resize(buffer.len() + backtrack_glyph_ids.len() * 2, 0);
+        push_u16(&mut buffer, lookahead_glyph_ids.len() as u16);
+        let lookahead_offsets_start = buffer.len();
+        buffer.resize(buffer.len() + lookahead_glyph_ids.len() * 2, 0);
+        push_u16(&mut buffer, coverage_glyph_ids.len() as u16);
         push_u16(&mut buffer, substitute_glyph_id);
 
         let coverage_offset = buffer.len() as u16;
-        buffer.extend_from_slice(&coverage_table(&[coverage_glyph_id]));
-        let backtrack_offset = buffer.len() as u16;
-        buffer.extend_from_slice(&coverage_table(&[backtrack_glyph_id]));
-        let lookahead_offset = buffer.len() as u16;
-        buffer.extend_from_slice(&coverage_table(&[lookahead_glyph_id]));
+        buffer.extend_from_slice(&coverage_table(coverage_glyph_ids));
+        for (index, glyph_id) in backtrack_glyph_ids.iter().enumerate() {
+            let offset = buffer.len() as u16;
+            buffer[backtrack_offsets_start + index * 2..backtrack_offsets_start + index * 2 + 2]
+                .copy_from_slice(&offset.to_be_bytes());
+            buffer.extend_from_slice(&coverage_table(&[*glyph_id]));
+        }
+        for (index, glyph_id) in lookahead_glyph_ids.iter().enumerate() {
+            let offset = buffer.len() as u16;
+            buffer[lookahead_offsets_start + index * 2..lookahead_offsets_start + index * 2 + 2]
+                .copy_from_slice(&offset.to_be_bytes());
+            buffer.extend_from_slice(&coverage_table(&[*glyph_id]));
+        }
 
         buffer[2..4].copy_from_slice(&coverage_offset.to_be_bytes());
-        buffer[6..8].copy_from_slice(&backtrack_offset.to_be_bytes());
-        buffer[10..12].copy_from_slice(&lookahead_offset.to_be_bytes());
-        build_lookup_record(
-            LookupType::ReverseChainingContextualSingleSubstitution as u16,
-            buffer,
-        )
+        buffer
     }
 
     #[cfg(feature = "layout")]
@@ -1367,6 +1405,13 @@ mod tests {
                     LookupResult::None => {}
                     _ => panic!("expected no result"),
                 }
+
+                let mut glyphs = vec![(0x0030usize, 0usize), (0x0042, 1), (0x0044, 2)];
+                assert!(crate::opentype::extentions::gsub::GSUB::apply_lookup_once(
+                    &lookup_list.lookups[1],
+                    &mut glyphs,
+                ));
+                assert_eq!(glyphs[1].0, 0x0201);
             }
             _ => panic!("expected reverse chain substitution"),
         }
@@ -1427,6 +1472,30 @@ mod tests {
             .lookup_pair_adjustment(10, 20, false, Some("ar"))
             .expect("arabic pair adjustment");
         assert_eq!(arabic_adjustment.first.x_advance, -30);
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn gpos_ignores_invalid_feature_and_lookup_indices() {
+        let invalid_feature = parse_gpos(build_gpos_table_with_scripted_features(
+            &[(*b"DFLT", 0xFFFF, &[9])],
+            &[(*b"kern", &[0])],
+            2,
+            vec![build_gpos_pair_format1_subtable(10, 20, -50)],
+        ));
+        assert!(invalid_feature
+            .lookup_pair_adjustment(10, 20, false, None)
+            .is_none());
+
+        let invalid_lookup = parse_gpos(build_gpos_table_with_scripted_features(
+            &[(*b"DFLT", 0xFFFF, &[0])],
+            &[(*b"kern", &[9])],
+            2,
+            vec![build_gpos_pair_format1_subtable(10, 20, -50)],
+        ));
+        assert!(invalid_lookup
+            .lookup_pair_adjustment(10, 20, false, None)
+            .is_none());
     }
 
     #[test]
@@ -1492,6 +1561,52 @@ mod tests {
         gsub.apply_ccmp_sequence(&mut glyphs);
 
         assert_eq!(glyphs, vec![(99, 0)]);
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn gsub_multiple_substitution_does_not_expand_its_own_output() {
+        let gsub = parse_gsub(build_gsub_table(
+            *b"ccmp",
+            vec![lookup_multiple_record(10, &[10, 10])],
+        ));
+        let mut glyphs = vec![(10usize, 0usize)];
+
+        gsub.apply_ccmp_sequence(&mut glyphs);
+
+        assert_eq!(glyphs, vec![(10, 0), (10, 0)]);
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn gsub_multiple_substitution_empty_sequence_consumes_only_one_input() {
+        let gsub = parse_gsub(build_gsub_table(
+            *b"ccmp",
+            vec![lookup_multiple_record(10, &[])],
+        ));
+        let mut glyphs = vec![(10usize, 0usize), (11usize, 1usize)];
+
+        gsub.apply_ccmp_sequence(&mut glyphs);
+
+        assert_eq!(glyphs, vec![(11, 1)]);
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn gsub_reverse_chaining_applies_candidates_from_right_to_left() {
+        let lookup = build_lookup_record_with_subtables(
+            LookupType::ReverseChainingContextualSingleSubstitution as u16,
+            vec![
+                build_reverse_chain_subtable(&[1], 10, &[], &[]),
+                build_reverse_chain_subtable(&[2], 20, &[1], &[]),
+            ],
+        );
+        let gsub = parse_gsub(build_gsub_table(*b"calt", vec![lookup]));
+        let mut glyphs = vec![(1usize, 0usize), (2usize, 1usize), (3usize, 2usize)];
+
+        gsub.apply_feature_sequence(&mut glyphs, None, &[*b"calt"]);
+
+        assert_eq!(glyphs, vec![(10, 0), (20, 1), (3, 2)]);
     }
 
     #[test]
@@ -1711,6 +1826,24 @@ mod tests {
 
         let urdu_forms = gsub.lookup_joining_forms(10, Some("ur-Arab-PK"));
         assert_eq!(urdu_forms.isolated, Some(300));
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn gsub_ignores_invalid_feature_and_lookup_indices() {
+        let invalid_feature = parse_gsub(build_gsub_table_with_scripted_features(
+            &[(*b"DFLT", 0xFFFF, &[9])],
+            &[(*b"isol", &[0])],
+            vec![lookup_single_record(10, 100)],
+        ));
+        assert_eq!(invalid_feature.lookup_joining_forms(10, None).isolated, None);
+
+        let invalid_lookup = parse_gsub(build_gsub_table_with_scripted_features(
+            &[(*b"DFLT", 0xFFFF, &[0])],
+            &[(*b"isol", &[9])],
+            vec![lookup_single_record(10, 100)],
+        ));
+        assert_eq!(invalid_lookup.lookup_joining_forms(10, None).isolated, None);
     }
 
     #[test]
@@ -3724,6 +3857,10 @@ mod tests {
         }
         None
     }
+
+    #[cfg(fontcore_external_corpus)]
+    mod external_corpus {
+        use super::*;
 
     fn real_variation_sequence(font: &crate::LoadedFont) -> (String, usize) {
         let cmap = font.font().cmap.as_ref().expect("cmap");
@@ -7263,5 +7400,6 @@ mod tests {
             )
             .expect("family rtl measure");
         assert!(measure > 0.0);
+    }
     }
 }

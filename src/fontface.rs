@@ -1109,7 +1109,7 @@ fn cursor_inline_extent(cursor_x: f32, cursor_y: f32, text_direction: TextDirect
 }
 
 fn normalize_font_name(name: &str) -> String {
-    name.trim().to_ascii_lowercase()
+    name.trim().to_lowercase()
 }
 
 fn width_class_to_stretch(width_class: u16) -> f32 {

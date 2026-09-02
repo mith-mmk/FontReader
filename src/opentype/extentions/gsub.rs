@@ -9,11 +9,14 @@ use std::io::SeekFrom;
 
 use crate::opentype::layouts::{
     feature::Feature,
-    lookup::{Lookup, LookupResult},
+    lookup::{Lookup, LookupResult, LookupType},
     script::ParsedScript,
     *,
 };
 use bin_rs::reader::BinaryReader;
+
+const MAX_GSUB_GLYPHS: usize = 1_000_000;
+const MAX_GSUB_LOOKUP_APPLICATIONS: usize = 1_000_000;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub(crate) struct JoiningForms {
@@ -133,14 +136,16 @@ impl GSUB {
 
     pub fn get_features(&self, tag: &[u8; 4], script: &ParsedScript) -> Vec<&Feature> {
         let mut features = Vec::new();
-        let language_system = &script.language_systems[0];
+        let Some(language_system) = script.language_systems.first() else {
+            return features;
+        };
         for feature_index in
             Self::collect_language_system_feature_indices(&language_system.language_system)
         {
-            if self.features.features[feature_index as usize].feature_tag
-                == u32::from_be_bytes(*tag)
-            {
-                features.push(&self.features.features[feature_index as usize]);
+            if let Some(feature) = self.features.features.get(feature_index as usize) {
+                if feature.feature_tag == u32::from_be_bytes(*tag) {
+                    features.push(feature);
+                }
             }
         }
         features
@@ -149,7 +154,9 @@ impl GSUB {
     pub fn get_lookups(&self, feature: &Feature) -> Vec<&Lookup> {
         let mut lookups = Vec::new();
         for lookup_index in feature.lookup_list_indices.iter() {
-            lookups.push(&self.lookups.lookups[*lookup_index as usize]);
+            if let Some(lookup) = self.lookups.lookups.get(*lookup_index as usize) {
+                lookups.push(lookup);
+            }
         }
         lookups
     }
@@ -221,7 +228,9 @@ impl GSUB {
                 for feature_index in
                     Self::collect_language_system_feature_indices(&language_system.language_system)
                 {
-                    let feature = &self.features.features[feature_index as usize];
+                    let Some(feature) = self.features.features.get(feature_index as usize) else {
+                        continue;
+                    };
                     let feature_tag = feature.feature_tag;
                     if !feature_tags
                         .iter()
@@ -234,7 +243,9 @@ impl GSUB {
                         if !seen_lookup_indices.insert(*lookup_index) {
                             continue;
                         }
-                        lookups.push(&self.lookups.lookups[*lookup_index as usize]);
+                        if let Some(lookup) = self.lookups.lookups.get(*lookup_index as usize) {
+                            lookups.push(lookup);
+                        }
                     }
                 }
             }
@@ -566,7 +577,19 @@ impl GSUB {
             }
             crate::opentype::layouts::lookup::LookupSubstitution::Multiple(multiple) => {
                 if let Some(coverage_index) = multiple.coverage.contains(glyph_id) {
-                    let replacement = multiple.sequence_tables[coverage_index]
+                    let Some(sequence_table) = multiple.sequence_tables.get(coverage_index) else {
+                        return false;
+                    };
+                    let new_length = glyphs
+                        .len()
+                        .checked_sub(1)
+                        .and_then(|length| {
+                            length.checked_add(sequence_table.substitute_glyph_ids.len())
+                        });
+                    if new_length.is_none_or(|length| length > MAX_GSUB_GLYPHS) {
+                        return false;
+                    }
+                    let replacement = sequence_table
                         .substitute_glyph_ids
                         .iter()
                         .map(|glyph_id| (*glyph_id as usize, source_index))
@@ -577,10 +600,15 @@ impl GSUB {
             }
             crate::opentype::layouts::lookup::LookupSubstitution::Ligature(ligature) => {
                 if let Some(coverage_index) = ligature.coverage.contains(glyph_id) {
-                    let ligature_set = &ligature.ligature_set[coverage_index];
+                    let Some(ligature_set) = ligature.ligature_set.get(coverage_index) else {
+                        return false;
+                    };
                     for record in &ligature_set.ligature_table {
                         let expected_len = record.component_count as usize;
-                        if index + expected_len > glyphs.len() {
+                        let Some(end) = index.checked_add(expected_len) else {
+                            continue;
+                        };
+                        if end > glyphs.len() {
                             continue;
                         }
                         if record
@@ -592,7 +620,7 @@ impl GSUB {
                                 .map(|item| item.0))
                         {
                             glyphs.splice(
-                                index..index + expected_len,
+                                index..end,
                                 [(record.ligature_glyph as usize, source_index)],
                             );
                             return true;
@@ -651,7 +679,10 @@ impl GSUB {
         glyphs: &[(usize, usize)],
         start: usize,
     ) -> bool {
-        if start + coverages.len() > glyphs.len() {
+        let Some(end) = start.checked_add(coverages.len()) else {
+            return false;
+        };
+        if end > glyphs.len() {
             return false;
         }
 
@@ -681,7 +712,10 @@ impl GSUB {
         glyphs: &[(usize, usize)],
         start: usize,
     ) -> bool {
-        if start + coverages.len() > glyphs.len() {
+        let Some(end) = start.checked_add(coverages.len()) else {
+            return false;
+        };
+        if end > glyphs.len() {
             return false;
         }
 
@@ -1016,6 +1050,57 @@ impl GSUB {
         false
     }
 
+    fn apply_lookup_all_with_tables(
+        &self,
+        lookup: &Lookup,
+        glyphs: &mut Vec<(usize, usize)>,
+    ) -> bool {
+        let mut changed = false;
+        let mut applications = 0usize;
+
+        if lookup.lookup_type
+            == LookupType::ReverseChainingContextualSingleSubstitution as u16
+        {
+            for index in (0..glyphs.len()).rev() {
+                for subtable in &lookup.subtables {
+                    if self.apply_subtable_at_with_tables(subtable, glyphs, index) {
+                        changed = true;
+                        break;
+                    }
+                }
+            }
+            return changed;
+        }
+
+        let mut index = 0usize;
+        while index < glyphs.len() && applications < MAX_GSUB_LOOKUP_APPLICATIONS {
+            let source_index = glyphs[index].1;
+            let mut applied = false;
+            for subtable in &lookup.subtables {
+                if self.apply_subtable_at_with_tables(subtable, glyphs, index) {
+                    changed = true;
+                    applications += 1;
+                    applied = true;
+                    break;
+                }
+            }
+
+            if applied {
+                // Multiple substitution output inherits the source index of
+                // the consumed glyph. Skip that output so a self-referential
+                // lookup cannot recursively expand it. Empty output leaves
+                // the cursor in place, allowing the next original glyph to
+                // be processed.
+                while index < glyphs.len() && glyphs[index].1 == source_index {
+                    index += 1;
+                }
+            } else {
+                index += 1;
+            }
+        }
+        changed
+    }
+
     pub(crate) fn apply_feature_sequence(
         &self,
         glyphs: &mut Vec<(usize, usize)>,
@@ -1027,20 +1112,11 @@ impl GSUB {
             return;
         }
 
-        let mut iterations = 0usize;
-        let max_iterations = lookups.len().saturating_mul(glyphs.len().max(1)).max(1) * 4;
-
-        loop {
-            let mut changed = false;
-            for lookup in &lookups {
-                if self.apply_lookup_once_with_tables(lookup, glyphs) {
-                    changed = true;
-                }
-            }
-            iterations += 1;
-            if !changed || iterations >= max_iterations {
+        for lookup in lookups {
+            if glyphs.is_empty() {
                 break;
             }
+            self.apply_lookup_all_with_tables(lookup, glyphs);
         }
     }
 
@@ -1117,7 +1193,10 @@ impl GSUB {
         let features = self.get_features(&b"ccmp", script);
         for feature in features.iter() {
             for lookup_index in feature.lookup_list_indices.iter() {
-                let lookup = self.lookups.lookups[*lookup_index as usize].clone();
+                let Some(lookup) = self.lookups.lookups.get(*lookup_index as usize).cloned()
+                else {
+                    continue;
+                };
                 for _subtable in lookup.subtables.iter() {
                     // get glyph_ids from subtable
                 }

@@ -40,15 +40,51 @@ impl AVAR {
             let map_count = read_u16(data, &mut cursor)? as usize;
             let mut map = Vec::with_capacity(map_count);
             for _ in 0..map_count {
+                let from_coordinate = f2dot14_to_f32(read_i16(data, &mut cursor)?);
+                let to_coordinate = f2dot14_to_f32(read_i16(data, &mut cursor)?);
+                if !(-1.0..=1.0).contains(&from_coordinate)
+                    || !(-1.0..=1.0).contains(&to_coordinate)
+                    || map
+                        .last()
+                        .is_some_and(|last: &AxisValueMap| {
+                            from_coordinate <= last.from_coordinate
+                        })
+                {
+                    return Err(Error::new(
+                        ErrorKind::InvalidData,
+                        "avar axis value map is outside its normalized range or unsorted",
+                    ));
+                }
                 map.push(AxisValueMap {
-                    from_coordinate: f2dot14_to_f32(read_i16(data, &mut cursor)?),
-                    to_coordinate: f2dot14_to_f32(read_i16(data, &mut cursor)?),
+                    from_coordinate,
+                    to_coordinate,
                 });
             }
             segment_maps.push(map);
         }
 
+        for map in &segment_maps {
+            let has_required_point = |from: f32, to: f32| {
+                map.iter().any(|record| {
+                    record.from_coordinate == from && record.to_coordinate == to
+                })
+            };
+            if !has_required_point(-1.0, -1.0)
+                || !has_required_point(0.0, 0.0)
+                || !has_required_point(1.0, 1.0)
+            {
+                return Err(Error::new(
+                    ErrorKind::InvalidData,
+                    "avar axis map is missing a required endpoint or default mapping",
+                ));
+            }
+        }
+
         Ok(Self { segment_maps })
+    }
+
+    pub(crate) fn axis_count(&self) -> usize {
+        self.segment_maps.len()
     }
 
     pub(crate) fn map_coordinate(&self, coordinates: &mut [f32], coordinate_index: usize) {
@@ -135,4 +171,56 @@ fn read_bytes<const N: usize>(data: &[u8], cursor: &mut usize) -> Result<[u8; N]
 
 fn f2dot14_to_f32(value: i16) -> f32 {
     value as f32 / 16384.0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn avar_with_map(map: &[(i16, i16)]) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(&0x0001_0000u32.to_be_bytes());
+        bytes.extend_from_slice(&0u16.to_be_bytes());
+        bytes.extend_from_slice(&1u16.to_be_bytes());
+        bytes.extend_from_slice(&(map.len() as u16).to_be_bytes());
+        for (from, to) in map {
+            bytes.extend_from_slice(&from.to_be_bytes());
+            bytes.extend_from_slice(&to.to_be_bytes());
+        }
+        bytes
+    }
+
+    #[test]
+    fn accepts_sorted_normalized_axis_map() {
+        let avar = AVAR::from_bytes(&avar_with_map(&[
+            (-16384, -16384),
+            (0, 0),
+            (16384, 16384),
+        ]))
+        .expect("valid avar");
+        let mut coordinates = [0.5];
+        avar.map_coordinate(&mut coordinates, 0);
+        assert!((coordinates[0] - 0.5).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn rejects_out_of_range_axis_map() {
+        assert!(AVAR::from_bytes(&avar_with_map(&[(0x7fff, 0)])).is_err());
+    }
+
+    #[test]
+    fn rejects_duplicate_source_coordinates() {
+        assert!(AVAR::from_bytes(&avar_with_map(&[
+            (-16384, -16384),
+            (0, 0),
+            (0, 16384),
+            (16384, 16384),
+        ]))
+        .is_err());
+    }
+
+    #[test]
+    fn rejects_missing_required_mapping_points() {
+        assert!(AVAR::from_bytes(&avar_with_map(&[(-16384, -16384), (16384, 16384)])).is_err());
+    }
 }

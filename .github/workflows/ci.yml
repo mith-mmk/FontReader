@@ -23,8 +23,12 @@ jobs:
             command: cargo test
           - name: test-layout-and-cff
             command: cargo test --features "layout,cff"
+          - name: test-all-features
+            command: cargo test --all-features --lib
           - name: check-all-features
             command: cargo check --all-features
+          - name: check-examples-all-features
+            command: cargo check --examples --all-features
           - name: docs
             command: cargo doc --all-features --no-deps
           - name: wasm-check
