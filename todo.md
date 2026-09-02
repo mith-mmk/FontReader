@@ -1,9 +1,9 @@
-# FontReader / fontcore 0.0.12 実装状況
+# FontReader / fontcore 実装状況
 
 更新日: 2026-09-02
-対象ブランチ: `codex-fontcore-remediation`
+対象ブランチ: `main`
 基準コミット: `819f677a2363f9e21b71b77a1f5bcf3d2f31b600`
-直近実装コミット: `f3b6079`
+直近リリースコミット: `0784157` (`fontcore 0.0.13`)
 
 ## このファイルの使い方
 
