@@ -2050,7 +2050,8 @@ impl Font {
                     glyph_index,
                     adjustment: GlyphPositionAdjustment {
                         placement_x: adjustment.x_placement as f32 * scale_x,
-                        placement_y: adjustment.y_placement as f32 * scale_y,
+                        // GPOS anchors are Y-up; glyph run and outline coordinates are Y-down.
+                        placement_y: -(adjustment.y_placement as f32) * scale_y,
                         advance_x: 0.0,
                         advance_y: 0.0,
                     },
@@ -2090,7 +2091,8 @@ impl Font {
             glyph_index,
             adjustment: GlyphPositionAdjustment {
                 placement_x: adjustment.x_placement as f32 * scale_x,
-                placement_y: adjustment.y_placement as f32 * scale_y,
+                // GPOS anchors are Y-up; glyph run and outline coordinates are Y-down.
+                placement_y: -(adjustment.y_placement as f32) * scale_y,
                 advance_x: 0.0,
                 advance_y: 0.0,
             },
