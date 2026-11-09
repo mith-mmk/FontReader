@@ -135,3 +135,10 @@ source = "tests/fixtures/generate_vertical_lookup_chain.py (fontTools 4.65.0)"
 license = "MIT (project test code)"
 sha256 = "1ffa05a1ffa72a05a45b914fb326191b2a0619513c7c3d0c81f8a2ea327e777a"
 features = ["vertical-flow", "GSUB", "vert", "vrt2", "lookup-order", "single-substitution", "extension", "identity", "unsupported-lookups", "lookup-flags", "GDEF"]
+
+[[fixture]]
+id = "sideways-ltr.ttc"
+source = "tests/fixtures/generate_sideways_ltr.py (fontTools 4.65.0)"
+license = "MIT (project test code)"
+sha256 = "0dc1a665febe0557fd1c28e7ef72af3b4b271b70da5473852a45bddbf5c8932c"
+features = ["sideways-ltr", "vrtr", "lookup-order", "lookup-flags", "GDEF", "ccmp", "smcp", "locl", "liga", "UVS", "marks", "upright-exclusion", "GPOS", "cross-axis-advance", "sbix", "SVG", "CurrentColor"]

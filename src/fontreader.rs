@@ -2256,6 +2256,28 @@ impl Font {
         text: &str,
         options: &crate::commands::FontOptions<'_>,
     ) -> Result<GlyphRun, Error> {
+        self.text2glyph_run_impl(text, options, false)
+    }
+
+    pub(crate) fn text2glyph_run_sideways_ltr(
+        &self,
+        text: &str,
+        options: &crate::commands::FontOptions<'_>,
+    ) -> Result<GlyphRun, Error> {
+        let options = options
+            .clone()
+            .with_text_direction(crate::commands::TextDirection::LeftToRight);
+        self.text2glyph_run_impl(text, &options, true)
+    }
+
+    fn text2glyph_run_impl(
+        &self,
+        text: &str,
+        options: &crate::commands::FontOptions<'_>,
+        sideways_ltr: bool,
+    ) -> Result<GlyphRun, Error> {
+        #[cfg(not(feature = "layout"))]
+        let _ = sideways_ltr;
         let _ = self.current_head()?;
 
         if !options.font_size.is_finite() || options.font_size <= 0.0 {
@@ -2289,13 +2311,28 @@ impl Font {
         let mut cursor_x = 0.0f32;
         let mut cursor_y = 0.0f32;
         let tab_advance = line_height;
-        let shaped_units = self.shape_text_units(
+        #[allow(unused_mut)]
+        let mut shaped_units = self.shape_text_units(
             text,
             is_vertical,
             is_right_to_left,
             options.locale,
             options.font_variant,
         )?;
+        #[cfg(feature = "layout")]
+        if sideways_ltr {
+            if let Some(gsub) = self.current_gsub() {
+                // Horizontal composition is complete. Only vrtr is selected;
+                // metrics, kerning, and mark attachment use the resulting IDs.
+                for unit in &mut shaped_units {
+                    if let ResolvedTextUnit::Glyph(glyph) = unit {
+                        if let Some(id) = gsub.lookup_sideways(glyph.glyph_id as u16) {
+                            glyph.glyph_id = id as usize;
+                        }
+                    }
+                }
+            }
+        }
         let mut unit_glyph_indices = vec![None; shaped_units.len()];
 
         for (index, unit) in shaped_units.iter().enumerate() {

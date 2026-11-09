@@ -1214,12 +1214,21 @@ impl GSUB {
     /// are skipped, without falling back to a different vertical feature.
     /// GDEF-dependent filtering flags are unsupported here and skip the lookup.
     pub fn lookup_vertical(&self, glyph_id: u16) -> Option<u16> {
-        use crate::opentype::layouts::lookup::LookupSubstitution;
-
         let mut selected = self.collect_feature_lookups(None, &[*b"vrt2"]);
         if selected.is_empty() {
             selected = self.collect_feature_lookups(None, &[*b"vert"]);
         }
+        self.apply_single_lookup_chain(glyph_id, selected)
+    }
+
+    /// Select only `vrtr` for a caller that graphically rotates a horizontal run.
+    pub(crate) fn lookup_sideways(&self, glyph_id: u16) -> Option<u16> {
+        self.apply_single_lookup_chain(glyph_id, self.collect_feature_lookups(None, &[*b"vrtr"]))
+    }
+
+    fn apply_single_lookup_chain(&self, glyph_id: u16, selected: Vec<&Lookup>) -> Option<u16> {
+        use crate::opentype::layouts::lookup::LookupSubstitution;
+
         // Preserve the collector's scope, but not its feature-reference order.
         // Pointer identity is only used for membership, never for ordering.
         let selected: HashSet<*const Lookup> = selected

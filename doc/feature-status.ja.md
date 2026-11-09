@@ -172,7 +172,8 @@ MITの再現可能なfixtureは`colr-vertical-origin.ttc`です。生成script�
 無効な Lookup インデックスだけを持つフィーチャーは利用不可とする。
 `vrt2` 選択後に対象グリフの coverage がなくても `vert` へ戻らない。
 サブテーブルが空の Lookup も同様。LangSys から参照されないレコードは
-選択対象に含めない。描画側でグリフを回転しないため `vrtr` は適用しない。
+選択対象に含めない。この従来の正立配置経路では描画側でグリフを回転しないため、
+`vrtr` は適用しない。
 [OpenType vrt2 仕様](https://learn.microsoft.com/en-us/typography/opentype/spec/features_uz#tag-vrt2)
 の回転済み字形とフィーチャーの排他性に従う。
 
@@ -220,3 +221,63 @@ MarkAttachmentType を指定する Lookup は全体をスキップする。こ�
 防ぎ、選択済みの `vrt2` から `vert` へのフォールバックも行わない。
 RightToLeft は OpenType 仕様上 GSUB では無意味なので、置換を妨げない。
 直接・Extension の各形式で、単独および連続 Lookup とマーク集合を検証する。
+
+### Sideways LTR の run
+
+`FontEngine::shape_sideways_ltr`・`measure_layout_sideways_ltr`・
+`measure_sideways_ltr`・`render_svg_sideways_ltr` は、単一 face・単一行を扱う
+明示的な API である。横書き LTR として整形した後、run 全体を時計回りに 90 度回転する。
+engine の LTR・RTL・上から下という設定は呼び出しの間だけ上書きし、engine や
+options 自体は変更しない。style・locale・variant・対応済みの可変軸座標・
+文字サイズ・横伸縮・SVG 単位を保持する。永続的なモード、必須の公開フィールド、
+公開 enum の variant は追加せず、既存の汎用 API と旧 raw API も変更しない。
+
+`layout` 有効時は通常の横書き GSUB の後に `vrtr` を適用し、最終グリフ ID を
+メトリクスと GPOS に使う。この順序は実装方針であり、`vrtr` を最後に適用するという
+仕様上の義務ではない。最後に適用するという明示的な要件を持つのは `vrt2` である。
+sideways 呼び出しでは `vert` と `vrt2` を選択せず、`vrtr` の置換がない場合や
+未対応の場合にも、いずれのフィーチャーへも fallback しない。`layout` 無効時も
+回転は行うが、OpenType layout による置換と位置調整は利用できない。
+
+`vrtr` の収集範囲は従来の全 Script・全 LangSys を維持する。単一グリフの
+Lookup 連続適用では、直接または Extension 内の Single 置換を LookupList 順に
+参照先ごとに一回適用する。列全体の処理が必要な置換や GDEF に依存するフィルタ
+フラグは、上記の従来方式と同じくスキップする。通常の横書き整形が持つ
+GSUB/GPOS の列処理・フィルタリングの制限も残る。特に pair-GPOS の
+`yPlacement`・`yAdvance` は、現在、上向きを正とするフォントの符号を下向きが正の
+横書き run にそのまま使う。sideways 回転もこの既存の符号処理の制限を引き継ぎ、
+今回の変更では修正しない。完全な OpenType 整形や Unicode の混在方向処理ではない。
+
+送り量と原点は横メトリクスを使い、縦組み用の `vmtx` や `VORG` は使わない。
+y が下向きの座標系で、配置位置・path・offset・送り量ベクトルを
+`(x, y) -> (-y, x)` と変換し、ベースライン原点 `(0, 0)` を中心に回転する。
+em 中央への移動は行わず、bounds も回転する。フォントの ascent・descent・line gap
+は横組みの値を交差軸の参照値として保持し、`FontMetrics::flow` を
+`GlyphFlow::Vertical` にする（ascent 側が右、descent 側が左）。従来の bearing は
+LSB と上向きを正とする ascender の参照値なので、
+`(bearing_x, bearing_y) -> (bearing_y, -bearing_x)` と変換する。描画位置そのもの
+ではないため、ink の配置には変換後の bounds を使う。
+
+計測と SVG は同じ変換後の run を使う。`inline_advance` は y 方向送り量の合計の
+絶対値であり、`measure_sideways_ltr` はこのスカラー値を返す。`ink_bounds` は
+配置済みのグリフ bounds の和集合である。`line_bounds` は各配置原点と、回転後の
+送り量ベクトルの両成分を足した終点の和集合となる。`block_extent` は
+`line_bounds` の x 方向の幅であり、フォントの行高ではない。空の run の bounds は
+なく、各 extent は 0 となる。空白だけの run も横送り量を回転した送り量を保持する。
+SVG は通常の ink padding と engine の SVG 単位を使う。
+
+対応可否はフォント形式の許可リストではなく、実際の layer で判定する。
+すべての layer が clip のない `GlyphLayer::Path` で、paint が
+`GlyphPaint::CurrentColor`、描画モードが `PathPaintMode::Fill` なら対応する。
+条件を満たす path 化済み SVG や foreground のみの COLR layer も含まれる。
+単色指定・gradient・stroke・clip・raster・raw SVG layer は
+`std::io::ErrorKind::Unsupported` となり、部分的な出力は返さない。
+TAB・CR・LF・VT・FF・NEL・U+2028・U+2029 は `std::io::ErrorKind::InvalidInput`
+となる。family fallback・BiDi・Unicode の方向や向きの自動判定・タブ・複数行・
+正立 CJK のベースラインとの位置合わせは、この API の対象外である。
+
+描画側の回転と専用代替字形の関係は
+[CSS Writing Modes の vertical font features](https://www.w3.org/TR/css-writing-modes-4/#vertical-font-features)
+と [OpenType `vrtr`](https://learn.microsoft.com/en-us/typography/opentype/spec/features_uz#tag-vrtr)
+を参照する。これらを根拠に CSS layout 全体への対応を示すものではない。
+公開 API の使用例は [APIレシピ](api-recipes.ja.md#sideways-ltr-の整形計測svg-出力) に記載する。

@@ -199,7 +199,8 @@ one valid referenced lookup; otherwise it selects `vert`. An empty feature or
 one containing only invalid lookup indices is unavailable. Once `vrt2` is
 selected, missing glyph coverage (including a lookup with no subtables) does
 not fall back to `vert`. Unreferenced feature records do not count.
-`vrtr` is never applied because the renderer does not graphically rotate glyphs.
+This legacy upright path never applies `vrtr`, because it does not graphically
+rotate glyphs.
 See the [OpenType vrt2 specification](https://learn.microsoft.com/en-us/typography/opentype/spec/features_uz#tag-vrt2)
 for pre-rotated alternates and mutual exclusivity of these features.
 
@@ -249,3 +250,68 @@ case prevents substitutions on excluded glyphs; it is not full GDEF filtering
 and does not trigger `vert` fallback. RightToLeft is ignored for GSUB by the
 OpenType specification and does not prevent substitution. Direct and Extension
 fixtures cover each filtering flag in standalone and chained lookups.
+
+### Sideways LTR runs
+
+`FontEngine::shape_sideways_ltr`, `measure_layout_sideways_ltr`,
+`measure_sideways_ltr`, and `render_svg_sideways_ltr` are explicit, single-face,
+single-line operations. They compose horizontal LTR text, then rotate the whole
+run 90 degrees clockwise. Each call overrides the engine's LTR, RTL, or
+top-to-bottom policy without mutating the engine or its options. Style, locale,
+variant, supported variation coordinates, font size, horizontal stretch, and
+SVG units are retained. No persistent mode, required public fields, or public
+enum variants are added; the existing generic and legacy raw APIs are unchanged.
+
+With `layout`, ordinary horizontal GSUB runs first, followed by `vrtr`, then
+metrics and GPOS using the resulting glyph IDs. This ordering is an
+implementation choice, not a specification requirement that `vrtr` run last;
+the explicit last-feature requirement applies to `vrt2`. Sideways calls never
+select `vert` or `vrt2`, and a missing or unsupported `vrtr` substitution does
+not fall back to either feature. Without `layout`, rotation still works but
+OpenType layout substitution and positioning are unavailable.
+
+The `vrtr` collector retains the existing all-Script/all-LangSys scope. Its
+single-glyph lookup chain supports direct and Extension-wrapped Single
+substitutions in LookupList order, once per referenced lookup. Sequence-aware
+substitutions and GDEF-dependent filtering flags are skipped, as described for
+legacy vertical lookup chaining above. Ordinary horizontal shaping keeps its
+existing GSUB/GPOS sequence and filtering limitations. In particular, pair-GPOS
+`yPlacement` and `yAdvance` currently keep the font's y-up signs in the y-down
+horizontal run. Sideways rotation preserves that existing sign limitation;
+this change does not correct it. This is not complete OpenType shaping or
+Unicode mixed-orientation layout.
+
+Horizontal metrics supply advances and origins; this path does not use `vmtx`
+or `VORG` for vertical layout. In y-down coordinates, positions, paths, offsets,
+and advance vectors use `(x, y) -> (-y, x)` about baseline `(0, 0)`, with no
+em-centering translation. Bounds are rotated too. Font ascent, descent, and
+line gap remain the horizontal values as cross-axis references, while
+`FontMetrics::flow` becomes `GlyphFlow::Vertical` (ascent to the right,
+descent to the left). Legacy bearings describe an LSB/positive-up ascender
+reference, so `(bearing_x, bearing_y) -> (bearing_y, -bearing_x)`; they are not
+the ink location. Use the transformed bounds for ink placement.
+
+Measurement and SVG consume the same transformed run. `inline_advance` is the
+absolute sum of y advances; `measure_sideways_ltr` returns that scalar.
+`ink_bounds` unions positioned glyph bounds. `line_bounds` unions each
+positioned origin and its endpoint using both components of the rotated
+advance vector. `block_extent` is the x extent of `line_bounds`, not a font
+line height. Empty runs have no bounds and zero extents; space-only runs retain
+their rotated horizontal advances. SVG uses the usual ink padding and the
+engine's SVG unit.
+
+Acceptance depends on the actual layers, not a font-format whitelist: every
+layer must be a clip-free `GlyphLayer::Path` with `GlyphPaint::CurrentColor`
+and `PathPaintMode::Fill`. A compatible pathified SVG or foreground-only COLR
+layer can qualify. Solid colors, gradients, strokes, clips, raster layers, and
+raw SVG layers return `std::io::ErrorKind::Unsupported`, without partial output.
+TAB, CR, LF, VT, FF, NEL, U+2028, and U+2029 return
+`std::io::ErrorKind::InvalidInput`. Family fallback, BiDi, automatic Unicode
+direction/orientation, tabs, multiline layout, and baseline alignment with
+upright CJK remain outside this API.
+
+The design follows [CSS Writing Modes: vertical font features](https://www.w3.org/TR/css-writing-modes-4/#vertical-font-features)
+and [OpenType `vrtr`](https://learn.microsoft.com/en-us/typography/opentype/spec/features_uz#tag-vrtr)
+for graphical rotation with rotation-specific alternates. These references do
+not imply support for full CSS layout. See [API Recipes](api-recipes.md#sideways-ltr-shaping-measurement-and-svg)
+for the public calls.
