@@ -2321,6 +2321,7 @@ impl Font {
                         .map(|svg| svg.has_glyph(glyph_id as u32))
                         .unwrap_or(false);
 
+                    let mut rendered_colr = false;
                     let mut layers = if let Some(sbix) = self.current_sbix() {
                         if let Some(bitmap) =
                             sbix.get_raster_glyph(glyph_id as u32, options.font_size, "px")
@@ -2338,7 +2339,7 @@ impl Font {
                                     open_type_glyph,
                                     scale_x,
                                     scale_y,
-                                    resolved.ch,
+                                    &mut rendered_colr,
                                 )?
                             }
                         } else {
@@ -2366,7 +2367,7 @@ impl Font {
                                         open_type_glyph,
                                         scale_x,
                                         scale_y,
-                                        resolved.ch,
+                                        &mut rendered_colr,
                                     )?
                                 }
                             }
@@ -2377,7 +2378,7 @@ impl Font {
                                     open_type_glyph,
                                     scale_x,
                                     scale_y,
-                                    resolved.ch,
+                                    &mut rendered_colr,
                                 )?
                             }
                         }
@@ -2406,7 +2407,7 @@ impl Font {
                                     open_type_glyph,
                                     scale_x,
                                     scale_y,
-                                    resolved.ch,
+                                    &mut rendered_colr,
                                 )?
                             }
                         }
@@ -2417,7 +2418,7 @@ impl Font {
                                 open_type_glyph,
                                 scale_x,
                                 scale_y,
-                                resolved.ch,
+                                &mut rendered_colr,
                             )?
                         }
                     };
@@ -2508,19 +2509,32 @@ impl Font {
                         metrics.advance_x = 0.0;
                         metrics.advance_y = 0.0;
                     }
-                    // Color/SVG/bitmap origins are outside this monochrome correction.
-                    let monochrome_outline = is_vertical
+                    // Only rendered static TrueType COLR v0 layers with vertical
+                    // metrics join the monochrome correction. Their origin is the
+                    // base glyph's yMax + TSB, never the layer union's yMax.
+                    let static_colr_outline = rendered_colr
+                        && self.current_outline_format() == GlyphFormat::OpenTypeGlyph
+                        && self.current_fvar().is_none()
+                        && self
+                            .current_colr()
+                            .map(|colr| colr.is_version_zero())
+                            .unwrap_or(false)
+                        && matches!(open_type_glyph.layout, FontLayout::Vertical(_));
+                    let vertical_outline = is_vertical
                         && layers
                             .iter()
                             .all(|layer| matches!(layer, GlyphLayer::Path(_)))
                         && match self.current_colr() {
-                            Some(colr) => colr.get_layer_record(glyph_id as u16).is_empty(),
+                            Some(colr) => {
+                                static_colr_outline
+                                    || colr.get_layer_record(glyph_id as u16).is_empty()
+                            }
                             None => true,
                         };
                     #[cfg(feature = "svg-fonts")]
-                    let monochrome_outline = monochrome_outline
+                    let vertical_outline = vertical_outline
                         && !(can_use_svg && (resolved.prefer_color || !can_use_outline));
-                    let layer_origin = if monochrome_outline {
+                    let layer_origin = if vertical_outline {
                         // Mark anchors use horizontal font coordinates. Attached
                         // marks must share the base's vertical-origin translation.
                         attach_glyph_index
@@ -2537,7 +2551,7 @@ impl Font {
                     } else {
                         (0.0, 0.0)
                     };
-                    if monochrome_outline {
+                    if vertical_outline {
                         translate_glyph_layers(&mut layers, layer_origin.0, layer_origin.1);
                     }
                     metrics.bounds = glyph_layers_bounds(&layers);
@@ -2648,11 +2662,12 @@ impl Font {
         open_type_glyph: &OpenTypeGlyph,
         scale_x: f32,
         scale_y: f32,
-        _ch: char,
+        rendered_colr: &mut bool,
     ) -> Result<Vec<GlyphLayer>, Error> {
         let color_layers =
             self.build_colr_layers(glyph_id, &open_type_glyph.layout, scale_x, scale_y);
         if !color_layers.is_empty() {
+            *rendered_colr = true;
             return Ok(color_layers);
         }
 

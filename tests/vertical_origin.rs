@@ -170,7 +170,7 @@ fn composite_glyph_origins_use_composite_bounds_and_ignore_truetype_vorg() {
 }
 
 #[test]
-fn color_origins_remain_outside_the_monochrome_origin_scope() {
+fn static_colr_origins_use_empty_base_metrics() {
     let file = FontFile::from_buffer(include_bytes!("fixtures/vertical-origin-cases.ttc")).unwrap();
     let face = file.face(3).unwrap();
     let run = face
@@ -184,11 +184,22 @@ fn color_origins_remain_outside_the_monochrome_origin_scope() {
         let GlyphLayer::Path(path) = layer else {
             panic!("expected path")
         };
-        assert_eq!((path.offset_x, path.offset_y), (0.0, 0.0));
+        assert_eq!(
+            (path.offset_x, path.offset_y),
+            if cfg!(feature = "layout") {
+                (-30.0, 80.0)
+            } else {
+                (0.0, 0.0)
+            }
+        );
     }
     assert_eq!(
         run.glyphs[0].glyph.metrics.bounds,
-        Some(bounds(5.0, -70.0, 80.0, 10.0))
+        Some(if cfg!(feature = "layout") {
+            bounds(-25.0, 10.0, 50.0, 90.0)
+        } else {
+            bounds(5.0, -70.0, 80.0, 10.0)
+        })
     );
 }
 

@@ -43,8 +43,8 @@ layer offsetに倍率を一度だけ適用し、論理的な列位置とadvance�
 boundsとSVGも同じlayerを使い、GPOS/GDEFで付くmarkはbaseの原点移動量を継承します。
 
 合成fixtureで約物、負のbearing、合成glyph、gvarの輪郭/phantom移動、TTC face選択、sfnt/WOFFを検証します。
-BASE、Unicode縦方向、COLR/sbix/SVGの色layer原点は別対応です。
-色layerのoffsetと旧raw glyph/SVG APIは変更しません。TrueTypeのVORGは仕様どおり無視します。
+BASE、Unicode縦方向、下記の静的COLR v0以外の色layer原点は別対応です。
+旧raw glyph/SVG APIは変更しません。TrueTypeのVORGは仕様どおり無視します。
 
 ### GSUB
 
@@ -127,7 +127,7 @@ VORGがない場合は、三次曲線の正確なyMaxとvmtxのtop side bearing�
 公開ink boundsは従来の保守的な制御点込みの範囲のままです。
 sfnt・選択したTTC face・WOFFに対応します。不正な任意VORGは無視してfallbackし、
 TrueTypeではVORGを使いません。`cff`が必要で、sfntの縦metricsには従来どおり`layout`も必要です。
-色layer原点、BASE、Unicode縦方向、横書き・旧raw APIは今回の対象外です。
+下記の静的COLR v0以外の色layer原点、BASE、Unicode縦方向、横書き・旧raw APIは今回の対象外です。
 MIT合成fixtureとSHA-256は`tests/fixtures/manifest.toml`を参照してください。
 
 ### CFF2の可変縦書き原点
@@ -150,3 +150,17 @@ Unicode縦方向、旧raw APIは拡張しません。
 仕様根拠: [VORG](https://learn.microsoft.com/en-us/typography/opentype/spec/vorg)、
 [VVAR](https://learn.microsoft.com/en-us/typography/opentype/spec/vvar)。
 fixtureの出典・再生成方法・SHA-256は`tests/fixtures/manifest.toml`に記載しています。
+
+### 静的TrueType COLR v0の縦原点
+
+`layout`とvhea/vmtxがある場合、実際に描画したCOLR v0/CPALの全path layerへ、
+base glyphの横advanceの半分と`glyf.yMax + vmtx.topSideBearing`による原点を適用します。
+空のbaseはyMaxが0なのでTSBが原点そのものです。色layerのunion上端へTSBを足しません。
+これは[COLRのglyph metrics要件](https://learn.microsoft.com/en-us/typography/opentype/spec/colr#glyph-metrics-and-boundedness)に従います。
+paintとlayer構成を保ち、付着した単色・色markはbaseの移動量を継承します。
+文字サイズ・横伸縮は一度だけ適用し、bounds・計測・SVGへ反映します。横書き・raw APIは変更しません。
+
+fvarを持つフォント（色layerはまだ変形しません）、COLR v1、CFFの色outline、sbix、SVGは対象外です。
+縦metricsなし、または`layout`無効時は従来のCOLR offsetを維持し、描画unionを使う中央配置は別対応です。
+CPAL欠落や利用できないpaletteで単色へfallbackする場合も、COLR metadataだけでは新しい原点補正を適用しません。
+MITの再現可能なfixtureは`colr-vertical-origin.ttc`です。生成scriptとSHA-256はmanifestに記録しています。
