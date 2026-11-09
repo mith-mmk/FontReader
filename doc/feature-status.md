@@ -276,10 +276,11 @@ substitutions in LookupList order, once per referenced lookup. Sequence-aware
 substitutions and GDEF-dependent filtering flags are skipped, as described for
 legacy vertical lookup chaining above. Ordinary horizontal shaping keeps its
 existing GSUB/GPOS sequence and filtering limitations. In particular, pair-GPOS
-`yPlacement` and `yAdvance` currently keep the font's y-up signs in the y-down
-horizontal run. Sideways rotation preserves that existing sign limitation;
-this change does not correct it. This is not complete OpenType shaping or
-Unicode mixed-orientation layout.
+`yPlacement` currently keeps the font's y-up sign in the y-down horizontal run.
+Sideways rotation preserves this existing placement conversion limitation;
+this change does not correct it. Existing `yAdvance` behavior is unchanged and
+is not assumed to follow the same sign rule. This is not complete OpenType
+shaping or Unicode mixed-orientation layout.
 
 Horizontal metrics supply advances and origins; this path does not use `vmtx`
 or `VORG` for vertical layout. In y-down coordinates, positions, paths, offsets,
