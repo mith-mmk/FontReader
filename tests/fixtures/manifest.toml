@@ -121,3 +121,10 @@ source = "tests/fixtures/generate_vertical_feature_selection.py (fontTools 4.65.
 license = "MIT (project test code)"
 sha256 = "eafde7455bc2feb6c5adbfefa5fe2a0d986674897431c8897fa47ef1f4c28cb2"
 features = ["vertical-flow", "GSUB", "vert", "vrt2", "vrtr-exclusion", "feature-selection"]
+
+[[fixture]]
+id = "vertical-gsub-order.ttc"
+source = "tests/fixtures/generate_vertical_gsub_order.py (fontTools 4.65.0)"
+license = "MIT (project test code)"
+sha256 = "05433434a4b292816104cca456b7656dfc7ebf47ce01d376f5c88d125d9cfd7d"
+features = ["vertical-flow", "GSUB-order", "ccmp", "smcp", "locl", "liga", "vrt2", "vert", "UVS", "marks"]
