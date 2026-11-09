@@ -2483,7 +2483,9 @@ impl Font {
                     }
                     // Color/SVG/bitmap origins are outside this monochrome correction.
                     let monochrome_outline = is_vertical
-                        && layers.iter().all(|layer| matches!(layer, GlyphLayer::Path(_)))
+                        && layers
+                            .iter()
+                            .all(|layer| matches!(layer, GlyphLayer::Path(_)))
                         && match self.current_colr() {
                             Some(colr) => colr.get_layer_record(glyph_id as u16).is_empty(),
                             None => true,
