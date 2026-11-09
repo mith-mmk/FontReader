@@ -6,6 +6,11 @@ fontcore is a Rust library for loading fonts, selecting a face, shaping text, an
 
 Japanese: [README.ja.md](README.ja.md)
 
+For opt-in single-face, single-line mixed vertical LTR outlines, use
+`shape_vertical_mixed_ltr` and its measurement/SVG companions. See the
+[recipe](doc/api-recipes.md#mixed-vertical-ltr-shaping-measurement-and-svg) and
+[restricted scope](doc/feature-status.md#opt-in-mixed-vertical-ltr-outlines).
+
 ## What To Use First
 
 Most users only need these three types.
@@ -30,7 +35,7 @@ no feature flags and does not choose automatic mixed vertical layout. See the
 
 Shaping and family fallback share Unicode **17.0.0** extended grapheme boundaries
 (`unicode-segmentation = "=1.13.3"`). This is distinct from the Unicode 18.0.0
-scalar orientation query and does not add automatic mixed vertical layout,
+scalar orientation query. Segmentation alone does not add mixed vertical layout,
 complete font shaping, or BiDi. See [text boundary behavior](doc/feature-status.md#extended-grapheme-boundaries).
 
 ## Supported Formats

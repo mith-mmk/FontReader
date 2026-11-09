@@ -9,8 +9,8 @@ README は公開APIと実行例を優先し、細かい対応状況はここに�
 4 値 (`U`、`R`、`Tu`、`Tr`) で返し、フォントや機能フラグを必要としません。
 `Tr` は正立の縦書き用字形を優先し、その字形がない場合にのみ回転します。
 文字単位の問い合わせであり、書記素クラスタや字形置換を解決せず、既存の shaping も
-変えません。自動的な混在縦書きのレイアウトは別対応です。以下の Unicode 縦方向に
-関する制限は、レイアウト動作について述べています。
+変えません。混在縦書きは通常の shaping 方針ではなく、下記の
+[明示的な混在縦書き API](#明示的な混在縦書き-ltr-アウトライン)で利用できます。
 [使用例](api-recipes.ja.md#unicode-の縦書きプロパティを調べる)と
 [データの出典](../data/unicode/README.md)を参照してください。
 
@@ -29,7 +29,7 @@ vheaだけがある場合も同じフォールバックです。
 `layout` featureなしではsfnt loaderが縦表を読まないため、同じフォールバックを使います。
 
 合成fixtureで縦メトリクスの有無とコレクション内のface選択を検証し、外部フォントを必要としません。
-このfallbackとは別に下記のTrueType縦原点補正を行います。Unicode縦方向、約物の回転は別対応です。静的CFFの原点は下記を参照してください。
+このfallbackとは別に下記のTrueType縦原点補正を行います。この従来フローは向きを判定しません。混在縦書きは下記の明示 API を使用します。静的CFFの原点は下記を参照してください。
 
 ### TrueTypeの可変縦メトリクス
 
@@ -54,7 +54,7 @@ layer offsetに倍率を一度だけ適用し、論理的な列位置とadvance�
 boundsとSVGも同じlayerを使い、GPOS/GDEFで付くmarkはbaseの原点移動量を継承します。
 
 合成fixtureで約物、負のbearing、合成glyph、gvarの輪郭/phantom移動、TTC face選択、sfnt/WOFFを検証します。
-BASE、Unicode縦方向、下記の静的COLR v0以外の色layer原点は別対応です。
+BASE と下記の静的COLR v0以外の色layer原点は別対応です。向きは従来の原点補正で判定せず、明示混在 API が指定します。
 旧raw glyph/SVG APIは変更しません。TrueTypeのVORGは仕様どおり無視します。
 
 ### GSUB
@@ -350,5 +350,58 @@ TAB はタブとして扱う。NUL・VT・FF・NEL・U+2028・U+2029 等を新�
 全スカラーを残す。複数スカラー用の既存 SVG 経路と縦書きの制約は維持する。
 
 公開の `Vertical_Orientation` スカラープロパティは別に **Unicode 18.0.0**
-へ固定されている。自動の混植方向決定や出典追跡モデルは追加せず、CSS 混植
-レイアウトへの適合も主張しない。[出典・ライセンス・オフライン検証](../data/unicode/README.md)を参照。
+へ固定されている。分割処理自体は方向選択、出典追跡、CSS 組版を提供しない。
+下記の明示的な混在 API が方向ごとのグループ化を行う。[出典・ライセンス・オフライン検証](../data/unicode/README.md)を参照。
+
+## 明示的な混在縦書き LTR アウトライン
+
+`FontEngine::shape_vertical_mixed_ltr`、`measure_vertical_mixed_ltr`、
+`measure_layout_vertical_mixed_ltr`、`render_svg_vertical_mixed_ltr` は、
+単一フェイス・単一行の LTR テキスト用です。呼び出し単位で方向を上書きし、
+エンジンの設定や従来 API、公開構造体・方向 enum を変更しません。
+
+分割は **Unicode 17.0 の拡張書記素クラスタ（EGC）**、方向プロパティ VO と
+囲み文字カテゴリ Me はそれぞれ **Unicode 18.0** です。GSUB の前に元の EGC の
+最初のスカラーの VO で向きを決め、EGC 内に Me（13 文字・5 範囲）があれば
+全体を正立にします。U/Tu/Tr は正立、R は横倒し。同じ向きの隣接 EGC をまとめ、
+そのグループ内で通常 GSUB、合字、カーニング、マーク配置を行います。
+異なる向きの境界を GSUB/GPOS が越えないのは意図した制限です。
+
+正立グループは従来の縦メトリクス・原点を使い、通常 GSUB の後に **vert のみ**を
+適用します。vrt2/vrtr は選びません。Tr に vert 代替がない場合や同一字形への
+置換でも正立のままです。回転フォールバックの合成は未対応です。横倒しは横組み
+LTR と **vrtr のみ**を使用し、グループ全体を時計回りに回転します。従来の縦組みの
+vrt2 優先・なければ vert という選択は変えません。layout 無効時は同じ分割・
+幾何変換を行いますが GSUB/GPOS は適用しません。
+
+横倒しグループの横位置には、そのインスタンスで既にスケールされた水平
+FontMetrics の `-(ascent - descent) / 2` を加えます。descent は正の距離です。
+既存の対応範囲の可変フォント・MVAR メトリクスを保持し、stretch を再適用しません。
+インク境界、line gap、指定行高を中点の代わりにはしません。ただし従来のサイズ
+スケーリング自体にはフォントの line gap が関わる場合があります。
+これは fontcore 独自の合成で、BASE、OS/2 優先順位、CSS の字号・ベースラインの
+同等性を実装するものではありません。中央揃えは配置にのみ加えます。次のグループの
+ペンには最終グリフの advance の X/Y 両成分の和だけを渡し、GPOS placement、
+最後の描画位置、インク端、中央揃え量は渡しません。既存 GPOS advance の扱いを保持します。
+
+全グループが CurrentColor・fill・clip なし Path である場合だけ成功します。
+色、グラデーション、stroke、clip、画像、raw SVG は Unsupported で全体を失敗させ、
+部分結果は返しません。エンジンの通常 API はその後も使用できます。TAB/CR/LF/VT/FF/
+NEL/U+2028/U+2029 は InvalidInput。空入力は境界なし・長さゼロ、空白は回転した
+advance を保持します。計測は最終 run の配置点と advance ベクトルの全終点を使用し、
+SVG も同じ run を通常のインク余白・設定単位で出力します。
+
+これは **UAX #50 型の「先頭スカラー＋任意の Me」方針**です。
+[CSS Writing Modes](https://www.w3.org/TR/css-writing-modes-4/#mixed-orientation) と
+[CSS Text Appendix E](https://www.w3.org/TR/css-text-3/#characters) にある
+基底文字などの追加調整を完全に実装するものではありません。Unicode18 EGC、
+CSS 完全準拠、ブラウザ同等、BiDi、ファミリーフォールバック、複数行・タブ、
+完全な OpenType には未対応です。[UAX #50 revision35](https://www.unicode.org/reports/tr50/tr50-35.html)
+と [Unicode の出典・個別バージョン](../data/unicode/README.md) も参照してください。
+
+MIT の固定テストフォントで漢字＋AV＋漢字、符号付き配置・両軸 advance、非対称 hhea、
+line gap・stretch・MVAR、Tr の無置換/同一置換/vert、ccmp・複数置換・合字・マーク、
+Unicode17/18 の `A + U+1D127` の境界差を検証します。既存 fixture で TT/CFF/CFF2、
+縦メトリクス欠落、対応済み可変フォント、カラー拒否も検証します。再生成は
+`python tests/fixtures/generate_mixed_vertical_ltr.py`（fontTools 4.65.0）。
+通常テストに Python やインストール済みフォントは不要です。

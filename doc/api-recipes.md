@@ -237,3 +237,20 @@ if buffer.is_complete() {
 - Current implementation notes and limitations live in [feature-status.md](feature-status.md).
 - CFF2 investigation notes live in [cff2-investigation.md](cff2-investigation.md).
 - For a document index, start at [README.md](README.md).
+
+## Mixed vertical LTR shaping, measurement, and SVG
+
+Explicit single-face, single-line LTR mixed layout. Unicode17 EGC boundaries and Unicode18 VO/Me properties are independent; see [scope and limits](feature-status.md#opt-in-mixed-vertical-ltr-outlines).
+
+```rust
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+let file = fontcore::FontFile::from_file("font.ttf")?;
+let face = file.current_face()?;
+let engine = face.engine().with_font_size(32.0);
+let run = engine.shape_vertical_mixed_ltr("漢字AV「かな」")?;
+let advance = engine.measure_vertical_mixed_ltr("漢字AV「かな」")?;
+let metrics = engine.measure_layout_vertical_mixed_ltr("漢字AV「かな」")?;
+let svg = engine.render_svg_vertical_mixed_ltr("漢字AV「かな」")?;
+# Ok(())
+# }
+```

@@ -2,8 +2,106 @@
 //!
 //! フォントやシェーピングに依存しない Unicode 文字プロパティです。
 
+mod enclosing_mark_data;
 pub(crate) mod graphemes;
 mod vertical_orientation_data;
+
+/// Whether a scalar has General_Category=Me in the pinned Unicode 18.0.0 data.
+/// Kept internal: this is not a general combining-mark or grapheme query.
+pub(crate) fn is_enclosing_mark(character: char) -> bool {
+    let scalar = character as u32;
+    enclosing_mark_data::RANGES
+        .binary_search_by(|&(start, end)| {
+            if end < scalar {
+                std::cmp::Ordering::Less
+            } else if start > scalar {
+                std::cmp::Ordering::Greater
+            } else {
+                std::cmp::Ordering::Equal
+            }
+        })
+        .is_ok()
+}
+
+#[cfg(test)]
+mod enclosing_mark_tests {
+    use super::{enclosing_mark_data, is_enclosing_mark};
+
+    #[test]
+    fn enclosing_mark_matches_independent_source_for_every_scalar() {
+        let source = include_str!("../../data/unicode/18.0.0/DerivedGeneralCategory.txt");
+        assert!(source.starts_with("# DerivedGeneralCategory-18.0.0.txt\n"));
+        // Parse every category, independently of the generator and lookup table.
+        // The official extracted file partitions the whole Unicode code space.
+        let mut categories = vec![None; 0x110000];
+        for line in source.lines() {
+            let data = line.split('#').next().unwrap().trim();
+            if data.is_empty() {
+                continue;
+            }
+            let (range, category) = data.split_once(';').unwrap();
+            let mut bounds = range.trim().split("..");
+            let start = u32::from_str_radix(bounds.next().unwrap(), 16).unwrap();
+            let end = bounds
+                .next()
+                .map(|value| u32::from_str_radix(value, 16).unwrap())
+                .unwrap_or(start);
+            assert!(bounds.next().is_none());
+            assert!(start <= end && end <= 0x10FFFF);
+            for scalar in start..=end {
+                assert!(categories[scalar as usize].is_none());
+                categories[scalar as usize] = Some(category.trim() == "Me");
+            }
+        }
+        let mut scalar_count = 0;
+        let mut mark_count = 0;
+        for (scalar, category) in categories.into_iter().enumerate() {
+            let expected = category.expect("source must cover every code point");
+            if let Some(character) = char::from_u32(scalar as u32) {
+                assert_eq!(is_enclosing_mark(character), expected, "U+{scalar:04X}");
+                scalar_count += 1;
+                mark_count += usize::from(expected);
+            } else {
+                assert!(!expected, "surrogates cannot be enclosing marks");
+            }
+        }
+        assert_eq!(scalar_count, 1_112_064);
+        assert_eq!(mark_count, 13);
+    }
+
+    #[test]
+    fn enclosing_mark_ranges_and_boundaries() {
+        assert_eq!(
+            enclosing_mark_data::RANGES,
+            &[
+                (0x0488, 0x0489),
+                (0x1ABE, 0x1ABE),
+                (0x20DD, 0x20E0),
+                (0x20E2, 0x20E4),
+                (0xA670, 0xA672)
+            ]
+        );
+        for &(start, end) in enclosing_mark_data::RANGES {
+            assert!(!is_enclosing_mark(char::from_u32(start - 1).unwrap()));
+            assert!(!is_enclosing_mark(char::from_u32(end + 1).unwrap()));
+            for scalar in start..=end {
+                assert!(is_enclosing_mark(char::from_u32(scalar).unwrap()));
+            }
+        }
+        // Mn, Mc, spacing marks, supplementary selectors and noncharacters
+        // must not be confused with the Me category.
+        for character in [
+            '\u{0301}',
+            '\u{0903}',
+            '\u{309B}',
+            '\u{E0100}',
+            '\0',
+            '\u{10FFFF}',
+        ] {
+            assert!(!is_enclosing_mark(character));
+        }
+    }
+}
 
 /// Unicode version used by [`vertical_orientation`], currently `"18.0.0"`.
 ///

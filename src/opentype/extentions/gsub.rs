@@ -1226,6 +1226,11 @@ impl GSUB {
         self.apply_single_lookup_chain(glyph_id, self.collect_feature_lookups(None, &[*b"vrtr"]))
     }
 
+    /// Select only `vert` for preclassified upright mixed-orientation groups.
+    pub(crate) fn lookup_mixed_upright(&self, glyph_id: u16) -> Option<u16> {
+        self.apply_single_lookup_chain(glyph_id, self.collect_feature_lookups(None, &[*b"vert"]))
+    }
+
     fn apply_single_lookup_chain(&self, glyph_id: u16, selected: Vec<&Lookup>) -> Option<u16> {
         use crate::opentype::layouts::lookup::LookupSubstitution;
 

@@ -6,6 +6,11 @@ fontcore は、フォントを読み込み、face を選び、文字列を shapi
 
 English: [README.md](README.md)
 
+単一フェイス・単一行の明示的な混在縦書き LTR には、`shape_vertical_mixed_ltr` と
+対応する計測・SVG API を使用できます。
+[使用例](doc/api-recipes.ja.md#混在縦書き-ltr-のシェーピング計測svg)と
+[対応範囲](doc/feature-status.ja.md#明示的な混在縦書き-ltr-アウトライン)を参照してください。
+
 ## 最初に使うAPI
 
 通常は次の 3 つから始めれば十分です。
@@ -30,7 +35,7 @@ English: [README.md](README.md)
 
 シェーピングとファミリーフォールバックの境界には、`unicode-segmentation = "=1.13.3"`
 による **Unicode 17.0.0** の拡張書記素クラスタを使用します。Unicode 18.0.0 の
-スカラー単位の縦書きプロパティとは別で、自動の混植縦書きや完全なシェーピング・
+スカラー単位の縦書きプロパティとは別です。この分割処理自体は混在縦書きや完全なシェーピング・
 BiDi を追加するものではありません。[境界の動作](doc/feature-status.ja.md#拡張書記素クラスタの境界)を参照してください。
 
 ## 対応フォーマット
