@@ -190,3 +190,25 @@ Lookup 連鎖処理やソースクラスタ表現は変更しない。
 出典とハッシュは `tests/fixtures/manifest.toml` を参照。
 `vertical-gsub-order.ttc` は合成、variant、locale、合字、UVS、最終字形の
 マークアンカーと原点、選択 face の fallback、raw グリフ互換性を検証する。
+
+
+### 従来方式の縦書き Lookup の連続適用
+
+選択済みの縦書きフィーチャー内では、Single 置換（format 1/2）と
+Extension で包まれた Single 置換を LookupList 順に各一回適用する。
+Feature 内の参照順が逆でも、複数の LangSys から参照されても順番と回数は
+変わらない。前の Lookup の出力を次の入力とし、各 Lookup は最初に
+適用できたサブテーブルで終了する。同一 ID への置換も適用として扱い、
+循環して元の ID に戻った場合も `Some(original_id)` を返す。未適用は `None`。
+
+単一グリフ API では Multiple・Alternate・Ligature・文脈依存・逆方向文脈依存の
+Lookup と、それらを包む Extension はスキップする。複数出力の先頭だけを
+採用したり、文脈条件を無視したりしない。未対応・空の Lookup を理由に
+グリフ単位で `vert` へ戻ることもない。全 Script/LangSys の探索範囲と
+縦書き以外の共通ヘルパーは変更しない。完全な文脈依存縦書き処理ではない。
+
+根拠は [OpenType 共通レイアウト仕様](https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#feature-table)
+と [GSUB 置換形式](https://learn.microsoft.com/en-us/typography/opentype/spec/gsub)。
+MIT 合成フォント `vertical-lookup-chain.ttc` で順序・恒等置換・循環・重複参照・
+未対応形式と、最終 bounds/原点・送り量・計測・SVG を検証する。
+生成スクリプトと SHA-256 は manifest に記録する。

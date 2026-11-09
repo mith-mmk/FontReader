@@ -1209,14 +1209,52 @@ impl GSUB {
     /// Availability means at least one valid lookup referenced by the existing
     /// all-script / all-LangSys collector, not coverage of this particular glyph.
     /// Never use `vrtr`: it requires graphical rotation by the renderer.
+    /// Apply direct / extension Single substitutions once per selected lookup,
+    /// in LookupList order. Other lookup types require a sequence-aware API and
+    /// are skipped, without falling back to a different vertical feature.
     pub fn lookup_vertical(&self, glyph_id: u16) -> Option<u16> {
-        let feature = if self.collect_feature_lookups(None, &[*b"vrt2"]).is_empty() {
-            *b"vert"
-        } else {
-            *b"vrt2"
-        };
-        self.lookup_single_feature(glyph_id as usize, None, &[feature])
-            .map(|glyph_id| glyph_id as u16)
+        use crate::opentype::layouts::lookup::LookupSubstitution;
+
+        let mut selected = self.collect_feature_lookups(None, &[*b"vrt2"]);
+        if selected.is_empty() {
+            selected = self.collect_feature_lookups(None, &[*b"vert"]);
+        }
+        // Preserve the collector's scope, but not its feature-reference order.
+        // Pointer identity is only used for membership, never for ordering.
+        let selected: HashSet<*const Lookup> = selected
+            .into_iter()
+            .map(|lookup| lookup as *const Lookup)
+            .collect();
+        let mut current = glyph_id;
+        let mut applied = false;
+        for lookup in self.lookups.lookups.iter() {
+            if !selected.contains(&(lookup as *const Lookup)) {
+                continue;
+            }
+            for subtable in &lookup.subtables {
+                let replacement = match subtable {
+                    LookupSubstitution::Single(_) | LookupSubstitution::Single2(_)
+                        if lookup.lookup_type == 1 =>
+                    {
+                        subtable.get_single_glyph_id(current)
+                    }
+                    LookupSubstitution::ExtensionSubstitution(extension)
+                        if lookup.lookup_type == 7
+                            && extension.subst_format == 1
+                            && extension.extension_lookup_type == 1 =>
+                    {
+                        extension.subtable.get_single_glyph_id(current)
+                    }
+                    _ => None,
+                };
+                if let Some(replacement) = replacement {
+                    current = replacement;
+                    applied = true;
+                    break;
+                }
+            }
+        }
+        applied.then_some(current)
     }
 
     // locl
@@ -1260,6 +1298,81 @@ impl GSUB {
 
 #[cfg(test)]
 mod vertical_feature_tests {
+    #[test]
+    fn vertical_lookup_chains_and_preserves_applied_identity() {
+        let font = crate::fontreader::Font::get_font_from_buffer(include_bytes!(
+            "../../../tests/fixtures/vertical-lookup-chain.ttc"
+        ))
+        .unwrap();
+        let expected = [
+            Some(3),
+            Some(3),
+            Some(3),
+            Some(2),
+            Some(3),
+            Some(1),
+            Some(1),
+            Some(2),
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some(3),
+            None,
+            None,
+            Some(3),
+            None,
+            Some(3),
+            Some(3),
+        ];
+        for (index, replacement) in expected.into_iter().enumerate() {
+            let selected = if index == 0 {
+                &font
+            } else {
+                &font.more_fonts[index - 1]
+            };
+            let gsub = selected.gsub.as_ref().unwrap();
+            assert_eq!(gsub.lookup_vertical(1), replacement, "face {index}");
+            assert_eq!(gsub.lookup_vertical(65535), None, "face {index}");
+        }
+    }
+
+    #[test]
+    fn vertical_lookup_skips_malformed_single_and_extension_subtables() {
+        use crate::opentype::layouts::lookup::LookupSubstitution;
+        let font = crate::fontreader::Font::get_font_from_buffer(include_bytes!(
+            "../../../tests/fixtures/vertical-lookup-chain.ttc"
+        ))
+        .unwrap();
+        let mut direct = font.more_fonts[17].gsub.as_ref().unwrap().clone();
+        if let LookupSubstitution::Single2(single) = &mut direct.lookups.lookups[0].subtables[0] {
+            single.substitute_glyph_ids.clear();
+        } else {
+            panic!("fixture must use Single format 2");
+        }
+        assert_eq!(direct.lookup_vertical(1), None);
+        for mode in 0..4 {
+            let mut gsub = font.more_fonts[1].gsub.as_ref().unwrap().clone();
+            if let LookupSubstitution::ExtensionSubstitution(extension) =
+                &mut gsub.lookups.lookups[0].subtables[0]
+            {
+                match mode {
+                    0 => extension.subst_format = 2,
+                    1 => extension.extension_lookup_type = 2,
+                    2 => *extension.subtable = LookupSubstitution::Unknown,
+                    _ => {
+                        *extension.subtable =
+                            LookupSubstitution::ExtensionSubstitution(extension.clone())
+                    }
+                }
+            } else {
+                panic!("fixture must use Extension substitution");
+            }
+            assert_eq!(gsub.lookup_vertical(1), None, "mode {mode}");
+        }
+    }
+
     #[test]
     fn vertical_lookup_selects_one_available_feature_before_coverage() {
         let font = crate::fontreader::Font::get_font_from_buffer(include_bytes!(
