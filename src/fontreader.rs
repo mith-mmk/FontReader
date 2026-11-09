@@ -2499,7 +2499,7 @@ impl Font {
                             };
                         }
                     }
-                    let adjustment = self.pair_adjustment_for_index(
+                    let mut adjustment = self.pair_adjustment_for_index(
                         &shaped_units,
                         index,
                         options.locale,
@@ -2507,6 +2507,10 @@ impl Font {
                         scale_x,
                         scale_y,
                     );
+                    // Pair placement is Cartesian (Y-up); this run is Y-down.
+                    // Advances are directional: positive YAdvance increases the
+                    // TTB advance height, so it must not be negated here.
+                    adjustment.placement_y = -adjustment.placement_y;
                     let mark_attachment = self.mark_attachment_for_index(
                         &shaped_units,
                         &unit_glyph_indices,
@@ -4759,6 +4763,76 @@ fn cff_y_bounds(commands: &[DrawCommand]) -> (f32, f32) {
     bounds
         .map(|(lo, hi)| (lo as f32, hi as f32))
         .unwrap_or((0.0, 0.0))
+}
+
+#[cfg(all(test, feature = "layout"))]
+mod pair_coordinate_tests {
+    use super::*;
+
+    #[test]
+    fn pair_records_and_helper_preserve_font_placement_coordinates() {
+        let mut font =
+            Font::get_font_from_buffer(include_bytes!("../tests/fixtures/pair-coordinates.ttc"))
+                .unwrap();
+        for face in 0..2 {
+            font.set_font(face).unwrap();
+            for vertical in [false, true] {
+                for (text, first, second) in [
+                    ("AB", (20, 100, -40, 120), (-30, -200, 60, -80)),
+                    ("BA", (-20, -100, 40, -120), (30, 200, -60, 80)),
+                    ("AA", (10, 0, 20, 0), (-10, 0, -20, 0)),
+                ] {
+                    let units = font
+                        .shape_text_units(
+                            text,
+                            vertical,
+                            false,
+                            None,
+                            crate::commands::FontVariant::Normal,
+                        )
+                        .unwrap();
+                    let left = Font::glyph_unit_at(&units, 0).unwrap().glyph_id as u16;
+                    let right = Font::glyph_unit_at(&units, 1).unwrap().glyph_id as u16;
+                    let pair = font
+                        .current_gpos()
+                        .unwrap()
+                        .lookup_pair_adjustment(left, right, vertical, None)
+                        .unwrap();
+                    for (index, (raw, expected)) in [(pair.first, first), (pair.second, second)]
+                        .into_iter()
+                        .enumerate()
+                    {
+                        assert_eq!(
+                            (
+                                raw.x_placement,
+                                raw.y_placement,
+                                raw.x_advance,
+                                raw.y_advance
+                            ),
+                            expected
+                        );
+                        let scaled = font
+                            .pair_adjustment_for_index(&units, index, None, vertical, 0.5, 0.25);
+                        assert_eq!(scaled.placement_x, expected.0 as f32 * 0.5);
+                        assert_eq!(scaled.placement_y, expected.1 as f32 * 0.25);
+                        assert_eq!(scaled.advance_x, expected.2 as f32 * 0.5);
+                        assert_eq!(scaled.advance_y, expected.3 as f32 * 0.25);
+                    }
+                }
+            }
+            // The legacy command path has its own origin/outline transforms.
+            // Do not change its contract while fixing high-level run positions.
+            let raw = font.text2commands("AB").unwrap();
+            assert_eq!(
+                (raw[0].origin_x, raw[0].origin_y, raw[0].advance_width),
+                (20.0, 100.0, 560.0)
+            );
+            assert_eq!(
+                (raw[1].origin_x, raw[1].origin_y, raw[1].advance_width),
+                (530.0, -200.0, 1060.0)
+            );
+        }
+    }
 }
 
 #[cfg(all(test, feature = "cff"))]

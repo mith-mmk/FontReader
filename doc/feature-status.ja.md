@@ -243,11 +243,10 @@ sideways 呼び出しでは `vert` と `vrt2` を選択せず、`vrtr` の置換
 Lookup 連続適用では、直接または Extension 内の Single 置換を LookupList 順に
 参照先ごとに一回適用する。列全体の処理が必要な置換や GDEF に依存するフィルタ
 フラグは、上記の従来方式と同じくスキップする。通常の横書き整形が持つ
-GSUB/GPOS の列処理・フィルタリングの制限も残る。特に pair-GPOS の
-`yPlacement` は、現在、上向きを正とするフォントの符号を下向きが正の横書き run に
-そのまま使う。sideways 回転もこの既存の配置座標変換の制限を引き継ぎ、今回の変更では
-修正しない。`yAdvance` の既存動作は変更せず、`yPlacement` と同じ符号規則とは
-主張しない。完全な OpenType 整形や Unicode の混在方向処理ではない。
+GSUB/GPOS の列処理・フィルタリングの制限も残る。pair-GPOS の `yPlacement` は、
+通常の横書き・正立縦書きと同じく、上向きが正のフォント座標から下向きが正の run 座標へ
+変換してから sideways 回転する。`yAdvance` の既存動作は変更しない。
+完全な OpenType 整形や Unicode の混在方向処理ではない。
 
 送り量と原点は横メトリクスを使い、縦組み用の `vmtx` や `VORG` は使わない。
 y が下向きの座標系で、配置位置・path・offset・送り量ベクトルを
@@ -282,3 +281,23 @@ TAB・CR・LF・VT・FF・NEL・U+2028・U+2029 は `std::io::ErrorKind::Invalid
 と [OpenType `vrtr`](https://learn.microsoft.com/en-us/typography/opentype/spec/features_uz#tag-vrtr)
 を参照する。これらを根拠に CSS layout 全体への対応を示すものではない。
 公開 API の使用例は [APIレシピ](api-recipes.ja.md#sideways-ltr-の整形計測svg-出力) に記載する。
+
+## ペア位置調整の座標
+
+GPOS PairPos Format 1・2 の符号付きフォント単位レコードは変更しない。
+高水準 run では両グリフのスケール済み `yPlacement` を一度だけ下向きが正の座標へ
+変換し、ペン位置または付加先原点へ加える。正の配置調整は LTR・RTL・正立 TTB の
+インクを上へ移動する。sideways は修正済みの横書き配置を回転する。
+X 配置・送り量、mark attachment、従来の raw command API は変更しない。
+
+送り量は配置の直交座標ベクトルとは異なり、組方向に依存する。
+[OpenType GPOS 仕様](https://learn.microsoft.com/en-us/typography/opentype/spec/gpos#overview)
+は、正の `YAdvance` が上から下への送り高さを増やすと明記している。
+下向きが正の `vmtx` 送り量へ加算し、符号は反転しない。
+横書きの交差軸送り量と、通常の line bounds が組方向の終点のみを見る既存動作は
+維持する。GPOS の軸適用条件や列処理全体への完全対応を主張するものではない。
+
+MIT の `pair-coordinates.ttc` は両 PairPos 形式、両グリフの正・負・ゼロの Y 値、
+異なる横・縦メトリクス、サイズ・stretch、raw 値、LTR・RTL・TTB の位置と送り量、
+インク・行計測、SVG、sideways 回転を検証する。再生成は fontTools 4.65.0 で
+`python tests/fixtures/generate_pair_coordinates.py` を実行する。
