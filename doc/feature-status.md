@@ -327,6 +327,21 @@ for graphical rotation with rotation-specific alternates. These references do
 not imply support for full CSS layout. See [API Recipes](api-recipes.md#sideways-ltr-shaping-measurement-and-svg)
 for the public calls.
 
+## Layout controls next to ZWJ
+
+The shared text parser keeps LF and TAB as layout controls, including directly
+after U+200D ZERO WIDTH JOINER. CR is ignored as before, so CRLF produces one
+newline. This applies to horizontal and upright vertical shaping and family
+fallback: LF starts a new line/column and TAB advances by four line heights.
+Controls do not turn into missing-glyph advances or enter fallback clusters.
+Existing glyph-advance and family maximum-line measurement contracts are unchanged.
+
+This is a boundary fix for the existing CR/LF/TAB policy, not full Unicode
+line breaking or UAX #29 extended grapheme segmentation. Ordinary marks,
+variation selectors, and emoji ZWJ grouping retain the existing parser behavior.
+Tests reuse the committed MIT vertical-flow and sideways fixtures without new
+fonts or dependencies.
+
 ## Pair positioning coordinates
 
 GPOS PairPos formats 1 and 2 keep their signed font-unit records unchanged.
