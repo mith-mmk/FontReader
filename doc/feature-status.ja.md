@@ -164,3 +164,23 @@ fvarを持つフォント（色layerはまだ変形しません）、COLR v1、C
 縦metricsなし、または`layout`無効時は従来のCOLR offsetを維持し、描画unionを使う中央配置は別対応です。
 CPAL欠落や利用できないpaletteで単色へfallbackする場合も、COLR metadataだけでは新しい原点補正を適用しません。
 MITの再現可能なfixtureは`colr-vertical-origin.ttc`です。生成scriptとSHA-256はmanifestに記録しています。
+
+### 従来方式の縦書きフィーチャー選択
+
+`lookup_vertical()` は、既存の収集処理で有効な参照先 Lookup が一つ以上
+見つかる場合に `vrt2`、それ以外は `vert` を選択する。空のフィーチャーや
+無効な Lookup インデックスだけを持つフィーチャーは利用不可とする。
+`vrt2` 選択後に対象グリフの coverage がなくても `vert` へ戻らない。
+サブテーブルが空の Lookup も同様。LangSys から参照されないレコードは
+選択対象に含めない。描画側でグリフを回転しないため `vrtr` は適用しない。
+[OpenType vrt2 仕様](https://learn.microsoft.com/en-us/typography/opentype/spec/features_uz#tag-vrt2)
+の回転済み字形とフィーチャーの排他性に従う。
+
+既存の探索範囲は維持する。全 Script の既定・名前付き LangSys と必須
+フィーチャーを含み、DFLT 以外だけを持つフォントも対象となる。
+Script run ごとの選択や Unicode の混在方向は未対応。
+他の GSUB 段階より前に縦書き置換する既存の順序は変更していない。
+`vrt2` を GSUB の最終段階に移す対応は別途行う。
+横書きと `layout` 無効時は変更なし。MIT の合成フォントで選択結果、
+最終字形の bounds・送り量、measure、SVG を検証する。
+出典とハッシュは `tests/fixtures/manifest.toml` を参照。

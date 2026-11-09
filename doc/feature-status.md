@@ -191,3 +191,23 @@ a rendered-union centering fallback is separate work. Missing CPAL or an unusabl
 palette that falls back to monochrome retains its previous origin policy rather
 than treating COLR metadata as evidence of rendered color. Reproducible MIT cases
 are in `colr-vertical-origin.ttc`; the generator and SHA-256 are in the manifest.
+
+### Legacy vertical feature selection
+
+`lookup_vertical()` selects `vrt2` when the existing collector finds at least
+one valid referenced lookup; otherwise it selects `vert`. An empty feature or
+one containing only invalid lookup indices is unavailable. Once `vrt2` is
+selected, missing glyph coverage (including a lookup with no subtables) does
+not fall back to `vert`. Unreferenced feature records do not count.
+`vrtr` is never applied because the renderer does not graphically rotate glyphs.
+See the [OpenType vrt2 specification](https://learn.microsoft.com/en-us/typography/opentype/spec/features_uz#tag-vrt2)
+for pre-rotated alternates and mutual exclusivity of these features.
+
+This preserves the current global scope: all scripts, their default and named
+LangSys records, and required features participate, including non-DFLT-only
+fonts. It does not implement script-run selection or Unicode mixed orientation.
+The existing position of vertical substitution before other GSUB stages is
+unchanged; moving `vrt2` to the final GSUB stage is separate work.
+Horizontal flow and builds without `layout` remain unchanged. MIT synthetic
+fixtures verify selection, final glyph bounds/advance, measure, and SVG output;
+see `tests/fixtures/manifest.toml` for provenance and hash.
