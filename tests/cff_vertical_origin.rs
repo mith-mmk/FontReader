@@ -44,6 +44,18 @@ fn cff_origins_scale_and_preserve_horizontal_and_empty_glyphs() {
         panic!()
     };
     assert_eq!((path.offset_x, path.offset_y), (0.0, 0.0));
+    let options = FontOptions::new(&face)
+        .with_font_size(100.0)
+        .with_font_stretch(FontStretch(0.0))
+        .with_vertical_flow();
+    let run = face.engine().with_options(options).shape("A").unwrap();
+    let GlyphLayer::Path(path) = &run.glyphs[0].glyph.layers[0] else {
+        panic!()
+    };
+    assert_eq!((path.offset_x, path.offset_y), (0.0, 90.0));
+    let bounds = run.glyphs[0].glyph.metrics.bounds.unwrap();
+    assert_eq!((bounds.min_x, bounds.max_x), (0.0, 0.0));
+    assert!(bounds.min_y.is_finite() && bounds.max_y.is_finite());
 }
 #[test]
 fn cff_woff_measure_and_svg() {
