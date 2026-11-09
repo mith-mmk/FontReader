@@ -1984,7 +1984,8 @@ impl Font {
                 self.current_gdef(),
             ) {
                 adjustment.placement_x += single.x_placement as f32 * scale_x;
-                adjustment.placement_y += single.y_placement as f32 * scale_y;
+                // OpenType placement is Y-up; shaped glyph positions are Y-down.
+                adjustment.placement_y -= single.y_placement as f32 * scale_y;
                 adjustment.advance_x += single.x_advance as f32 * scale_x;
                 adjustment.advance_y += single.y_advance as f32 * scale_y;
             }
