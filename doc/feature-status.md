@@ -25,6 +25,24 @@ metrics and mixed collection faces without requiring an installed font. This
 fallback is distinct from the TrueType origin correction below. Unicode
 orientation and punctuation rotation remain separate work. Static CFF origins are covered below.
 
+### TrueType variable vertical metrics
+
+Vertical phantom points start from default `vmtx` metrics. `gvar` deltas and
+`VVAR` deltas are alternative sources, so matching adjustments are applied once.
+Each available `VVAR` advance or top-side-bearing entry takes precedence over
+the corresponding derived `gvar` metric; an omitted optional TSB mapping keeps
+the `gvar` result, including changes caused by varied outline bounds. Explicit
+zero deltas still take precedence. TrueType ignores `VVAR` vertical-origin maps.
+
+The [VVAR specification](https://learn.microsoft.com/en-us/typography/opentype/spec/vvar)
+describes the alternate metric access path and optional side-bearing mappings.
+Conflicting tables are tested as a deterministic source-selection policy, not
+as conforming font authoring or a spec-mandated conflict-resolution rule.
+Committed MIT fixtures cover default/middle/maximum axis values, optional
+mappings, selected collection faces, shaping, measurement, and ink origins.
+This correction is vertical-only; horizontal `HVAR`/`gvar` interaction is not
+changed or validated by these fixtures.
+
 ### TrueType vertical origins
 
 Monochrome TrueType layers use half the horizontal advance as the x origin and
