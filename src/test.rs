@@ -1384,7 +1384,7 @@ mod tests {
                     _ => panic!("expected nested single substitution"),
                 }
                 match extension.subtable.get_lookup(0x0041) {
-                    LookupResult::Single(glyph_id) => assert_eq!(glyph_id, 4),
+                    LookupResult::Single(glyph_id) => assert_eq!(glyph_id, 0x0045),
                     _ => panic!("expected single result"),
                 }
             }

@@ -1112,10 +1112,9 @@ impl LookupSubstitution {
         match self {
             Self::Single(single) => {
                 let coverage = &single.coverage;
-                let id = coverage.contains(gliph_id);
-                if let Some(id) = id {
-                    let return_gliph = (single.delta_glyph_id as i32 + id as i32) & 0xFFFF;
-                    LookupResult::Single(return_gliph as u16)
+                if coverage.contains(gliph_id).is_some() {
+                    // Format 1 adds the signed delta to the glyph ID, not its coverage index.
+                    LookupResult::Single((gliph_id as u16).wrapping_add(single.delta_glyph_id as u16))
                 } else {
                     LookupResult::None
                 }
@@ -1459,4 +1458,61 @@ pub(crate) struct ReverseChainSingleSubstitutionFormat1 {
     pub(crate) lookahead_coverages: Vec<Coverage>,
     pub(crate) glyph_count: u16,
     pub(crate) substitute_glyph_ids: Vec<u16>,
+}
+
+#[cfg(test)]
+mod single_format1_tests {
+    use super::*;
+    use crate::opentype::layouts::coverage::{CoverageFormat2, RangeRecord};
+
+    #[test]
+    fn single_format1_uses_glyph_ids_with_signed_wrapping_deltas() {
+        for (glyph_id, delta, expected) in
+            [(40, 7, 47), (40, -7, 33), (65535, 1, 0), (1, -2, 65535)]
+        {
+            for coverage in [
+                Coverage::Format1(CoverageFormat1 {
+                    coverage_format: 1,
+                    glyph_count: 2,
+                    glyph_ids: vec![0, glyph_id],
+                }),
+                Coverage::Format2(CoverageFormat2 {
+                    coverage_format: 2,
+                    range_count: 2,
+                    range_records: vec![
+                        RangeRecord {
+                            start_glyph_id: 0,
+                            end_glyph_id: 0,
+                            start_coverage_index: 0,
+                        },
+                        RangeRecord {
+                            start_glyph_id: glyph_id,
+                            end_glyph_id: glyph_id,
+                            start_coverage_index: 1,
+                        },
+                    ],
+                }),
+            ] {
+                let single = LookupSubstitution::Single(SingleSubstitutionFormat1 {
+                    subst_format: 1,
+                    coverage,
+                    delta_glyph_id: delta,
+                });
+                assert_eq!(single.get_single_glyph_id(glyph_id), Some(expected));
+                let extension =
+                    LookupSubstitution::ExtensionSubstitution(ExtensionSubstitutionFormat1 {
+                        subst_format: 1,
+                        extension_lookup_type: 1,
+                        extension_offset: 8,
+                        subtable: Box::new(single.clone()),
+                    });
+                for lookup in [single, extension] {
+                    assert!(
+                        matches!(lookup.get_lookup(glyph_id as usize), LookupResult::Single(id) if id == expected)
+                    );
+                    assert!(matches!(lookup.get_lookup(10), LookupResult::None));
+                }
+            }
+        }
+    }
 }
