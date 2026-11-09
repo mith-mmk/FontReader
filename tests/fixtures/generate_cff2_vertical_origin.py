@@ -6,6 +6,7 @@ All bytes and checksums are reproducible; tests do not require Python.
 from generate_vertical_flow import build, ROOT
 from fontTools.misc.psCharStrings import T2CharString
 from fontTools.pens.t2CharStringPen import T2CharStringPen
+from fontTools.pens.boundsPen import BoundsPen
 from fontTools.ttLib import TTCollection, newTable
 from fontTools.ttLib.tables import otTables
 from fontTools.varLib.builder import (buildVarRegionList, buildVarData,
@@ -38,14 +39,27 @@ def font(vertical=True, vorg=True, origin='signed'):
         old['VORG'].majorVersion, old['VORG'].minorVersion = 1, 0
         old['VORG'].defaultVertOriginY = 900
         old['VORG'].VOriginRecords = {'B': -100, 'acute': 1200}
+    if vertical and vorg:
+        # Keep both spec-permitted ways to obtain the default origin equal.
+        default_glyphs = old.getGlyphSet()
+        for name in old.getGlyphOrder():
+            pen = BoundsPen(default_glyphs)
+            default_glyphs[name].draw(pen)
+            ymax = pen.bounds[3] if pen.bounds else 0
+            advance, _ = old['vmtx'].metrics[name]
+            origin_y = old['VORG'].VOriginRecords.get(name, 900)
+            old['vmtx'].metrics[name] = (advance, round(origin_y - ymax))
     if vertical:
+        # Outline ymax deltas are A=100/B=120. VORG and yMax+TSB
+        # must agree throughout the variation region, not just at default.
+        tsb_deltas = ((-20, -180) if origin == 'signed' else (-100, -120)) if vorg else (40, 20)
         vvar = newTable('VVAR'); vvar.table = t = otTables.VVAR()
         t.Version = 0x10000
         # Distinct indices deliberately distinguish each optional map from advances.
         t.VarStore = buildVarStore(
             buildVarRegionList([{'wght': (0, 1, 1)}], ['wght']),
             [buildVarData([0], [[0], [200], [100]] + [[0]] * 5
-                          + [[40], [20], [80], [-60]], optimize=False)])
+                          + [[tsb_deltas[0]], [tsb_deltas[1]], [80], [-60]], optimize=False)])
         t.AdvHeightMap = None
         t.TsbMap = buildDeltaSetIndexMap([0, 8, 9, 0, 0, 0, 0, 0])
         t.BsbMap = None
@@ -64,9 +78,9 @@ def font(vertical=True, vorg=True, origin='signed'):
 
 
 collection = TTCollection()
+# Face 5 alone is diagnostic: it has an origin map without VORG.
 collection.fonts = [font(), font(vorg=False, origin='absent'),
                     font(origin='absent'), font(origin='zero'),
                     font(vertical=False, vorg=False), font(vorg=False)]
 collection.save(ROOT / 'cff2-vertical-origin.ttc')
 f = font(); f.flavor = 'woff'; f.save(ROOT / 'cff2-vertical-origin.woff')
-

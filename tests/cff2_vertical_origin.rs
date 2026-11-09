@@ -102,7 +102,8 @@ fn cff2_woff_shape_measure_and_svg_agree() {
     let bounds = run.glyphs[0].glyph.metrics.bounds.unwrap();
     assert_eq!((bounds.min_y, bounds.max_y), (180.0, 980.0));
     assert_eq!(engine.measure_layout("A").unwrap().ink_bounds, Some(bounds));
-    assert!(engine.render_svg("A").unwrap().contains("<path"));
+    let svg = engine.render_svg("A").unwrap();
+    assert!(svg.contains("viewBox=\"-254 176 408 808\""), "{svg}");
 }
 
 #[cfg(feature = "layout")]
