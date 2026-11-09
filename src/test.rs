@@ -1419,6 +1419,144 @@ mod tests {
 
     #[test]
     #[cfg(feature = "layout")]
+    fn synthetic_single_gpos_reaches_shape_and_measure_with_scaling() {
+        let font =
+            crate::load_font_from_buffer(include_bytes!("../tests/fixtures/gpos-single.ttf"))
+                .unwrap();
+        for size in [1000.0, 500.0] {
+            let scale = size / 1000.0;
+            let options = crate::FontOptions::new(&font).with_font_size(size);
+            let run = crate::text2commands("ABC", options.clone()).unwrap();
+            assert_eq!(run.glyphs.len(), 3);
+            assert_eq!(run.glyphs[0].x, 10.0 * scale);
+            assert_eq!(run.glyphs[0].y, 20.0 * scale);
+            assert_eq!(run.glyphs[0].glyph.metrics.advance_x, 630.0 * scale);
+            assert_eq!(run.glyphs[0].glyph.metrics.advance_y, 40.0 * scale);
+            assert_eq!(run.glyphs[1].x, 625.0 * scale);
+            assert_eq!(run.glyphs[1].y, 46.0 * scale);
+            assert_eq!(run.glyphs[1].glyph.metrics.advance_x, 593.0 * scale);
+            assert_eq!(run.glyphs[2].glyph.metrics.advance_x, 605.0 * scale);
+            assert_eq!(
+                font.font().measure_with_options("ABC", &options).unwrap(),
+                1828.0 * scale as f64
+            );
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn synthetic_single_gpos_preserves_attached_mark_advance() {
+        let font =
+            crate::load_font_from_buffer(include_bytes!("../tests/fixtures/gpos-single.ttf"))
+                .unwrap();
+        let options = crate::FontOptions::new(&font).with_font_size(1000.0);
+        let run = crate::text2commands("A\u{0301}B", options.clone()).unwrap();
+        assert_eq!(run.glyphs.len(), 3);
+        assert_eq!(run.glyphs[1].x, 315.0);
+        assert_eq!(run.glyphs[1].y, 527.0);
+        assert_eq!(run.glyphs[1].glyph.metrics.advance_x, 25.0);
+        assert_eq!(run.glyphs[1].glyph.metrics.advance_y, 5.0);
+        assert_eq!(run.glyphs[2].x, 650.0);
+        assert_eq!(run.glyphs[2].y, 51.0);
+        assert_eq!(
+            font.font()
+                .measure_with_options("A\u{0301}B", &options)
+                .unwrap(),
+            1248.0
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn synthetic_single_gpos_public_face_scales_stretch_once() {
+        let file =
+            crate::FontFile::from_buffer(include_bytes!("../tests/fixtures/gpos-single.ttf"))
+                .unwrap();
+        let face = file.current_face().unwrap();
+        let engine = face.engine();
+        let options = engine
+            .options()
+            .clone()
+            .with_font_size(1000.0)
+            .with_font_stretch(crate::FontStretch(2.0));
+        let engine = engine.with_options(options);
+        let run = engine.shape("A").unwrap();
+        assert_eq!(run.glyphs[0].x, 20.0);
+        assert_eq!(run.glyphs[0].y, 20.0);
+        assert_eq!(run.glyphs[0].glyph.metrics.advance_x, 1260.0);
+        assert_eq!(run.glyphs[0].glyph.metrics.advance_y, 40.0);
+        assert_eq!(engine.measure("A").unwrap(), 1260.0);
+        assert!(engine.render_svg("A").unwrap().contains("<svg"));
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn synthetic_single_gpos_combines_with_pair_positioning() {
+        let font =
+            crate::load_font_from_buffer(include_bytes!("../tests/fixtures/gpos-single.ttf"))
+                .unwrap();
+        let options = crate::FontOptions::new(&font).with_font_size(1000.0);
+        let run = crate::text2commands("CB", options.clone()).unwrap();
+        assert_eq!(run.glyphs[0].glyph.metrics.advance_x, 555.0);
+        assert_eq!(run.glyphs[1].glyph.metrics.advance_x, 593.0);
+        assert_eq!(
+            font.font().measure_with_options("CB", &options).unwrap(),
+            1148.0
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn single_gpos_selects_the_locale_script() {
+        let single = |advance: i16| {
+            [1u16, 8, 4, advance as u16, 1, 1, 10]
+                .iter()
+                .flat_map(|word| word.to_be_bytes())
+                .collect()
+        };
+        let gpos = parse_gpos(build_gpos_table_with_scripted_features(
+            &[(*b"DFLT", 0xffff, &[0]), (*b"arab", 0xffff, &[1])],
+            &[(*b"kern", &[0]), (*b"kern", &[1])],
+            1,
+            vec![single(10), single(20)],
+        ));
+        assert_eq!(
+            gpos.lookup_single_adjustment(10, false, Some("default"), None)
+                .unwrap()
+                .x_advance,
+            10
+        );
+        assert_eq!(
+            gpos.lookup_single_adjustment(10, false, Some("ar"), None)
+                .unwrap()
+                .x_advance,
+            20
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn synthetic_single_gpos_selects_vertical_spacing_features() {
+        let font =
+            crate::load_font_from_buffer(include_bytes!("../tests/fixtures/gpos-single.ttf"))
+                .unwrap();
+        let options = crate::FontOptions::new(&font)
+            .with_font_size(1000.0)
+            .with_vertical_flow();
+        let run = crate::text2commands("AC", options.clone()).unwrap();
+        assert_eq!(run.glyphs[0].x, 1.0);
+        assert_eq!(run.glyphs[0].y, 2.0);
+        assert_eq!(run.glyphs[0].glyph.metrics.advance_x, 3.0);
+        assert_eq!(run.glyphs[0].glyph.metrics.advance_y, 1004.0);
+        assert_eq!(run.glyphs[1].glyph.metrics.advance_y, 1006.0);
+        assert_eq!(
+            font.font().measure_with_options("AC", &options).unwrap(),
+            2010.0
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
     fn gpos_pair_adjustment_format1_parses_and_resolves() {
         let gpos = parse_gpos(build_gpos_table(
             *b"kern",
