@@ -41,6 +41,8 @@ miniz_oxide = {version = "0.7.1"}
 # for Woff2
 woff2 = { package = "woff2-no-std", version = "0.3.2" }
 base64 = "0.21.4"
+# Pin Unicode 17.0.0 extended grapheme boundaries for library consumers too.
+unicode-segmentation = "=1.13.3"
 
 [target.'cfg(all(not(windows), not(target_arch = "wasm32")))'.dependencies]
 # for legacy name-table encodings when `encoding` is enabled

@@ -149,3 +149,10 @@ source = "tests/fixtures/generate_pair_coordinates.py (fontTools 4.65.0)"
 license = "MIT (project test code)"
 sha256 = "f5ab8a7c959c8dd812f3304039cd2a63f0bbfeb166ca37bae0c73f8d74805b5b"
 features = ["GPOS", "PairPos-format1", "PairPos-format2", "signed-placement", "directional-advance", "kern", "vkrn", "sideways-ltr"]
+
+[[fixture]]
+id = "unicode-grapheme-fallback.ttc"
+source = "tests/fixtures/generate_unicode_grapheme_fallback.py (fontTools 4.65.0)"
+license = "MIT (project test code)"
+sha256 = "39a7427fa679d29e83e3ad8238a1b8d0629b553b6a8de575e8e206e9c165a50f"
+features = ["Unicode-EGC", "fallback", "Hangul", "SpacingMark", "Prepend", "Indic-conjunct", "emoji-ZWJ", "regional-indicators", "combining-marks", "UVS", "missing-glyph"]

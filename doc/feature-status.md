@@ -336,11 +336,9 @@ fallback: LF starts a new line/column and TAB advances by four line heights.
 Controls do not turn into missing-glyph advances or enter fallback clusters.
 Existing glyph-advance and family maximum-line measurement contracts are unchanged.
 
-This is a boundary fix for the existing CR/LF/TAB policy, not full Unicode
-line breaking or UAX #29 extended grapheme segmentation. Ordinary marks,
-variation selectors, and emoji ZWJ grouping retain the existing parser behavior.
-Tests reuse the committed MIT vertical-flow and sideways fixtures without new
-fonts or dependencies.
+This retains the existing CR/LF/TAB layout policy. Unicode extended grapheme
+boundaries are described separately below; other Unicode controls are not
+newly treated as line breaks. Tests reuse committed MIT fonts.
 
 ## Pair positioning coordinates
 
@@ -364,3 +362,33 @@ negative, and zero Y values on both glyphs, differing horizontal/vertical
 metrics, size/stretch, raw values, LTR/RTL/TTB positions and advances, ink and
 line measurement, SVG, and sideways rotation. Regenerate it with
 `python tests/fixtures/generate_pair_coordinates.py` (fontTools 4.65.0).
+
+## Extended grapheme boundaries
+
+Shaping and FontFamily fallback share Unicode **17.0.0** extended grapheme
+clusters from the exactly pinned `unicode-segmentation = "=1.13.3"`. This replaces
+the handwritten mark ranges and unconditional ZWJ grouping. Hangul L/V/T,
+SpacingMark, Prepend, Indic conjuncts (GB9c), emoji ZWJ sequences, and regional
+indicator pairs follow UAX #29. For example, `A + ZWJ + B` is now two units
+(`A + ZWJ`, then `B`), not an arbitrary ZWJ ligature; an intervening combining
+mark also prevents pairing two regional indicators across that mark.
+
+The layout adapter still ignores lone CR, emits one newline for CRLF or LF,
+and treats TAB as a tab. NUL, VT, FF, NEL, U+2028, U+2029 and other controls
+keep their existing scalar-glyph behavior rather than becoming line breaks.
+Leading orphan variation selectors are ignored, including repeated selectors,
+but following marks in that same grapheme are preserved. Base+selector UVS
+lookup and scalar ZWJ/.notdef handling are unchanged.
+
+Fallback selects one face for each adapted cluster. If no candidate supports
+the entire cluster, the existing first-candidate/.notdef policy is retained;
+it does not splice a cluster across partial fonts. Segmentation does not itself
+perform Indic/emoji shaping, guarantee a single glyph, normalize text, or add
+BiDi. Raw HTML helpers retain all scalar glyphs in two-character graphemes,
+instead of assuming every such pair is a base+selector; their existing
+multi-scalar SVG rendering path and vertical-layout limitations remain.
+
+This boundary version is independent of the public **Unicode 18.0.0**
+`Vertical_Orientation` scalar property. There is no new automatic mixed
+orientation, source-provenance model, or claim of CSS mixed-layout conformance.
+See [Unicode sources, licenses, and offline verification](../data/unicode/README.md#extended-grapheme-clusters-unicode-1700).

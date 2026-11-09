@@ -1340,50 +1340,6 @@ impl Font {
         ch == '\u{20E3}'
     }
 
-    fn is_combining_mark(ch: char) -> bool {
-        matches!(
-            ch as u32,
-            0x0300..=0x036F
-                | 0x0483..=0x0489
-                | 0x0591..=0x05BD
-                | 0x05BF
-                | 0x05C1..=0x05C2
-                | 0x05C4..=0x05C5
-                | 0x05C7
-                | 0x0610..=0x061A
-                | 0x064B..=0x065F
-                | 0x0670
-                | 0x06D6..=0x06DC
-                | 0x06DF..=0x06E4
-                | 0x06E7..=0x06E8
-                | 0x06EA..=0x06ED
-                | 0x0711
-                | 0x0730..=0x074A
-                | 0x07A6..=0x07B0
-                | 0x07EB..=0x07F3
-                | 0x0816..=0x0819
-                | 0x081B..=0x0823
-                | 0x0825..=0x0827
-                | 0x0829..=0x082D
-                | 0x0859..=0x085B
-                | 0x08D3..=0x08E1
-                | 0x08E3..=0x08FF
-                | 0x0F18..=0x0F19
-                | 0x0F35
-                | 0x0F37
-                | 0x0F39
-                | 0x0F71..=0x0F7E
-                | 0x0F80..=0x0F84
-                | 0x0F86..=0x0F87
-                | 0x0F8D..=0x0FBC
-                | 0x1AB0..=0x1AFF
-                | 0x1DC0..=0x1DFF
-                | 0x20D0..=0x20FF
-                | 0x3099..=0x309A
-                | 0xFE20..=0xFE2F
-        )
-    }
-
     fn is_regional_indicator(ch: char) -> bool {
         (0x1F1E6..=0x1F1FF).contains(&(ch as u32))
     }
@@ -1415,23 +1371,6 @@ impl Font {
         saw_emoji_scalar
     }
 
-    fn extend_cluster_suffix(chars: &[char], index: &mut usize, text: &mut String) {
-        while *index < chars.len() {
-            let ch = chars[*index];
-            if Self::is_variation_selector(ch)
-                || Self::is_emoji_modifier(ch)
-                || Self::is_keycap_mark(ch)
-                || Self::is_tag_character(ch)
-                || Self::is_combining_mark(ch)
-            {
-                text.push(ch);
-                *index += 1;
-            } else {
-                break;
-            }
-        }
-    }
-
     fn cluster_glyph_scalars(text: &str) -> Vec<(char, char)> {
         let chars: Vec<char> = text.chars().collect();
         let mut glyphs = Vec::new();
@@ -1458,72 +1397,30 @@ impl Font {
     }
 
     fn parse_text_units(text: &str) -> Vec<ParsedTextUnit> {
-        let chars: Vec<char> = text.chars().collect();
-        let mut units = Vec::new();
-        let mut index = 0;
-
-        while index < chars.len() {
-            let ch = chars[index];
-            match ch {
-                '\r' => {
-                    index += 1;
-                }
-                '\n' => {
-                    units.push(ParsedTextUnit::Newline);
-                    index += 1;
-                }
-                '\t' => {
-                    units.push(ParsedTextUnit::Tab);
-                    index += 1;
-                }
-                _ if Self::is_variation_selector(ch) => {
-                    index += 1;
-                }
+        crate::unicode::graphemes::extended_graphemes(text)
+            .filter_map(|grapheme| match grapheme {
+                // Layout controls are an adapter policy, separate from UAX #29.
+                "\r" => None,
+                "\n" | "\r\n" => Some(ParsedTextUnit::Newline),
+                "\t" => Some(ParsedTextUnit::Tab),
                 _ => {
-                    let mut text = String::new();
-                    text.push(ch);
-                    let mut variation_selector = '\0';
-                    if index + 1 < chars.len() && Self::is_variation_selector(chars[index + 1]) {
-                        variation_selector = chars[index + 1];
-                        text.push(variation_selector);
-                        index += 1;
-                    }
-
-                    index += 1;
-                    Self::extend_cluster_suffix(&chars, &mut index, &mut text);
-
-                    if Self::is_regional_indicator(ch)
-                        && index < chars.len()
-                        && Self::is_regional_indicator(chars[index])
-                    {
-                        text.push(chars[index]);
-                        index += 1;
-                        Self::extend_cluster_suffix(&chars, &mut index, &mut text);
-                    }
-
-                    while index < chars.len() && Self::is_zero_width_joiner(chars[index]) {
-                        text.push(chars[index]);
-                        index += 1;
-                        // Leave layout controls for the outer loop, even after ZWJ.
-                        // CR remains ignored; LF and TAB each emit their own unit.
-                        if index >= chars.len() || matches!(chars[index], '\r' | '\n' | '\t') {
-                            break;
-                        }
-                        text.push(chars[index]);
-                        index += 1;
-                        Self::extend_cluster_suffix(&chars, &mut index, &mut text);
-                    }
-
-                    units.push(ParsedTextUnit::Glyph {
-                        text,
+                    // Keep the existing orphan-selector policy, but do not drop
+                    // other marks that share the selector's leading grapheme.
+                    let text = grapheme.trim_start_matches(Self::is_variation_selector);
+                    let mut chars = text.chars();
+                    let ch = chars.next()?;
+                    let variation_selector = chars
+                        .next()
+                        .filter(|ch| Self::is_variation_selector(*ch))
+                        .unwrap_or('\0');
+                    Some(ParsedTextUnit::Glyph {
+                        text: text.to_owned(),
                         ch,
                         variation_selector,
-                    });
+                    })
                 }
-            }
-        }
-
-        units
+            })
+            .collect()
     }
 
     pub(crate) fn parse_text_units_for_fallback(text: &str) -> Vec<ParsedTextUnit> {
@@ -1860,13 +1757,11 @@ impl Font {
                 ch,
                 variation_selector,
             } => {
+                // A two-scalar grapheme need not be a base + variation selector
+                // (e.g. Prepend or SpacingMark). Never omit its second glyph.
                 let svg = if text.chars().count() > 2
                     || text.contains('\u{200D}')
-                    || text
-                        .chars()
-                        .filter(|ch| Self::is_regional_indicator(*ch))
-                        .count()
-                        > 1
+                    || Self::cluster_glyph_scalars(&text).len() > 1
                 {
                     self.text2svg(&text, fontsize, fontunit)?
                 } else {
@@ -4904,6 +4799,113 @@ mod text_control_tests {
     }
 
     #[test]
+    fn extended_graphemes_keep_hangul_spacing_marks_prepend_and_indic_together() {
+        for text in [
+            "\u{1100}\u{1161}\u{11a8}", // Hangul L V T
+            "\u{ac00}\u{11a8}",         // Hangul LV T
+            "\u{0915}\u{093e}",         // SpacingMark
+            "\u{0600}A",                // Prepend
+            "\u{0915}\u{094d}\u{0924}", // Indic conjunct (GB9c)
+            "A\u{0897}",                // Extend absent from the handwritten ranges
+            "\u{1f469}\u{1f3fd}\u{200d}\u{1f4bb}",
+        ] {
+            assert_eq!(unit_texts(text), [text], "{text:?}");
+        }
+    }
+
+    #[test]
+    fn extended_graphemes_do_not_join_arbitrary_letters_or_controls_after_zwj() {
+        for (text, expected) in [
+            ("A\u{200d}B", vec!["A\u{200d}", "B"]),
+            (
+                "A\u{0301}\u{200d}B\u{0301}",
+                vec!["A\u{0301}\u{200d}", "B\u{0301}"],
+            ),
+            (
+                "\u{1f1ef}\u{0301}\u{1f1f5}",
+                vec!["\u{1f1ef}\u{0301}", "\u{1f1f5}"],
+            ),
+            (
+                "\u{1f1ef}\u{1f1f5}\u{1f1fa}",
+                vec!["\u{1f1ef}\u{1f1f5}", "\u{1f1fa}"],
+            ),
+        ] {
+            assert_eq!(unit_texts(text), expected, "{text:?}");
+        }
+        for ch in [
+            '\u{0000}', '\u{000b}', '\u{000c}', '\u{0085}', '\u{2028}', '\u{2029}',
+        ] {
+            let text = format!("A\u{200d}{ch}\u{0301}B");
+            assert_eq!(
+                unit_texts(&text),
+                [
+                    "A\u{200d}".to_owned(),
+                    ch.to_string(),
+                    "\u{0301}".to_owned(),
+                    "B".to_owned()
+                ]
+            );
+            assert!(Font::parse_text_units(&text)
+                .iter()
+                .all(|unit| matches!(unit, ParsedTextUnit::Glyph { .. })));
+        }
+    }
+
+    #[test]
+    fn adapter_keeps_orphan_marks_but_ignores_leading_variation_selectors() {
+        for (text, expected) in [
+            ("", vec![]),
+            ("\u{fe0f}\u{e0100}", vec![]),
+            ("\u{fe0f}\u{e0100}\u{0301}A", vec!["\u{0301}", "A"]),
+            ("\u{fe0f}\u{093e}A", vec!["\u{093e}", "A"]),
+            ("\u{0301}\u{fe0f}A", vec!["\u{0301}\u{fe0f}", "A"]),
+            (
+                "A\u{fe00}\u{fe01}\u{0301}",
+                vec!["A\u{fe00}\u{fe01}\u{0301}"],
+            ),
+            (
+                "\r\n\u{fe0f}\u{0301}\t\rA",
+                vec!["\n", "\u{0301}", "\t", "A"],
+            ),
+            ("AB\u{6f22}\u{3001}", vec!["A", "B", "\u{6f22}", "\u{3001}"]),
+        ] {
+            assert_eq!(unit_texts(text), expected, "{text:?}");
+        }
+        let units = Font::parse_text_units("\u{fe0f}\u{0301}\u{e0100}");
+        assert!(matches!(
+            &units[0],
+            ParsedTextUnit::Glyph {
+                ch: '\u{0301}',
+                variation_selector: '\u{e0100}',
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn html_adapter_keeps_every_scalar_in_new_two_character_graphemes() {
+        let file = crate::FontFile::from_buffer(include_bytes!(
+            "../tests/fixtures/unicode-grapheme-fallback.ttc"
+        ))
+        .unwrap();
+        let face = file.face(1).unwrap();
+        let font = face.font();
+        for text in ["\u{0600}\u{0627}", "\u{0915}\u{093e}", "A\u{0301}"] {
+            let expected = font.text2svg(text, 100.0, "px").unwrap();
+            assert_eq!(expected.matches("<path ").count(), 2, "{text:?}");
+            assert!(font
+                .get_html(text, 100.0, "px")
+                .unwrap()
+                .contains(&expected));
+            // Retain the raw HTML adapter's existing multi-scalar SVG path.
+            assert!(font
+                .get_html_vert(text, 100.0, "px")
+                .unwrap()
+                .contains(&expected));
+        }
+    }
+
+    #[test]
     fn zwj_preserves_lf_tab_and_ignored_cr_boundaries() {
         for (control, emitted) in [("\n", "\n"), ("\t", "\t"), ("\r", ""), ("\r\n", "\n")] {
             let text = format!("A\u{200d}{control}B");
@@ -4967,11 +4969,8 @@ mod text_control_tests {
     }
 
     #[test]
-    fn ordinary_zwj_marks_and_variation_clusters_are_unchanged() {
+    fn emoji_zwj_marks_and_variation_scalar_handling_are_unchanged() {
         for text in [
-            "A\u{200d}B",
-            "A\u{0301}\u{200d}B\u{0301}",
-            "A\u{fe00}\u{200d}B\u{e0100}",
             "\u{1f469}\u{1f3fd}\u{200d}\u{1f4bb}",
             "\u{1f469}\u{200d}\u{2764}\u{fe0f}\u{200d}\u{1f469}",
             "\u{1f1ef}\u{1f1f5}",
@@ -4996,7 +4995,7 @@ mod text_control_tests {
         // This fix does not broaden the existing CR/LF/TAB control policy.
         for ch in ['\u{000b}', '\u{000c}', '\u{0085}', '\u{2028}', '\u{2029}'] {
             let text = format!("A\u{200d}{ch}");
-            assert_eq!(unit_texts(&text), [text]);
+            assert_eq!(unit_texts(&text), ["A\u{200d}".to_owned(), ch.to_string()]);
         }
     }
 }

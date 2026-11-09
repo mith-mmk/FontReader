@@ -1,5 +1,7 @@
 # Preserve the official downloads byte-for-byte for their pinned SHA-256 hashes.
 /data/unicode/18.0.0/VerticalOrientation.txt -text
+# The official grapheme-test header includes two trailing spaces.
+/data/unicode/17.0.0/GraphemeBreakTest.txt -text whitespace=-blank-at-eol
 /data/unicode/LICENSE.txt -text
 # The generator emits LF regardless of the contributor's platform.
 /src/unicode/vertical_orientation_data.rs text eol=lf

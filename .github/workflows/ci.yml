@@ -15,6 +15,8 @@ jobs:
         include:
           - name: unicode-data
             command: python3 tools/generate_vertical_orientation.py --check
+          - name: grapheme-data
+            command: python3 tools/check_grapheme_data.py
           - name: fmt
             command: cargo fmt --all -- --check
           - name: clippy
