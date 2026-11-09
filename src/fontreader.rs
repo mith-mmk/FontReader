@@ -2584,15 +2584,20 @@ impl Font {
             }
             FontData::ParsedGlyph(parsed) => (parsed.y_min as f32, parsed.y_max as f32),
             #[cfg(feature = "cff")]
-            FontData::CFF(_) if self.current_outline_format() == GlyphFormat::CFF => {
-                let commands = self.current_cff()?.to_path_commands(glyph_id, 1.0).ok()?;
+            FontData::CFF(_) | FontData::CFF2(_) => {
+                let commands = self
+                    .current_cff()?
+                    .to_path_commands_with_coords(glyph_id, 1.0, &glyph.variation_coords)
+                    .ok()?;
                 cff_y_bounds(&commands)
             }
             _ => return None,
         };
         let horizontal = self.get_horizontal_layout_with_coords(glyph_id, &glyph.variation_coords);
-        // VORG is defined only for CFF. CFF2 variation origins remain out of scope.
-        let vorg = if self.current_outline_format() == GlyphFormat::CFF {
+        // VORG applies to CFF/CFF2, never TrueType. Its values describe the
+        // default instance; CFF2 origin variation requires an explicit VVAR map.
+        let outline_format = self.current_outline_format();
+        let vorg = if matches!(outline_format, GlyphFormat::CFF | GlyphFormat::CFF2) {
             if self.current_font == 0 {
                 self.vorg.as_ref()
             } else {
@@ -2602,7 +2607,23 @@ impl Font {
             None
         };
         let origin_y = match (vorg, &glyph.layout) {
-            (Some(vorg), _) => vorg.origin(glyph_id as u16) as f32,
+            (Some(vorg), _) => {
+                let delta = if outline_format == GlyphFormat::CFF2 {
+                    let vvar = if self.current_font == 0 {
+                        self.vvar.as_ref()
+                    } else {
+                        self.more_fonts[self.current_font - 1].vvar.as_ref()
+                    };
+                    vvar.and_then(|vvar| {
+                        vvar.vertical_origin_offset(glyph_id, &glyph.variation_coords)
+                    })
+                    .unwrap_or(0.0)
+                } else {
+                    0.0
+                };
+                // Do not also add TSB variation to the VORG-derived origin.
+                vorg.origin(glyph_id as u16) as f32 + delta
+            }
             (_, FontLayout::Vertical(layout)) => y_max + layout.tsb as f32,
             _ => {
                 let height = horizontal.accender - horizontal.descender;

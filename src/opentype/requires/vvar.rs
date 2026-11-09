@@ -84,7 +84,6 @@ impl VVAR {
             .parse_delta(outer_index, inner_index, coordinates)
     }
 
-    #[allow(dead_code)]
     pub(crate) fn vertical_origin_offset(
         &self,
         glyph_id: usize,

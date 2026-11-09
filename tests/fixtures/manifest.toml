@@ -93,3 +93,17 @@ source = "tests/fixtures/generate_vertical_variations.py (fontTools 4.65.0)"
 license = "MIT (project test code)"
 sha256 = "2036f9200c47b103895fcc226310044f1dea2c2275584679cfd72cf8c2aff215"
 features = ["vertical-metrics", "gvar", "VVAR", "variable-bounds", "source-selection"]
+
+[[fixture]]
+id = "cff2-vertical-origin.ttc"
+source = "tests/fixtures/generate_cff2_vertical_origin.py (fontTools 4.65.0)"
+license = "MIT (project test code)"
+sha256 = "3c39d2c333b5fd7568fcf37829df51d3a345a0b69239eb106e281b8f52dd3c85"
+features = ["vertical-origin", "CFF2", "VORG", "VVAR", "variable-cubic-extrema", "marks"]
+
+[[fixture]]
+id = "cff2-vertical-origin.woff"
+source = "tests/fixtures/generate_cff2_vertical_origin.py (fontTools 4.65.0)"
+license = "MIT (project test code)"
+sha256 = "9e1acf5dea0cb36f8e7bca8aa131079399ef716d49c31593389f85ab843cb1dd"
+features = ["vertical-origin", "CFF2", "VORG", "VVAR", "variable-cubic-extrema", "marks"]

@@ -55,7 +55,7 @@ attached by GPOS/GDEF inherit the base glyph's origin translation.
 
 Synthetic regressions cover punctuation, negative bearings, composites, gvar
 outline/phantom movement, collection face selection, and sfnt/WOFF parity.
-CFF2 VORG, VVAR origin maps, BASE alignment, Unicode orientation, and color
+BASE alignment, Unicode orientation, and color
 origins (COLR, sbix, SVG) remain separate work. Color layer offsets and the legacy
 raw glyph/SVG APIs are unchanged. TrueType ignores VORG as required by OpenType.
 
@@ -145,7 +145,31 @@ Invalid optional VORG (unsupported version, short data, unsorted or duplicate
 records) is ignored and uses the same fallback. TrueType ignores VORG entirely.
 
 This correction requires `cff`; sfnt vertical metrics require `layout` as before.
-CFF2/VVAR origin variation, color COLR/sbix/SVG origins, BASE alignment and Unicode
-orientation remain outside this scope. Horizontal and legacy raw APIs are unchanged.
+Color COLR/sbix/SVG origins, BASE alignment and Unicode orientation remain outside
+this scope. Horizontal and legacy raw APIs are unchanged.
 Tests use committed MIT synthetic fixtures in `cff-vertical-origin.ttc` and
 `cff-vertical-origin.woff`; provenance and SHA-256 are in `tests/fixtures/manifest.toml`.
+
+### CFF2 variable vertical origins
+
+With `cff2`, monochrome CFF2 uses the same high-level origin policy. A VORG
+origin is the default instance value; only the explicitly mapped VVAR origin
+delta is added at the selected normalized coordinates. Missing mappings mean
+zero delta, not the implicit advance-height mapping. TSB variation is not added
+to a VORG-derived origin. TrueType ignores both VORG and VVAR origin mappings.
+
+Without usable VORG, origins use the actual coordinate-varied CFF2 cubic yMax
+plus the coordinate-varied vmtx/VVAR top side bearing. Origin-map deltas are not
+added to this fallback. Without vertical metrics, coordinate-varied extrema
+are centered in the synthesized cell. Metric rounding/clamping follows the
+existing vmtx/VVAR path; public ink bounds still include control points.
+
+This covers default/intermediate/maximum coordinates, selected TTC faces, WOFF,
+attached marks and scaling, including zero horizontal stretch. Coverage uses
+MIT synthetic fixtures, not a confirmed real-world CFF2 vertical-font corpus.
+Malformed optional VORG uses the fallback; general malformed CFF2/VVAR recovery,
+color origins, BASE, Unicode orientation and legacy raw APIs are not extended.
+
+See the [VORG specification](https://learn.microsoft.com/en-us/typography/opentype/spec/vorg)
+and [VVAR specification](https://learn.microsoft.com/en-us/typography/opentype/spec/vvar).
+Fixture provenance, reproduction and SHA-256: `tests/fixtures/manifest.toml`.
