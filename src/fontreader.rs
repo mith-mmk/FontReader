@@ -2242,6 +2242,7 @@ impl Font {
         }
 
         let mut glyphs: Vec<PositionedGlyph> = Vec::new();
+        let mut layer_origins = Vec::new();
         let mut cursor_x = 0.0f32;
         let mut cursor_y = 0.0f32;
         let tab_advance = line_height;
@@ -2293,7 +2294,7 @@ impl Font {
                         .map(|svg| svg.has_glyph(glyph_id as u32))
                         .unwrap_or(false);
 
-                    let layers = if let Some(sbix) = self.current_sbix() {
+                    let mut layers = if let Some(sbix) = self.current_sbix() {
                         if let Some(bitmap) =
                             sbix.get_raster_glyph(glyph_id as u32, options.font_size, "px")
                         {
@@ -2435,7 +2436,6 @@ impl Font {
                     );
                     metrics.advance_x += adjustment.advance_x;
                     metrics.advance_y += adjustment.advance_y;
-                    metrics.bounds = glyph_layers_bounds(&layers);
                     let uses_gpos_mark_attachment = mark_attachment.is_some();
                     let gdef_attach_glyph_index = if !uses_gpos_mark_attachment
                         && self.gdef_supports_mark_attachment(glyph_id as u16)
@@ -2481,6 +2481,38 @@ impl Font {
                         metrics.advance_x = 0.0;
                         metrics.advance_y = 0.0;
                     }
+                    // Color/SVG/bitmap origins are outside this monochrome correction.
+                    let monochrome_outline = is_vertical
+                        && layers.iter().all(|layer| matches!(layer, GlyphLayer::Path(_)))
+                        && match self.current_colr() {
+                            Some(colr) => colr.get_layer_record(glyph_id as u16).is_empty(),
+                            None => true,
+                        };
+                    #[cfg(feature = "svg-fonts")]
+                    let monochrome_outline = monochrome_outline
+                        && !(can_use_svg && (resolved.prefer_color || !can_use_outline));
+                    let layer_origin = if monochrome_outline {
+                        // Mark anchors use horizontal font coordinates. Attached
+                        // marks must share the base's vertical-origin translation.
+                        attach_glyph_index
+                            .and_then(|index| layer_origins.get(index).copied())
+                            .or_else(|| {
+                                self.truetype_vertical_origin_offset(
+                                    glyph_id,
+                                    open_type_glyph,
+                                    scale_x,
+                                    scale_y,
+                                )
+                            })
+                            .unwrap_or((0.0, 0.0))
+                    } else {
+                        (0.0, 0.0)
+                    };
+                    if monochrome_outline {
+                        translate_glyph_layers(&mut layers, layer_origin.0, layer_origin.1);
+                    }
+                    metrics.bounds = glyph_layers_bounds(&layers);
+                    layer_origins.push(layer_origin);
                     let glyph = Glyph {
                         font: Some(font_metrics),
                         metrics,
@@ -2501,6 +2533,47 @@ impl Font {
         }
 
         Ok(GlyphRun::new(glyphs))
+    }
+
+    fn truetype_vertical_origin_offset(
+        &self,
+        glyph_id: usize,
+        glyph: &OpenTypeGlyph,
+        scale_x: f32,
+        scale_y: f32,
+    ) -> Option<(f32, f32)> {
+        let (y_min, y_max) = match &glyph.glyph {
+            FontData::Glyph(raw) => {
+                // Read only the glyf header; empty glyphs have no bounding box.
+                let y = |offset| {
+                    raw.glyphs
+                        .get(offset..offset + 2)
+                        .map(|bytes| i16::from_be_bytes([bytes[0], bytes[1]]) as f32)
+                        .unwrap_or(0.0)
+                };
+                (y(4), y(8))
+            }
+            FontData::ParsedGlyph(parsed) => (parsed.y_min as f32, parsed.y_max as f32),
+            _ => return None,
+        };
+        let horizontal = self.get_horizontal_layout_with_coords(glyph_id, &glyph.variation_coords);
+        let origin_y = match &glyph.layout {
+            FontLayout::Vertical(layout) => y_max + layout.tsb as f32,
+            _ => {
+                let height = horizontal.accender - horizontal.descender;
+                let height = if height > 0 {
+                    height as f32
+                } else {
+                    self.current_head().ok()?.units_per_em.max(1) as f32
+                };
+                // With no vertical metrics, center the outline in its cell.
+                (height + y_min + y_max) * 0.5
+            }
+        };
+        Some((
+            -(horizontal.advance_width as f32) * 0.5 * scale_x,
+            origin_y * scale_y,
+        ))
     }
 
     fn build_outline_layers(
@@ -3685,6 +3758,19 @@ fn glyph_metrics_from_layout(layout: &FontLayout, scale_x: f32, scale_y: f32) ->
             bounds: None,
         },
         FontLayout::Unknown => DrawGlyphMetrics::default(),
+    }
+}
+
+fn translate_glyph_layers(layers: &mut [GlyphLayer], x: f32, y: f32) {
+    for layer in layers {
+        let (offset_x, offset_y) = match layer {
+            GlyphLayer::Path(path) => (&mut path.offset_x, &mut path.offset_y),
+            GlyphLayer::Raster(raster) => (&mut raster.offset_x, &mut raster.offset_y),
+            #[cfg(feature = "svg-fonts")]
+            GlyphLayer::Svg(svg) => (&mut svg.offset_x, &mut svg.offset_y),
+        };
+        *offset_x += x;
+        *offset_y += y;
     }
 }
 

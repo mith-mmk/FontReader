@@ -51,3 +51,17 @@ source = "tests/fixtures/generate_mark_coordinates.py (fontTools 4.65.0)"
 license = "MIT (project test code)"
 sha256 = "ba41b8718860b39e64ed8c6eb34c1cadf10e3204ef5a0b82be0c73964a5c19ba"
 features = ["mark-to-base", "mark-to-mark", "mark-to-ligature", "screen-coordinates"]
+
+[[fixture]]
+id = "vertical-origin-cases.ttc"
+source = "tests/fixtures/generate_vertical_origin.py (fontTools 4.65.0)"
+license = "MIT (project test code)"
+sha256 = "b780151c39d876709004585da1a6f2966b2444691e04b640fb8f90f19fca2de5"
+features = ["vertical-origin", "glyf", "vmtx", "gvar", "marks", "color-scope"]
+
+[[fixture]]
+id = "vertical-origin.woff"
+source = "tests/fixtures/generate_vertical_origin.py (fontTools 4.65.0)"
+license = "MIT (project test code)"
+sha256 = "3b182451aae750440060e8322be29ca335ffc7125cf1c9b1a1ce44216ff885fb"
+features = ["vertical-origin", "glyf", "vmtx", "gvar", "marks", "color-scope"]

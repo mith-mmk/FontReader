@@ -18,7 +18,20 @@ vheaだけがある場合も同じフォールバックです。
 `layout` featureなしではsfnt loaderが縦表を読まないため、同じフォールバックを使います。
 
 合成fixtureで縦メトリクスの有無とコレクション内のface選択を検証し、外部フォントを必要としません。
-この修正には縦原点、Unicode縦方向、約物の回転、CFFのVORG対応は含みません。
+このfallbackとは別に下記のTrueType縦原点補正を行います。Unicode縦方向、約物の回転、CFFのVORGは別対応です。
+
+### TrueTypeの縦原点
+
+モノクロTrueTypeの描画layerは、横advanceの半分をx原点、
+`glyf.yMax + vmtx.topSideBearing`をy原点として配置します。
+基準は[OpenType vmtx仕様](https://learn.microsoft.com/en-us/typography/opentype/spec/vmtx)です。
+縦メトリクスがなければ合成セルの縦中央に輪郭を置きます。
+layer offsetに倍率を一度だけ適用し、論理的な列位置とadvanceは維持します。
+boundsとSVGも同じlayerを使い、GPOS/GDEFで付くmarkはbaseの原点移動量を継承します。
+
+合成fixtureで約物、負のbearing、合成glyph、gvarの輪郭/phantom移動、TTC face選択、sfnt/WOFFを検証します。
+CFF/CFF2のVORG、VVAR原点map、BASE、Unicode縦方向、COLR/sbix/SVGの色layer原点は別対応です。
+色layerのoffsetと旧raw glyph/SVG APIは変更しません。TrueTypeのVORGは仕様どおり無視します。
 
 ### GSUB
 
