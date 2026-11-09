@@ -9,3 +9,31 @@ source = "inline byte builders in src/test.rs and table unit tests"
 license = "MIT (project test code)"
 sha256 = "not-applicable-inline-fixture"
 features = ["cmap", "layout", "color", "limits"]
+
+[[fixture]]
+id = "vertical-no-metrics.ttf"
+source = "tests/fixtures/generate_vertical_flow.py (fontTools 4.65.0)"
+license = "MIT (project test code)"
+sha256 = "245ec636ff0adffe69502bcb7a11b2cb589ce46108b8f69e99928bda2162ebb2"
+features = ["vertical-flow", "vhea", "vmtx", "fallback"]
+
+[[fixture]]
+id = "vertical-metrics.ttf"
+source = "tests/fixtures/generate_vertical_flow.py (fontTools 4.65.0)"
+license = "MIT (project test code)"
+sha256 = "2a7a07fb0f7d87fac2b55b959146a0e79d88a91b5e3aab096ad9772ecab3c745"
+features = ["vertical-flow", "vhea", "vmtx", "fallback"]
+
+[[fixture]]
+id = "vertical-header-only.ttf"
+source = "tests/fixtures/generate_vertical_flow.py (fontTools 4.65.0)"
+license = "MIT (project test code)"
+sha256 = "3c6cdd23b90d011dd66575834a4fb2b8ae1854f5ee07baf36601a5be47318549"
+features = ["vertical-flow", "vhea", "vmtx", "fallback"]
+
+[[fixture]]
+id = "vertical-mixed.ttc"
+source = "tests/fixtures/generate_vertical_flow.py (fontTools 4.65.0)"
+license = "MIT (project test code)"
+sha256 = "6993e0af3880af2ebbec5e159ee54762226ed8ed8812f9f9890d7c2e47293dff"
+features = ["vertical-flow", "vhea", "vmtx", "fallback"]
