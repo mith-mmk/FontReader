@@ -1464,6 +1464,9 @@ mod tests {
                 .unwrap();
             assert_eq!(raw.y_placement, i32::from(y_placement));
             assert_eq!(raw.y_advance, 40);
+            let raw_commands = font.font().text2commands("A").unwrap();
+            assert_eq!(raw_commands[0].origin_y, f64::from(y_placement));
+            assert_eq!(raw_commands[0].advance_width, 630.0);
             for size in [1000.0, 500.0] {
                 let scale = size / 1000.0;
                 let options = crate::FontOptions::new(&font).with_font_size(size);

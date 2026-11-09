@@ -1984,8 +1984,7 @@ impl Font {
                 self.current_gdef(),
             ) {
                 adjustment.placement_x += single.x_placement as f32 * scale_x;
-                // OpenType placement is Y-up; shaped glyph positions are Y-down.
-                adjustment.placement_y -= single.y_placement as f32 * scale_y;
+                adjustment.placement_y += single.y_placement as f32 * scale_y;
                 adjustment.advance_x += single.x_advance as f32 * scale_x;
                 adjustment.advance_y += single.y_advance as f32 * scale_y;
             }
@@ -2398,7 +2397,7 @@ impl Font {
 
                     let mut metrics =
                         glyph_metrics_from_layout(&open_type_glyph.layout, scale_x, scale_y);
-                    let adjustment = self.position_adjustment_for_index(
+                    let mut adjustment = self.position_adjustment_for_index(
                         &shaped_units,
                         index,
                         options.locale,
@@ -2406,6 +2405,10 @@ impl Font {
                         scale_x,
                         scale_y,
                     );
+                    // GPOS placement is Cartesian (Y-up); this run is Y-down.
+                    // Advances are directional: positive YAdvance increases the
+                    // TTB advance height, so it must not be negated here.
+                    adjustment.placement_y = -adjustment.placement_y;
                     let mark_attachment = self.mark_attachment_for_index(
                         &shaped_units,
                         &unit_glyph_indices,
