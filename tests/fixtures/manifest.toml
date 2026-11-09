@@ -133,5 +133,5 @@ features = ["vertical-flow", "GSUB-order", "ccmp", "smcp", "locl", "liga", "vrt2
 id = "vertical-lookup-chain.ttc"
 source = "tests/fixtures/generate_vertical_lookup_chain.py (fontTools 4.65.0)"
 license = "MIT (project test code)"
-sha256 = "474fec69c6ee8db9621dc602841a24f8c4bd72591964c7d723ab52c8db468d7d"
-features = ["vertical-flow", "GSUB", "vert", "vrt2", "lookup-order", "single-substitution", "extension", "identity", "unsupported-lookups"]
+sha256 = "1ffa05a1ffa72a05a45b914fb326191b2a0619513c7c3d0c81f8a2ea327e777a"
+features = ["vertical-flow", "GSUB", "vert", "vrt2", "lookup-order", "single-substitution", "extension", "identity", "unsupported-lookups", "lookup-flags", "GDEF"]

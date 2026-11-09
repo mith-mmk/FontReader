@@ -183,8 +183,8 @@ Script run ごとの選択や Unicode の混在方向は未対応。
 （合成、locale/variant、RTL 字形、合字）の後に選択した縦書きフィーチャーを
 適用する。メトリクス、輪郭の原点、GPOS は最終的なグリフ ID を使う。
 raw の `get_glyph_with_uvs_axis()` はテキスト整形を
-行わず、従来どおり直接縦書き字形へ置換する。既存の単一フィーチャー内の
-Lookup 連鎖処理やソースクラスタ表現は変更しない。
+行わず、従来どおり直接縦書き字形へ置換する。ソースクラスタ表現は変更しない。
+縦書きフィーチャー内の Lookup 連続適用は次節で説明する。
 横書きと `layout` 無効時は変更なし。MIT の合成フォントで選択結果、
 最終字形の bounds・送り量、measure、SVG を検証する。
 出典とハッシュは `tests/fixtures/manifest.toml` を参照。
@@ -212,3 +212,11 @@ Lookup と、それらを包む Extension はスキップする。複数出力�
 MIT 合成フォント `vertical-lookup-chain.ttc` で順序・恒等置換・循環・重複参照・
 未対応形式と、最終 bounds/原点・送り量・計測・SVG を検証する。
 生成スクリプトと SHA-256 は manifest に記録する。
+
+この単一グリフ API は GDEF のクラス・マークフィルタ情報を受け取らないため、
+IgnoreBaseGlyphs / IgnoreLigatures / IgnoreMarks / UseMarkFilteringSet /
+MarkAttachmentType を指定する Lookup は全体をスキップする。これは保守的な
+未対応扱いであり、GDEF による完全な選別処理ではない。対象外グリフへの誤置換を
+防ぎ、選択済みの `vrt2` から `vert` へのフォールバックも行わない。
+RightToLeft は OpenType 仕様上 GSUB では無意味なので、置換を妨げない。
+直接・Extension の各形式で、単独および連続 Lookup とマーク集合を検証する。

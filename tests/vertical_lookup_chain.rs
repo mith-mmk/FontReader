@@ -71,7 +71,7 @@ fn vertical_lookups_do_not_flatten_or_ignore_context() {
 #[cfg(not(feature = "layout"))]
 #[test]
 fn vertical_lookup_chain_is_inactive_without_layout() {
-    for index in 0..20 {
+    for index in 0..42 {
         check(index, "A");
     }
 }
@@ -82,7 +82,7 @@ fn horizontal_lookup_chain_is_inactive() {
     let base = FontFile::from_buffer(BASE).unwrap();
     let base_face = base.current_face().unwrap();
     let expected = base_face.engine().with_font_size(1000.0);
-    for index in 0..20 {
+    for index in 0..42 {
         let face = file.face(index).unwrap();
         let engine = face.engine().with_font_size(1000.0);
         assert_eq!(
@@ -91,4 +91,15 @@ fn horizontal_lookup_chain_is_inactive() {
         );
         assert_eq!(engine.measure("A").unwrap(), 600.0);
     }
+}
+
+#[cfg(feature = "layout")]
+#[test]
+fn vertical_lookups_skip_gdef_dependent_flags_but_keep_right_to_left() {
+    check(21, "B"); // A -> B, then IgnoreBaseGlyphs must not turn B into comma.
+    for index in 20..40 {
+        check(index, if index % 2 == 0 { "A" } else { "B" });
+    }
+    check(40, "B");
+    check(41, "\u{3001}");
 }

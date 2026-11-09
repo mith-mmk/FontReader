@@ -1212,6 +1212,7 @@ impl GSUB {
     /// Apply direct / extension Single substitutions once per selected lookup,
     /// in LookupList order. Other lookup types require a sequence-aware API and
     /// are skipped, without falling back to a different vertical feature.
+    /// GDEF-dependent filtering flags are unsupported here and skip the lookup.
     pub fn lookup_vertical(&self, glyph_id: u16) -> Option<u16> {
         use crate::opentype::layouts::lookup::LookupSubstitution;
 
@@ -1229,6 +1230,12 @@ impl GSUB {
         let mut applied = false;
         for lookup in self.lookups.lookups.iter() {
             if !selected.contains(&(lookup as *const Lookup)) {
+                continue;
+            }
+            // This single-glyph API has no GDEF class/mark-filtering context.
+            // Do not apply a potentially excluded substitution. RIGHT_TO_LEFT
+            // (0x0001) is ignored for GSUB; reserved bits do not select classes.
+            if lookup.lookup_flag & 0xFF1E != 0 {
                 continue;
             }
             for subtable in &lookup.subtables {
@@ -1335,6 +1342,16 @@ mod vertical_feature_tests {
             let gsub = selected.gsub.as_ref().unwrap();
             assert_eq!(gsub.lookup_vertical(1), replacement, "face {index}");
             assert_eq!(gsub.lookup_vertical(65535), None, "face {index}");
+        }
+        for index in 20..42 {
+            let gsub = font.more_fonts[index - 1].gsub.as_ref().unwrap();
+            let expected = match index {
+                40 => Some(2),
+                41 => Some(3),
+                _ if index % 2 == 0 => None,
+                _ => Some(2),
+            };
+            assert_eq!(gsub.lookup_vertical(1), expected, "flag face {index}");
         }
     }
 

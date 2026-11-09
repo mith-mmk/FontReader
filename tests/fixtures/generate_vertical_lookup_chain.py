@@ -5,6 +5,8 @@ Faces: direct, reversed indices, extension, first subtable, missed subtable,
 identity, cycle, duplicate LangSys references, multiple, ligature, alternate,
 contextual, reverse contextual, invalid index, empty lookup, extension multiple.
 Then vert chain, unsupported vrt2 with vert, direct/extension Single format 2.
+Faces 20..39: five GDEF-dependent flags, standalone/chained, direct/extension.
+Faces 40..41: RightToLeft standalone/chained (ignored for GSUB).
 """
 from copy import deepcopy
 from pathlib import Path
@@ -78,6 +80,34 @@ for extension in ["", "useExtension"]:
         lookup L0 {extension} {{ sub A by B; sub bracket by A; }} L0;
         lookup L1 {extension} {{ sub B by comma; sub bracket by A; }} L1;
         feature vrt2 {{ lookup L0; lookup L1; }} vrt2;
+    """))
+flags = [
+    ("IgnoreBaseGlyphs", "[A B], [], [], []"),
+    ("IgnoreLigatures", "[], [A B], [], []"),
+    ("IgnoreMarks", "[], [], [A B acute], []"),
+    ("MarkAttachmentType @allowed", "[], [], [A B acute], []"),
+    ("UseMarkFilteringSet @allowed", "[], [], [A B acute], []"),
+]
+for extension in ["", "useExtension"]:
+    for flag, classes in flags:
+        for chained in [False, True]:
+            source, target = ("B", "comma") if chained else ("A", "B")
+            first = "lookup L0;" if chained else ""
+            fonts.append(build(f"""
+                @allowed = [acute];
+                table GDEF {{ GlyphClassDef {classes}; }} GDEF;
+                lookup L0 {{ sub A by B; }} L0;
+                lookup L1 {extension} {{ lookupflag {flag}; sub {source} by {target}; }} L1;
+                feature vrt2 {{ {first} lookup L1; }} vrt2;
+                feature vert {{ sub A by bracket; }} vert;
+            """))
+for chained in [False, True]:
+    source, target = ("B", "comma") if chained else ("A", "B")
+    first = "lookup L0;" if chained else ""
+    fonts.append(build(f"""
+        lookup L0 {{ sub A by B; }} L0;
+        lookup L1 {{ lookupflag RightToLeft; sub {source} by {target}; }} L1;
+        feature vrt2 {{ {first} lookup L1; }} vrt2;
     """))
 collection = TTCollection(); collection.fonts = fonts
 collection.save(root / "vertical-lookup-chain.ttc")

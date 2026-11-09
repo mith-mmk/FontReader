@@ -241,3 +241,11 @@ and [GSUB substitution types](https://learn.microsoft.com/en-us/typography/opent
 The reproducible MIT `vertical-lookup-chain.ttc` tests cover ordering, identity,
 cycles, duplicate references, unsupported types, and final bounds/origin,
 advance, measurement and SVG; its generator and SHA-256 are in the manifest.
+
+This single-glyph API has no GDEF class or mark-filtering context. A lookup
+using IgnoreBaseGlyphs, IgnoreLigatures, IgnoreMarks, UseMarkFilteringSet, or
+MarkAttachmentType is therefore skipped entirely. This conservative unsupported
+case prevents substitutions on excluded glyphs; it is not full GDEF filtering
+and does not trigger `vert` fallback. RightToLeft is ignored for GSUB by the
+OpenType specification and does not prevent substitution. Direct and Extension
+fixtures cover each filtering flag in standalone and chained lookups.
