@@ -1114,7 +1114,9 @@ impl LookupSubstitution {
                 let coverage = &single.coverage;
                 if coverage.contains(gliph_id).is_some() {
                     // Format 1 adds the signed delta to the glyph ID, not its coverage index.
-                    LookupResult::Single((gliph_id as u16).wrapping_add(single.delta_glyph_id as u16))
+                    LookupResult::Single(
+                        (gliph_id as u16).wrapping_add(single.delta_glyph_id as u16),
+                    )
                 } else {
                     LookupResult::None
                 }
