@@ -3,6 +3,17 @@
 このファイルは、以前 `README.ja.md` に置いていた実装メモ寄りの内容を移したものです。
 README は公開APIと実行例を優先し、細かい対応状況はここにまとめます。
 
+## Unicode の縦書きプロパティ
+
+`vertical_orientation(char)` は Unicode 18.0.0 の `Vertical_Orientation` を
+4 値 (`U`、`R`、`Tu`、`Tr`) で返し、フォントや機能フラグを必要としません。
+`Tr` は正立の縦書き用字形を優先し、その字形がない場合にのみ回転します。
+文字単位の問い合わせであり、書記素クラスタや字形置換を解決せず、既存の shaping も
+変えません。自動的な混在縦書きのレイアウトは別対応です。以下の Unicode 縦方向に
+関する制限は、レイアウト動作について述べています。
+[使用例](api-recipes.ja.md#unicode-の縦書きプロパティを調べる)と
+[データの出典](../data/unicode/README.md)を参照してください。
+
 ## Layout 対応状況
 
 `layout` feature は一部のみ実装されています。

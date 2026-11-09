@@ -42,6 +42,7 @@ pub mod fontfile;
 pub mod limits;
 #[cfg(feature = "svg-fonts")]
 pub(crate) mod svgparse;
+pub mod unicode;
 pub(crate) mod util;
 pub mod woff;
 
@@ -65,6 +66,9 @@ pub use fontfile::{
     open_font_from_file_with_limits, open_font_from_net, ChunkedFontBuffer, FontFile, FontSource,
 };
 pub use limits::DecodeLimits;
+pub use unicode::{
+    vertical_orientation, VerticalOrientation, VERTICAL_ORIENTATION_UNICODE_VERSION,
+};
 
 #[cfg(feature = "raw")]
 #[allow(deprecated)]

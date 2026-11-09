@@ -22,6 +22,12 @@ Most users only need these three types.
 
 The old low-level parser surface still exists behind `features = ["raw"]`.
 
+For font-independent Unicode 18.0.0 vertical-orientation properties, use
+`vertical_orientation(char)` and `VerticalOrientation`. This scalar query needs
+no feature flags and does not choose automatic mixed vertical layout. See the
+[recipe](doc/api-recipes.md#query-unicode-vertical-orientation) and
+[Unicode data and license](data/unicode/README.md).
+
 ## Supported Formats
 
 - TrueType
