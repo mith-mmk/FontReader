@@ -16,8 +16,9 @@ pub enum GlyphFlow {
     Vertical,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum TextDirection {
+    #[default]
     LeftToRight,
     RightToLeft,
     TopToBottom,
@@ -30,12 +31,6 @@ impl TextDirection {
 
     pub(crate) fn is_right_to_left(self) -> bool {
         matches!(self, Self::RightToLeft)
-    }
-}
-
-impl Default for TextDirection {
-    fn default() -> Self {
-        Self::LeftToRight
     }
 }
 
@@ -318,34 +313,24 @@ impl Default for FontStretch {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum FontStyle {
+    #[default]
     Normal,
     Italic,
     Oblique,
 }
 
-impl Default for FontStyle {
-    fn default() -> Self {
-        Self::Normal
-    }
-}
-
 /// GSUB variant selection exposed through the public API.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum FontVariant {
+    #[default]
     Normal,
     SmallCaps,
     Jis78,
     Jis90,
     TraditionalForms,
     NlcKanjiForms,
-}
-
-impl Default for FontVariant {
-    fn default() -> Self {
-        Self::Normal
-    }
 }
 
 impl FontVariant {

@@ -494,7 +494,7 @@ impl Font {
                     v_metrix = metric;
                 }
             }
-            return Some(VerticalLayout {
+            Some(VerticalLayout {
                 tsb: v_metrix.top_side_bearing as isize,
                 advance_height: v_metrix.advance_height as isize,
                 accender: self.metric_value_i16(tag4("vasc"), vhea.get_accender(), coordinates)
@@ -504,9 +504,9 @@ impl Font {
                 line_gap: self.metric_value_i16(tag4("vlgp"), vhea.get_line_gap(), coordinates)
                     as isize,
                 vhea: vhea.clone(),
-            });
+            })
         } else {
-            return None;
+            None
         }
     }
 
@@ -639,13 +639,10 @@ impl Font {
         let pos = glyph_id as u32;
         if let Some(glyf) = self.current_glyf() {
             let glyph = glyf.get_glyph(pos as usize).ok_or_else(|| {
-                Error::new(
-                    std::io::ErrorKind::Other,
-                    "glyph is none,also you need --features cff".to_string(),
-                )
+                Error::other("glyph is none,also you need --features cff".to_string())
             })?;
             if let Some(sbix) = self.current_sbix() {
-                let result = sbix.get_svg(pos as u32, fontsize, fontunit, &layout, 0.0, 0.0);
+                let result = sbix.get_svg(pos, fontsize, fontunit, &layout, 0.0, 0.0);
                 if let Some(svg) = result {
                     let mut string = "".to_string();
                     #[cfg(debug_assertions)]
@@ -656,7 +653,7 @@ impl Font {
                     return Ok(string);
                 }
             } else if let Some(svg) = self.current_svg_table() {
-                let result = svg.get_svg(pos as u32, fontsize, fontunit, &layout, 0.0, 0.0);
+                let result = svg.get_svg(pos, fontsize, fontunit, &layout, 0.0, 0.0);
                 if let Some(svg) = result {
                     let mut string = "".to_string();
                     #[cfg(debug_assertions)]
@@ -726,16 +723,13 @@ impl Font {
                 #[cfg(debug_assertions)]
                 {
                     let string = glyf.to_svg(glyph_id, fontsize, fontunit, &layout, 0.0, 0.0);
-                    return Ok(format!("<!-- glyf id: {} -->{}", pos, string));
+                    Ok(format!("<!-- glyf id: {} -->{}", pos, string))
                 }
                 #[cfg(not(debug_assertions))]
                 Ok(glyf.to_svg(glyph_id, fontsize, fontunit, &layout, 0.0, 0.0))
             }
         } else {
-            return Err(Error::new(
-                std::io::ErrorKind::Other,
-                "glyf is none".to_string(),
-            ));
+            Err(Error::other("glyf is none".to_string()))
         }
     }
 
@@ -755,7 +749,7 @@ impl Font {
         if let Some(cff) = self.cff.as_ref() {
             let glyf_data = self.get_glyph_with_uvs_axis(ch, vs, is_vert);
             let glyph_id = glyf_data.glyph_id;
-            let layout = self.get_layout(glyph_id as usize, is_vert);
+            let layout = self.get_layout(glyph_id, is_vert);
             let string = cff.to_svg(glyph_id, fontsize, fontunit, &layout, 0.0, 0.0);
             return string;
         }
@@ -774,13 +768,13 @@ impl Font {
         let open_type_glyph = glyf_data
             .open_type_glyf
             .as_ref()
-            .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "glyph is none"))?;
+            .ok_or_else(|| Error::other("glyph is none"))?;
         let layout = &open_type_glyph.layout;
         match &open_type_glyph.glyph {
             FontData::Glyph(glyph) => {
                 if let Some(sbix) = self.current_sbix() {
                     let result =
-                        sbix.get_svg(glyph_id as u32, fontsize, fontunit, &layout, 0.0, 0.0);
+                        sbix.get_svg(glyph_id as u32, fontsize, fontunit, layout, 0.0, 0.0);
                     if let Some(svg) = result {
                         let mut string = "".to_string();
                         #[cfg(debug_assertions)]
@@ -791,8 +785,7 @@ impl Font {
                         return Ok(string);
                     }
                 } else if let Some(svg) = self.current_svg_table() {
-                    let result =
-                        svg.get_svg(glyph_id as u32, fontsize, fontunit, &layout, 0.0, 0.0);
+                    let result = svg.get_svg(glyph_id as u32, fontsize, fontunit, layout, 0.0, 0.0);
                     if let Some(svg) = result {
                         let mut string = "".to_string();
                         #[cfg(debug_assertions)]
@@ -823,7 +816,7 @@ impl Font {
                     }
                 }
                 let Some(glyf) = self.current_glyf() else {
-                    return Err(Error::new(std::io::ErrorKind::Other, "glyf is none"));
+                    return Err(Error::other("glyf is none"));
                 };
 
                 let cpal = self.current_cpal();
@@ -832,9 +825,9 @@ impl Font {
                 if let Some(colr) = colr.as_ref() {
                     let layers = colr.get_layer_record(glyph_id as u16);
                     if layers.is_empty() {
-                        return Ok(glyf.to_svg(glyph_id, fontsize, fontunit, &layout, 0.0, 0.0));
+                        return Ok(glyf.to_svg(glyph_id, fontsize, fontunit, layout, 0.0, 0.0));
                     }
-                    let mut string = glyph.get_svg_heder(fontsize, fontunit, &layout);
+                    let mut string = glyph.get_svg_heder(fontsize, fontunit, layout);
                     #[cfg(debug_assertions)]
                     {
                         string += &format!("\n<!-- {} glyf id: {} -->", ch, glyph_id);
@@ -843,12 +836,12 @@ impl Font {
                     for layer in layers {
                         let glyf_id = layer.glyph_id as u32;
                         let Some(cpal) = cpal.as_ref() else {
-                            return Ok(glyf.to_svg(glyph_id, fontsize, fontunit, &layout, 0.0, 0.0));
+                            return Ok(glyf.to_svg(glyph_id, fontsize, fontunit, layout, 0.0, 0.0));
                         };
                         let Some(pallet) = cpal.get_palette_color(0, layer.palette_index) else {
                             if layer.palette_index == 0xffff {
                                 string += "<g fill=\"currentColor\">\n";
-                                string += &glyf.get_svg_path(glyf_id as usize, &layout, 0.0, 0.0);
+                                string += &glyf.get_svg_path(glyf_id as usize, layout, 0.0, 0.0);
                                 string += "</g>\n";
                             }
                             continue;
@@ -865,7 +858,7 @@ impl Font {
                             "<g fill=\"rgba({}, {}, {}, {})\">\n",
                             pallet.red, pallet.green, pallet.blue, pallet.alpha
                         );
-                        string += &glyf.get_svg_path(glyf_id as usize, &layout, 0.0, 0.0);
+                        string += &glyf.get_svg_path(glyf_id as usize, layout, 0.0, 0.0);
                         string += "</g>\n";
                     }
                     string += "</svg>";
@@ -873,8 +866,8 @@ impl Font {
                 } else {
                     #[cfg(debug_assertions)]
                     {
-                        let string = glyf.to_svg(glyph_id, fontsize, fontunit, &layout, 0.0, 0.0);
-                        return Ok(format!("<!-- {} glyf id: {} -->{}", ch, glyph_id, string));
+                        let string = glyf.to_svg(glyph_id, fontsize, fontunit, layout, 0.0, 0.0);
+                        Ok(format!("<!-- {} glyf id: {} -->{}", ch, glyph_id, string))
                     }
                     #[cfg(not(debug_assertions))]
                     Ok(glyf.to_svg(glyph_id, fontsize, fontunit, &layout, 0.0, 0.0))
@@ -887,10 +880,7 @@ impl Font {
                 string += "\n</svg>";
                 Ok(string)
             }
-            _ => Err(Error::new(
-                std::io::ErrorKind::Other,
-                "glyf is none".to_string(),
-            )),
+            _ => Err(Error::other("glyf is none".to_string())),
         }
     }
 
@@ -912,12 +902,12 @@ impl Font {
         if self.current_font == 0 {
             self.hhea
                 .as_ref()
-                .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "hhea is none"))
+                .ok_or_else(|| Error::other("hhea is none"))
         } else {
             self.more_fonts[self.current_font - 1]
                 .hhea
                 .as_ref()
-                .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "hhea is none"))
+                .ok_or_else(|| Error::other("hhea is none"))
         }
     }
 
@@ -925,12 +915,12 @@ impl Font {
         if self.current_font == 0 {
             self.head
                 .as_ref()
-                .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "head is none"))
+                .ok_or_else(|| Error::other("head is none"))
         } else {
             self.more_fonts[self.current_font - 1]
                 .head
                 .as_ref()
-                .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "head is none"))
+                .ok_or_else(|| Error::other("head is none"))
         }
     }
 
@@ -962,12 +952,12 @@ impl Font {
         if self.current_font == 0 {
             self.cmap
                 .as_ref()
-                .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "cmap is none"))
+                .ok_or_else(|| Error::other("cmap is none"))
         } else {
             self.more_fonts[self.current_font - 1]
                 .cmap
                 .as_ref()
-                .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "cmap is none"))
+                .ok_or_else(|| Error::other("cmap is none"))
         }
     }
 
@@ -2296,7 +2286,7 @@ impl Font {
                     let open_type_glyph = glyph_data
                         .open_type_glyf
                         .as_ref()
-                        .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "glyph is none"))?;
+                        .ok_or_else(|| Error::other("glyph is none"))?;
                     let glyph_id = glyph_data.glyph_id;
                     let can_use_outline =
                         self.resolved_glyph_can_use_outline(open_type_glyph, glyph_id);
@@ -2682,7 +2672,7 @@ impl Font {
             FontData::Glyph(_) => {
                 let glyf = self
                     .current_glyf()
-                    .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "glyf is none"))?;
+                    .ok_or_else(|| Error::other("glyf is none"))?;
                 let commands = glyf.to_path_commands(glyph_id, &open_type_glyph.layout, 0.0, 0.0);
                 let commands =
                     transform_glyf_commands(&commands, &open_type_glyph.layout, scale_x, scale_y);
@@ -2815,7 +2805,7 @@ impl Font {
                     let open_type_glyph = glyph_data
                         .open_type_glyf
                         .as_ref()
-                        .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "glyph is none"))?;
+                        .ok_or_else(|| Error::other("glyph is none"))?;
                     let adjustment = self.position_adjustment_for_index(
                         &shaped_units,
                         index,
@@ -2899,9 +2889,9 @@ impl Font {
                                 origin_y,
                             );
                             if commands.is_empty() {
-                                let glyf = self.current_glyf().ok_or_else(|| {
-                                    Error::new(std::io::ErrorKind::Other, "glyf is none")
-                                })?;
+                                let glyf = self
+                                    .current_glyf()
+                                    .ok_or_else(|| Error::other("glyf is none"))?;
                                 commands = glyf.to_path_commands(
                                     glyph_data.glyph_id,
                                     &open_type_glyph.layout,
@@ -2945,8 +2935,7 @@ impl Font {
                             ));
                         }
                         _ => {
-                            return Err(Error::new(
-                                std::io::ErrorKind::Other,
+                            return Err(Error::other(
                                 "text2commands supports glyf outlines and sbix bitmap glyphs only",
                             ));
                         }
@@ -3074,7 +3063,7 @@ impl Font {
     pub fn get_name(&self, name_id: NameID, locale: &String) -> Result<String, Error> {
         let name_table = self
             .current_name_table()
-            .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "name table is none"))?;
+            .ok_or_else(|| Error::other("name table is none"))?;
         let platform_id = PlatformID::Windows;
         name_table.get_name(name_id, locale, platform_id)
     }
@@ -3246,10 +3235,7 @@ impl Font {
         let encodings = &cmap.cmap_encodings;
         let mut string = String::new();
         for encoding in encodings.as_ref().iter() {
-            string += &format!(
-                "Encording Record\n{}\n",
-                encoding.encoding_record.to_string()
-            );
+            string += &format!("Encording Record\n{}\n", encoding.encoding_record);
             string += &format!(
                 "Subtable\n{}\n",
                 encoding.cmap_subtable.get_part_of_string(10)
@@ -3422,7 +3408,7 @@ impl Font {
         let name = self
             .name
             .as_ref()
-            .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "name table is none"))?;
+            .ok_or_else(|| Error::other("name table is none"))?;
         let font_famiry = name.get_family_name();
         let subfamily_name = name.get_subfamily_name();
         string += &format!("Font famiry: {} {}\n", font_famiry, subfamily_name);
@@ -4010,7 +3996,7 @@ fn font_debug(_font: &Font) {
     }
     let _ = writeln!(&mut writer);
     for i in 0x4e00..0x4eff {
-        if i as u32 % 16 == 0 {
+        if (i as u32).is_multiple_of(16) {
             let _ = writeln!(&mut writer);
         }
         let pos = cmap_encodings.get_glyph_position(i as u32);
@@ -4084,7 +4070,7 @@ fn font_load<R: BinaryReader>(file: &mut R, limits: &DecodeLimits) -> Result<Fon
                 }
             }
             if let Ok(font) = font.as_mut() {
-                font.more_fonts = Box::new(fonts);
+                *font.more_fonts = fonts;
                 #[cfg(debug_assertions)]
                 {
                     //    font_debug(font.as_ref().unwrap());
@@ -4239,7 +4225,7 @@ fn font_load<R: BinaryReader>(file: &mut R, limits: &DecodeLimits) -> Result<Fon
                     #[cfg(feature = "layout")]
                     b"GDEF" => {
                         let mut reader = BytesReader::new(&table.data);
-                        let gdef = gdef::GDEF::new(&mut reader, 0, table.data.len() as usize)?;
+                        let gdef = gdef::GDEF::new(&mut reader, 0, table.data.len())?;
                         font.gdef = Some(gdef);
                     }
                     b"vhea" => {
@@ -4264,15 +4250,15 @@ fn font_load<R: BinaryReader>(file: &mut R, limits: &DecodeLimits) -> Result<Fon
             }
             let hmtx_table = hmtx_table
                 .as_ref()
-                .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "No hmtx table"))?;
+                .ok_or_else(|| Error::other("No hmtx table"))?;
             let hhea = font
                 .hhea
                 .as_ref()
-                .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "No hhea table"))?;
+                .ok_or_else(|| Error::other("No hhea table"))?;
             let maxp = font
                 .maxp
                 .as_ref()
-                .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "No maxp table"))?;
+                .ok_or_else(|| Error::other("No maxp table"))?;
             let mut reader = BytesReader::new(&hmtx_table.data);
             let hmtx = hmtx::HMTX::new(
                 &mut reader,
@@ -4287,7 +4273,7 @@ fn font_load<R: BinaryReader>(file: &mut R, limits: &DecodeLimits) -> Result<Fon
                 let vhea = font
                     .vhea
                     .as_ref()
-                    .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "No vhea table"))?;
+                    .ok_or_else(|| Error::other("No vhea table"))?;
                 let vmtx = vmtx::VMTX::new(
                     &mut reader,
                     0,
@@ -4303,7 +4289,7 @@ fn font_load<R: BinaryReader>(file: &mut R, limits: &DecodeLimits) -> Result<Fon
                 let head = font
                     .head
                     .as_ref()
-                    .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "No head table"))?;
+                    .ok_or_else(|| Error::other("No head table"))?;
                 let index_to_loc_format = head.index_to_loc_format as usize;
                 let loca = loca::LOCA::new_by_size(
                     &mut reader,
@@ -4316,7 +4302,7 @@ fn font_load<R: BinaryReader>(file: &mut R, limits: &DecodeLimits) -> Result<Fon
                 let loca = font
                     .loca
                     .as_ref()
-                    .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "No loca table"))?;
+                    .ok_or_else(|| Error::other("No loca table"))?;
                 let glyf = glyf::GLYF::new(&mut reader, 0, glyf_table.data.len() as u32, loca);
                 font.glyf = Some(glyf);
                 font.outline_format = GlyphFormat::OpenTypeGlyph;
@@ -4339,10 +4325,7 @@ fn font_load<R: BinaryReader>(file: &mut R, limits: &DecodeLimits) -> Result<Fon
         fontheader::FontHeaders::WOFF2(_) => todo!(),
         fontheader::FontHeaders::Unknown => {
             //todo!(),
-            Err(Error::new(
-                std::io::ErrorKind::Other,
-                "Unknown font type".to_string(),
-            ))
+            Err(Error::other("Unknown font type".to_string()))
         }
     }
 }
@@ -4535,17 +4518,17 @@ fn from_opentype<R: BinaryReader>(
     let num_glyphs = font
         .maxp
         .as_ref()
-        .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "No maxp table"))?
+        .ok_or_else(|| Error::other("No maxp table"))?
         .num_glyphs;
     let number_of_hmetrics = font
         .hhea
         .as_ref()
-        .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "No hhea table"))?
+        .ok_or_else(|| Error::other("No hhea table"))?
         .number_of_hmetrics;
     let hmtx_pointer = font
         .hmtx_pos
         .as_ref()
-        .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "No hmtx table pointer"))?;
+        .ok_or_else(|| Error::other("No hmtx table pointer"))?;
     let offset = hmtx_pointer.offset;
     let length = hmtx_pointer.length;
 
@@ -4556,12 +4539,12 @@ fn from_opentype<R: BinaryReader>(
         let number_of_vmetrics = font
             .vhea
             .as_ref()
-            .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "No vhea table"))?
+            .ok_or_else(|| Error::other("No vhea table"))?
             .number_of_vmetrics;
         let vmtx_pointer = font
             .vmtx_pos
             .as_ref()
-            .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "No vmtx table pointer"))?;
+            .ok_or_else(|| Error::other("No vmtx table pointer"))?;
         let offset = vmtx_pointer.offset;
         let length = vmtx_pointer.length;
         let vmtx = vmtx::VMTX::new(file, offset, length, number_of_vmetrics, num_glyphs)?;
@@ -4573,20 +4556,20 @@ fn from_opentype<R: BinaryReader>(
         let index_to_loc_format = font
             .head
             .as_ref()
-            .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "No head table"))?
+            .ok_or_else(|| Error::other("No head table"))?
             .index_to_loc_format as usize;
         let loca = loca::LOCA::new_by_size(file, offset.offset, length, index_to_loc_format)?;
         font.loca = Some(loca);
         let glyf_pointer = font
             .glyf_pos
             .as_ref()
-            .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "No glyf table pointer"))?;
+            .ok_or_else(|| Error::other("No glyf table pointer"))?;
         let offset = glyf_pointer.offset;
         let length = glyf_pointer.length;
         let loca = font
             .loca
             .as_ref()
-            .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "No loca table"))?;
+            .ok_or_else(|| Error::other("No loca table"))?;
         let glyf = glyf::GLYF::new(file, offset, length, loca);
         font.glyf = Some(glyf);
         font.outline_format = GlyphFormat::OpenTypeGlyph;
@@ -4600,45 +4583,27 @@ fn from_opentype<R: BinaryReader>(
 
     if font.cmap.is_none() {
         debug_assert!(true, "No cmap table");
-        return Err(Error::new(
-            std::io::ErrorKind::Other,
-            "No cmap table".to_string(),
-        ));
+        return Err(Error::other("No cmap table".to_string()));
     }
     if font.head.is_none() {
         debug_assert!(true, "No head table");
-        return Err(Error::new(
-            std::io::ErrorKind::Other,
-            "No head table".to_string(),
-        ));
+        return Err(Error::other("No head table".to_string()));
     }
     if font.hhea.is_none() {
         debug_assert!(true, "No hhea table");
-        return Err(Error::new(
-            std::io::ErrorKind::Other,
-            "No hhea table".to_string(),
-        ));
+        return Err(Error::other("No hhea table".to_string()));
     }
     if font.hmtx.is_none() {
         debug_assert!(true, "No hmtx table");
-        return Err(Error::new(
-            std::io::ErrorKind::Other,
-            "No hmtx table".to_string(),
-        ));
+        return Err(Error::other("No hmtx table".to_string()));
     }
     if font.maxp.is_none() {
         debug_assert!(true, "No maxp table");
-        return Err(Error::new(
-            std::io::ErrorKind::Other,
-            "No maxp table".to_string(),
-        ));
+        return Err(Error::other("No maxp table".to_string()));
     }
     if font.name.is_none() {
         debug_assert!(true, "No name table");
-        return Err(Error::new(
-            std::io::ErrorKind::Other,
-            "No name table".to_string(),
-        ));
+        return Err(Error::other("No name table".to_string()));
     }
 
     Ok(font)

@@ -80,6 +80,12 @@ impl OTFHeader {
     }
 }
 
+impl fmt::Display for OTFHeader {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.to_stirng())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -89,11 +95,5 @@ mod tests {
     fn otf_header_returns_error_on_truncated_input() {
         let mut reader = BytesReader::new(&[0x00, 0x01, 0x00]);
         assert!(OTFHeader::new(&mut reader).is_err());
-    }
-}
-
-impl fmt::Display for OTFHeader {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.to_stirng())
     }
 }

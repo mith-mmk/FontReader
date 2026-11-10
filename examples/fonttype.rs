@@ -16,7 +16,7 @@ fn get_font_type(folder: &std::path::Path) {
         if font.is_dir() {
             continue;
         }
-        let font_type = fontheader::get_font_type_from_file(&mut font);
+        let font_type = fontheader::get_font_type_from_file(&font);
         if let Err(e) = font_type {
             println!("font load error: {}", e);
             continue;

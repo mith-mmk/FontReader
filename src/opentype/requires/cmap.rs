@@ -841,7 +841,7 @@ impl UVSMapping {
         format!(
             "\nunicode_value: {:04X} {}, glyph_id: {}",
             self.unicode_value,
-            char::from_u32(self.unicode_value as u32).unwrap_or(' '),
+            char::from_u32(self.unicode_value).unwrap_or(' '),
             self.glyph_id
         )
     }
@@ -900,7 +900,7 @@ pub(crate) fn select_encoding(encoding_records: &Vec<EncodingRecord>) -> Encodin
                     // 1. Platform ID = 0 (Unicode) and Encoding ID  = 5 (Unicode Variation Sequences)
                     // substitude format 13 fallback to format 4
                     // 2. Platform ID = 0 (Unicode) and Encoding ID  = 6 (Unicode Full Repertoire)
-                    0 | 1 | 2 => {
+                    0..=2 => {
                         priolities.push(100);
                     }
                     3 => {
@@ -960,7 +960,7 @@ pub(crate) fn select_encoding(encoding_records: &Vec<EncodingRecord>) -> Encodin
     for (i, priority) in priolities.iter().enumerate() {
         priolity.push((i, *priority));
     }
-    priolity.sort_by(|a, b| a.1.cmp(&b.1));
+    priolity.sort_by_key(|a| a.1);
 
     let mut records_priolity = Vec::new();
     for (i, _) in priolity.iter() {

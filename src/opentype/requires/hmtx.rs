@@ -28,7 +28,7 @@ impl HMTX {
     pub(crate) fn get_metrix(&self, i: usize) -> LongHorMetric {
         let h_metric = self.h_metrics.get(i);
         match h_metric {
-            Some(h_metric) => h_metric.clone(),
+            Some(h_metric) => *h_metric,
             None => LongHorMetric {
                 advance_width: 0,
                 left_side_bearing: 0,

@@ -258,9 +258,7 @@ impl PositioningSubtable {
                 })
             }
             PositioningSubtable::PairFormat2(pair) => {
-                if pair.coverage.contains(left as usize).is_none() {
-                    return None;
-                }
+                pair.coverage.contains(left as usize)?;
                 let class1 = pair.class_def1.get_class(left) as usize;
                 let class2 = pair.class_def2.get_class(right) as usize;
                 let class1_record = pair.class1_records.get(class1)?;

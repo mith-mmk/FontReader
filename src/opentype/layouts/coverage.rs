@@ -16,10 +16,7 @@ impl Coverage {
             Coverage::Format1(coverage) => {
                 let glyph_ids = &coverage.glyph_ids;
                 let result = glyph_ids.binary_search(&glyph_id);
-                match result {
-                    Ok(index) => Some(index),
-                    Err(_) => None,
-                }
+                result.ok()
             }
             Coverage::Format2(coverage) => {
                 let range_records: &Vec<RangeRecord> = &coverage.range_records;
@@ -69,7 +66,7 @@ impl Coverage {
         reader: &mut R,
         offset: u64,
     ) -> Result<Self, std::io::Error> {
-        reader.seek(SeekFrom::Start(offset as u64))?;
+        reader.seek(SeekFrom::Start(offset))?;
         let coverage_format = reader.read_u16_be()?;
         match coverage_format {
             1 => {

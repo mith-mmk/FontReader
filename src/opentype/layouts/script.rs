@@ -22,7 +22,7 @@ impl ParsedScript {
         script: &Script,
     ) -> Result<Self, std::io::Error> {
         let offset = script.script_offset;
-        reader.seek(SeekFrom::Start(offset as u64))?;
+        reader.seek(SeekFrom::Start(offset))?;
         let default_language_system_offset = reader.read_u16_be()?;
         let language_system_count = reader.read_u16_be()?;
         let mut language_systems = Vec::new();
@@ -74,7 +74,7 @@ impl ParsedScript {
         let tag = unsafe { std::str::from_utf8_unchecked(&u8s) };
         let mut string = format!("Script: {} {}\n", tag, self.language_systems.len());
         for language_system in self.language_systems.iter() {
-            string += &format!("{}", language_system.to_string());
+            string += &language_system.to_string();
         }
         string
     }
@@ -118,19 +118,17 @@ impl ScriptList {
 
     pub(crate) fn get_script(&self, script_tag: &[u8; 4]) -> Option<&ParsedScript> {
         let script_tag = u32::from_be_bytes(*script_tag);
-        for script in self.scripts.iter() {
-            if script.script_tag == script_tag {
-                return Some(script);
-            }
-        }
-        None
+        self.scripts
+            .iter()
+            .find(|&script| script.script_tag == script_tag)
+            .map(|v| v as _)
     }
 
     pub(crate) fn to_string(&self) -> String {
         let mut string = String::new();
         string += &format!("script count {}\n", self.script_count);
         for script in self.scripts.iter() {
-            string += &format!("{}", script.to_string());
+            string += &script.to_string();
         }
         string
     }

@@ -32,7 +32,7 @@ impl GDEF {
         offset: u64,
         length: usize,
     ) -> Result<Self, std::io::Error> {
-        reader.seek(SeekFrom::Start(offset as u64))?;
+        reader.seek(SeekFrom::Start(offset))?;
         let major_versionn = reader.read_u16_be()?;
         let minor_version = reader.read_u16_be()?;
         let glyph_class_def_offset = reader.read_u16_be()?;
@@ -252,7 +252,7 @@ impl LigatureCaretList {
         let mut lig_glyph = Vec::with_capacity(lig_glyph_count as usize);
         for lig_glyph_offset in lig_glyph_offsets {
             let offset = lig_glyph_offset as u64 + offset;
-            lig_glyph.push(LigatureGlyph::new(reader, offset as u64)?);
+            lig_glyph.push(LigatureGlyph::new(reader, offset)?);
         }
         let coverage = Coverage::new(reader, offset + coverage_offset as u64)?;
         Ok(Self {

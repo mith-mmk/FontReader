@@ -13,8 +13,9 @@ use std::fmt::Write as _;
 use std::io::{Error, ErrorKind};
 
 /// Public shaping direction used by [`FontEngine`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ShapingPolicy {
+    #[default]
     LeftToRight,
     RightToLeft,
     TopToBottom,
@@ -27,12 +28,6 @@ pub struct LayoutMetrics {
     pub block_extent: f64,
     pub ink_bounds: Option<GlyphBounds>,
     pub line_bounds: Option<GlyphBounds>,
-}
-
-impl Default for ShapingPolicy {
-    fn default() -> Self {
-        Self::LeftToRight
-    }
 }
 
 impl ShapingPolicy {

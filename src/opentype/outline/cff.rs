@@ -279,7 +279,7 @@ impl CFF {
         let mut fd_arrays = Vec::new();
         if ros.is_some() || is_cff2 {
             if let Some(fd_array_offset) = fd_array_offset {
-                let fd_array_offset = (fd_array_offset as u64 + offset) as u64;
+                let fd_array_offset = fd_array_offset as u64 + offset;
                 reader.seek(SeekFrom::Start(fd_array_offset))?;
                 let fd_arrays_index = if is_cff2 {
                     Index::parse_cff2(reader)?
@@ -363,7 +363,7 @@ impl CFF {
         layout: &FontLayout,
         coordinates: &[f32],
     ) -> String {
-        let data = &self.char_string.data.data[gid as usize];
+        let data = &self.char_string.data.data[gid];
         let context = self.glyph_context(gid);
         self.parse_data(
             gid,
@@ -395,10 +395,7 @@ impl CFF {
         coordinates: &[f32],
     ) -> Result<Vec<Command>, std::io::Error> {
         if gid >= self.char_string.data.data.len() {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                format!("gid {} is not found", gid),
-            ));
+            return Err(std::io::Error::other(format!("gid {} is not found", gid)));
         }
 
         let data = &self.char_string.data.data[gid];
@@ -526,7 +523,7 @@ impl CFF {
 
                     let mut y = args.pop()?;
                     command += &format!(" {}", y);
-                    if 1 <= args.len() {
+                    if !args.is_empty() {
                         let dy = args.pop()?;
                         y += dy;
                         command += &format!(" {}", y);
@@ -654,7 +651,7 @@ impl CFF {
                         parce_data.commands.as_mut().commands.push(command);
                     }
 
-                    let len = (parce_data.hints / 2 + 7) / 8;
+                    let len = (parce_data.hints / 2).div_ceil(8);
                     let mut command = "hintmask".to_string();
                     command += &format!(" {}", parce_data.hints / 2);
                     for j in 0..len {
@@ -694,8 +691,8 @@ impl CFF {
                         parce_data.commands.as_mut().commands.push(command);
                     }
 
-                    let len = (parce_data.hints / 2 + 7) / 8;
-                    let mut command = format! {"cntrmask {} {}",parce_data.hints / 2, len};
+                    let len = (parce_data.hints / 2).div_ceil(8);
+                    let mut command = format!("cntrmask {} {}", parce_data.hints / 2, len);
                     for j in 0..len {
                         let mask = data[i + j];
                         command += &format!(" {:08b}", mask);
@@ -724,7 +721,7 @@ impl CFF {
                         .push(Operation::M(parce_data.x, parce_data.y));
 
                     if !parce_data.is_cff2
-                        && 1 <= parce_data.stacks.len()
+                        && !parce_data.stacks.is_empty()
                         && parce_data.is_first == 0
                     {
                         parce_data.width = parce_data.stacks.pop();
@@ -753,7 +750,7 @@ impl CFF {
                         .operations
                         .push(Operation::M(parce_data.x, parce_data.y));
                     if !parce_data.is_cff2
-                        && 1 <= parce_data.stacks.len()
+                        && !parce_data.stacks.is_empty()
                         && parce_data.is_first == 0
                     {
                         parce_data.width = parce_data.stacks.pop();
@@ -782,7 +779,7 @@ impl CFF {
                         .push(Operation::M(parce_data.x, parce_data.y));
 
                     if !parce_data.is_cff2
-                        && 1 <= parce_data.stacks.len()
+                        && !parce_data.stacks.is_empty()
                         && parce_data.is_first == 0
                     {
                         parce_data.width = parce_data.stacks.pop();
@@ -828,7 +825,7 @@ impl CFF {
                         args.push(parce_data.stacks.pop()?);
                         args.push(parce_data.stacks.pop()?);
                     }
-                    if 1 <= parce_data.stacks.len() {
+                    if !parce_data.stacks.is_empty() {
                         args.push(parce_data.stacks.pop()?);
                     }
 
@@ -897,7 +894,7 @@ impl CFF {
                         args.push(parce_data.stacks.pop()?);
                         args.push(parce_data.stacks.pop()?);
                     }
-                    if 1 <= parce_data.stacks.len() {
+                    if !parce_data.stacks.is_empty() {
                         args.push(parce_data.stacks.pop()?);
                     }
 
@@ -1016,7 +1013,7 @@ impl CFF {
                         args.push(parce_data.stacks.pop()?);
                         args.push(parce_data.stacks.pop()?);
                     }
-                    if 1 <= parce_data.stacks.len() {
+                    if !parce_data.stacks.is_empty() {
                         args.push(parce_data.stacks.pop()?);
                     }
 
@@ -1085,7 +1082,7 @@ impl CFF {
                         args.push(parce_data.stacks.pop()?);
                         args.push(parce_data.stacks.pop()?);
                     }
-                    if 1 <= parce_data.stacks.len() {
+                    if !parce_data.stacks.is_empty() {
                         args.push(parce_data.stacks.pop()?);
                     }
 
@@ -1174,7 +1171,7 @@ impl CFF {
                                 .operations
                                 .push(Operation::C(xd, yd, xe, ye, xf, yf));
                         }
-                        if 1 <= args.len() {
+                        if !args.is_empty() {
                             let dxf = args.pop()?;
                             parce_data.x += dxf;
                             parce_data.min_x = parce_data.min_x.min(parce_data.x);
@@ -1245,7 +1242,7 @@ impl CFF {
                                 .push(Operation::C(xd, yd, xe, ye, xf, yf));
                             command += &format!(" dxf {}", dxf);
                         }
-                        if 1 <= args.len() {
+                        if !args.is_empty() {
                             let dyf = args.pop()?;
                             parce_data.y += dyf;
                             let yf = parce_data.y;
@@ -1415,7 +1412,7 @@ impl CFF {
                         args.push(parce_data.stacks.pop()?);
                         args.push(parce_data.stacks.pop()?);
                     }
-                    if 1 <= parce_data.stacks.len() {
+                    if !parce_data.stacks.is_empty() {
                         args.push(parce_data.stacks.pop()?);
                     }
                     let mut command = "vhcurveto".to_string();
@@ -1502,7 +1499,7 @@ impl CFF {
                                 .operations
                                 .push(Operation::C(xd, yd, xe, ye, xf, yf));
                         }
-                        if 1 <= args.len() {
+                        if !args.is_empty() {
                             let dyf = args.pop()?;
                             parce_data.y += dyf;
                             let yf = parce_data.y;
@@ -1575,7 +1572,7 @@ impl CFF {
                                 .operations
                                 .push(Operation::C(xd, yd, xe, ye, xf, yf));
                         }
-                        if 1 <= args.len() {
+                        if !args.is_empty() {
                             let dxf = args.pop()?;
                             parce_data.x += dxf;
                             parce_data.min_x = parce_data.min_x.min(parce_data.x);
@@ -1604,7 +1601,7 @@ impl CFF {
                         args.push(parce_data.stacks.pop()?);
                         args.push(parce_data.stacks.pop()?);
                     }
-                    if 1 <= parce_data.stacks.len() {
+                    if !parce_data.stacks.is_empty() {
                         args.push(parce_data.stacks.pop()?);
                     }
                     let mut command = "vvcurveto".to_string();
@@ -1651,7 +1648,7 @@ impl CFF {
                     if parce_data.is_cff2 {
                         continue;
                     }
-                    if 1 <= parce_data.stacks.len() && parce_data.is_first == 0 {
+                    if !parce_data.stacks.is_empty() && parce_data.is_first == 0 {
                         parce_data.width = parce_data.stacks.pop();
                         let width = parce_data.width;
                         parce_data
@@ -2269,16 +2266,13 @@ impl CFF {
         coordinates: &[f32],
     ) -> Result<String, std::io::Error> {
         if gid >= self.char_string.data.data.len() {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                format!("gid {} is not found", gid),
-            ));
+            return Err(std::io::Error::other(format!("gid {} is not found", gid)));
         }
-        let data = &self.char_string.data.data[gid as usize];
+        let data = &self.char_string.data.data[gid];
         let context = self.glyph_context(gid);
         Ok(self.parse_data(
             gid,
-            &data,
+            data,
             fontsize,
             fontunit,
             layout,
@@ -2306,7 +2300,7 @@ impl CFF {
                 let line_gap = layout.line_gap;
                 let advance_width = layout.advance_width as f64;
                 // let width = self.width + parce_data.width;
-                let height = self.bbox[3] - self.bbox[1] as f64;
+                let height = self.bbox[3] - self.bbox[1];
                 let y_scale = (height + line_gap as f64) / height;
                 let width = advance_width / height * fontsize;
                 let h = format!("{}{}", fontsize, fontunit);
@@ -2368,7 +2362,7 @@ impl CFF {
                     let descender = layout.descender;
                     let accender = layout.accender;
                     let line_gap = layout.line_gap;
-                    let height = self.bbox[3] - self.bbox[1] as f64;
+                    let height = self.bbox[3] - self.bbox[1];
                     svg += &format!(
                         "<!-- gid {} nominal_width {} default_width {} resolved_width {} min_x {} height {} -->\n",
                         gid, nominal_width, default_width, self_width, parce_data.min_x, height

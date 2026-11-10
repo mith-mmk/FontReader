@@ -33,7 +33,7 @@ impl ClassDef {
         reader: &mut R,
         offset: u64,
     ) -> Result<Self, std::io::Error> {
-        reader.seek(SeekFrom::Start(offset as u64))?;
+        reader.seek(SeekFrom::Start(offset))?;
         let class_format = reader.read_u16_be()?;
         if class_format == 1 {
             let start_glyph_id = reader.read_u16_be()?;
@@ -68,10 +68,7 @@ impl ClassDef {
                 range_records,
             }))
         } else {
-            Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "Unknown class format",
-            ))
+            Err(std::io::Error::other("Unknown class format"))
         }
     }
 

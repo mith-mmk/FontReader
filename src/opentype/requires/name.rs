@@ -147,11 +147,7 @@ impl NameTable {
 
     pub fn get_name_list(&self, locale: &String, platform_id: PlatformID) -> HashMap<u16, String> {
         let language_id = get_locale_to_language_id(locale, platform_id);
-        let language_id = if let Some(language_id) = language_id {
-            language_id
-        } else {
-            0
-        };
+        let language_id = language_id.unwrap_or_default();
         let key = (platform_id as u16, language_id);
 
         match self.namelist.get(&key) {
@@ -167,11 +163,7 @@ impl NameTable {
         platform_id: PlatformID,
     ) -> Result<String, Error> {
         let language_id = get_locale_to_language_id(locale, platform_id);
-        let language_id = if let Some(language_id) = language_id {
-            language_id
-        } else {
-            0
-        };
+        let language_id = language_id.unwrap_or_default();
 
         let key = (platform_id as u16, language_id);
         match self.namelist.get(&key) {
