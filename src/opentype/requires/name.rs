@@ -463,11 +463,7 @@ fn get_names<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> Result
                     name_records[i].string = "this encoding is not support".to_string();
                 }
             }
-            #[cfg(any(
-                not(feature = "encoding"),
-                windows,
-                target_arch = "wasm32"
-            ))]
+            #[cfg(any(not(feature = "encoding"), windows, target_arch = "wasm32"))]
             EncodingEngine::MacintoshLegcy => {
                 let _ = file.read_bytes_as_vec(name_records[i].length as usize)?;
                 name_records[i].string = "this encoding is not support".to_string();

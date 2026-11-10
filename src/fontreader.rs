@@ -2467,9 +2467,9 @@ impl Font {
                         .map(|attachment| attachment.glyph_index)
                         .or(gdef_attach_glyph_index);
                     let attachment_base = attach_glyph_index.and_then(|index| glyphs.get(index));
-                    let uses_mark_attachment =
-                        (uses_gpos_mark_attachment || uses_gdef_mark_attachment)
-                            && attachment_base.is_some();
+                    let uses_mark_attachment = (uses_gpos_mark_attachment
+                        || uses_gdef_mark_attachment)
+                        && attachment_base.is_some();
                     // Attached marks start with zero advance, then GPOS may
                     // explicitly add one. Do not erase SinglePos values afterward.
                     if uses_mark_attachment {
@@ -2750,10 +2750,7 @@ impl Font {
                     | color.blue as u32;
                 GlyphPaint::Solid(argb)
             };
-            layers.push(GlyphLayer::Path(PathGlyphLayer::new(
-                commands,
-                paint,
-            )));
+            layers.push(GlyphLayer::Path(PathGlyphLayer::new(commands, paint)));
         }
 
         layers
@@ -3528,8 +3525,16 @@ fn validate_woff_buffer(
     }
 
     for (offset, length, name) in [
-        (header.meta_offset as usize, header.meta_length as usize, "metadata"),
-        (header.priv_offset as usize, header.priv_length as usize, "private data"),
+        (
+            header.meta_offset as usize,
+            header.meta_length as usize,
+            "metadata",
+        ),
+        (
+            header.priv_offset as usize,
+            header.priv_length as usize,
+            "private data",
+        ),
     ] {
         if length == 0 {
             continue;
@@ -3555,7 +3560,10 @@ fn validate_woff_buffer(
                 format!("WOFF {name} exceeds declared length"),
             ));
         }
-        if ranges.iter().any(|&(start, table_end)| start < end && offset < table_end) {
+        if ranges
+            .iter()
+            .any(|&(start, table_end)| start < end && offset < table_end)
+        {
             return Err(Error::new(
                 ErrorKind::InvalidData,
                 format!("WOFF {name} overlaps a table"),
@@ -3610,15 +3618,16 @@ fn validate_sfnt_table_records(
 
 fn read_u32_be(data: &[u8], offset: usize) -> Result<u32, Error> {
     let bytes = data
-        .get(offset..offset.checked_add(4).ok_or_else(|| {
-            Error::new(ErrorKind::InvalidData, "integer offset overflow")
-        })?)
+        .get(
+            offset
+                ..offset
+                    .checked_add(4)
+                    .ok_or_else(|| Error::new(ErrorKind::InvalidData, "integer offset overflow"))?,
+        )
         .ok_or_else(|| Error::new(ErrorKind::UnexpectedEof, "truncated integer"))?;
-    Ok(u32::from_be_bytes(
-        bytes
-            .try_into()
-            .map_err(|_| Error::new(ErrorKind::InvalidData, "invalid integer width"))?,
-    ))
+    Ok(u32::from_be_bytes(bytes.try_into().map_err(|_| {
+        Error::new(ErrorKind::InvalidData, "invalid integer width")
+    })?))
 }
 
 #[derive(Debug, Clone)]

@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 
+use crate::limits::{resource_limit, DecodeLimits};
 use bin_rs::reader::BinaryReader;
 use miniz_oxide::inflate::decompress_to_vec_zlib_with_limit;
-use crate::limits::{resource_limit, DecodeLimits};
 
 #[derive(Debug, Clone)]
 pub struct WOFFHeader {
@@ -145,10 +145,7 @@ impl WOFF {
                 ));
             }
             let compress_metadata = reader.read_bytes_as_vec(header.meta_length as usize)?;
-            match decompress_to_vec_zlib_with_limit(
-                &compress_metadata,
-                limits.max_metadata_bytes,
-            ) {
+            match decompress_to_vec_zlib_with_limit(&compress_metadata, limits.max_metadata_bytes) {
                 Ok(metadata_bytes) if metadata_bytes.len() == header.meta_orig_length as usize => {
                     String::from_utf8(metadata_bytes).unwrap_or_default()
                 }
@@ -218,7 +215,13 @@ impl WOFF {
             }
             total_decompressed = total_decompressed
                 .checked_add(table_data.len())
-                .ok_or_else(|| resource_limit("WOFF decompressed data", usize::MAX, limits.max_total_decompressed_bytes))?;
+                .ok_or_else(|| {
+                    resource_limit(
+                        "WOFF decompressed data",
+                        usize::MAX,
+                        limits.max_total_decompressed_bytes,
+                    )
+                })?;
             if total_decompressed > limits.max_total_decompressed_bytes {
                 return Err(resource_limit(
                     "WOFF decompressed data",
@@ -240,20 +243,22 @@ impl WOFF {
     }
 
     fn checksum(tag: u32, data: &[u8]) -> u32 {
-        data.chunks(4).enumerate().fold(0u32, |sum, (index, chunk)| {
-            let mut word = [0u8; 4];
-            word[..chunk.len()].copy_from_slice(chunk);
-            if tag == u32::from_be_bytes(*b"head") {
-                let word_start = index * 4;
-                for byte in word.iter_mut().enumerate() {
-                    let position = word_start + byte.0;
-                    if (8..12).contains(&position) {
-                        *byte.1 = 0;
+        data.chunks(4)
+            .enumerate()
+            .fold(0u32, |sum, (index, chunk)| {
+                let mut word = [0u8; 4];
+                word[..chunk.len()].copy_from_slice(chunk);
+                if tag == u32::from_be_bytes(*b"head") {
+                    let word_start = index * 4;
+                    for byte in word.iter_mut().enumerate() {
+                        let position = word_start + byte.0;
+                        if (8..12).contains(&position) {
+                            *byte.1 = 0;
+                        }
                     }
                 }
-            }
-            sum.wrapping_add(u32::from_be_bytes(word))
-        })
+                sum.wrapping_add(u32::from_be_bytes(word))
+            })
     }
 
     pub fn get_metadata(&self) -> &str {

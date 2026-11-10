@@ -218,7 +218,8 @@ fn decompress_gzip(document: &[u8], max_output: usize) -> Option<Vec<u8>> {
     if expected_size > max_output {
         return None;
     }
-    let decompressed = decompress_to_vec_with_limit(&document[cursor..document.len() - 8], max_output).ok()?;
+    let decompressed =
+        decompress_to_vec_with_limit(&document[cursor..document.len() - 8], max_output).ok()?;
     if decompressed.len() != expected_size {
         return None;
     }
@@ -270,8 +271,22 @@ fn find_svg_tag_end(payload: &str, start: usize) -> Option<usize> {
 
 fn validate_svg_tag(tag: &str) -> Option<()> {
     const SAFE_ELEMENTS: &[&str] = &[
-        "svg", "g", "path", "rect", "circle", "ellipse", "line", "polyline", "polygon",
-        "defs", "lineargradient", "radialgradient", "stop", "clippath", "mask", "use",
+        "svg",
+        "g",
+        "path",
+        "rect",
+        "circle",
+        "ellipse",
+        "line",
+        "polyline",
+        "polygon",
+        "defs",
+        "lineargradient",
+        "radialgradient",
+        "stop",
+        "clippath",
+        "mask",
+        "use",
     ];
     let bytes = tag.as_bytes();
     let mut cursor = 0usize;
@@ -697,7 +712,9 @@ mod tests {
         assert!(sanitize_svg_payload("<use href=\"https://example.test/x\"/>").is_none());
         assert!(sanitize_svg_payload("<path\nonload = \"alert(1)\"/>").is_none());
         assert!(sanitize_svg_payload("<use href = \" javascript:alert(1)\"/>").is_none());
-        assert!(sanitize_svg_payload("<style>@import url(https://example.test);</style>").is_none());
+        assert!(
+            sanitize_svg_payload("<style>@import url(https://example.test);</style>").is_none()
+        );
     }
 
     #[test]

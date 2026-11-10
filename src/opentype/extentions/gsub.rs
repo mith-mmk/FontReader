@@ -580,12 +580,9 @@ impl GSUB {
                     let Some(sequence_table) = multiple.sequence_tables.get(coverage_index) else {
                         return false;
                     };
-                    let new_length = glyphs
-                        .len()
-                        .checked_sub(1)
-                        .and_then(|length| {
-                            length.checked_add(sequence_table.substitute_glyph_ids.len())
-                        });
+                    let new_length = glyphs.len().checked_sub(1).and_then(|length| {
+                        length.checked_add(sequence_table.substitute_glyph_ids.len())
+                    });
                     if new_length.is_none_or(|length| length > MAX_GSUB_GLYPHS) {
                         return false;
                     }
@@ -638,27 +635,31 @@ impl GSUB {
                     return false;
                 };
                 if reverse.backtrack_coverages.len() > index
-                    || index.saturating_add(1).saturating_add(reverse.lookahead_coverages.len())
+                    || index
+                        .saturating_add(1)
+                        .saturating_add(reverse.lookahead_coverages.len())
                         > glyphs.len()
                 {
                     return false;
                 }
-                let backtrack_matches = reverse
-                    .backtrack_coverages
-                    .iter()
-                    .enumerate()
-                    .all(|(offset, coverage)| {
-                        coverage.contains(glyphs[index - 1 - offset].0).is_some()
-                    });
-                let lookahead_matches = reverse
-                    .lookahead_coverages
-                    .iter()
-                    .enumerate()
-                    .all(|(offset, coverage)| {
-                        coverage
-                            .contains(glyphs[index.saturating_add(1) + offset].0)
-                            .is_some()
-                    });
+                let backtrack_matches =
+                    reverse
+                        .backtrack_coverages
+                        .iter()
+                        .enumerate()
+                        .all(|(offset, coverage)| {
+                            coverage.contains(glyphs[index - 1 - offset].0).is_some()
+                        });
+                let lookahead_matches =
+                    reverse
+                        .lookahead_coverages
+                        .iter()
+                        .enumerate()
+                        .all(|(offset, coverage)| {
+                            coverage
+                                .contains(glyphs[index.saturating_add(1) + offset].0)
+                                .is_some()
+                        });
                 if !(backtrack_matches && lookahead_matches) {
                     return false;
                 }
@@ -1058,9 +1059,7 @@ impl GSUB {
         let mut changed = false;
         let mut applications = 0usize;
 
-        if lookup.lookup_type
-            == LookupType::ReverseChainingContextualSingleSubstitution as u16
-        {
+        if lookup.lookup_type == LookupType::ReverseChainingContextualSingleSubstitution as u16 {
             for index in (0..glyphs.len()).rev() {
                 for subtable in &lookup.subtables {
                     if self.apply_subtable_at_with_tables(subtable, glyphs, index) {
@@ -1193,8 +1192,7 @@ impl GSUB {
         let features = self.get_features(&b"ccmp", script);
         for feature in features.iter() {
             for lookup_index in feature.lookup_list_indices.iter() {
-                let Some(lookup) = self.lookups.lookups.get(*lookup_index as usize).cloned()
-                else {
+                let Some(lookup) = self.lookups.lookups.get(*lookup_index as usize).cloned() else {
                     continue;
                 };
                 for _subtable in lookup.subtables.iter() {
