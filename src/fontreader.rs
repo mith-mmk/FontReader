@@ -1504,7 +1504,9 @@ impl Font {
                     while index < chars.len() && Self::is_zero_width_joiner(chars[index]) {
                         text.push(chars[index]);
                         index += 1;
-                        if index >= chars.len() {
+                        // Leave layout controls for the outer loop, even after ZWJ.
+                        // CR remains ignored; LF and TAB each emit their own unit.
+                        if index >= chars.len() || matches!(chars[index], '\r' | '\n' | '\t') {
                             break;
                         }
                         text.push(chars[index]);
@@ -4900,5 +4902,118 @@ mod cff_origin_bounds_tests {
             ]),
             (0.0, 300.0)
         );
+    }
+}
+
+#[cfg(test)]
+mod text_control_tests {
+    use super::{Font, ParsedTextUnit};
+
+    fn unit_texts(text: &str) -> Vec<String> {
+        Font::parse_text_units(text)
+            .into_iter()
+            .map(|unit| match unit {
+                ParsedTextUnit::Glyph { text, .. } => text,
+                ParsedTextUnit::Newline => "\n".to_owned(),
+                ParsedTextUnit::Tab => "\t".to_owned(),
+            })
+            .collect()
+    }
+
+    #[test]
+    fn zwj_preserves_lf_tab_and_ignored_cr_boundaries() {
+        for (control, emitted) in [("\n", "\n"), ("\t", "\t"), ("\r", ""), ("\r\n", "\n")] {
+            let text = format!("A\u{200d}{control}B");
+            let mut expected = vec!["A\u{200d}".to_owned()];
+            if !emitted.is_empty() {
+                expected.push(emitted.to_owned());
+            }
+            expected.push("B".to_owned());
+            assert_eq!(unit_texts(&text), expected, "{text:?}");
+        }
+    }
+
+    #[test]
+    fn zwj_controls_are_handled_once_with_leading_trailing_and_repeated_joiners() {
+        for prefix in ["", "A", "A\u{0301}\u{fe0f}"] {
+            for count in 1..=6 {
+                let joined = format!("{prefix}{}", "\u{200d}".repeat(count));
+                for control in ["\n", "\t", "\r", "\r\n"] {
+                    let text = format!("{joined}{control}B\u{200d}{control}");
+                    let units = Font::parse_text_units(&text);
+                    let glyph_text: String = units
+                        .iter()
+                        .filter_map(|unit| match unit {
+                            ParsedTextUnit::Glyph { text, .. } => Some(text.as_str()),
+                            _ => None,
+                        })
+                        .collect();
+                    assert_eq!(glyph_text, format!("{joined}B\u{200d}"), "{text:?}");
+                    let newlines = units
+                        .iter()
+                        .filter(|u| matches!(u, ParsedTextUnit::Newline))
+                        .count();
+                    let tabs = units
+                        .iter()
+                        .filter(|u| matches!(u, ParsedTextUnit::Tab))
+                        .count();
+                    assert_eq!(
+                        newlines,
+                        if control.contains('\n') { 2 } else { 0 },
+                        "{text:?}"
+                    );
+                    assert_eq!(tabs, if control == "\t" { 2 } else { 0 }, "{text:?}");
+                }
+                assert_eq!(unit_texts(&joined).concat(), joined);
+            }
+        }
+        assert_eq!(
+            unit_texts("A\u{200d}\n\nB\u{200d}\t\tA\u{200d}\r\nB"),
+            [
+                "A\u{200d}",
+                "\n",
+                "\n",
+                "B\u{200d}",
+                "\t",
+                "\t",
+                "A\u{200d}",
+                "\n",
+                "B"
+            ]
+        );
+    }
+
+    #[test]
+    fn ordinary_zwj_marks_and_variation_clusters_are_unchanged() {
+        for text in [
+            "A\u{200d}B",
+            "A\u{0301}\u{200d}B\u{0301}",
+            "A\u{fe00}\u{200d}B\u{e0100}",
+            "\u{1f469}\u{1f3fd}\u{200d}\u{1f4bb}",
+            "\u{1f469}\u{200d}\u{2764}\u{fe0f}\u{200d}\u{1f469}",
+            "\u{1f1ef}\u{1f1f5}",
+            "1\u{fe0f}\u{20e3}",
+            "\u{1f3f4}\u{e0067}\u{e0062}\u{e007f}",
+        ] {
+            assert_eq!(unit_texts(text), [text], "{text:?}");
+        }
+        let units = Font::parse_text_units("A\u{fe00}\u{200d}B\u{e0100}");
+        assert!(matches!(
+            &units[0],
+            ParsedTextUnit::Glyph {
+                ch: 'A',
+                variation_selector: '\u{fe00}',
+                ..
+            }
+        ));
+        assert_eq!(
+            Font::cluster_glyph_scalars("A\u{fe00}\u{200d}B\u{e0100}"),
+            [('A', '\u{fe00}'), ('\u{200d}', '\0'), ('B', '\u{e0100}')]
+        );
+        // This fix does not broaden the existing CR/LF/TAB control policy.
+        for ch in ['\u{000b}', '\u{000c}', '\u{0085}', '\u{2028}', '\u{2029}'] {
+            let text = format!("A\u{200d}{ch}");
+            assert_eq!(unit_texts(&text), [text]);
+        }
     }
 }
