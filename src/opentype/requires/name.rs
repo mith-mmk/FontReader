@@ -468,6 +468,12 @@ fn get_names<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> Result
 
     let mut lang_tag_string = Vec::new();
     for record in &lang_tag_record {
+        if !record.length.is_multiple_of(2) {
+            return Err(Error::new(
+                std::io::ErrorKind::InvalidData,
+                "language-tag byte length must be even",
+            ));
+        }
         // Language-tag offsets, like name-string offsets, are relative to the
         // string storage area. Keep the original on-disk record unchanged.
         let string_offset = current_position + u64::from(record.offset);
@@ -516,6 +522,17 @@ mod tests {
         let expected = "name\nVersion 1\nCount 0\nLang Count 1\nen-US\n";
         assert_eq!(name.to_string(), expected);
         assert_eq!(format!("{name}"), expected);
+    }
+
+    #[test]
+    fn language_tags_reject_odd_byte_lengths() {
+        for tag in [&[0, b'e', 0][..], &[0, b'e'][..]] {
+            let mut data = language_tag_table(0, tag);
+            // Declare three bytes, with or without the trailing byte present.
+            data[8..10].copy_from_slice(&3u16.to_be_bytes());
+            let error = Name::new(&mut BytesReader::new(&data), 0, data.len() as u32).unwrap_err();
+            assert_eq!(error.kind(), std::io::ErrorKind::InvalidData);
+        }
     }
 
     #[test]
