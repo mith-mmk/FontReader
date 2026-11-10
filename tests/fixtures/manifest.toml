@@ -116,6 +116,13 @@ sha256 = "f9cd0d0db9a26406f8776d4fb682ca3817a445f9460808d6472a64259201937f"
 features = ["vertical-origin", "COLR-v0", "CPAL", "empty-base", "negative-bearing", "marks", "color-fallback"]
 
 [[fixture]]
+id = "vertical-feature-selection.ttc"
+source = "tests/fixtures/generate_vertical_feature_selection.py (fontTools 4.65.0)"
+license = "MIT (project test code)"
+sha256 = "eafde7455bc2feb6c5adbfefa5fe2a0d986674897431c8897fa47ef1f4c28cb2"
+features = ["vertical-flow", "GSUB", "vert", "vrt2", "vrtr-exclusion", "feature-selection"]
+
+[[fixture]]
 id = "gpos-single.ttf"
 source = "generate_gpos_single.py (fontTools 4.65.0; no external font)"
 license = "MIT (project test code)"

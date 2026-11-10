@@ -1205,9 +1205,17 @@ impl GSUB {
         None
     }
 
-    // vert, vrt2, vrtr
+    /// Select one legacy vertical feature: available `vrt2`, otherwise `vert`.
+    /// Availability means at least one valid lookup referenced by the existing
+    /// all-script / all-LangSys collector, not coverage of this particular glyph.
+    /// Never use `vrtr`: it requires graphical rotation by the renderer.
     pub fn lookup_vertical(&self, glyph_id: u16) -> Option<u16> {
-        self.lookup_single_feature(glyph_id as usize, None, &[*b"vert", *b"vrt2", *b"vrtr"])
+        let feature = if self.collect_feature_lookups(None, &[*b"vrt2"]).is_empty() {
+            *b"vert"
+        } else {
+            *b"vrt2"
+        };
+        self.lookup_single_feature(glyph_id as usize, None, &[feature])
             .map(|glyph_id| glyph_id as u16)
     }
 
@@ -1247,5 +1255,42 @@ impl GSUB {
     // dnom, numr, frac, subs, sups, zero
     pub fn lookup_number(&self, _griph_ids: Vec<usize>) -> usize {
         todo!("lookup_number")
+    }
+}
+
+#[cfg(test)]
+mod vertical_feature_tests {
+    #[test]
+    fn vertical_lookup_selects_one_available_feature_before_coverage() {
+        let font = crate::fontreader::Font::get_font_from_buffer(include_bytes!(
+            "../../../tests/fixtures/vertical-feature-selection.ttc"
+        ))
+        .unwrap();
+        let expected = [
+            Some(3),
+            Some(3),
+            Some(2),
+            None,
+            None,
+            Some(3),
+            Some(2),
+            Some(2),
+            Some(2),
+            Some(3),
+            Some(3),
+            None,
+        ];
+        for (index, replacement) in expected.into_iter().enumerate() {
+            let selected = if index == 0 {
+                &font
+            } else {
+                &font.more_fonts[index - 1]
+            };
+            assert_eq!(
+                selected.gsub.as_ref().unwrap().lookup_vertical(1),
+                replacement,
+                "face {index}"
+            );
+        }
     }
 }
