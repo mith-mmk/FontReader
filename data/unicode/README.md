@@ -125,8 +125,8 @@ The internal boundary iterator uses `unicode-segmentation = "=1.13.3"`, whose
 `UNICODE_VERSION` is `(17, 0, 0)`. The exact Cargo.toml pin protects downstream
 library users even when they do not use this repository's Cargo.lock. The crate
 is MIT OR Apache-2.0, has no runtime dependencies, and declares Rust 1.85.0 as
-its minimum version. fontcore has no declared overall MSRV; this dependency
-floor is not a claim that the complete crate builds with Rust 1.85.0.
+its minimum version. fontcore's overall MSRV is Rust 1.91, aligned with WML2;
+the dependency's lower floor does not change that requirement.
 
 - Dependency: <https://crates.io/crates/unicode-segmentation/1.13.3>
 - Implementation: <https://github.com/unicode-rs/unicode-segmentation>
@@ -167,7 +167,7 @@ fontTools 4.65.0 via `python tests/fixtures/generate_unicode_grapheme_fallback.p
 `vertical_orientation(char)` は別に **Unicode 18.0.0** へ固定されています。
 Unicode 18 の書記素分割や、完全なシェーピング・BiDi・CSS 混植レイアウトへの
 適合を示すものではありません。依存 crate の最低 Rust バージョンは 1.85.0
-ですが、fontcore 全体の MSRV を宣言するものではありません。
+ですが、fontcore 全体の MSRV は WML2 に合わせて **1.91** です。
 
 公式の全 766 テストを省略せず同梱し、分割処理とレイアウト用の調整を別々に
 検証します。上記のスクリプトで原本とライセンスの SHA-256 をオフライン確認
