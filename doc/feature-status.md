@@ -220,10 +220,42 @@ High-level text shaping resolves cmap/UVS first and applies the selected vertica
 feature after ordinary GSUB stages (composition, locale/variant, RTL forms, and
 ligatures). Metrics, outline origins, and GPOS use those final glyph IDs. Raw
 `get_glyph_with_uvs_axis()` keeps its direct vertical alternate behavior without
-running the text shaping stages. This does not change
-the existing single-feature lookup chaining or source-cluster representation.
+running the text shaping stages. Source-cluster representation is unchanged.
+Vertical single-feature lookup chaining is described below.
 Horizontal flow and builds without `layout` remain unchanged. MIT synthetic
 fixtures verify selection, final glyph bounds/advance, measure, and SVG output;
 see `tests/fixtures/manifest.toml` for provenance and hash.
 `vertical-gsub-order.ttc` covers composition, variants, locale, ligatures, UVS,
 final mark anchors and origins, selected-face fallback, and raw glyph compatibility.
+
+
+### Legacy vertical lookup chaining
+
+Within the selected vertical feature, direct Single substitutions (formats 1
+and 2) and Extension-wrapped Single substitutions run once per referenced
+lookup, in LookupList order. Feature indices can be stored in arbitrary order;
+references repeated across features or LangSys records do not repeat a lookup.
+Each lookup uses the preceding lookup's output and stops at its first matching
+subtable, including identity substitutions. An applied identity or net cycle
+returns `Some(original_id)`, while no applicable substitution returns `None`.
+
+This single-glyph API skips Multiple, Alternate, Ligature, contextual and reverse
+contextual lookups, including Extension wrappers of those types. It does not
+flatten their results or discard context to manufacture a single replacement.
+Unsupported/empty lookups do not trigger per-glyph `vert` fallback. The global
+Script/LangSys scope and generic non-vertical feature helpers are unchanged.
+This is not a full sequence-aware vertical shaping implementation.
+
+See [OpenType common layout: feature and lookup processing](https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#feature-table)
+and [GSUB substitution types](https://learn.microsoft.com/en-us/typography/opentype/spec/gsub).
+The reproducible MIT `vertical-lookup-chain.ttc` tests cover ordering, identity,
+cycles, duplicate references, unsupported types, and final bounds/origin,
+advance, measurement and SVG; its generator and SHA-256 are in the manifest.
+
+This single-glyph API has no GDEF class or mark-filtering context. A lookup
+using IgnoreBaseGlyphs, IgnoreLigatures, IgnoreMarks, UseMarkFilteringSet, or
+MarkAttachmentType is therefore skipped entirely. This conservative unsupported
+case prevents substitutions on excluded glyphs; it is not full GDEF filtering
+and does not trigger `vert` fallback. RightToLeft is ignored for GSUB by the
+OpenType specification and does not prevent substitution. Direct and Extension
+fixtures cover each filtering flag in standalone and chained lookups.

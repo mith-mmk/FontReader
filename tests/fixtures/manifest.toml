@@ -130,6 +130,13 @@ sha256 = "05433434a4b292816104cca456b7656dfc7ebf47ce01d376f5c88d125d9cfd7d"
 features = ["vertical-flow", "GSUB-order", "ccmp", "smcp", "locl", "liga", "vrt2", "vert", "UVS", "marks"]
 
 [[fixture]]
+id = "vertical-lookup-chain.ttc"
+source = "tests/fixtures/generate_vertical_lookup_chain.py (fontTools 4.65.0)"
+license = "MIT (project test code)"
+sha256 = "1ffa05a1ffa72a05a45b914fb326191b2a0619513c7c3d0c81f8a2ea327e777a"
+features = ["vertical-flow", "GSUB", "vert", "vrt2", "lookup-order", "single-substitution", "extension", "identity", "unsupported-lookups", "lookup-flags", "GDEF"]
+
+[[fixture]]
 id = "gpos-single.ttf"
 source = "generate_gpos_single.py (fontTools 4.65.0; no external font)"
 license = "MIT (project test code)"
