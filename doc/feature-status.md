@@ -58,6 +58,16 @@ orientation, punctuation rotation, or CFF VORG origins.
 - Type 7 Extension Substitution: parsed, not fully applied
 - Type 8 Reverse Chaining Contextual Single Substitution: parsed, not applied
 
+### GPOS Single Positioning
+
+- Type 1 SinglePos Formats 1/2 and Type 9 wrapping SinglePos are parsed and executed.
+- Default execution covers `kern` / `dist` horizontally and `vkrn` / `dist` vertically, with the existing locale/script selection. Arbitrary feature selection and contextual GPOS are not added.
+- All four static ValueRecord fields reach shaping and measurement, including explicit advances on attached marks. Distinct lookups accumulate in i32, and the first matching subtable (including a zero record) wins within one lookup.
+- SinglePos observes GDEF glyph classes, IgnoreBaseGlyphs / IgnoreLigatures / IgnoreMarks, MarkAttachmentType, and MarkFilteringSet. This does not add shared filtering to the existing pair/mark paths.
+- Device / VariationIndex offsets are consumed but their deltas are not evaluated. Cursive positioning and Unicode Arabic joining remain separate work.
+- Regressions use the committed MIT synthetic font (`tests/fixtures/gpos-single.ttf`) and byte fixtures for truncation, invalid coverage/counts, lookup accumulation, locale, scaling, vertical flow, and mark attachment. Broad real-font / HarfBuzz comparison is not yet covered.
+- Reference: [OpenType GPOS Single Adjustment](https://learn.microsoft.com/en-us/typography/opentype/spec/gpos#lookup-type-1-single-adjustment-positioning-subtable).
+
 ### GDEF
 
 - Parsed: glyph class definitions, attach list, ligature caret list, mark attach class definition, mark glyph sets definition

@@ -44,3 +44,17 @@ source = "tests/fixtures/generate_vertical_gsub.py (fontTools 4.65.0)"
 license = "MIT (project test code)"
 sha256 = "13826e3c77b002909b501fb55bb72c1896e8c7904884254e299b75a26d18cc78"
 features = ["vertical-flow", "GSUB", "vert", "single-substitution-format1"]
+
+[[fixture]]
+id = "gpos-single.ttf"
+source = "generate_gpos_single.py (fontTools 4.65.0; no external font)"
+license = "MIT (project test code)"
+sha256 = "be9b903f5b5528264aed870708f66bf2bda5eaac53765fd3640bcae850b47a89"
+features = ["layout", "gpos-single"]
+
+[[fixture]]
+id = "gpos-single.bin"
+source = "generate_gpos_single.py (fontTools 4.65.0; no external font)"
+license = "MIT (project test code)"
+sha256 = "e96e6c7902bc6942a27698f1adab5f8293b0327cb184f52d87e593a2cbd192f1"
+features = ["layout", "gpos-single"]
