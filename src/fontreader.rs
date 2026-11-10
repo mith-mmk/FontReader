@@ -123,6 +123,14 @@ pub enum GlyphFormat {
     Unknown,
 }
 
+// Explicit per-call routes keep mixed upright text away from legacy vrt2.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum TextRunMode {
+    Standard,
+    SidewaysLtr,
+    MixedUpright,
+}
+
 #[derive(Debug, Clone)]
 
 pub enum FontLayout {
@@ -2164,7 +2172,7 @@ impl Font {
         text: &str,
         options: &crate::commands::FontOptions<'_>,
     ) -> Result<GlyphRun, Error> {
-        self.text2glyph_run_impl(text, options, false)
+        self.text2glyph_run_impl(text, options, TextRunMode::Standard)
     }
 
     pub(crate) fn text2glyph_run_sideways_ltr(
@@ -2175,17 +2183,26 @@ impl Font {
         let options = options
             .clone()
             .with_text_direction(crate::commands::TextDirection::LeftToRight);
-        self.text2glyph_run_impl(text, &options, true)
+        self.text2glyph_run_impl(text, &options, TextRunMode::SidewaysLtr)
+    }
+
+    pub(crate) fn text2glyph_run_mixed_upright(
+        &self,
+        text: &str,
+        options: &crate::commands::FontOptions<'_>,
+    ) -> Result<GlyphRun, Error> {
+        let options = options
+            .clone()
+            .with_text_direction(crate::commands::TextDirection::TopToBottom);
+        self.text2glyph_run_impl(text, &options, TextRunMode::MixedUpright)
     }
 
     fn text2glyph_run_impl(
         &self,
         text: &str,
         options: &crate::commands::FontOptions<'_>,
-        sideways_ltr: bool,
+        mode: TextRunMode,
     ) -> Result<GlyphRun, Error> {
-        #[cfg(not(feature = "layout"))]
-        let _ = sideways_ltr;
         let _ = self.current_head()?;
 
         if !options.font_size.is_finite() || options.font_size <= 0.0 {
@@ -2222,19 +2239,26 @@ impl Font {
         #[allow(unused_mut)]
         let mut shaped_units = self.shape_text_units(
             text,
-            is_vertical,
+            is_vertical && mode == TextRunMode::Standard,
             is_right_to_left,
             options.locale,
             options.font_variant,
         )?;
         #[cfg(feature = "layout")]
-        if sideways_ltr {
+        if mode != TextRunMode::Standard {
             if let Some(gsub) = self.current_gsub() {
-                // Horizontal composition is complete. Only vrtr is selected;
-                // metrics, kerning, and mark attachment use the resulting IDs.
+                // Ordinary GSUB is complete. The explicit route selects exactly
+                // one orientation feature before metrics and GPOS, never vrt2.
                 for unit in &mut shaped_units {
                     if let ResolvedTextUnit::Glyph(glyph) = unit {
-                        if let Some(id) = gsub.lookup_sideways(glyph.glyph_id as u16) {
+                        let id = match mode {
+                            TextRunMode::SidewaysLtr => gsub.lookup_sideways(glyph.glyph_id as u16),
+                            TextRunMode::MixedUpright => {
+                                gsub.lookup_mixed_upright(glyph.glyph_id as u16)
+                            }
+                            TextRunMode::Standard => None,
+                        };
+                        if let Some(id) = id {
                             glyph.glyph_id = id as usize;
                         }
                     }
@@ -4725,8 +4749,9 @@ mod pair_coordinate_tests {
                             ),
                             expected
                         );
-                        let scaled = font
-                            .position_adjustment_for_index(&units, index, None, vertical, 0.5, 0.25);
+                        let scaled = font.position_adjustment_for_index(
+                            &units, index, None, vertical, 0.5, 0.25,
+                        );
                         assert_eq!(scaled.placement_x, expected.0 as f32 * 0.5);
                         assert_eq!(scaled.placement_y, expected.1 as f32 * 0.25);
                         assert_eq!(scaled.advance_x, expected.2 as f32 * 0.5);

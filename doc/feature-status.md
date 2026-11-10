@@ -9,8 +9,9 @@ The README now focuses on the public API and runnable examples.
 four distinct values (`U`, `R`, `Tu`, `Tr`), without fonts or feature flags.
 `Tr` prefers a transformed upright form and rotates only as a fallback.
 The scalar query does not resolve grapheme clusters or font substitutions and
-does not change existing shaping. Automatic mixed-orientation layout remains
-separate work; references to Unicode orientation below concern layout behavior.
+does not change existing shaping. Mixed orientation is available only through
+the explicit [mixed vertical LTR outline APIs](#opt-in-mixed-vertical-ltr-outlines),
+not through the scalar query or the ordinary shaping policy.
 See the [recipe](api-recipes.md#query-unicode-vertical-orientation) and
 [data provenance](../data/unicode/README.md).
 
@@ -34,7 +35,8 @@ uses the same fallback.
 The committed synthetic fixtures exercise fonts with and without vertical
 metrics and mixed collection faces without requiring an installed font. This
 fallback is distinct from the TrueType origin correction below. Unicode
-orientation and punctuation rotation remain separate work. Static CFF origins are covered below.
+orientation is not inferred by this legacy flow; opt-in mixed layout is described
+[below](#opt-in-mixed-vertical-ltr-outlines). Static CFF origins are covered below.
 
 ### TrueType variable vertical metrics
 
@@ -66,8 +68,9 @@ attached by GPOS/GDEF inherit the base glyph's origin translation.
 
 Synthetic regressions cover punctuation, negative bearings, composites, gvar
 outline/phantom movement, collection face selection, and sfnt/WOFF parity.
-BASE alignment, Unicode orientation, and color
-origins outside the static COLR v0 case below remain separate work. The legacy
+BASE alignment and color origins outside the static COLR v0 case below remain
+separate work. Orientation is supplied by the explicit mixed API, not inferred
+by this legacy origin correction. The legacy
 raw glyph/SVG APIs are unchanged. TrueType ignores VORG as required by OpenType.
 
 ### GSUB
@@ -399,6 +402,73 @@ instead of assuming every such pair is a base+selector; their existing
 multi-scalar SVG rendering path and vertical-layout limitations remain.
 
 This boundary version is independent of the public **Unicode 18.0.0**
-`Vertical_Orientation` scalar property. There is no new automatic mixed
-orientation, source-provenance model, or claim of CSS mixed-layout conformance.
+`Vertical_Orientation` scalar property. The boundary iterator itself does not
+choose orientation or provide a source-provenance model or CSS conformance.
+The explicit mixed-layout methods described below perform orientation grouping.
 See [Unicode sources, licenses, and offline verification](../data/unicode/README.md#extended-grapheme-clusters-unicode-1700).
+
+## Opt-in mixed vertical LTR outlines
+
+`FontEngine::shape_vertical_mixed_ltr`, `measure_vertical_mixed_ltr`,
+`measure_layout_vertical_mixed_ltr`, and `render_svg_vertical_mixed_ltr` are
+explicit per-call, single-face, single-line LTR operations. They override the
+engine's selected direction without changing its options or existing methods.
+No public options field, direction variant, or glyph structure was added.
+
+The boundary algorithm is **Unicode 17.0 EGC** (`unicode-segmentation 1.13.3`),
+while **Unicode 18.0 VO** and **Unicode 18.0 General_Category=Me** are separately
+pinned property tables. Before any GSUB, each original EGC uses its first
+scalar's VO; any enclosing mark (`Me`, 13 scalars in five ranges) forces that
+entire EGC upright. `U`, `Tu`, and `Tr` form upright groups, and `R` forms
+sideways groups. Adjacent EGCs with the same final orientation are coalesced,
+so ordinary GSUB, ligatures, kerning and mark attachment work within each group.
+GSUB/GPOS deliberately do not cross orientation boundaries. This avoids inferring
+orientation from substituted glyph IDs or incomplete substitution provenance.
+
+Upright groups use existing vertical metrics/origins and select **only `vert`**
+after ordinary GSUB, before final metrics and GPOS. They never select `vrt2` or
+`vrtr`. `Tr` with no applicable `vert` alternate, including identity substitution,
+stays upright; rotated fallback synthesis is not implemented. Sideways groups
+use horizontal LTR metrics/GPOS and **only `vrtr`**, then the existing clockwise
+whole-run transformation. The ordinary vertical API still selects `vrt2` when
+available, otherwise `vert`; it is not silently changed by these methods.
+Without `layout`, the same grouping and geometry apply without GSUB/GPOS.
+
+Each sideways group is centered on the vertical axis using the horizontal
+`FontMetrics` from that exact shaped instance: `x_shift = -(ascent - descent) / 2`,
+where descent is a positive distance. These values are already scaled and retain
+existing supported variations, including the current MVAR metric path. The shift
+is added only to positioning, not advances. Stretch is not applied again; ink
+bounds, line gap and requested line height are not substituted for the metric
+midpoint. Existing font-size scaling can itself include the font's line gap.
+This is fontcore synthesis, not OpenType BASE, OS/2 metric priority, or CSS
+font-size/baseline equivalence. Groups connect by summing **both components** of
+all final glyph advance vectors; GPOS placement, last drawn position, ink edges
+and centering shifts never become the next group's pen. Existing GPOS advance
+behavior is preserved rather than broadened into full OpenType shaping.
+
+All groups must contain only CurrentColor, clip-free fill paths. Unsupported
+colors, gradients, strokes, clips, raster or raw SVG layers fail atomically with
+`Unsupported`; no partial run is returned and the engine remains usable.
+TAB, CR, LF, VT, FF, NEL, U+2028 and U+2029 are rejected with `InvalidInput`.
+Empty runs have zero extents and no bounds; spaces retain their rotated advances.
+Measurement uses the final run, and line bounds include every positioned origin
+and full advance-vector endpoint. SVG exports precisely that run with normal
+ink padding and the configured SVG unit.
+
+This is an explicit **UAX #50-style first-scalar/any-Me policy**, not complete
+CSS character tailoring. [CSS Writing Modes mixed orientation](https://www.w3.org/TR/css-writing-modes-4/#mixed-orientation)
+and [CSS Text Appendix E](https://www.w3.org/TR/css-text-3/#characters) use
+additional typographic-character/base tailoring. No Unicode18 EGC, complete CSS,
+browser-equivalent layout, BiDi, family fallback, multiline/tabs, BASE alignment,
+or complete OpenType behavior is claimed. See also
+[UAX #50 revision 35](https://www.unicode.org/reports/tr50/tr50-35.html) and
+[the separate Unicode data/version provenance](../data/unicode/README.md).
+
+The deterministic MIT fixture covers Han+AV+Han, both cross-axis advances and
+signed placements, asymmetric hhea metrics and gaps, stretch, MVAR, Tr feature
+sentinels, ccmp/multiple/ligature/mark ordering, and the Unicode17/18 boundary
+difference `A + U+1D127`. Existing fixtures cover selected TT/CFF/CFF2 faces,
+missing vertical metrics, supported variations and rejected color layers.
+Regenerate with `python tests/fixtures/generate_mixed_vertical_ltr.py`
+(fontTools 4.65.0); tests need only committed bytes, not Python or installed fonts.

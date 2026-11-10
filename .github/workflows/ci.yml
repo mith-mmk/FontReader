@@ -14,7 +14,7 @@ jobs:
       matrix:
         include:
           - name: unicode-data
-            command: python3 tools/generate_vertical_orientation.py --check
+            command: python3 tools/generate_vertical_orientation.py --check && python3 tools/generate_enclosing_marks.py --check
           - name: grapheme-data
             command: python3 tools/check_grapheme_data.py
           - name: fmt

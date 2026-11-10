@@ -8,6 +8,46 @@ The internal shaping/fallback text boundaries use Unicode **17.0.0** extended
 grapheme clusters, separately pinned as described below. Neither version states
 that fontcore implements complete Unicode shaping, BiDi, or CSS mixed layout.
 
+## Enclosing marks (General_Category=Me)
+
+The internal `unicode::is_enclosing_mark(char)` query independently pins
+`General_Category=Me` to **Unicode 18.0.0**. This category is not equivalent to
+all combining marks, grapheme extenders, or a segmentation library's data.
+
+- Official source: <https://www.unicode.org/Public/18.0.0/ucd/extracted/DerivedGeneralCategory.txt>
+- Local original: [`18.0.0/DerivedGeneralCategory.txt`](18.0.0/DerivedGeneralCategory.txt)
+- Source header date: 2026-06-29, 15:25:02 GMT
+- Retrieved: 2026-11-09
+- Source size: 282,143 bytes
+- Source SHA-256: `d6b151d2d40ee9b1876d26f417980f45ffae47b6055ccf7203cb31f07a030f94`
+- License: **Unicode-3.0**, the same unchanged [Unicode License V3](LICENSE.txt)
+  and license hash documented below. The original and derived table are
+  copyright (c) 2026 Unicode, Inc.
+
+The generated table contains 13 scalars in five inclusive ranges:
+`0488..0489`, `1ABE`, `20DD..20E0`, `20E2..20E4`, and `A670..A672`.
+The allocation-free internal lookup uses binary search. Build and runtime do
+not need Python, network access, or source parsing.
+
+```console
+python tools/generate_enclosing_marks.py
+python tools/generate_enclosing_marks.py --check
+cargo test --offline --no-default-features --lib enclosing_mark
+```
+
+The deterministic offline generator verifies source size, source/license hashes,
+version header, valid scalar ranges, ordering, overlap, and range/scalar counts.
+The independent Rust test parses every category in the original file, verifies
+complete nonoverlapping code-space coverage, and compares every one of the
+1,112,064 valid scalars with the lookup. Additional tests pin all five ranges,
+their boundaries, and non-Me combining marks. The originals are kept byte-for-byte
+by `.gitattributes`; generated Rust uses LF. Review source, license, hashes,
+counts, tests, and behavior together when updating this Unicode pin.
+
+内部の囲み文字判定も Unicode 18.0.0 の `General_Category=Me` に固定しています。
+結合文字全般や書記素分割の判定ではありません。原本・ライセンスのハッシュを
+検証して 13 文字・5 範囲を生成し、独立した Rust テストで全スカラー値を照合します。
+
 ## Provenance and license
 
 - Official source: <https://www.unicode.org/Public/18.0.0/ucd/VerticalOrientation.txt>

@@ -234,3 +234,20 @@ if buffer.is_complete() {
 - 実装状況と制限事項は [feature-status.ja.md](feature-status.ja.md) にまとめています。
 - CFF2 調査メモは [cff2-investigation.ja.md](cff2-investigation.ja.md) にまとめています。
 - ドキュメントの入口は [README.ja.md](README.ja.md) です。
+
+## 混在縦書き LTR のシェーピング・計測・SVG
+
+単一フェイス・単一行の明示的な混在縦書きです。Unicode17 EGC と Unicode18 VO/Me は別々のバージョンです。[対応範囲と制限](feature-status.ja.md#明示的な混在縦書き-ltr-アウトライン)も参照してください。
+
+```rust
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+let file = fontcore::FontFile::from_file("font.ttf")?;
+let face = file.current_face()?;
+let engine = face.engine().with_font_size(32.0);
+let run = engine.shape_vertical_mixed_ltr("漢字AV「かな」")?;
+let advance = engine.measure_vertical_mixed_ltr("漢字AV「かな」")?;
+let metrics = engine.measure_layout_vertical_mixed_ltr("漢字AV「かな」")?;
+let svg = engine.render_svg_vertical_mixed_ltr("漢字AV「かな」")?;
+# Ok(())
+# }
+```

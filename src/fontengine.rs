@@ -222,17 +222,7 @@ impl<'a> FontEngine<'a> {
     /// `InvalidInput`. This is a single-face LTR operation, not BiDi or Unicode
     /// mixed-orientation layout. Existing horizontal shaping limits apply.
     pub fn shape_sideways_ltr(&self, text: &str) -> Result<GlyphRun, Error> {
-        if text.chars().any(|ch| {
-            matches!(
-                ch,
-                '\t' | '\r' | '\n' | '\u{000b}' | '\u{000c}' | '\u{0085}' | '\u{2028}' | '\u{2029}'
-            )
-        }) {
-            return Err(Error::new(
-                ErrorKind::InvalidInput,
-                "sideways LTR requires one line without tabs or line-break controls",
-            ));
-        }
+        validate_single_line(text, "sideways LTR")?;
         let run = self
             .face
             .font()
@@ -253,44 +243,93 @@ impl<'a> FontEngine<'a> {
     /// and zero extents; spaces retain their horizontal advance, rotated down.
     pub fn measure_layout_sideways_ltr(&self, text: &str) -> Result<LayoutMetrics, Error> {
         let run = self.shape_sideways_ltr(text)?;
-        let mut ink_bounds = None;
-        let mut line_bounds = None;
-        let mut inline_advance = 0.0f32;
-        for positioned in &run.glyphs {
-            let metrics = &positioned.glyph.metrics;
-            inline_advance += metrics.advance_y;
-            if let Some(bounds) = metrics.bounds {
-                extend_bounds(
-                    &mut ink_bounds,
-                    positioned.x + bounds.min_x,
-                    positioned.y + bounds.min_y,
-                );
-                extend_bounds(
-                    &mut ink_bounds,
-                    positioned.x + bounds.max_x,
-                    positioned.y + bounds.max_y,
-                );
-            }
-            extend_bounds(&mut line_bounds, positioned.x, positioned.y);
-            extend_bounds(
-                &mut line_bounds,
-                positioned.x + metrics.advance_x,
-                positioned.y + metrics.advance_y,
-            );
-        }
-        Ok(LayoutMetrics {
-            inline_advance: inline_advance.abs() as f64,
-            block_extent: line_bounds
-                .map(|bounds| (bounds.max_x - bounds.min_x).abs() as f64)
-                .unwrap_or(0.0),
-            ink_bounds,
-            line_bounds,
-        })
+        Ok(measure_vertical_run(&run))
     }
 
     /// Exports [`Self::shape_sideways_ltr`] with the normal SVG ink padding.
     pub fn render_svg_sideways_ltr(&self, text: &str) -> Result<String, Error> {
         glyph_run_to_svg(&self.shape_sideways_ltr(text)?, &self.svg_unit)
+    }
+
+    /// Shapes one single-face LTR line with opt-in mixed vertical orientation.
+    ///
+    /// Before GSUB, Unicode 17.0 extended grapheme clusters are classified by
+    /// their first scalar's Unicode 18.0 `Vertical_Orientation`. Any Unicode
+    /// 18.0 enclosing mark (`Me`) forces the whole cluster upright. `U`, `Tu`,
+    /// and `Tr` stay upright with only `vert`; `R` uses horizontal shaping with
+    /// only `vrtr`, then a clockwise whole-group rotation. Adjacent clusters of
+    /// the same final orientation share GSUB/GPOS; orientation boundaries do not.
+    /// `Tr` without a vertical alternate stays upright: rotated fallback synthesis
+    /// is not implemented. This is an explicit UAX #50-style policy, not complete
+    /// CSS character tailoring or browser-equivalent layout.
+    ///
+    /// Upright glyphs retain existing vertical origins. Each sideways group is
+    /// centered using its already-scaled horizontal font metrics:
+    /// `x_shift = -(ascent - descent) / 2`, with positive descent. This placement
+    /// shift does not affect the pen. Groups join only by the sum of their final
+    /// advance vectors, never GPOS placement, ink edges, or the centering shift.
+    /// This synthesis does not implement OpenType BASE or CSS baseline rules.
+    ///
+    /// Like [`Self::shape_sideways_ltr`], this overrides the engine's direction
+    /// for this call only, accepts only current-color, clip-free fill paths,
+    /// rejects tabs/line-break controls, and fails without a partial run.
+    /// Existing LTR shaping and variation support limits apply. No BiDi, family
+    /// fallback, multiline layout, or full OpenType shaping is provided.
+    pub fn shape_vertical_mixed_ltr(&self, text: &str) -> Result<GlyphRun, Error> {
+        validate_single_line(text, "mixed vertical LTR")?;
+        let options = self.options();
+        let font = self.face.font();
+        let mut glyphs = Vec::new();
+        let (mut pen_x, mut pen_y) = (0.0, 0.0);
+        let groups = mixed_orientation_groups(text);
+        if groups.is_empty() {
+            // Preserve the underlying option validation even for empty text.
+            return font.text2glyph_run_mixed_upright(text, &options);
+        }
+        for (group, sideways) in groups {
+            let (mut run, shift_x) = if sideways {
+                let horizontal = font.text2glyph_run_sideways_ltr(group, &options)?;
+                // Take metrics from this shaped instance before rotation. No
+                // second stretch/size scaling, line gap, or ink bounds enter it.
+                let shift = horizontal
+                    .glyphs
+                    .first()
+                    .and_then(|glyph| glyph.glyph.font)
+                    .map(|metrics| -(metrics.ascent - metrics.descent) / 2.0)
+                    .unwrap_or(0.0);
+                (rotate_sideways_ltr(horizontal)?, shift)
+            } else {
+                (font.text2glyph_run_mixed_upright(group, &options)?, 0.0)
+            };
+            validate_outline_run(&run, "mixed vertical LTR")?;
+            let (mut advance_x, mut advance_y) = (0.0, 0.0);
+            for glyph in &mut run.glyphs {
+                glyph.x += pen_x + shift_x;
+                glyph.y += pen_y;
+                advance_x += glyph.glyph.metrics.advance_x;
+                advance_y += glyph.glyph.metrics.advance_y;
+            }
+            pen_x += advance_x;
+            pen_y += advance_y;
+            glyphs.extend(run.glyphs);
+        }
+        Ok(GlyphRun::new(glyphs))
+    }
+
+    /// Measures the absolute sum of the mixed run's final y advances.
+    pub fn measure_vertical_mixed_ltr(&self, text: &str) -> Result<f64, Error> {
+        Ok(self.measure_layout_vertical_mixed_ltr(text)?.inline_advance)
+    }
+
+    /// Measures exactly [`Self::shape_vertical_mixed_ltr`], including both
+    /// components of every positioned origin and advance-vector endpoint.
+    pub fn measure_layout_vertical_mixed_ltr(&self, text: &str) -> Result<LayoutMetrics, Error> {
+        Ok(measure_vertical_run(&self.shape_vertical_mixed_ltr(text)?))
+    }
+
+    /// Exports the final mixed run with the normal SVG ink padding.
+    pub fn render_svg_vertical_mixed_ltr(&self, text: &str) -> Result<String, Error> {
+        glyph_run_to_svg(&self.shape_vertical_mixed_ltr(text)?, &self.svg_unit)
     }
 
     /// Shapes text into a [`GlyphRun`].
@@ -392,7 +431,82 @@ impl<'a> FontEngine<'a> {
     }
 }
 
-fn rotate_sideways_ltr(mut run: GlyphRun) -> Result<GlyphRun, Error> {
+fn validate_single_line(text: &str, context: &str) -> Result<(), Error> {
+    if text.chars().any(|ch| {
+        matches!(
+            ch,
+            '\t' | '\r' | '\n' | '\u{000b}' | '\u{000c}' | '\u{0085}' | '\u{2028}' | '\u{2029}'
+        )
+    }) {
+        return Err(Error::new(
+            ErrorKind::InvalidInput,
+            format!("{context} requires one line without tabs or line-break controls"),
+        ));
+    }
+    Ok(())
+}
+
+fn mixed_orientation_groups(text: &str) -> Vec<(&str, bool)> {
+    let mut groups = Vec::new();
+    let (mut start, mut end) = (0, 0);
+    let mut previous = None;
+    for cluster in crate::unicode::graphemes::extended_graphemes(text) {
+        let sideways = cluster.chars().next().is_some_and(|first| {
+            crate::unicode::vertical_orientation(first)
+                == crate::unicode::VerticalOrientation::Rotated
+        }) && !cluster.chars().any(crate::unicode::is_enclosing_mark);
+        if let Some(orientation) = previous {
+            if orientation != sideways {
+                groups.push((&text[start..end], orientation));
+                start = end;
+            }
+        }
+        end += cluster.len();
+        previous = Some(sideways);
+    }
+    if let Some(sideways) = previous {
+        groups.push((&text[start..end], sideways));
+    }
+    groups
+}
+
+fn measure_vertical_run(run: &GlyphRun) -> LayoutMetrics {
+    let mut ink_bounds = None;
+    let mut line_bounds = None;
+    let mut inline_advance = 0.0f32;
+    for positioned in &run.glyphs {
+        let metrics = &positioned.glyph.metrics;
+        inline_advance += metrics.advance_y;
+        if let Some(bounds) = metrics.bounds {
+            extend_bounds(
+                &mut ink_bounds,
+                positioned.x + bounds.min_x,
+                positioned.y + bounds.min_y,
+            );
+            extend_bounds(
+                &mut ink_bounds,
+                positioned.x + bounds.max_x,
+                positioned.y + bounds.max_y,
+            );
+        }
+        extend_bounds(&mut line_bounds, positioned.x, positioned.y);
+        extend_bounds(
+            &mut line_bounds,
+            positioned.x + metrics.advance_x,
+            positioned.y + metrics.advance_y,
+        );
+    }
+    LayoutMetrics {
+        inline_advance: inline_advance.abs() as f64,
+        block_extent: line_bounds
+            .map(|bounds| (bounds.max_x - bounds.min_x).abs() as f64)
+            .unwrap_or(0.0),
+        ink_bounds,
+        line_bounds,
+    }
+}
+
+fn validate_outline_run(run: &GlyphRun, context: &str) -> Result<(), Error> {
     // Validate the entire run before changing any geometry. Capability-based
     // scope also permits pathified SVG or foreground COLR that meets it.
     for positioned in &run.glyphs {
@@ -404,11 +518,16 @@ fn rotate_sideways_ltr(mut run: GlyphRun) -> Result<GlyphRun, Error> {
             {
                 return Err(Error::new(
                     ErrorKind::Unsupported,
-                    "sideways LTR supports only current-color, clip-free fill paths",
+                    format!("{context} supports only current-color, clip-free fill paths"),
                 ));
             }
         }
     }
+    Ok(())
+}
+
+fn rotate_sideways_ltr(mut run: GlyphRun) -> Result<GlyphRun, Error> {
+    validate_outline_run(&run, "sideways LTR")?;
     for positioned in &mut run.glyphs {
         (positioned.x, positioned.y) = (-positioned.y, positioned.x);
         let glyph = &mut positioned.glyph;
@@ -471,6 +590,27 @@ mod tests {
         std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join(".test_fonts")
             .join("NotoSansJP-Regular.otf")
+    }
+
+    #[test]
+    fn mixed_svg_is_exactly_the_final_run_export() {
+        let file = crate::FontFile::from_buffer(include_bytes!(
+            "../tests/fixtures/mixed-vertical-ltr.ttc"
+        ))
+        .unwrap();
+        let face = file.face(1).unwrap();
+        let engine = face.engine().with_font_size(100.0).with_svg_unit("pt");
+        for text in ["", " ", "漢AV漢", "A\u{302a}「", "1\u{fe0f}\u{20e3}AV"] {
+            let run = engine.shape_vertical_mixed_ltr(text).unwrap();
+            assert_eq!(
+                engine.render_svg_vertical_mixed_ltr(text).unwrap(),
+                glyph_run_to_svg(&run, "pt").unwrap()
+            );
+            assert_eq!(
+                engine.measure_layout_vertical_mixed_ltr(text).unwrap(),
+                measure_vertical_run(&run)
+            );
+        }
     }
 
     #[test]
