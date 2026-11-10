@@ -66,6 +66,8 @@ Default features include `layout` and `cff`.
 
 ## Install
 
+The minimum supported Rust version (MSRV) is **1.91**, aligned with WML2.
+
 ```toml
 [dependencies]
 fontcore = "0.0.13"

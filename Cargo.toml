@@ -2,6 +2,7 @@
 name = "fontcore"
 version = "0.0.13"
 edition = "2021"
+rust-version = "1.91"
 authors = ["Mith@mmk"]
 description = "Load fonts, select faces, shape text, and export SVG in Rust."
 license = "MIT AND Unicode-3.0"

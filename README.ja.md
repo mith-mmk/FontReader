@@ -65,6 +65,8 @@ default feature には `layout` と `cff` が含まれます。
 
 ## 導入
 
+最小サポート Rust バージョン（MSRV）は、WML2 に合わせて **1.91** です。
+
 ```toml
 [dependencies]
 fontcore = "0.0.13"
