@@ -477,7 +477,7 @@ impl Font {
         coordinates: &[f32],
     ) -> Option<VerticalLayout> {
         let vhea = self.current_vhea();
-        if let Some(vhea) = vhea {
+        if let (Some(vhea), Some(_)) = (vhea, self.current_vmtx()) {
             let mut v_metrix = self.get_v_metrix_with_coords(id, coordinates);
             if let Some(variation) = self.current_gvar_variation(id, coordinates) {
                 if let Some(metric) = variation.vertical_metric {
@@ -929,6 +929,14 @@ impl Font {
             self.vhea.as_ref()
         } else {
             self.more_fonts[self.current_font - 1].vhea.as_ref()
+        }
+    }
+
+    fn current_vmtx(&self) -> Option<&vmtx::VMTX> {
+        if self.current_font == 0 {
+            self.vmtx.as_ref()
+        } else {
+            self.more_fonts[self.current_font - 1].vmtx.as_ref()
         }
     }
 
@@ -2397,6 +2405,27 @@ impl Font {
 
                     let mut metrics =
                         glyph_metrics_from_layout(&open_type_glyph.layout, scale_x, scale_y);
+                    let mut font_metrics =
+                        font_metrics_from_layout(&open_type_glyph.layout, scale_y);
+                    if is_vertical {
+                        font_metrics.flow = GlyphFlow::Vertical;
+                        if let FontLayout::Horizontal(layout) = &open_type_glyph.layout {
+                            // Without vhea/vmtx, synthesize a vertical cell from the
+                            // horizontal ascender/descender, never the glyph width.
+                            let height = layout.accender - layout.descender;
+                            let height = if height > 0 {
+                                height as f32
+                            } else {
+                                self.current_head()?.units_per_em.max(1) as f32
+                            };
+                            metrics.advance_x = 0.0;
+                            metrics.advance_y = if layout.advance_width == 0 {
+                                0.0
+                            } else {
+                                height * scale_y
+                            };
+                        }
+                    }
                     let mut adjustment = self.position_adjustment_for_index(
                         &shaped_units,
                         index,
@@ -2468,7 +2497,7 @@ impl Font {
                         cursor_y + adjustment.placement_y
                     };
                     let glyph = Glyph {
-                        font: Some(font_metrics_from_layout(&open_type_glyph.layout, scale_y)),
+                        font: Some(font_metrics),
                         metrics,
                         layers,
                     };

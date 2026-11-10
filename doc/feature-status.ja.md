@@ -7,6 +7,19 @@ README は公開APIと実行例を優先し、細かい対応状況はここに�
 
 `layout` feature は一部のみ実装されています。
 
+### 縦メトリクスのフォールバック
+
+`FontEngine::shape`、計測、SVGは、vhea/vmtxの組がないfaceでも上から下への流れを保ちます。
+縦advanceは横メトリクスのascenderからdescenderを引いた値を使い、正でない場合はunits per emを使います。
+既存のfont-size倍率を一度だけ適用し、横stretchは縦advanceに影響しません。
+vheaだけがある場合も同じフォールバックです。
+横advanceが0のグリフは、attachment表のない結合記号やゼロ幅文字も含めて縦advanceを0のままにします。
+両表がある場合のvmtx advanceは0も含めて保持します。
+`layout` featureなしではsfnt loaderが縦表を読まないため、同じフォールバックを使います。
+
+合成fixtureで縦メトリクスの有無とコレクション内のface選択を検証し、外部フォントを必要としません。
+この修正には縦原点、Unicode縦方向、約物の回転、CFFのVORG対応は含みません。
+
 ### GSUB
 
 - パース済み: `ScriptList`, `FeatureList`, `LookupList`

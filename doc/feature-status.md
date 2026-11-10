@@ -7,6 +7,24 @@ The README now focuses on the public API and runnable examples.
 
 `layout` is partially implemented.
 
+### Vertical metrics fallback
+
+`FontEngine::shape`, measurement, and SVG keep top-to-bottom flow even when a
+face lacks the vhea/vmtx pair. In that case the vertical advance is synthesized
+from the horizontal ascender minus descender (units per em for nonpositive
+extents), scaled once with the existing font-size scale. Horizontal stretch does
+not change this advance. A vhea header without vmtx also takes this fallback.
+Zero horizontal advances stay zero in the fallback, including unattached marks
+and zero-width characters. Existing vmtx advances, including zero, are retained
+when both tables exist.
+Without the `layout` feature the sfnt loader does not read these tables, so it
+uses the same fallback.
+
+The committed synthetic fixtures exercise fonts with and without vertical
+metrics and mixed collection faces without requiring an installed font. This
+fallback does not yet correct vertical origins or implement Unicode vertical
+orientation, punctuation rotation, or CFF VORG origins.
+
 ### GSUB
 
 - Parsed: `ScriptList`, `FeatureList`, `LookupList`
