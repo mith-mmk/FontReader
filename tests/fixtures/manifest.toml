@@ -121,3 +121,17 @@ source = "tests/fixtures/generate_vertical_feature_selection.py (fontTools 4.65.
 license = "MIT (project test code)"
 sha256 = "eafde7455bc2feb6c5adbfefa5fe2a0d986674897431c8897fa47ef1f4c28cb2"
 features = ["vertical-flow", "GSUB", "vert", "vrt2", "vrtr-exclusion", "feature-selection"]
+
+[[fixture]]
+id = "gpos-single.ttf"
+source = "generate_gpos_single.py (fontTools 4.65.0; no external font)"
+license = "MIT (project test code)"
+sha256 = "be9b903f5b5528264aed870708f66bf2bda5eaac53765fd3640bcae850b47a89"
+features = ["layout", "gpos-single"]
+
+[[fixture]]
+id = "gpos-single.bin"
+source = "generate_gpos_single.py (fontTools 4.65.0; no external font)"
+license = "MIT (project test code)"
+sha256 = "e96e6c7902bc6942a27698f1adab5f8293b0327cb184f52d87e593a2cbd192f1"
+features = ["layout", "gpos-single"]
