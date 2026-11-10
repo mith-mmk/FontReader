@@ -423,3 +423,40 @@ fn selected_raw_svg_is_unsupported_but_current_color_pathified_svg_rotates() {
         &raw.shape("A").unwrap(),
     );
 }
+
+#[cfg(feature = "layout")]
+#[test]
+fn single_gpos_survives_sideways_rotation_and_mark_attachment() {
+    let file = FontFile::from_buffer(include_bytes!("fixtures/gpos-single.ttf")).unwrap();
+    let face = file.current_face().unwrap();
+    for (size, stretch) in [(1000.0, 1.0), (500.0, 2.0)] {
+        let sx = size / 1000.0 * stretch;
+        let sy = size / 1000.0;
+        let options = FontOptions::new(&face)
+            .with_font_size(size)
+            .with_font_stretch(FontStretch(stretch));
+        let engine = face.engine().with_options(options);
+        let text = "A\u{0301}B";
+        let horizontal = engine.shape(text).unwrap();
+        let rotated = engine.shape_sideways_ltr(text).unwrap();
+        assert_rotation(&rotated, &horizontal);
+        // Independent constants also catch a shared shaping regression.
+        let expected = [
+            (20.0 * sy, 10.0 * sx, -40.0 * sy, 630.0 * sx),
+            (527.0 * sy, 315.0 * sx, -5.0 * sy, 25.0 * sx),
+            (-39.0 * sy, 650.0 * sx, -8.0 * sy, 593.0 * sx),
+        ];
+        assert_eq!(rotated.glyphs.len(), expected.len());
+        for (g, (x, y, ax, ay)) in rotated.glyphs.iter().zip(expected) {
+            assert_eq!((g.x, g.y), (x, y));
+            assert_eq!(
+                (g.glyph.metrics.advance_x, g.glyph.metrics.advance_y),
+                (ax, ay)
+            );
+        }
+        assert_eq!(
+            engine.measure_sideways_ltr(text).unwrap(),
+            f64::from(1248.0 * sx)
+        );
+    }
+}
