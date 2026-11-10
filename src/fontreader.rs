@@ -4749,8 +4749,9 @@ mod pair_coordinate_tests {
                             ),
                             expected
                         );
-                        let scaled = font
-                            .position_adjustment_for_index(&units, index, None, vertical, 0.5, 0.25);
+                        let scaled = font.position_adjustment_for_index(
+                            &units, index, None, vertical, 0.5, 0.25,
+                        );
                         assert_eq!(scaled.placement_x, expected.0 as f32 * 0.5);
                         assert_eq!(scaled.placement_y, expected.1 as f32 * 0.25);
                         assert_eq!(scaled.advance_x, expected.2 as f32 * 0.5);
