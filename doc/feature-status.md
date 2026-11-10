@@ -22,8 +22,24 @@ uses the same fallback.
 
 The committed synthetic fixtures exercise fonts with and without vertical
 metrics and mixed collection faces without requiring an installed font. This
-fallback does not yet correct vertical origins or implement Unicode vertical
-orientation, punctuation rotation, or CFF VORG origins.
+fallback is distinct from the TrueType origin correction below. Unicode
+orientation, punctuation rotation, and CFF VORG origins remain separate work.
+
+### TrueType vertical origins
+
+Monochrome TrueType layers use half the horizontal advance as the x origin and
+`glyf.yMax + vmtx.topSideBearing` as the y origin, per the
+[OpenType vmtx specification](https://learn.microsoft.com/en-us/typography/opentype/spec/vmtx).
+Without vertical metrics, outlines are centered vertically in the synthesized
+cell. Glyph-local layer offsets are scaled once; logical column positions and
+advances stay unchanged. Bounds and SVG use the same translated layers. Marks
+attached by GPOS/GDEF inherit the base glyph's origin translation.
+
+Synthetic regressions cover punctuation, negative bearings, composites, gvar
+outline/phantom movement, collection face selection, and sfnt/WOFF parity.
+CFF/CFF2 VORG, VVAR origin maps, BASE alignment, Unicode orientation, and color
+origins (COLR, sbix, SVG) remain separate work. Color layer offsets and the legacy
+raw glyph/SVG APIs are unchanged. TrueType ignores VORG as required by OpenType.
 
 ### GSUB
 
