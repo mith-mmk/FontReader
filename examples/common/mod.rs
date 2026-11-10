@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+#[cfg(windows)]
 use std::env;
 use std::path::PathBuf;
 
