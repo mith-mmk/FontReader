@@ -7,7 +7,7 @@ use std::{fmt, io::SeekFrom};
 use crate::fontheader::{FWORD, UFWORD};
 
 #[derive(Debug, Clone)]
-pub(crate) struct HHEA {
+pub(crate) struct Hhea {
     pub(crate) major_version: u16,
     pub(crate) minor_version: u16,
     pub(crate) ascender: FWORD,
@@ -28,13 +28,13 @@ pub(crate) struct HHEA {
     pub(crate) number_of_hmetrics: u16,
 }
 
-impl fmt::Display for HHEA {
+impl fmt::Display for Hhea {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.to_string())
+        f.write_str(&self.format_table())
     }
 }
 
-impl HHEA {
+impl Hhea {
     pub(crate) fn new<R: BinaryReader>(
         file: &mut R,
         offest: u32,
@@ -55,7 +55,7 @@ impl HHEA {
         self.line_gap
     }
 
-    pub(crate) fn to_string(&self) -> String {
+    fn format_table(&self) -> String {
         let mut string = "hhea\n".to_string();
         let version = format!("Version {}.{}\n", self.major_version, self.minor_version);
         string += &version;
@@ -97,8 +97,7 @@ impl HHEA {
     }
 }
 
-fn get_hhea<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> Result<HHEA, Error> {
-    let file = file;
+fn get_hhea<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> Result<Hhea, Error> {
     file.seek(SeekFrom::Start(offest as u64))?;
     let major_version = file.read_u16_be()?;
     let minor_version = file.read_u16_be()?;
@@ -118,7 +117,7 @@ fn get_hhea<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> Result<
     let reserved4 = file.read_i16_be()?;
     let metric_data_format = file.read_i16_be()?;
     let number_of_hmetrics = file.read_u16_be()?;
-    Ok(HHEA {
+    Ok(Hhea {
         major_version,
         minor_version,
         ascender,

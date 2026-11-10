@@ -4,17 +4,17 @@ use std::{fmt, io::SeekFrom};
 // vmtx table Font vertical metrics
 
 #[derive(Debug, Clone)]
-pub(crate) struct VMTX {
-    pub(crate) v_metrics: Box<Vec<VerticalMetric>>,
+pub(crate) struct Vmtx {
+    pub(crate) v_metrics: Vec<VerticalMetric>,
 }
 
-impl fmt::Display for VMTX {
+impl fmt::Display for Vmtx {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.to_string())
+        f.write_str(&self.format_table())
     }
 }
 
-impl VMTX {
+impl Vmtx {
     pub(crate) fn new<R: BinaryReader>(
         file: &mut R,
         offest: u32,
@@ -41,7 +41,7 @@ impl VMTX {
         v_metric.unwrap().clone()
     }
 
-    pub(crate) fn to_string(&self) -> String {
+    fn format_table(&self) -> String {
         let mut string = "hmtx\n".to_string();
         let max_len = 10;
         for (i, v_metric) in self.v_metrics.iter().enumerate() {
@@ -69,7 +69,7 @@ fn get_vmtx<R: bin_rs::reader::BinaryReader>(
     _length: u32,
     number_of_vmetrics: u16,
     num_glyphs: u16,
-) -> Result<VMTX, std::io::Error> {
+) -> Result<Vmtx, std::io::Error> {
     file.seek(SeekFrom::Start(offest as u64))?;
     let mut v_metrics = Vec::new();
     for _ in 0..number_of_vmetrics {
@@ -92,9 +92,7 @@ fn get_vmtx<R: bin_rs::reader::BinaryReader>(
             top_side_bearing,
         });
     }
-    Ok(VMTX {
-        v_metrics: Box::new(v_metrics),
-    })
+    Ok(Vmtx { v_metrics })
 }
 
 #[cfg(test)]
@@ -106,7 +104,7 @@ mod tests {
     fn vmtx_allows_zero_vertical_metrics() {
         let buffer = [0x00, 0x04, 0xFF, 0xFD];
         let mut reader = BytesReader::new(&buffer);
-        let vmtx = VMTX::new(&mut reader, 0, buffer.len() as u32, 0, 2).expect("parse vmtx");
+        let vmtx = Vmtx::new(&mut reader, 0, buffer.len() as u32, 0, 2).expect("parse vmtx");
 
         assert_eq!(vmtx.v_metrics.len(), 2);
         assert_eq!(vmtx.get_metrix(0).advance_height, 0);

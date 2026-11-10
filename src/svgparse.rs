@@ -1379,7 +1379,7 @@ fn parse_hex_color(hex: &str) -> Option<u32> {
             .map(|rgb| 0xff00_0000 | rgb),
         8 => u32::from_str_radix(hex, 16)
             .ok()
-            .map(|rgba| (rgba << 24) | (rgba >> 8)),
+            .map(|rgba| rgba.rotate_right(8)),
         _ => None,
     }
 }
@@ -1582,7 +1582,7 @@ fn poly_points_to_commands(
 ) -> Option<Vec<Command>> {
     let points = attrs.get("points")?;
     let numbers = parse_numbers(points);
-    if numbers.len() < 4 || numbers.len() % 2 != 0 {
+    if numbers.len() < 4 || !numbers.len().is_multiple_of(2) {
         return None;
     }
     let mut commands = Vec::new();

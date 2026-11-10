@@ -7,7 +7,7 @@ use base64::{engine::general_purpose, Engine as _};
 use bin_rs::reader::BinaryReader;
 
 #[derive(Debug, Clone)]
-pub(crate) struct SBIX {
+pub(crate) struct Sbix {
     version: u16,
     flags: u16,
     strikes: Vec<Strike>,
@@ -38,7 +38,7 @@ pub(crate) struct RasterGlyphData {
     pub(crate) glyph_data: Vec<u8>,
 }
 
-impl SBIX {
+impl Sbix {
     fn resolve_raster_glyph_in_strike(
         strike: &Strike,
         gid: usize,
@@ -103,10 +103,10 @@ impl SBIX {
             strike_offsets.push(strike_offset as u64);
         }
         for (index, strike_offset) in strike_offsets.iter().enumerate() {
-            if *strike_offset as u64 >= length {
+            if *strike_offset >= length {
                 continue;
             }
-            let next_offset = strike_offsets.get(index + 1).copied().unwrap_or(length) as u64;
+            let next_offset = strike_offsets.get(index + 1).copied().unwrap_or(length);
             if next_offset <= *strike_offset || next_offset > length {
                 continue;
             }
@@ -135,7 +135,7 @@ impl SBIX {
         })
     }
 
-    pub(crate) fn to_string(&self) -> String {
+    fn dump_text(&self) -> String {
         let mut string = "SBIX\n".to_string();
         string += &format!("version: {}\n", self.version);
         string += &format!("flags: {}\n", self.flags);
@@ -153,13 +153,13 @@ impl SBIX {
                 if let Some(glyph_data) = glyph_data {
                     string += &format!("    original_offset_x: {}\n", glyph_data.original_offset_x);
                     string += &format!("    original_offset_y: {}\n", glyph_data.original_offset_y);
-                    let u32bytes = u32::to_be_bytes(glyph_data.graphic_type.clone());
+                    let u32bytes = u32::to_be_bytes(glyph_data.graphic_type);
                     let tag = String::from_utf8_lossy(&u32bytes);
                     string += &format!("    graphic_type: {}\n", tag);
                     string += &format!("    glyph_data: {}\n", glyph_data.glyph_data.len());
                     some += 1;
                 } else {
-                    string += &format!("    None\n");
+                    string += "    None\n";
                 }
             }
         }
@@ -339,5 +339,11 @@ impl GlyphData {
             graphic_type,
             glyph_data,
         })
+    }
+}
+
+impl std::fmt::Display for Sbix {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.dump_text())
     }
 }

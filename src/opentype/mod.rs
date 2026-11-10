@@ -23,7 +23,7 @@ pub struct OTFHeader {
     pub(crate) search_range: u16,
     pub(crate) entry_selector: u16,
     pub(crate) range_shift: u16,
-    pub(crate) table_records: Box<Vec<TableRecord>>,
+    pub(crate) table_records: Vec<TableRecord>,
 }
 
 impl OTFHeader {
@@ -59,7 +59,7 @@ impl OTFHeader {
             search_range,
             entry_selector,
             range_shift,
-            table_records: Box::new(table_records),
+            table_records,
         })
     }
 
@@ -80,6 +80,12 @@ impl OTFHeader {
     }
 }
 
+impl fmt::Display for OTFHeader {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.to_stirng())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -89,11 +95,5 @@ mod tests {
     fn otf_header_returns_error_on_truncated_input() {
         let mut reader = BytesReader::new(&[0x00, 0x01, 0x00]);
         assert!(OTFHeader::new(&mut reader).is_err());
-    }
-}
-
-impl fmt::Display for OTFHeader {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.to_stirng())
     }
 }

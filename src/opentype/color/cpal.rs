@@ -6,7 +6,7 @@ use bin_rs::reader::BinaryReader;
 
 #[derive(Debug, Clone)]
 
-pub(crate) struct CPAL {
+pub(crate) struct Cpal {
     version: u16,
     num_palette_entries: u16,
     num_palettes: u16,
@@ -21,7 +21,7 @@ pub(crate) struct CPAL {
     */
 }
 
-impl CPAL {
+impl Cpal {
     pub(crate) fn new<R: BinaryReader>(
         reader: &mut R,
         offset: u32,
@@ -103,7 +103,7 @@ impl CPAL {
         })
     }
 
-    pub(crate) fn to_string(&self) -> String {
+    fn dump_text(&self) -> String {
         let mut string = "CPAL Table\n".to_string();
         string.push_str(&format!("version: {}\n", self.version));
         string.push_str(&format!(
@@ -144,7 +144,7 @@ impl CPAL {
     }
 }
 
-impl CPAL {
+impl Cpal {
     pub(crate) fn get_palette_color(
         &self,
         palette_index: usize,
@@ -177,6 +177,12 @@ pub(crate) struct ColorRecord {
     pub(crate) alpha: u8,
 }
 
+impl std::fmt::Display for Cpal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.dump_text())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -199,7 +205,7 @@ mod tests {
         bytes.extend_from_slice(&[255, 255, 255, 255]);
 
         let mut reader = BytesReader::new(&bytes);
-        let cpal = CPAL::new(&mut reader, 0, bytes.len() as u32).expect("valid CPAL");
+        let cpal = Cpal::new(&mut reader, 0, bytes.len() as u32).expect("valid CPAL");
         assert_eq!(cpal.get_palette_color(0, 0).expect("palette 0").red, 255);
         assert_eq!(cpal.get_palette_color(1, 0).expect("palette 1").blue, 255);
         assert!(cpal.get_palette_color(0, 0xffff).is_none());

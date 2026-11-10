@@ -82,7 +82,7 @@ use crate::opentype::platforms::{get_locale_to_language_id, PlatformID};
 
 enum EncodingEngine {
     UTF16BE,
-    ASCII,
+    Ascii,
     MacintoshLegcy,
     WindowsLegcy,
     Unknown,
@@ -96,7 +96,7 @@ pub(crate) struct NameTable {
 }
 
 impl NameTable {
-    pub fn new(name: &NAME) -> Self {
+    pub fn new(name: &Name) -> Self {
         let name_records = name.name_records.clone();
         let mut default_namelist = HashMap::new();
         let mut namelist: HashMap<(u16, u16), HashMap<u16, String>> = HashMap::new();
@@ -147,11 +147,7 @@ impl NameTable {
 
     pub fn get_name_list(&self, locale: &String, platform_id: PlatformID) -> HashMap<u16, String> {
         let language_id = get_locale_to_language_id(locale, platform_id);
-        let language_id = if let Some(language_id) = language_id {
-            language_id
-        } else {
-            0
-        };
+        let language_id = language_id.unwrap_or_default();
         let key = (platform_id as u16, language_id);
 
         match self.namelist.get(&key) {
@@ -167,11 +163,7 @@ impl NameTable {
         platform_id: PlatformID,
     ) -> Result<String, Error> {
         let language_id = get_locale_to_language_id(locale, platform_id);
-        let language_id = if let Some(language_id) = language_id {
-            language_id
-        } else {
-            0
-        };
+        let language_id = language_id.unwrap_or_default();
 
         let key = (platform_id as u16, language_id);
         match self.namelist.get(&key) {
@@ -198,25 +190,25 @@ impl NameTable {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct NAME {
+pub(crate) struct Name {
     pub(crate) version: u16,
     pub(crate) count: u16,
     pub(crate) storage_offset: u16,
-    pub(crate) name_records: Box<Vec<NameRecord>>,
+    pub(crate) name_records: Vec<NameRecord>,
     // above V0
     // under V1
     pub(crate) lang_tag_count: u16,
-    pub(crate) lang_tag_records: Box<Vec<LangTagRecord>>,
-    pub(crate) lang_tag_string: Box<Vec<String>>,
+    pub(crate) lang_tag_records: Vec<LangTagRecord>,
+    pub(crate) lang_tag_string: Vec<String>,
 }
 
-impl Display for NAME {
+impl Display for Name {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.to_string())
+        f.write_str(&self.format_table())
     }
 }
 
-impl NAME {
+impl Name {
     pub(crate) fn new<R: BinaryReader>(
         file: &mut R,
         offest: u32,
@@ -225,7 +217,7 @@ impl NAME {
         get_names(file, offest, length)
     }
 
-    pub(crate) fn to_string(&self) -> String {
+    fn format_table(&self) -> String {
         let mut string = "name\n".to_string();
         let version = format!("Version {}\n", self.version);
         string += &version;
@@ -299,7 +291,7 @@ pub(crate) struct NameRecord {
     pub(crate) string: String,
 }
 
-fn get_names<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> Result<NAME, Error> {
+fn get_names<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> Result<Name, Error> {
     file.seek(SeekFrom::Start(offest as u64))?;
     let current_position = file.offset()?;
     let version = file.read_u16_be()?;
@@ -409,88 +401,87 @@ fn get_names<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> Result
         "CP1252",     // Uninterpreted
     ];
 
-    for i in 0..count as usize {
-        let encoding_engine = match name_records[i].platform_id {
+    for name_record in &mut name_records {
+        let encoding_engine = match name_record.platform_id {
             0 | 3 | 4 => EncodingEngine::UTF16BE,
-            2 => EncodingEngine::ASCII,
-            1 => match name_records[i].encoding_id {
-                0 => EncodingEngine::ASCII, // ROMAN
+            2 => EncodingEngine::Ascii,
+            1 => match name_record.encoding_id {
+                0 => EncodingEngine::Ascii, // ROMAN
                 _ => EncodingEngine::MacintoshLegcy,
             },
             _ => EncodingEngine::Unknown,
         };
 
-        let string_offset = name_records[i].string_offset as u64 + current_position;
+        let string_offset = name_record.string_offset as u64 + current_position;
         file.seek(SeekFrom::Start(string_offset))?;
         match encoding_engine {
             EncodingEngine::UTF16BE => {
                 let mut utf16s = Vec::new();
-                for _ in 0..name_records[i].length / 2 {
+                for _ in 0..name_record.length / 2 {
                     let utf16 = file.read_u16_be()?;
                     utf16s.push(utf16);
                 }
                 if let Ok(string) = String::from_utf16(&utf16s) {
-                    name_records[i].string = string;
+                    name_record.string = string;
                 } else {
-                    name_records[i].string = "this encoding is not support".to_string();
+                    name_record.string = "this encoding is not support".to_string();
                 }
             }
-            EncodingEngine::ASCII => {
-                let ascii = file.read_bytes_as_vec(name_records[i].length as usize)?;
+            EncodingEngine::Ascii => {
+                let ascii = file.read_bytes_as_vec(name_record.length as usize)?;
                 let mut utf16s = Vec::new();
-                for i in 0..ascii.len() {
-                    utf16s.push(ascii[i] as u16);
+                for byte in ascii {
+                    utf16s.push(byte as u16);
                 }
                 let string = String::from_utf16(&utf16s);
                 if let Ok(string) = string {
-                    name_records[i].string = string;
+                    name_record.string = string;
                 } else {
-                    name_records[i].string = "this encoding is not support".to_string();
+                    name_record.string = "this encoding is not support".to_string();
                 }
             }
             #[cfg(all(feature = "encoding", not(windows), not(target_arch = "wasm32")))]
             EncodingEngine::MacintoshLegcy => {
-                let bytes = file.read_bytes_as_vec(name_records[i].length as usize)?;
-                if mac_convert_table.len() > name_records[i].encoding_id as usize {
-                    name_records[i].string = match iconv::decode(
+                let bytes = file.read_bytes_as_vec(name_record.length as usize)?;
+                if mac_convert_table.len() > name_record.encoding_id as usize {
+                    name_record.string = match iconv::decode(
                         &bytes,
-                        mac_convert_table[name_records[i].encoding_id as usize],
+                        mac_convert_table[name_record.encoding_id as usize],
                     ) {
                         Ok(string) => string,
                         Err(_) => "this encoding is not support".to_string(),
                     };
                 } else {
-                    name_records[i].string = "this encoding is not support".to_string();
+                    name_record.string = "this encoding is not support".to_string();
                 }
             }
             #[cfg(any(not(feature = "encoding"), windows, target_arch = "wasm32"))]
             EncodingEngine::MacintoshLegcy => {
-                let _ = file.read_bytes_as_vec(name_records[i].length as usize)?;
-                name_records[i].string = "this encoding is not support".to_string();
+                let _ = file.read_bytes_as_vec(name_record.length as usize)?;
+                name_record.string = "this encoding is not support".to_string();
             }
             _ => {
-                name_records[i].string = "this encoding is not support".to_string();
+                name_record.string = "this encoding is not support".to_string();
             }
         }
     }
 
     let mut lang_tag_string = Vec::new();
-    for i in 0..lang_tag_count {
-        let string_offset = lang_tag_record[i as usize].offset + current_position as u16;
+    for record in &mut lang_tag_record {
+        let string_offset = record.offset + current_position as u16;
         file.seek(SeekFrom::Start(string_offset as u64))?;
-        let string = file.read_utf16be_string(lang_tag_record[i as usize].length as usize)?;
-        lang_tag_record[i as usize].offset = string_offset;
-        lang_tag_record[i as usize].length = lang_tag_record[i as usize].length;
+        let string = file.read_utf16be_string(record.length as usize)?;
+        record.offset = string_offset;
         lang_tag_string.push(string);
     }
 
-    Ok(NAME {
+    Ok(Name {
         version,
         count,
         storage_offset,
-        name_records: Box::new(name_records),
+        name_records,
         lang_tag_count,
-        lang_tag_records: Box::new(lang_tag_record),
-        lang_tag_string: Box::new(lang_tag_string),
+        lang_tag_records: lang_tag_record,
+        lang_tag_string,
     })
 }

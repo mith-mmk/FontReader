@@ -11,5 +11,5 @@ pub(crate) struct ConditionTable {
 #[derive(Debug, Clone)]
 pub(crate) struct ConditionSet {
     pub(crate) condition_count: u16,
-    pub(crate) conditions: Box<Vec<ConditionTable>>,
+    pub(crate) conditions: Vec<ConditionTable>,
 }

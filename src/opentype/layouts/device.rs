@@ -32,7 +32,7 @@ impl DeviceTable {
             1 => {
                 // LOCAL_2_BIT_DELTAS
                 let value_count = end_size.saturating_sub(start_size) as usize + 1;
-                let length = ((value_count * 2) + 15) / 16;
+                let length = (value_count * 2).div_ceil(16);
                 let mut delta_value = Vec::new();
                 for _ in 0..length {
                     delta_value.push(reader.read_u16()?);
@@ -42,7 +42,7 @@ impl DeviceTable {
             2 => {
                 // LOCAL_4_BIT_DELTAS
                 let value_count = end_size.saturating_sub(start_size) as usize + 1;
-                let length = ((value_count * 4) + 15) / 16;
+                let length = (value_count * 4).div_ceil(16);
                 let mut delta_value = Vec::new();
                 for _ in 0..length {
                     delta_value.push(reader.read_u16()?);
@@ -52,7 +52,7 @@ impl DeviceTable {
             3 => {
                 // LOCAL_8_BIT_DELTAS
                 let value_count = end_size.saturating_sub(start_size) as usize + 1;
-                let length = (value_count + 1) / 2;
+                let length = value_count.div_ceil(2);
                 let mut delta_value = Vec::new();
                 for _ in 0..length {
                     delta_value.push(reader.read_u16()?);

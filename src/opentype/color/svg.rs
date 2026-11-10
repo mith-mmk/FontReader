@@ -18,14 +18,14 @@ pub(crate) struct SvgGlyphDocument {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct SVG {
+pub(crate) struct Svg {
     version: u16,
     svg_document_list: SVGDocumetList,
     max_svg_bytes: usize,
     // reserved: u32,
 }
 
-impl SVG {
+impl Svg {
     pub(crate) fn new<R: BinaryReader>(
         reader: &mut R,
         offset: u32,
@@ -56,7 +56,7 @@ impl SVG {
         })
     }
 
-    pub(crate) fn to_string(&self) -> String {
+    fn dump_text(&self) -> String {
         let mut string = "SVG\n".to_string();
         string += &format!("version: {}\n", self.version);
         string += &format!(
@@ -213,7 +213,7 @@ fn decompress_gzip(document: &[u8], max_output: usize) -> Option<Vec<u8>> {
         *document.get(document.len() - 4)?,
         *document.get(document.len() - 3)?,
         *document.get(document.len() - 2)?,
-        *document.get(document.len() - 1)?,
+        *document.last()?,
     ]) as usize;
     if expected_size > max_output {
         return None;
@@ -258,10 +258,10 @@ fn sanitize_svg_payload(payload: &str) -> Option<String> {
 fn find_svg_tag_end(payload: &str, start: usize) -> Option<usize> {
     let bytes = payload.as_bytes();
     let mut quote = None;
-    for index in start + 1..bytes.len() {
-        match (quote, bytes[index]) {
+    for (index, &byte) in bytes.iter().enumerate().skip(start + 1) {
+        match (quote, byte) {
             (Some(expected), byte) if byte == expected => quote = None,
-            (None, b'\'' | b'\"') => quote = Some(bytes[index]),
+            (None, b'\'' | b'\"') => quote = Some(byte),
             (None, b'>') => return Some(index + 1),
             _ => {}
         }
@@ -379,15 +379,13 @@ fn validate_svg_tag(tag: &str) -> Option<()> {
         {
             return None;
         }
-        if attribute == "href" || attribute == "xlink:href" {
-            if !compact.starts_with("#") {
-                return None;
-            }
+        if (attribute == "href" || attribute == "xlink:href") && !compact.starts_with("#") {
+            return None;
         }
         let mut url_cursor = 0usize;
         while let Some(relative) = compact.get(url_cursor..)?.find("url(") {
             let url_start = url_cursor + relative + 4;
-            if compact.get(url_start..)?.chars().next() != Some('#') {
+            if !compact.get(url_start..)?.starts_with('#') {
                 return None;
             }
             url_cursor = url_start;
@@ -571,7 +569,7 @@ fn fragment_matches_glyph_id(fragment: &str, gid: u16) -> bool {
     lower.contains(&marker) || lower.contains(&gid_marker)
 }
 
-fn collect_glyph_tagged_elements<'a>(source: &'a str, gid: u16) -> Vec<&'a str> {
+fn collect_glyph_tagged_elements(source: &str, gid: u16) -> Vec<&str> {
     let lower = source.to_ascii_lowercase();
     let markers = [format!("glyph{}", gid), format!("id=\"{}\"", gid)];
     let mut elements = Vec::new();
@@ -602,7 +600,7 @@ fn collect_glyph_tagged_elements<'a>(source: &'a str, gid: u16) -> Vec<&'a str> 
                 continue;
             };
             let candidate = &source[start..end];
-            if !elements.iter().any(|existing| *existing == candidate) {
+            if !elements.contains(&candidate) {
                 elements.push(candidate);
             }
             cursor = end;
@@ -663,6 +661,12 @@ impl SVGDocumetRecord {
             svg_document_length,
             svg_document: None,
         })
+    }
+}
+
+impl std::fmt::Display for Svg {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.dump_text())
     }
 }
 

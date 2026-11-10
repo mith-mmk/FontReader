@@ -80,18 +80,14 @@ pub(crate) fn check_sum(table: Vec<u8>) -> u32 {
     for i in 0..table.len() / 4 {
         let offset = i * 4;
         let mut bytes = [0; 4];
-        for j in 0..4 {
-            bytes[j] = table[offset + j];
-        }
+        bytes.copy_from_slice(&table[offset..offset + 4]);
         let number: u32 = u32::from_be_bytes(bytes);
         sum += number;
     }
     let remain = table.len() % 4;
     if remain > 0 {
         let mut bytes = [0; 4];
-        for i in 0..remain {
-            bytes[i] = table[table.len() - remain + i];
-        }
+        bytes[..remain].copy_from_slice(&table[table.len() - remain..]);
         let number: u32 = u32::from_be_bytes(bytes);
         sum += number;
     }

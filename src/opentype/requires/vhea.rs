@@ -7,7 +7,7 @@ use std::io::Error;
 use std::{fmt, io::SeekFrom};
 
 #[derive(Debug, Clone)]
-pub(crate) struct VHEA {
+pub(crate) struct Vhea {
     pub(crate) major_version: u16,
     pub(crate) minor_version: u16,
     pub(crate) ascender: FWORD,
@@ -28,13 +28,13 @@ pub(crate) struct VHEA {
     pub(crate) number_of_vmetrics: u16,
 }
 
-impl fmt::Display for VHEA {
+impl fmt::Display for Vhea {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.to_string())
+        f.write_str(&self.format_table())
     }
 }
 
-impl VHEA {
+impl Vhea {
     pub(crate) fn new<R: BinaryReader>(
         file: &mut R,
         offest: u32,
@@ -55,7 +55,7 @@ impl VHEA {
         self.line_gap
     }
 
-    pub(crate) fn to_string(&self) -> String {
+    fn format_table(&self) -> String {
         let mut string = "vhea\n".to_string();
         let version = format!("Version {}.{}\n", self.major_version, self.minor_version);
         string += &version;
@@ -96,8 +96,7 @@ impl VHEA {
     }
 }
 
-fn get_vhea<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> Result<VHEA, Error> {
-    let file = file;
+fn get_vhea<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> Result<Vhea, Error> {
     file.seek(SeekFrom::Start(offest as u64))?;
     let major_version = file.read_u16_be()?;
     let minor_version = file.read_u16_be()?;
@@ -118,7 +117,7 @@ fn get_vhea<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> Result<
     let metric_data_format = file.read_i16_be()?;
     let number_of_vmetrics = file.read_u16_be()?;
 
-    Ok(VHEA {
+    Ok(Vhea {
         major_version,
         minor_version,
         ascender,

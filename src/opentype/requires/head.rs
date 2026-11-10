@@ -6,7 +6,7 @@ use std::{fmt, io::SeekFrom};
 // head table
 
 #[derive(Debug, Clone)]
-pub(crate) struct HEAD {
+pub(crate) struct Head {
     pub(crate) major_version: u16,
     pub(crate) minor_version: u16,
     // fot revision is fixed 16dot16 majorVersion + minorVersion / 0x10000
@@ -53,13 +53,13 @@ pub(crate) struct HEAD {
     pub(crate) glyph_data_format: i16,
 }
 
-impl fmt::Display for HEAD {
+impl fmt::Display for Head {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.to_string())
+        f.write_str(&self.format_table())
     }
 }
 
-impl HEAD {
+impl Head {
     pub(crate) fn new<B: BinaryReader>(
         file: &mut B,
         offest: u32,
@@ -68,7 +68,7 @@ impl HEAD {
         get_head(file, offest, length)
     }
 
-    pub(crate) fn to_string(&self) -> String {
+    fn format_table(&self) -> String {
         let mut string = "head\n".to_string();
         let version = format!("Version {}.{}\n", self.major_version, self.minor_version);
         string += &version;
@@ -140,7 +140,7 @@ impl HEAD {
     }
 }
 
-fn get_head<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> Result<HEAD, Error> {
+fn get_head<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> Result<Head, Error> {
     file.seek(SeekFrom::Start(offest as u64))?;
 
     let major_version = file.read_u16_be()?;
@@ -161,7 +161,7 @@ fn get_head<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> Result<
     let font_direction_hint = file.read_i16_be()?;
     let index_to_loc_format = file.read_i16_be()?;
     let glyph_data_format = file.read_i16_be()?;
-    Ok(HEAD {
+    Ok(Head {
         major_version,
         minor_version,
         font_revision,

@@ -5,7 +5,7 @@ use std::{io::Error, io::SeekFrom};
 use bin_rs::reader::BinaryReader;
 
 #[derive(Debug, Clone)]
-pub(crate) struct COLR {
+pub(crate) struct Colr {
     version: u16,
     num_base_glyphs: u16,
     base_glyph_records: Vec<BaseGlyphRecord>,
@@ -20,7 +20,7 @@ pub(crate) struct COLR {
      */
 }
 
-impl COLR {
+impl Colr {
     pub(crate) fn is_version_zero(&self) -> bool {
         self.version == 0
     }
@@ -60,7 +60,7 @@ impl COLR {
         })
     }
 
-    pub(crate) fn to_string(&self) -> String {
+    fn dump_text(&self) -> String {
         let mut string = "COLR Table\n".to_string();
         string.push_str(&format!("version: {}\n", self.version));
         string.push_str(&format!("num_base_glyphs: {}\n", self.num_base_glyphs));
@@ -129,6 +129,12 @@ pub(crate) struct LayerRecord {
     pub(crate) palette_index: u16, // see CPAL
 }
 
+impl std::fmt::Display for Colr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.dump_text())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -137,12 +143,12 @@ mod tests {
     #[test]
     fn colr_returns_error_on_truncated_input() {
         let mut reader = BytesReader::new(&[0x00, 0x00, 0x00]);
-        assert!(COLR::new(&mut reader, 0, 3).is_err());
+        assert!(Colr::new(&mut reader, 0, 3).is_err());
     }
 
     #[test]
     fn colr_get_layer_record_stops_at_available_layers() {
-        let colr = COLR {
+        let colr = Colr {
             version: 0,
             num_base_glyphs: 1,
             base_glyph_records: vec![BaseGlyphRecord {
@@ -158,5 +164,31 @@ mod tests {
         };
 
         assert!(colr.get_layer_record(7).is_empty());
+    }
+}
+
+#[cfg(test)]
+mod display_tests {
+    use super::*;
+
+    #[test]
+    fn display_preserves_color_layer_dump() {
+        let colr = Colr {
+            version: 0,
+            num_base_glyphs: 1,
+            base_glyph_records: vec![BaseGlyphRecord {
+                base_glyph: 7,
+                first_layer_index: 0,
+                num_layers: 1,
+            }],
+            layer_records: vec![LayerRecord {
+                glyph_id: 8,
+                palette_index: 2,
+            }],
+            num_layers: 1,
+        };
+        let expected = "COLR Table\nversion: 0\nnum_base_glyphs: 1\nnum_layers: 1\nbase_glyph_record[0]: BaseGlyphRecord { base_glyph: 7, first_layer_index: 0, num_layers: 1 }\nlayer_record[0]: LayerRecord { glyph_id: 8, palette_index: 2 }\n";
+        assert_eq!(colr.to_string(), expected);
+        assert_eq!(format!("{colr}"), expected);
     }
 }

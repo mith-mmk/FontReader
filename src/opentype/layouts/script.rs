@@ -13,7 +13,7 @@ pub(crate) struct Script {
 #[derive(Debug, Clone)]
 pub(crate) struct ParsedScript {
     pub(crate) script_tag: u32,
-    pub(crate) language_systems: Box<Vec<LanguageSystemRecord>>,
+    pub(crate) language_systems: Vec<LanguageSystemRecord>,
 }
 
 impl ParsedScript {
@@ -22,7 +22,7 @@ impl ParsedScript {
         script: &Script,
     ) -> Result<Self, std::io::Error> {
         let offset = script.script_offset;
-        reader.seek(SeekFrom::Start(offset as u64))?;
+        reader.seek(SeekFrom::Start(offset))?;
         let default_language_system_offset = reader.read_u16_be()?;
         let language_system_count = reader.read_u16_be()?;
         let mut language_systems = Vec::new();
@@ -62,11 +62,11 @@ impl ParsedScript {
 
         Ok(Self {
             script_tag: script.script_tag,
-            language_systems: Box::new(language_systems),
+            language_systems,
         })
     }
 
-    pub(crate) fn to_string(&self) -> String {
+    fn dump_text(&self) -> String {
         let mut u8s = [0; 4];
         for i in 0..4 {
             u8s[3 - i] = (self.script_tag >> (i * 8)) as u8;
@@ -74,7 +74,7 @@ impl ParsedScript {
         let tag = unsafe { std::str::from_utf8_unchecked(&u8s) };
         let mut string = format!("Script: {} {}\n", tag, self.language_systems.len());
         for language_system in self.language_systems.iter() {
-            string += &format!("{}", language_system.to_string());
+            string += &language_system.to_string();
         }
         string
     }
@@ -83,7 +83,7 @@ impl ParsedScript {
 #[derive(Debug, Clone)]
 pub(crate) struct ScriptList {
     pub(crate) script_count: u16,
-    pub(crate) scripts: Box<Vec<ParsedScript>>,
+    pub(crate) scripts: Vec<ParsedScript>,
 }
 
 impl ScriptList {
@@ -112,26 +112,36 @@ impl ScriptList {
 
         Ok(Self {
             script_count,
-            scripts: Box::new(parced_scripts),
+            scripts: parced_scripts,
         })
     }
 
     pub(crate) fn get_script(&self, script_tag: &[u8; 4]) -> Option<&ParsedScript> {
         let script_tag = u32::from_be_bytes(*script_tag);
-        for script in self.scripts.iter() {
-            if script.script_tag == script_tag {
-                return Some(script);
-            }
-        }
-        None
+        self.scripts
+            .iter()
+            .find(|&script| script.script_tag == script_tag)
+            .map(|v| v as _)
     }
 
-    pub(crate) fn to_string(&self) -> String {
+    fn dump_text(&self) -> String {
         let mut string = String::new();
         string += &format!("script count {}\n", self.script_count);
         for script in self.scripts.iter() {
-            string += &format!("{}", script.to_string());
+            string += &script.to_string();
         }
         string
+    }
+}
+
+impl std::fmt::Display for ParsedScript {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.dump_text())
+    }
+}
+
+impl std::fmt::Display for ScriptList {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.dump_text())
     }
 }

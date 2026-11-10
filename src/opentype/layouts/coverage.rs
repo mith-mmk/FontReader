@@ -16,10 +16,7 @@ impl Coverage {
             Coverage::Format1(coverage) => {
                 let glyph_ids = &coverage.glyph_ids;
                 let result = glyph_ids.binary_search(&glyph_id);
-                match result {
-                    Ok(index) => Some(index),
-                    Err(_) => None,
-                }
+                result.ok()
             }
             Coverage::Format2(coverage) => {
                 let range_records: &Vec<RangeRecord> = &coverage.range_records;
@@ -46,7 +43,7 @@ impl Coverage {
         }
     }
 
-    pub(crate) fn to_string(&self) -> String {
+    fn dump_text(&self) -> String {
         match self {
             Coverage::Format1(coverage) => {
                 let mut string = String::new();
@@ -69,7 +66,7 @@ impl Coverage {
         reader: &mut R,
         offset: u64,
     ) -> Result<Self, std::io::Error> {
-        reader.seek(SeekFrom::Start(offset as u64))?;
+        reader.seek(SeekFrom::Start(offset))?;
         let coverage_format = reader.read_u16_be()?;
         match coverage_format {
             1 => {
@@ -130,4 +127,10 @@ pub(crate) struct RangeRecord {
     pub(crate) start_glyph_id: u16,
     pub(crate) end_glyph_id: u16,
     pub(crate) start_coverage_index: u16,
+}
+
+impl std::fmt::Display for Coverage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.dump_text())
+    }
 }

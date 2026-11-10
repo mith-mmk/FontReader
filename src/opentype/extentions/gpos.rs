@@ -9,7 +9,7 @@ use crate::opentype::layouts::{
 };
 use bin_rs::reader::BinaryReader;
 
-use super::gdef::{GlyphClass, GDEF};
+use super::gdef::{Gdef, GlyphClass};
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub(crate) struct ValueRecord {
@@ -258,9 +258,7 @@ impl PositioningSubtable {
                 })
             }
             PositioningSubtable::PairFormat2(pair) => {
-                if pair.coverage.contains(left as usize).is_none() {
-                    return None;
-                }
+                pair.coverage.contains(left as usize)?;
                 let class1 = pair.class_def1.get_class(left) as usize;
                 let class2 = pair.class_def2.get_class(right) as usize;
                 let class1_record = pair.class1_records.get(class1)?;
@@ -404,7 +402,7 @@ struct PositioningLookup {
 impl PositioningLookup {
     // Kept local to the new SinglePos execution path. Pair/mark filtering remains
     // outside this change until the shared lookup-filter work is integrated.
-    fn includes_single_glyph(&self, glyph: u16, gdef: Option<&GDEF>) -> bool {
+    fn includes_single_glyph(&self, glyph: u16, gdef: Option<&Gdef>) -> bool {
         let Some(gdef) = gdef else { return true };
         match gdef.glyph_class(glyph) {
             Some(GlyphClass::Base) => self.lookup_flag & 0x0002 == 0,
@@ -433,7 +431,7 @@ impl PositioningLookup {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct GPOS {
+pub(crate) struct Gpos {
     pub(crate) major_version: u16,
     pub(crate) minor_version: u16,
     pub(crate) scripts: Box<ScriptList>,
@@ -442,7 +440,7 @@ pub(crate) struct GPOS {
     pub(crate) feature_variations: Option<Box<FeatureVariationList>>,
 }
 
-impl GPOS {
+impl Gpos {
     pub(crate) fn new<R: BinaryReader>(
         reader: &mut R,
         offset: u32,
@@ -1319,7 +1317,7 @@ impl GPOS {
         glyph: u16,
         is_vertical: bool,
         locale: Option<&str>,
-        gdef: Option<&GDEF>,
+        gdef: Option<&Gdef>,
     ) -> Option<SingleAdjustment> {
         let feature_tags = if is_vertical {
             [*b"vkrn", *b"dist"]
@@ -1477,12 +1475,12 @@ mod tests {
     }
 
     fn parse_single(bytes: &[u8]) -> Result<PositioningSubtable, std::io::Error> {
-        GPOS::parse_subtable(&mut BytesReader::new(bytes), 1, 0)
+        Gpos::parse_subtable(&mut BytesReader::new(bytes), 1, 0)
     }
 
-    fn single_gpos(subtables: Vec<PositioningSubtable>, flag: u16) -> GPOS {
+    fn single_gpos(subtables: Vec<PositioningSubtable>, flag: u16) -> Gpos {
         let bytes = include_bytes!("../../../tests/fixtures/gpos-single.bin");
-        let mut gpos = GPOS::new(&mut BytesReader::new(bytes), 0, bytes.len() as u32).unwrap();
+        let mut gpos = Gpos::new(&mut BytesReader::new(bytes), 0, bytes.len() as u32).unwrap();
         let kern_index = gpos
             .features
             .features
@@ -1577,7 +1575,7 @@ mod tests {
     fn single_extension_uses_the_relative_offset() {
         let mut bytes = vec![0, 1, 0, 1, 0, 0, 0, 8];
         bytes.extend(single_bytes(1, &[10], &[[1, 2, 3, 4]]));
-        let extension = GPOS::parse_subtable(&mut BytesReader::new(&bytes), 9, 0).unwrap();
+        let extension = Gpos::parse_subtable(&mut BytesReader::new(&bytes), 9, 0).unwrap();
         let mut gpos = single_gpos(vec![extension], 0);
         for lookup in &mut gpos.lookups {
             lookup.lookup_type = 9;
@@ -1763,7 +1761,7 @@ mod tests {
         ];
         let mut reader = BytesReader::new(&bytes);
 
-        let subtable = GPOS::parse_subtable(&mut reader, 4, 0).expect("parse mark-to-base");
+        let subtable = Gpos::parse_subtable(&mut reader, 4, 0).expect("parse mark-to-base");
         let adjustment = subtable
             .lookup_mark_to_base_adjustment(10, 20)
             .expect("mark attachment adjustment");
@@ -1806,7 +1804,7 @@ mod tests {
         ];
         let mut reader = BytesReader::new(&bytes);
 
-        let subtable = GPOS::parse_subtable(&mut reader, 6, 0).expect("parse mark-to-mark");
+        let subtable = Gpos::parse_subtable(&mut reader, 6, 0).expect("parse mark-to-mark");
         let adjustment = subtable
             .lookup_mark_to_mark_adjustment(20, 30)
             .expect("mark-to-mark adjustment");
@@ -1855,7 +1853,7 @@ mod tests {
         ];
         let mut reader = BytesReader::new(&bytes);
 
-        let subtable = GPOS::parse_subtable(&mut reader, 5, 0).expect("parse mark-to-ligature");
+        let subtable = Gpos::parse_subtable(&mut reader, 5, 0).expect("parse mark-to-ligature");
         let adjustment = subtable
             .lookup_mark_to_ligature_adjustment(10, 20, 1)
             .expect("mark-to-ligature adjustment");

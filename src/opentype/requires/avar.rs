@@ -2,7 +2,7 @@ use bin_rs::reader::BinaryReader;
 use std::io::{Error, ErrorKind, SeekFrom};
 
 #[derive(Debug, Clone)]
-pub(crate) struct AVAR {
+pub(crate) struct Avar {
     segment_maps: Vec<Vec<AxisValueMap>>,
 }
 
@@ -12,7 +12,7 @@ struct AxisValueMap {
     to_coordinate: f32,
 }
 
-impl AVAR {
+impl Avar {
     pub(crate) fn new<R: BinaryReader>(
         reader: &mut R,
         offset: u32,
@@ -189,7 +189,7 @@ mod tests {
 
     #[test]
     fn accepts_sorted_normalized_axis_map() {
-        let avar = AVAR::from_bytes(&avar_with_map(&[(-16384, -16384), (0, 0), (16384, 16384)]))
+        let avar = Avar::from_bytes(&avar_with_map(&[(-16384, -16384), (0, 0), (16384, 16384)]))
             .expect("valid avar");
         let mut coordinates = [0.5];
         avar.map_coordinate(&mut coordinates, 0);
@@ -198,12 +198,12 @@ mod tests {
 
     #[test]
     fn rejects_out_of_range_axis_map() {
-        assert!(AVAR::from_bytes(&avar_with_map(&[(0x7fff, 0)])).is_err());
+        assert!(Avar::from_bytes(&avar_with_map(&[(0x7fff, 0)])).is_err());
     }
 
     #[test]
     fn rejects_duplicate_source_coordinates() {
-        assert!(AVAR::from_bytes(&avar_with_map(&[
+        assert!(Avar::from_bytes(&avar_with_map(&[
             (-16384, -16384),
             (0, 0),
             (0, 16384),
@@ -214,6 +214,6 @@ mod tests {
 
     #[test]
     fn rejects_missing_required_mapping_points() {
-        assert!(AVAR::from_bytes(&avar_with_map(&[(-16384, -16384), (16384, 16384)])).is_err());
+        assert!(Avar::from_bytes(&avar_with_map(&[(-16384, -16384), (16384, 16384)])).is_err());
     }
 }

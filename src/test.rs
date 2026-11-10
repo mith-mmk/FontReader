@@ -1,5 +1,16 @@
 #[allow(deprecated, dead_code)]
 mod tests {
+    #[test]
+    fn legacy_raw_name_methods_keep_string_reference_signatures() {
+        let _: fn(&crate::Font, &String) -> std::collections::HashMap<u16, String> =
+            crate::Font::get_name_list;
+        let _: fn(
+            &crate::Font,
+            crate::opentype::NameID,
+            &String,
+        ) -> Result<String, std::io::Error> = crate::Font::get_name;
+    }
+
     #[cfg(feature = "layout")]
     use crate::opentype::layouts::{
         classdef::ClassRangeRecord,
@@ -626,9 +637,10 @@ mod tests {
     }
 
     #[cfg(feature = "layout")]
-    fn build_script_list_with_language_systems(
-        scripts: &[([u8; 4], &[(u32, u16, &[u16])])],
-    ) -> Vec<u8> {
+    type ScriptLanguageSystems<'a> = ([u8; 4], &'a [(u32, u16, &'a [u16])]);
+
+    #[cfg(feature = "layout")]
+    fn build_script_list_with_language_systems(scripts: &[ScriptLanguageSystems<'_>]) -> Vec<u8> {
         let mut script_list = Vec::new();
         push_u16(&mut script_list, scripts.len() as u16);
 
@@ -802,9 +814,9 @@ mod tests {
     }
 
     #[cfg(feature = "layout")]
-    fn parse_gpos(buffer: Vec<u8>) -> crate::opentype::extentions::gpos::GPOS {
+    fn parse_gpos(buffer: Vec<u8>) -> crate::opentype::extentions::gpos::Gpos {
         let mut reader = BytesReader::new(&buffer);
-        crate::opentype::extentions::gpos::GPOS::new(&mut reader, 0, buffer.len() as u32).unwrap()
+        crate::opentype::extentions::gpos::Gpos::new(&mut reader, 0, buffer.len() as u32).unwrap()
     }
 
     #[cfg(feature = "layout")]
@@ -1352,9 +1364,9 @@ mod tests {
     }
 
     #[cfg(feature = "layout")]
-    fn parse_gsub(buffer: Vec<u8>) -> crate::opentype::extentions::gsub::GSUB {
+    fn parse_gsub(buffer: Vec<u8>) -> crate::opentype::extentions::gsub::Gsub {
         let mut reader = BytesReader::new(&buffer);
-        crate::opentype::extentions::gsub::GSUB::new(&mut reader, 0, buffer.len() as u32).unwrap()
+        crate::opentype::extentions::gsub::Gsub::new(&mut reader, 0, buffer.len() as u32).unwrap()
     }
 
     #[test]
@@ -1404,7 +1416,7 @@ mod tests {
                 }
 
                 let mut glyphs = vec![(0x0030usize, 0usize), (0x0042, 1), (0x0044, 2)];
-                assert!(crate::opentype::extentions::gsub::GSUB::apply_lookup_once(
+                assert!(crate::opentype::extentions::gsub::Gsub::apply_lookup_once(
                     &lookup_list.lookups[1],
                     &mut glyphs,
                 ));
@@ -1701,13 +1713,13 @@ mod tests {
         };
 
         let mut glyphs = vec![(10usize, 0usize)];
-        assert!(crate::opentype::extentions::gsub::GSUB::apply_lookup_once(
+        assert!(crate::opentype::extentions::gsub::Gsub::apply_lookup_once(
             &multiple_lookup,
             &mut glyphs,
         ));
         assert_eq!(glyphs, vec![(20, 0), (21, 0)]);
 
-        assert!(crate::opentype::extentions::gsub::GSUB::apply_lookup_once(
+        assert!(crate::opentype::extentions::gsub::Gsub::apply_lookup_once(
             &ligature_lookup,
             &mut glyphs,
         ));
@@ -3011,7 +3023,7 @@ mod tests {
 
     #[cfg(feature = "layout")]
     fn collapse_ligatures_like_text_api(
-        gsub: &crate::opentype::extentions::gsub::GSUB,
+        gsub: &crate::opentype::extentions::gsub::Gsub,
         glyphs: &[(usize, usize)],
         locale: Option<&str>,
         is_right_to_left: bool,

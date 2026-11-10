@@ -5,7 +5,7 @@ use bin_rs::reader::BinaryReader;
 use std::io::SeekFrom;
 
 #[derive(Debug, Clone)]
-pub(crate) struct GDEF {
+pub(crate) struct Gdef {
     pub(crate) major_versionn: u16,
     pub(crate) minor_version: u16,
     pub(crate) glyph_class_def: Option<ClassDef>,
@@ -26,13 +26,13 @@ pub(crate) enum GlyphClass {
     Component,
 }
 
-impl GDEF {
+impl Gdef {
     pub fn new<R: BinaryReader>(
         reader: &mut R,
         offset: u64,
         length: usize,
     ) -> Result<Self, std::io::Error> {
-        reader.seek(SeekFrom::Start(offset as u64))?;
+        reader.seek(SeekFrom::Start(offset))?;
         let major_versionn = reader.read_u16_be()?;
         let minor_version = reader.read_u16_be()?;
         let glyph_class_def_offset = reader.read_u16_be()?;
@@ -91,7 +91,7 @@ impl GDEF {
             None
         };
 
-        Ok(GDEF {
+        Ok(Gdef {
             major_versionn,
             minor_version,
             glyph_class_def,
@@ -103,29 +103,26 @@ impl GDEF {
         })
     }
 
-    pub(crate) fn to_string(&self) -> String {
+    fn dump_text(&self) -> String {
         let mut string = String::new();
         string += &format!("major_version: {}\n", self.major_versionn);
         string += &format!("minor_version: {}\n", self.minor_version);
 
         string += "glyph class def 1 = Base, 2 = Lig, 3 = Mark, 4 = Component\n";
         if let Some(glyph_class_def) = &self.glyph_class_def {
-            string += &format!("glyph_class_def: {}\n", glyph_class_def.to_string());
+            string += &format!("glyph_class_def: {}\n", glyph_class_def);
         }
         if let Some(attach_list) = &self.attach_list {
-            string += &format!("attach_list: {}\n", attach_list.to_string());
+            string += &format!("attach_list: {}\n", attach_list);
         }
         if let Some(lig_caret_list) = &self.lig_caret_list {
-            string += &format!("lig_caret_list: {}\n", lig_caret_list.to_string());
+            string += &format!("lig_caret_list: {}\n", lig_caret_list);
         }
         if let Some(mark_attach_class_def) = &self.mark_attach_class_def {
-            string += &format!(
-                "mark_attach_class_def: {}\n",
-                mark_attach_class_def.to_string()
-            );
+            string += &format!("mark_attach_class_def: {}\n", mark_attach_class_def);
         }
         if let Some(mark_glyph_sets_def) = &self.mark_glyph_sets_def {
-            string += &format!("mark_glyph_sets_def: {}\n", mark_glyph_sets_def.to_string());
+            string += &format!("mark_glyph_sets_def: {}\n", mark_glyph_sets_def);
         }
         string
     }
@@ -201,11 +198,11 @@ impl AttachPointList {
         })
     }
 
-    fn to_string(&self) -> String {
+    fn dump_text(&self) -> String {
         let mut string = String::new();
-        string += &format!("coverage: {}\n", self.coverage.to_string());
+        string += &format!("coverage: {}\n", self.coverage);
         for attach_point in self.attach_point.iter() {
-            string += &format!("attach_point: {}\n", attach_point.to_string());
+            string += &format!("attach_point: {}\n", attach_point);
         }
         string
     }
@@ -227,7 +224,7 @@ impl AttachPoint {
         Ok(AttachPoint { point_indices })
     }
 
-    fn to_string(&self) -> String {
+    fn dump_text(&self) -> String {
         let mut string = String::new();
         string += &format!("point_indices: {:?}\n", self.point_indices);
         string
@@ -252,7 +249,7 @@ impl LigatureCaretList {
         let mut lig_glyph = Vec::with_capacity(lig_glyph_count as usize);
         for lig_glyph_offset in lig_glyph_offsets {
             let offset = lig_glyph_offset as u64 + offset;
-            lig_glyph.push(LigatureGlyph::new(reader, offset as u64)?);
+            lig_glyph.push(LigatureGlyph::new(reader, offset)?);
         }
         let coverage = Coverage::new(reader, offset + coverage_offset as u64)?;
         Ok(Self {
@@ -261,9 +258,9 @@ impl LigatureCaretList {
         })
     }
 
-    fn to_string(&self) -> String {
+    fn dump_text(&self) -> String {
         let mut string = String::new();
-        string += &format!("coverage: {}\n", self.coverage.to_string());
+        string += &format!("coverage: {}\n", self.coverage);
         for lig_glyph in self.lig_glyph.iter() {
             string += &format!("lig_glyph: {:?}\n", lig_glyph.caret_value);
         }
@@ -392,13 +389,43 @@ impl MarkGlyphSetsDef {
         })
     }
 
-    fn to_string(&self) -> String {
+    fn dump_text(&self) -> String {
         let mut string = String::new();
         string += &format!("mark_set_table_format: {}\n", self.mark_set_table_format);
         string += &format!("mark_set_count: {}\n", self.mark_set_count);
         for coverage in self.coverages.iter() {
-            string += &format!("coverage: {}\n", coverage.to_string());
+            string += &format!("coverage: {}\n", coverage);
         }
         string
+    }
+}
+
+impl std::fmt::Display for Gdef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.dump_text())
+    }
+}
+
+impl std::fmt::Display for AttachPointList {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.dump_text())
+    }
+}
+
+impl std::fmt::Display for AttachPoint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.dump_text())
+    }
+}
+
+impl std::fmt::Display for LigatureCaretList {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.dump_text())
+    }
+}
+
+impl std::fmt::Display for MarkGlyphSetsDef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.dump_text())
     }
 }

@@ -5,7 +5,7 @@ use std::{fmt, io::SeekFrom};
 // post table for PostScript
 
 #[derive(Debug, Clone)]
-pub(crate) struct POST {
+pub(crate) struct Post {
     pub(crate) version: u32,
     pub(crate) italic_angle: i32,
     pub(crate) underline_position: i16,
@@ -21,13 +21,13 @@ pub(crate) struct POST {
     pub(crate) names: Vec<String>,
 }
 
-impl fmt::Display for POST {
+impl fmt::Display for Post {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.to_string())
+        f.write_str(&self.format_table())
     }
 }
 
-impl POST {
+impl Post {
     pub(crate) fn new<R: BinaryReader>(
         file: &mut R,
         offest: u32,
@@ -36,7 +36,7 @@ impl POST {
         get_post(file, offest, length)
     }
 
-    pub(crate) fn to_string(&self) -> String {
+    fn format_table(&self) -> String {
         let mut string = "post\n".to_string();
         let mager_version = self.version >> 16;
         let minor_version = self.version & 0xFFFF;
@@ -83,8 +83,7 @@ impl POST {
     }
 }
 
-fn get_post<R: BinaryReader>(file: &mut R, offest: u32, length: u32) -> Result<POST, Error> {
-    let file = file;
+fn get_post<R: BinaryReader>(file: &mut R, offest: u32, length: u32) -> Result<Post, Error> {
     let _buffer = vec![0u8; length as usize];
     file.seek(SeekFrom::Start(offest as u64))?;
     let version = file.read_u32_be()?;
@@ -127,7 +126,7 @@ fn get_post<R: BinaryReader>(file: &mut R, offest: u32, length: u32) -> Result<P
         }
     }
 
-    Ok(POST {
+    Ok(Post {
         version,
         italic_angle,
         underline_position,

@@ -4,17 +4,17 @@ use std::{fmt, io::SeekFrom};
 // hmtx table Font horizontal metrics
 
 #[derive(Debug, Clone)]
-pub(crate) struct HMTX {
-    pub(crate) h_metrics: Box<Vec<LongHorMetric>>,
+pub(crate) struct Hmtx {
+    pub(crate) h_metrics: Vec<LongHorMetric>,
 }
 
-impl fmt::Display for HMTX {
+impl fmt::Display for Hmtx {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.to_string())
+        f.write_str(&self.format_table())
     }
 }
 
-impl HMTX {
+impl Hmtx {
     pub(crate) fn new<R: BinaryReader>(
         file: &mut R,
         offest: u32,
@@ -28,7 +28,7 @@ impl HMTX {
     pub(crate) fn get_metrix(&self, i: usize) -> LongHorMetric {
         let h_metric = self.h_metrics.get(i);
         match h_metric {
-            Some(h_metric) => h_metric.clone(),
+            Some(h_metric) => *h_metric,
             None => LongHorMetric {
                 advance_width: 0,
                 left_side_bearing: 0,
@@ -36,7 +36,7 @@ impl HMTX {
         }
     }
 
-    pub(crate) fn to_string(&self) -> String {
+    fn format_table(&self) -> String {
         let mut string = "hmtx\n".to_string();
         let max_len = 10;
         for (i, h_metric) in self.h_metrics.iter().enumerate() {
@@ -64,8 +64,7 @@ fn get_hmtx<R: bin_rs::reader::BinaryReader>(
     _length: u32,
     number_of_hmetrics: u16,
     num_glyphs: u16,
-) -> Result<HMTX, Error> {
-    let file = file;
+) -> Result<Hmtx, Error> {
     file.seek(SeekFrom::Start(offest as u64))?;
     let mut h_metrics = Vec::new();
     for _ in 0..number_of_hmetrics {
@@ -88,9 +87,7 @@ fn get_hmtx<R: bin_rs::reader::BinaryReader>(
             left_side_bearing,
         });
     }
-    Ok(HMTX {
-        h_metrics: Box::new(h_metrics),
-    })
+    Ok(Hmtx { h_metrics })
 }
 
 #[cfg(test)]
@@ -102,7 +99,7 @@ mod tests {
     fn hmtx_allows_zero_long_metrics() {
         let buffer = [0x00, 0x01, 0xFF, 0xFE, 0x00, 0x03];
         let mut reader = BytesReader::new(&buffer);
-        let hmtx = HMTX::new(&mut reader, 0, buffer.len() as u32, 0, 3).expect("parse hmtx");
+        let hmtx = Hmtx::new(&mut reader, 0, buffer.len() as u32, 0, 3).expect("parse hmtx");
 
         assert_eq!(hmtx.h_metrics.len(), 3);
         assert_eq!(hmtx.get_metrix(0).advance_width, 0);

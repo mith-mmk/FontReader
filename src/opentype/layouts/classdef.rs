@@ -33,7 +33,7 @@ impl ClassDef {
         reader: &mut R,
         offset: u64,
     ) -> Result<Self, std::io::Error> {
-        reader.seek(SeekFrom::Start(offset as u64))?;
+        reader.seek(SeekFrom::Start(offset))?;
         let class_format = reader.read_u16_be()?;
         if class_format == 1 {
             let start_glyph_id = reader.read_u16_be()?;
@@ -68,14 +68,11 @@ impl ClassDef {
                 range_records,
             }))
         } else {
-            Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "Unknown class format",
-            ))
+            Err(std::io::Error::other("Unknown class format"))
         }
     }
 
-    pub(crate) fn to_string(&self) -> String {
+    fn dump_text(&self) -> String {
         let mut string = "Class Deffinition\n".to_string();
         match self {
             ClassDef::Format1(class_def) => {
@@ -115,4 +112,10 @@ pub(crate) struct ClassRangeRecord {
     pub(crate) start_glyph_id: u16,
     pub(crate) end_glyph_id: u16,
     pub(crate) class: u16,
+}
+
+impl std::fmt::Display for ClassDef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.dump_text())
+    }
 }
