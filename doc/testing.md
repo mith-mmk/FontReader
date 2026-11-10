@@ -23,8 +23,9 @@ cargo clippy --all-targets --all-features -- -D warnings
 
 Real-font compatibility tests are compiled when `FONTCORE_TEST_FONTS` is set.
 `build.rs` tracks this variable and enables `fontcore_external_corpus`; it is
-independent of Cargo feature selection. These tests are not silently skipped
-when enabled: a missing required font fails the relevant test.
+independent of Cargo feature selection. The emoji SVG test fails when its
+required font is missing; it does not silently skip. Other corpus tests may
+select an available alternative font or return when optional fonts are absent.
 
 For the emoji SVG smoke test, obtain the static COLRv1
 `NotoColorEmoji-Regular.ttf` from the
