@@ -114,3 +114,17 @@ source = "tests/fixtures/generate_colr_vertical_origin.py (fontTools 4.65.0)"
 license = "MIT (project test code)"
 sha256 = "f9cd0d0db9a26406f8776d4fb682ca3817a445f9460808d6472a64259201937f"
 features = ["vertical-origin", "COLR-v0", "CPAL", "empty-base", "negative-bearing", "marks", "color-fallback"]
+
+[[fixture]]
+id = "gpos-single.ttf"
+source = "generate_gpos_single.py (fontTools 4.65.0; no external font)"
+license = "MIT (project test code)"
+sha256 = "be9b903f5b5528264aed870708f66bf2bda5eaac53765fd3640bcae850b47a89"
+features = ["layout", "gpos-single"]
+
+[[fixture]]
+id = "gpos-single.bin"
+source = "generate_gpos_single.py (fontTools 4.65.0; no external font)"
+license = "MIT (project test code)"
+sha256 = "e96e6c7902bc6942a27698f1adab5f8293b0327cb184f52d87e593a2cbd192f1"
+features = ["layout", "gpos-single"]
