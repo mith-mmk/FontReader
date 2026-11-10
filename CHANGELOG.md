@@ -4,7 +4,7 @@
 
 ### Compatibility and fixes
 
-- Update the published `bin-rs` dependency to 0.0.11.
+- Update the published `bin-rs` dependency to 0.0.11. Callers passing `bin-rs` readers to low-level APIs must also use `bin-rs` 0.0.11; reader types from `bin-rs` 0.0.9, used by published fontcore 0.0.14, are not interchangeable.
 - Preserve name-table UTF-16 byte-length handling with the updated reader API, including rejection of odd byte lengths.
 - Read the fixed-size OS/2 PANOSE and vendor-ID fields with the updated reader API’s exact-read method.
 - Add a UTF-16 name-table regression test. The Rust 1.91 minimum and public feature set are unchanged.
