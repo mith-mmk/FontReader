@@ -70,21 +70,21 @@ The minimum supported Rust version (MSRV) is **1.91**, aligned with WML2.
 
 ```toml
 [dependencies]
-fontcore = "0.0.13"
+fontcore = "0.0.14"
 ```
 
 If you need the low-level parser API:
 
 ```toml
 [dependencies]
-fontcore = { version = "0.0.13", features = ["raw"] }
+fontcore = { version = "0.0.14", features = ["raw"] }
 ```
 
 If you also want provisional SVG emoji font support:
 
 ```toml
 [dependencies]
-fontcore = { version = "0.0.13", features = ["svg-fonts"] }
+fontcore = { version = "0.0.14", features = ["svg-fonts"] }
 ```
 
 ## Quick Start
