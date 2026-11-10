@@ -144,6 +144,13 @@ sha256 = "0dc1a665febe0557fd1c28e7ef72af3b4b271b70da5473852a45bddbf5c8932c"
 features = ["sideways-ltr", "vrtr", "lookup-order", "lookup-flags", "GDEF", "ccmp", "smcp", "locl", "liga", "UVS", "marks", "upright-exclusion", "GPOS", "cross-axis-advance", "sbix", "SVG", "CurrentColor"]
 
 [[fixture]]
+id = "pair-coordinates.ttc"
+source = "tests/fixtures/generate_pair_coordinates.py (fontTools 4.65.0)"
+license = "MIT (project test code)"
+sha256 = "f5ab8a7c959c8dd812f3304039cd2a63f0bbfeb166ca37bae0c73f8d74805b5b"
+features = ["GPOS", "PairPos-format1", "PairPos-format2", "signed-placement", "directional-advance", "kern", "vkrn", "sideways-ltr"]
+
+[[fixture]]
 id = "gpos-single.ttf"
 source = "generate_gpos_single.py (fontTools 4.65.0; no external font)"
 license = "MIT (project test code)"

@@ -285,12 +285,11 @@ single-glyph lookup chain supports direct and Extension-wrapped Single
 substitutions in LookupList order, once per referenced lookup. Sequence-aware
 substitutions and GDEF-dependent filtering flags are skipped, as described for
 legacy vertical lookup chaining above. Ordinary horizontal shaping keeps its
-existing GSUB/GPOS sequence and filtering limitations. In particular, pair-GPOS
-`yPlacement` currently keeps the font's y-up sign in the y-down horizontal run.
-Sideways rotation preserves this existing placement conversion limitation;
-this change does not correct it. Existing `yAdvance` behavior is unchanged and
-is not assumed to follow the same sign rule. This is not complete OpenType
-shaping or Unicode mixed-orientation layout.
+existing GSUB/GPOS sequence and filtering limitations. Pair-GPOS `yPlacement`
+is converted from the font's y-up coordinates to the run's y-down coordinates
+before sideways rotation, as in ordinary horizontal and upright vertical runs.
+Existing `yAdvance` behavior is unchanged. This is not complete OpenType shaping
+or Unicode mixed-orientation layout.
 
 Horizontal metrics supply advances and origins; this path does not use `vmtx`
 or `VORG` for vertical layout. In y-down coordinates, positions, paths, offsets,
@@ -326,3 +325,26 @@ and [OpenType `vrtr`](https://learn.microsoft.com/en-us/typography/opentype/spec
 for graphical rotation with rotation-specific alternates. These references do
 not imply support for full CSS layout. See [API Recipes](api-recipes.md#sideways-ltr-shaping-measurement-and-svg)
 for the public calls.
+
+## Pair positioning coordinates
+
+GPOS PairPos formats 1 and 2 keep their signed font-unit records unchanged.
+The high-level run converts scaled `yPlacement` to y-down once, for both value
+records, before adding it to the pen or attachment origin. Positive placement
+therefore raises ink in LTR, RTL, and upright TTB; sideways rotates the corrected
+horizontal placement. X placement/advance, mark attachment, and legacy raw
+command APIs are unchanged.
+
+Advance is directional, not a Cartesian placement vector: the
+[OpenType GPOS specification](https://learn.microsoft.com/en-us/typography/opentype/spec/gpos#overview)
+explicitly states that positive `YAdvance` increases top-to-bottom advance
+height. It is added to the positive screen-down `vmtx` advance without another
+sign flip. Existing horizontal cross-axis advance handling and axis-only
+ordinary line bounds are preserved; this is not a claim of complete GPOS
+axis applicability or sequence semantics.
+
+The MIT `pair-coordinates.ttc` fixture tests both PairPos formats, positive,
+negative, and zero Y values on both glyphs, differing horizontal/vertical
+metrics, size/stretch, raw values, LTR/RTL/TTB positions and advances, ink and
+line measurement, SVG, and sideways rotation. Regenerate it with
+`python tests/fixtures/generate_pair_coordinates.py` (fontTools 4.65.0).
