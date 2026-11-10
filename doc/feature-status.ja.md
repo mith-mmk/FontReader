@@ -43,7 +43,7 @@ layer offsetに倍率を一度だけ適用し、論理的な列位置とadvance�
 boundsとSVGも同じlayerを使い、GPOS/GDEFで付くmarkはbaseの原点移動量を継承します。
 
 合成fixtureで約物、負のbearing、合成glyph、gvarの輪郭/phantom移動、TTC face選択、sfnt/WOFFを検証します。
-CFF2のVORG、VVAR原点map、BASE、Unicode縦方向、COLR/sbix/SVGの色layer原点は別対応です。
+BASE、Unicode縦方向、COLR/sbix/SVGの色layer原点は別対応です。
 色layerのoffsetと旧raw glyph/SVG APIは変更しません。TrueTypeのVORGは仕様どおり無視します。
 
 ### GSUB
@@ -137,5 +137,26 @@ VORGがない場合は、三次曲線の正確なyMaxとvmtxのtop side bearing�
 公開ink boundsは従来の保守的な制御点込みの範囲のままです。
 sfnt・選択したTTC face・WOFFに対応します。不正な任意VORGは無視してfallbackし、
 TrueTypeではVORGを使いません。`cff`が必要で、sfntの縦metricsには従来どおり`layout`も必要です。
-CFF2/VVARの原点変動、色layer原点、BASE、Unicode縦方向、横書き・旧raw APIは今回の対象外です。
+色layer原点、BASE、Unicode縦方向、横書き・旧raw APIは今回の対象外です。
 MIT合成fixtureとSHA-256は`tests/fixtures/manifest.toml`を参照してください。
+
+### CFF2の可変縦書き原点
+
+`cff2`有効時、単色CFF2にも同じ高水準原点処理を適用します。VORGの値を
+既定インスタンスの原点とし、選択した正規化座標で明示的にmapされたVVAR原点差分だけを
+加算します。原点mapがなければ差分は0です。advance用の暗黙mapは使いません。
+VORG由来の原点にTSB差分を重ねて加算しません。TrueTypeでは両方の原点tableを無視します。
+
+有効なVORGがなければ、座標変動を適用したCFF2三次曲線の実際のyMaxと
+vmtx/VVARの変動後top side bearingを使います。このfallbackに原点map差分は加算しません。
+縦metricsもなければ変動後の輪郭極値を合成セルの中央に配置します。
+metricsの丸めと範囲制限は既存処理に従い、公開ink boundsは制御点を含む従来の範囲です。
+
+既定・中間・最大座標、選択TTC face、WOFF、結合mark、横伸縮0を含む倍率を検証します。
+検証はMIT合成fixtureによるもので、実在CFF2縦書きフォント群での検証ではありません。
+不正な任意VORGはfallbackしますが、CFF2/VVAR全般の破損回復、色原点、BASE、
+Unicode縦方向、旧raw APIは拡張しません。
+
+仕様根拠: [VORG](https://learn.microsoft.com/en-us/typography/opentype/spec/vorg)、
+[VVAR](https://learn.microsoft.com/en-us/typography/opentype/spec/vvar)。
+fixtureの出典・再生成方法・SHA-256は`tests/fixtures/manifest.toml`に記載しています。

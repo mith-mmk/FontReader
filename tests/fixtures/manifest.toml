@@ -95,6 +95,20 @@ sha256 = "2036f9200c47b103895fcc226310044f1dea2c2275584679cfd72cf8c2aff215"
 features = ["vertical-metrics", "gvar", "VVAR", "variable-bounds", "source-selection"]
 
 [[fixture]]
+id = "cff2-vertical-origin.ttc"
+source = "tests/fixtures/generate_cff2_vertical_origin.py (fontTools 4.65.0)"
+license = "MIT (project test code)"
+sha256 = "96889803caf426ebb8b6c460b4deaefd8e6b471d3a314f2abe3823d9f3e4e01c"
+features = ["vertical-origin", "CFF2", "VORG", "VVAR", "variable-cubic-extrema", "marks"]
+
+[[fixture]]
+id = "cff2-vertical-origin.woff"
+source = "tests/fixtures/generate_cff2_vertical_origin.py (fontTools 4.65.0)"
+license = "MIT (project test code)"
+sha256 = "8d559cfb06c85b960909eec2c248cf462e7588d561c849cdcdb2a9849f4b76f8"
+features = ["vertical-origin", "CFF2", "VORG", "VVAR", "variable-cubic-extrema", "marks"]
+
+[[fixture]]
 id = "gpos-single.ttf"
 source = "generate_gpos_single.py (fontTools 4.65.0; no external font)"
 license = "MIT (project test code)"
