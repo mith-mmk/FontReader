@@ -2003,7 +2003,7 @@ impl Font {
         Some(svg_document_to_glyph_layers(&document, scale_x, scale_y))
     }
 
-    fn pair_adjustment_for_index(
+    fn position_adjustment_for_index(
         &self,
         units: &[ResolvedTextUnit],
         index: usize,
@@ -2028,6 +2028,17 @@ impl Font {
             };
 
             let mut adjustment = GlyphPositionAdjustment::default();
+            if let Some(single) = gpos.lookup_single_adjustment(
+                current.glyph_id as u16,
+                is_vertical,
+                locale,
+                self.current_gdef(),
+            ) {
+                adjustment.placement_x += single.x_placement as f32 * scale_x;
+                adjustment.placement_y += single.y_placement as f32 * scale_y;
+                adjustment.advance_x += single.x_advance as f32 * scale_x;
+                adjustment.advance_y += single.y_advance as f32 * scale_y;
+            }
             let previous_index = self.find_previous_spacing_glyph_index(units, index);
             let next_index = self.find_next_spacing_glyph_index(units, index);
 
@@ -2462,7 +2473,7 @@ impl Font {
                             };
                         }
                     }
-                    let adjustment = self.pair_adjustment_for_index(
+                    let mut adjustment = self.position_adjustment_for_index(
                         &shaped_units,
                         index,
                         options.locale,
@@ -2470,6 +2481,10 @@ impl Font {
                         scale_x,
                         scale_y,
                     );
+                    // GPOS placement is Cartesian (Y-up); this run is Y-down.
+                    // Advances are directional: positive YAdvance increases the
+                    // TTB advance height, so it must not be negated here.
+                    adjustment.placement_y = -adjustment.placement_y;
                     let mark_attachment = self.mark_attachment_for_index(
                         &shaped_units,
                         &unit_glyph_indices,
@@ -2478,8 +2493,6 @@ impl Font {
                         scale_x,
                         scale_y,
                     );
-                    metrics.advance_x += adjustment.advance_x;
-                    metrics.advance_y += adjustment.advance_y;
                     let uses_gpos_mark_attachment = mark_attachment.is_some();
                     let gdef_attach_glyph_index = if !uses_gpos_mark_attachment
                         && self.gdef_supports_mark_attachment(glyph_id as u16)
@@ -2499,6 +2512,14 @@ impl Font {
                     let uses_mark_attachment =
                         (uses_gpos_mark_attachment || uses_gdef_mark_attachment)
                             && attachment_base.is_some();
+                    // Attached marks start with zero advance, then GPOS may
+                    // explicitly add one. Do not erase SinglePos values afterward.
+                    if uses_mark_attachment {
+                        metrics.advance_x = 0.0;
+                        metrics.advance_y = 0.0;
+                    }
+                    metrics.advance_x += adjustment.advance_x;
+                    metrics.advance_y += adjustment.advance_y;
                     let origin_x = if let Some(base_glyph) = attachment_base {
                         let base_x = base_glyph.x;
                         let placement_x = mark_attachment
@@ -2521,10 +2542,6 @@ impl Font {
                     } else {
                         cursor_y + adjustment.placement_y
                     };
-                    if uses_mark_attachment {
-                        metrics.advance_x = 0.0;
-                        metrics.advance_y = 0.0;
-                    }
                     // Only rendered static TrueType COLR v0 layers with vertical
                     // metrics join the monochrome correction. Their origin is the
                     // base glyph's yMax + TSB, never the layer union's yMax.
@@ -2579,14 +2596,12 @@ impl Font {
                     };
                     glyphs.push(PositionedGlyph::new(glyph, origin_x, origin_y));
                     unit_glyph_indices[index] = Some(glyphs.len() - 1);
-                    if !uses_mark_attachment {
-                        if is_right_to_left && !is_vertical {
-                            cursor_x -= metrics.advance_x;
-                        } else {
-                            cursor_x += metrics.advance_x;
-                        }
-                        cursor_y += metrics.advance_y;
+                    if is_right_to_left && !is_vertical {
+                        cursor_x -= metrics.advance_x;
+                    } else {
+                        cursor_x += metrics.advance_x;
                     }
+                    cursor_y += metrics.advance_y;
                 }
             }
         }
@@ -2846,8 +2861,14 @@ impl Font {
                         .open_type_glyf
                         .as_ref()
                         .ok_or_else(|| Error::new(std::io::ErrorKind::Other, "glyph is none"))?;
-                    let adjustment =
-                        self.pair_adjustment_for_index(&shaped_units, index, None, false, 1.0, 1.0);
+                    let adjustment = self.position_adjustment_for_index(
+                        &shaped_units,
+                        index,
+                        None,
+                        false,
+                        1.0,
+                        1.0,
+                    );
                     let origin_y =
                         -(line_index as f64 * line_height) + adjustment.placement_y as f64;
                     let advance_width = match &open_type_glyph.layout {
