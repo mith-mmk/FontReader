@@ -28,9 +28,9 @@ checksum = "9d297deb1925b89f2ccc13d7635fa0714f12c87adce1c75356b39ca9b7178567"
 
 [[package]]
 name = "bin-rs"
-version = "0.0.9"
+version = "0.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1bd4397ed51cf25473907e4f67156904fb18dda32d22f107c94be41b047e2461"
+checksum = "b28062885c4e7689b7fbf601cc5ed5519efd9e07ae5c33266c41f9e87755e007"
 
 [[package]]
 name = "brotli"

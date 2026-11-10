@@ -202,7 +202,7 @@ fn get_os2<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> Result<O
     let s_family_class = file.read_i16_be()?;
     // 16 * 2 = 32
     let mut panose = [0; 10];
-    file.read_bytes(&mut panose)?;
+    file.read_exact(&mut panose)?;
     // 42
     let ul_unicode_range1 = file.read_u32_be()?;
     let ul_unicode_range2 = file.read_u32_be()?;
@@ -211,7 +211,7 @@ fn get_os2<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> Result<O
     // 58
 
     let mut ach_vend_id = [0; 4];
-    file.read_bytes(&mut ach_vend_id)?;
+    file.read_exact(&mut ach_vend_id)?;
     // 62
     let fs_selection = file.read_u16_be()?;
     let us_first_char_index = file.read_u16_be()?;

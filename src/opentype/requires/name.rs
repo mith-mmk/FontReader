@@ -478,8 +478,8 @@ fn get_names<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> Result
         // string storage area. Keep the original on-disk record unchanged.
         let string_offset = current_position + u64::from(record.offset);
         file.seek(SeekFrom::Start(string_offset))?;
-        // bin-rs 0.0.9 expects UTF-16 code units; the table stores byte lengths.
-        let string = file.read_utf16be_string(record.length as usize / 2)?;
+        // bin-rs 0.0.11 and the table both express UTF-16 lengths in bytes.
+        let string = file.read_utf16be_string(record.length as usize)?;
         lang_tag_string.push(string);
     }
 
@@ -522,6 +522,17 @@ mod tests {
         let expected = "name\nVersion 1\nCount 0\nLang Count 1\nen-US\n";
         assert_eq!(name.to_string(), expected);
         assert_eq!(format!("{name}"), expected);
+    }
+
+    #[test]
+    fn language_tag_reader_consumes_the_declared_byte_length() {
+        let tag = [0, b'e', 0, b'n', 0, b'-', 0, b'U', 0, b'S'];
+        let mut data = language_tag_table(0, &tag);
+        data.extend_from_slice(&[0x12, 0x34]);
+        let mut reader = BytesReader::new(&data);
+        let name = Name::new(&mut reader, 0, 24).unwrap();
+        assert_eq!(name.lang_tag_string, ["en-US"]);
+        assert_eq!(reader.read_u16_be().unwrap(), 0x1234);
     }
 
     #[test]
