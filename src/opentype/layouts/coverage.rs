@@ -35,8 +35,9 @@ impl Coverage {
                 match result {
                     Ok(index) => {
                         let reage_record = &range_records[index];
-                        let index = reage_record.start_coverage_index
-                            + (glyph_id as u16 - reage_record.start_glyph_id);
+                        let index = reage_record
+                            .start_coverage_index
+                            .checked_add(glyph_id - reage_record.start_glyph_id)?;
                         Some(index as usize)
                     }
                     Err(_) => None,
