@@ -585,13 +585,6 @@ fn extend_bounds(bounds: &mut Option<GlyphBounds>, x: f32, y: f32) {
 mod tests {
     use super::*;
 
-    #[cfg(feature = "raw")]
-    fn japanese_font_path() -> std::path::PathBuf {
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join(".test_fonts")
-            .join("NotoSansJP-Regular.otf")
-    }
-
     #[test]
     fn mixed_svg_is_exactly_the_final_run_export() {
         let file = crate::FontFile::from_buffer(include_bytes!(
@@ -743,7 +736,9 @@ mod tests {
     #[test]
     #[cfg(feature = "raw")]
     fn engine_stores_font_variant() {
-        let face = crate::FontFile::from_file(japanese_font_path())
+        let face = crate::FontFile::from_buffer(include_bytes!(
+            "../tests/fixtures/vertical-no-metrics.ttf"
+        ))
             .expect("load font file")
             .current_face()
             .expect("current face");

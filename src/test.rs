@@ -2020,8 +2020,7 @@ mod tests {
     #[test]
     #[cfg(not(target_arch = "wasm32"))]
     fn fontload_from_net_works() {
-        let path = sample_font_path();
-        let bytes = std::fs::read(&path).expect("read font bytes");
+        let bytes = include_bytes!("../tests/fixtures/vertical-no-metrics.ttf");
         let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind tcp listener");
         let addr = listener.local_addr().expect("local addr");
 
@@ -2045,7 +2044,7 @@ mod tests {
                 bytes.len()
             );
             std::io::Write::write_all(&mut socket, response.as_bytes()).expect("write header");
-            std::io::Write::write_all(&mut socket, &bytes).expect("write body");
+            std::io::Write::write_all(&mut socket, bytes).expect("write body");
         });
 
         let url = format!("http://127.0.0.1:{}/font.ttf", addr.port());
@@ -2056,10 +2055,9 @@ mod tests {
     }
 
     #[test]
+    #[cfg(fontcore_external_corpus)]
     fn emoji_font_renders_svg() {
-        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join(".test_fonts")
-            .join("NotoColorEmoji-Regular.ttf");
+        let path = test_fonts_dir().join("NotoColorEmoji-Regular.ttf");
         let font = crate::fontload_file(&path).expect("load emoji font");
         let svg = font.font().get_svg('😀', 32.0, "px").expect("emoji svg");
         assert!(svg.contains("<svg"));

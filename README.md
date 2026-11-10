@@ -217,6 +217,7 @@ The crate supports `wasm32-unknown-unknown`.
 
 ## Documentation Map
 
+- Self-contained and external-corpus tests: [doc/testing.md](doc/testing.md)
 - Overview of the extra docs: [doc/README.md](doc/README.md)
 - Public API recipes: [doc/api-recipes.md](doc/api-recipes.md)
 - Current implementation status and limitations: [doc/feature-status.md](doc/feature-status.md)
