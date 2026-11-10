@@ -1,4 +1,4 @@
-use crate::woff::woff::WOFFHeader;
+use crate::woff::container::WOFFHeader;
 use crate::{opentype::OTFHeader, opentype::TTCHeader, util::u32_to_string};
 use bin_rs::{
     reader::{BinaryReader, BytesReader},
@@ -23,7 +23,7 @@ pub(crate) struct TableRecord {
 
 impl TableRecord {
     #[allow(dead_code)]
-    pub(crate) fn to_string(self) -> String {
+    fn format_text(&self) -> String {
         let mut string = String::new();
         string.push_str("table tag: ");
         string.push_str(u32_to_string(self.table_tag).as_str());
@@ -77,12 +77,12 @@ pub fn longdatetime_to_string(value: &LONGDATETIME) -> String {
     let monthes = [31, 28 + leap_year, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
     let mut month = 0;
     let mut days = days;
-    for i in 0..monthes.len() {
-        if days < monthes[i] {
+    for (i, month_days) in monthes.iter().enumerate() {
+        if days < *month_days {
             month = i + 1;
             break;
         } else {
-            days -= monthes[i];
+            days -= *month_days;
         }
     }
 
@@ -118,7 +118,7 @@ pub enum FontHeaders {
 }
 
 impl FontHeaders {
-    pub fn to_string(&self) -> String {
+    fn format_text(&self) -> String {
         match self {
             FontHeaders::TTC(header) => header.to_string(),
             FontHeaders::OTF(header) => Self::get_otf_string(header),
@@ -229,7 +229,7 @@ impl FontHeaders {
         string.push_str(" table records:\n");
         #[cfg(debug_assertions)]
         for table in header.table_records.iter() {
-            string.push_str(&table.clone().to_string());
+            string.push_str(&table.to_string());
             string.push('\n');
         }
         string
@@ -343,5 +343,36 @@ mod tests {
     fn get_font_type_returns_error_on_short_buffer() {
         let mut reader = BytesReader::new(b"OT");
         assert!(get_font_type(&mut reader).is_err());
+    }
+}
+
+impl std::fmt::Display for TableRecord {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.format_text())
+    }
+}
+
+impl std::fmt::Display for FontHeaders {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.format_text())
+    }
+}
+
+#[cfg(test)]
+mod display_tests {
+    use super::*;
+
+    #[test]
+    fn header_display_preserves_table_record() {
+        let record = TableRecord {
+            table_tag: u32::from_be_bytes(*b"head"),
+            check_sum: 0xab,
+            offset: 0x10,
+            length: 0x20,
+        };
+        let expected = "table tag: head check sum: 000000AB offset: 00000010 length: 00000020";
+        assert_eq!(record.to_string(), expected);
+        assert_eq!(format!("{record}"), expected);
+        assert_eq!(FontHeaders::Unknown.to_string(), "Unknown");
     }
 }

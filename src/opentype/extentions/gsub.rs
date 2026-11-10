@@ -57,7 +57,7 @@ impl JoiningForms {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct GSUB {
+pub(crate) struct Gsub {
     pub(crate) major_version: u16,
     pub(crate) minor_version: u16,
     pub(crate) scripts: Box<ScriptList>,
@@ -67,7 +67,7 @@ pub(crate) struct GSUB {
     pub(crate) feature_variations: Option<Box<FeatureVariationList>>,
 }
 
-impl GSUB {
+impl Gsub {
     pub(crate) fn new<R: BinaryReader>(
         reader: &mut R,
         offset: u32,
@@ -119,13 +119,13 @@ impl GSUB {
         })
     }
 
-    pub(crate) fn to_string(&self) -> String {
+    fn dump_text(&self) -> String {
         let mut string = "GSUB\n".to_string();
         string += &format!("MajorVersion: {}\n", self.major_version);
         string += &format!("MinorVersion: {}\n", self.minor_version);
-        string += &format!("Scripts:\n{}\n", self.scripts.to_string());
-        string += &format!("Features:\n{}\n", self.features.to_string());
-        string += &format!("Lookups:\n{}\n", self.lookups.to_string());
+        string += &format!("Scripts:\n{}\n", self.scripts);
+        string += &format!("Features:\n{}\n", self.features);
+        string += &format!("Lookups:\n{}\n", self.lookups);
         string += &format!("FeatureVariations:\n{:?}\n", self.feature_variations);
         string
     }
@@ -1138,7 +1138,7 @@ impl GSUB {
 
     pub(crate) fn apply_joining_sequence(
         &self,
-        glyphs: &mut Vec<(usize, usize)>,
+        glyphs: &mut [(usize, usize)],
         locale: Option<&str>,
     ) {
         if glyphs.is_empty() {
@@ -1312,6 +1312,12 @@ impl GSUB {
     // dnom, numr, frac, subs, sups, zero
     pub fn lookup_number(&self, _griph_ids: Vec<usize>) -> usize {
         todo!("lookup_number")
+    }
+}
+
+impl std::fmt::Display for Gsub {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.dump_text())
     }
 }
 

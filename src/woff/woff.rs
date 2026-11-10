@@ -93,15 +93,15 @@ impl WOFFTable {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct WOFF {
+pub(crate) struct Woff {
     pub(crate) header: WOFFHeader,
     pub(crate) table_records: Vec<WOFFTableRecord>,
-    pub(crate) metadata: Box<String>,
-    pub(crate) private_data: Box<Vec<u8>>,
+    pub(crate) metadata: String,
+    pub(crate) private_data: Vec<u8>,
     pub(crate) tables: Vec<WOFFTable>,
 }
 
-impl WOFF {
+impl Woff {
     pub(crate) fn from<B: BinaryReader>(
         reader: &mut B,
         header: WOFFHeader,
@@ -233,11 +233,11 @@ impl WOFF {
             tables.push(table);
         }
 
-        Ok(WOFF {
+        Ok(Woff {
             header,
             table_records,
-            metadata: Box::new(metadata),
-            private_data: Box::new(private_data),
+            metadata,
+            private_data,
             tables,
         })
     }
@@ -294,6 +294,6 @@ mod tests {
             priv_length: 0,
         };
         let mut reader = BytesReader::new(&[]);
-        assert!(WOFF::from_with_limits(&mut reader, header, &DecodeLimits::default()).is_err());
+        assert!(Woff::from_with_limits(&mut reader, header, &DecodeLimits::default()).is_err());
     }
 }

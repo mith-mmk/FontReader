@@ -2,7 +2,7 @@ use bin_rs::reader::BinaryReader;
 use std::io::{Error, ErrorKind, SeekFrom};
 
 #[derive(Debug, Clone)]
-pub(crate) struct FVAR {
+pub(crate) struct Fvar {
     pub(crate) axes: Vec<VariationAxisRecord>,
 }
 
@@ -16,7 +16,7 @@ pub(crate) struct VariationAxisRecord {
     pub(crate) hidden: bool,
 }
 
-impl FVAR {
+impl Fvar {
     pub(crate) fn new<R: BinaryReader>(
         reader: &mut R,
         offset: u32,
@@ -220,7 +220,7 @@ mod tests {
         ];
         bytes.extend_from_slice(&axis_record(0, 1, 2, 1));
 
-        let fvar = FVAR::from_bytes(&bytes).expect("valid fvar");
+        let fvar = Fvar::from_bytes(&bytes).expect("valid fvar");
         assert!(fvar.axes[0].hidden);
         assert_eq!(fvar.axes[0].min_value, 0.0);
         assert_eq!(fvar.axes[0].default_value, 1.0);
@@ -235,7 +235,7 @@ mod tests {
         ];
         bytes.extend_from_slice(&axis_record(2, 1, 3, 0));
 
-        assert!(FVAR::from_bytes(&bytes).is_err());
+        assert!(Fvar::from_bytes(&bytes).is_err());
     }
 
     #[test]
@@ -246,7 +246,7 @@ mod tests {
         ];
         bytes.extend_from_slice(&axis_record(0, 1, 2, 0));
 
-        assert!(FVAR::from_bytes(&bytes).is_err());
+        assert!(Fvar::from_bytes(&bytes).is_err());
     }
 
     #[test]
@@ -257,6 +257,6 @@ mod tests {
         ];
         bytes.extend_from_slice(&axis_record(0, 1, 2, 0));
 
-        assert!(FVAR::from_bytes(&bytes).is_err());
+        assert!(Fvar::from_bytes(&bytes).is_err());
     }
 }

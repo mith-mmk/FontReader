@@ -18,14 +18,14 @@ pub(crate) struct SvgGlyphDocument {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct SVG {
+pub(crate) struct Svg {
     version: u16,
     svg_document_list: SVGDocumetList,
     max_svg_bytes: usize,
     // reserved: u32,
 }
 
-impl SVG {
+impl Svg {
     pub(crate) fn new<R: BinaryReader>(
         reader: &mut R,
         offset: u32,
@@ -56,7 +56,7 @@ impl SVG {
         })
     }
 
-    pub(crate) fn to_string(&self) -> String {
+    fn dump_text(&self) -> String {
         let mut string = "SVG\n".to_string();
         string += &format!("version: {}\n", self.version);
         string += &format!(
@@ -258,10 +258,10 @@ fn sanitize_svg_payload(payload: &str) -> Option<String> {
 fn find_svg_tag_end(payload: &str, start: usize) -> Option<usize> {
     let bytes = payload.as_bytes();
     let mut quote = None;
-    for index in start + 1..bytes.len() {
-        match (quote, bytes[index]) {
+    for (index, &byte) in bytes.iter().enumerate().skip(start + 1) {
+        match (quote, byte) {
             (Some(expected), byte) if byte == expected => quote = None,
-            (None, b'\'' | b'\"') => quote = Some(bytes[index]),
+            (None, b'\'' | b'\"') => quote = Some(byte),
             (None, b'>') => return Some(index + 1),
             _ => {}
         }
@@ -661,6 +661,12 @@ impl SVGDocumetRecord {
             svg_document_length,
             svg_document: None,
         })
+    }
+}
+
+impl std::fmt::Display for Svg {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.dump_text())
     }
 }
 

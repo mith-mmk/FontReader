@@ -440,6 +440,7 @@ pub enum WindowsLanguageID {
 //  language-script-region -> language-script
 // zh-yue-Hant ? language-extlang-script  => donot match Traditinal Chinese
 
+#[expect(clippy::ptr_arg, reason = "Preserve the existing raw API signature.")]
 pub fn get_locale_to_language_id(locale: &String, platform_id: PlatformID) -> Option<u16> {
     let binding = locale.to_uppercase();
     let binding = binding.split('.').collect::<Vec<&str>>()[0].replace('_', "-");

@@ -6,20 +6,20 @@ use std::{fmt, io::Error};
 // cmap is a table that maps character codes to glyph index values
 
 #[derive(Debug, Clone)]
-pub(crate) struct CMAP {
+pub(crate) struct Cmap {
     pub(crate) version: u16,
     pub(crate) num_tables: u16,
-    pub(crate) encoding_records: Box<Vec<EncodingRecord>>,
+    pub(crate) encoding_records: Vec<EncodingRecord>,
     pub(crate) buffer: Vec<u8>,
 }
 
-impl fmt::Display for CMAP {
+impl fmt::Display for Cmap {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.to_string())
+        f.write_str(&self.format_table())
     }
 }
 
-impl CMAP {
+impl Cmap {
     pub(crate) fn new<R: BinaryReader>(
         file: &mut R,
         offset: u32,
@@ -28,7 +28,7 @@ impl CMAP {
         load_cmap_table(file, offset, length)
     }
 
-    pub(crate) fn to_string(&self) -> String {
+    fn format_table(&self) -> String {
         let mut string = "cmap\n".to_string();
         let version = format!("Version {}\n", self.version);
         string += &version;
@@ -52,12 +52,12 @@ pub(crate) struct EncodingRecord {
 
 impl fmt::Display for EncodingRecord {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.to_string())
+        f.write_str(&self.format_table())
     }
 }
 
 impl EncodingRecord {
-    pub(crate) fn to_string(&self) -> String {
+    fn format_table(&self) -> String {
         format!(
             "platform_id: {} {}, encoding_id: {} {}, offset: {}",
             self.platform_id,
@@ -157,8 +157,8 @@ impl EncodingRecord {
 
 #[derive(Debug, Clone)]
 pub(crate) struct CmapEncodings {
-    pub(crate) cmap: Box<CMAP>,
-    pub(crate) cmap_encodings: Box<Vec<CmapEncoding>>,
+    pub(crate) cmap: Box<Cmap>,
+    pub(crate) cmap_encodings: Vec<CmapEncoding>,
 }
 
 impl CmapEncodings {
@@ -172,11 +172,11 @@ impl CmapEncodings {
 
         Ok(CmapEncodings {
             cmap: Box::new(cmap),
-            cmap_encodings: Box::new(cmap_encodings),
+            cmap_encodings,
         })
     }
 
-    pub(crate) fn get_encoding_engine(&self) -> Box<Vec<EncodingRecord>> {
+    pub(crate) fn get_encoding_engine(&self) -> Vec<EncodingRecord> {
         self.cmap.encoding_records.clone()
     }
 
@@ -513,7 +513,7 @@ impl CmapSubtable {
                 };
                 string += "groups:\n";
                 for i in 0..lenghth {
-                    string += &format!("\n{} ", format8.groups[i].to_string());
+                    string += &format!("\n{} ", format8.groups[i]);
                 }
                 string += "\n";
                 string
@@ -575,7 +575,7 @@ impl CmapSubtable {
                 string += &format!("num_groups: {}\n", format13.num_groups);
                 string += "groups:\n";
                 for i in 0..length {
-                    string += &format!("{:3} {}\n", i, format13.groups[i].to_string());
+                    string += &format!("{:3} {}\n", i, format13.groups[i]);
                 }
                 string += "\n";
                 string
@@ -710,7 +710,7 @@ pub(crate) struct SequentialMapGroup {
 }
 
 impl SequentialMapGroup {
-    fn to_string(&self) -> String {
+    fn format_table(&self) -> String {
         format!(
             "start_char_code: {:04x}, end_char_code: {:04x}, start_glyph_id: {}",
             self.start_char_code, self.end_char_code, self.start_glyph_id
@@ -737,7 +737,7 @@ pub(crate) struct ConstantMapGroup {
 }
 
 impl ConstantMapGroup {
-    fn to_string(&self) -> String {
+    fn format_table(&self) -> String {
         format!(
             "sstart_char_code: {:04x}, end_char_code: {:04x}, glyph_id: {}",
             self.start_char_code, self.end_char_code, self.glyph_id
@@ -766,7 +766,7 @@ pub(crate) struct VarSelectorRecord {
 
 impl VarSelectorRecord {
     fn to_stirng(&self) -> String {
-        format!("var_selector: {:04x}\n default_uvs_offset: {}, default_uvs: {}\n non_default_uvs_offset: {}, non_default_uvs: {}", self.var_selector, self.default_uvs_offset, self.default_uvs.to_string(), self.non_default_uvs_offset, self.non_default_uvs.to_string())
+        format!("var_selector: {:04x}\n default_uvs_offset: {}, default_uvs: {}\n non_default_uvs_offset: {}, non_default_uvs: {}", self.var_selector, self.default_uvs_offset, self.default_uvs, self.non_default_uvs_offset, self.non_default_uvs)
     }
 }
 
@@ -777,7 +777,7 @@ pub(crate) struct DefaultUVS {
 }
 
 impl DefaultUVS {
-    fn to_string(&self) -> String {
+    fn format_table(&self) -> String {
         let mut string = format!(
             "num_unicode_value_ranges: {}",
             self.num_unicode_value_ranges
@@ -813,7 +813,7 @@ pub(crate) struct NonDefautUVS {
 }
 
 impl NonDefautUVS {
-    fn to_string(&self) -> String {
+    fn format_table(&self) -> String {
         let mut string = format!(
             "num_unicode_value_ranges: {}\n",
             self.num_unicode_value_ranges
@@ -824,7 +824,7 @@ impl NonDefautUVS {
             self.unicode_value_ranges.len()
         };
         for i in 0..length {
-            string += &format!("{}\n", self.unicode_value_ranges[i].to_string());
+            string += &format!("{}\n", self.unicode_value_ranges[i]);
         }
         string
     }
@@ -837,7 +837,7 @@ pub(crate) struct UVSMapping {
 }
 
 impl UVSMapping {
-    fn to_string(&self) -> String {
+    fn format_table(&self) -> String {
         format!(
             "\nunicode_value: {:04X} {}, glyph_id: {}",
             self.unicode_value,
@@ -848,7 +848,7 @@ impl UVSMapping {
 }
 
 // load_cmap_table(buffer.clone(), record.offset, record.length) -> CMAP
-fn load_cmap_table<R: BinaryReader>(file: &mut R, offset: u32, length: u32) -> Result<CMAP, Error> {
+fn load_cmap_table<R: BinaryReader>(file: &mut R, offset: u32, length: u32) -> Result<Cmap, Error> {
     file.seek(std::io::SeekFrom::Start(offset as u64))?;
 
     let version = file.read_u16_be()?;
@@ -867,10 +867,10 @@ fn load_cmap_table<R: BinaryReader>(file: &mut R, offset: u32, length: u32) -> R
     file.seek(std::io::SeekFrom::Start(offset as u64))?;
     let buffer = file.read_bytes_as_vec(length as usize)?;
 
-    Ok(CMAP {
+    Ok(Cmap {
         version,
         num_tables,
-        encoding_records: Box::new(encoding_records),
+        encoding_records,
         buffer,
     })
 }
@@ -882,7 +882,7 @@ pub(crate) struct EncodingRecordPriority {
     pub(crate) substitute: Vec<EncodingRecord>,
 }
 
-pub(crate) fn select_encoding(encoding_records: &Vec<EncodingRecord>) -> EncodingRecordPriority {
+pub(crate) fn select_encoding(encoding_records: &[EncodingRecord]) -> EncodingRecordPriority {
     let mut uvs = Vec::new();
     let mut substitute = Vec::new();
     let mut priolities = Vec::new();
@@ -984,10 +984,8 @@ pub(crate) fn get_subtable(encoding_record: &EncodingRecord, buffer: &[u8]) -> C
             // Format0
             let length = u16::from_be_bytes([buffer[2], buffer[3]]);
             let language = u16::from_be_bytes([buffer[4], buffer[5]]);
-            let mut glyph_id_array = Vec::new();
-            for i in 6..length as usize {
-                glyph_id_array.push(buffer[i]);
-            }
+            // The former 6..length loop was empty for short declared lengths.
+            let glyph_id_array = buffer[6..usize::from(length).max(6)].to_vec();
             CmapSubtable::Format0(ByteEncoding {
                 format,
                 length,
@@ -1058,10 +1056,10 @@ pub(crate) fn get_subtable(encoding_record: &EncodingRecord, buffer: &[u8]) -> C
             let _: u16 = u16::from_be_bytes([buffer[offset], buffer[offset + 1]]);
             offset += 2;
             let mut codes = Vec::with_capacity(seg_count as usize);
-            for i in 0..seg_count as usize {
+            for &end in &end_code {
                 let code = u16::from_be_bytes([buffer[offset], buffer[offset + 1]]);
                 offset += 2;
-                codes.push((code, end_code[i]));
+                codes.push((code, end));
             }
             let mut id_delta = Vec::with_capacity(seg_count as usize);
             for _ in 0..seg_count {
@@ -1417,7 +1415,7 @@ pub(crate) fn get_subtable(encoding_record: &EncodingRecord, buffer: &[u8]) -> C
     }
 }
 
-pub(crate) fn get_cmap_maps(cmap: &CMAP) -> Vec<CmapEncoding> {
+pub(crate) fn get_cmap_maps(cmap: &Cmap) -> Vec<CmapEncoding> {
     let encoding_records = &cmap.encoding_records;
     let mut cmap_encodings = Vec::new();
     for enconding_record in encoding_records.as_slice() {
@@ -1429,4 +1427,113 @@ pub(crate) fn get_cmap_maps(cmap: &CMAP) -> Vec<CmapEncoding> {
         });
     }
     cmap_encodings
+}
+
+impl fmt::Display for SequentialMapGroup {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.format_table())
+    }
+}
+
+impl fmt::Display for ConstantMapGroup {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.format_table())
+    }
+}
+
+impl fmt::Display for DefaultUVS {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.format_table())
+    }
+}
+
+impl fmt::Display for NonDefautUVS {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.format_table())
+    }
+}
+
+impl fmt::Display for UVSMapping {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.format_table())
+    }
+}
+
+#[cfg(test)]
+mod formatting_tests {
+    use super::*;
+
+    #[test]
+    fn format_zero_short_declared_length_keeps_empty_glyph_array() {
+        let record = EncodingRecord {
+            platform_id: 0,
+            encoding_id: 0,
+            subtable_offset: 0,
+        };
+        for length in 0..=6u16 {
+            let mut buffer = [0u8; 6];
+            buffer[2..4].copy_from_slice(&length.to_be_bytes());
+            let CmapSubtable::Format0(table) = get_subtable(&record, &buffer) else {
+                panic!("expected format 0");
+            };
+            assert!(table.glyph_id_array.is_empty());
+        }
+    }
+
+    #[test]
+    fn cmap_display_preserves_encoding_dump() {
+        let cmap = Cmap {
+            version: 0,
+            num_tables: 1,
+            encoding_records: vec![EncodingRecord {
+                platform_id: 0,
+                encoding_id: 4,
+                subtable_offset: 12,
+            }],
+            buffer: Vec::new(),
+        };
+        let expected = "cmap\nVersion 0\nNum Tables 1\nEncoding Record 0 : platform_id: 0 Unicode, encoding_id: 4 Unicode2.0 Full, offset: 12\n";
+        assert_eq!(cmap.to_string(), expected);
+        assert_eq!(format!("{cmap}"), expected);
+    }
+
+    #[test]
+    fn cmap_group_display_preserves_text() {
+        let group = SequentialMapGroup {
+            start_char_code: 65,
+            end_char_code: 66,
+            start_glyph_id: 3,
+        };
+        assert_eq!(
+            group.to_string(),
+            "start_char_code: 0041, end_char_code: 0042, start_glyph_id: 3"
+        );
+        let group = ConstantMapGroup {
+            start_char_code: 65,
+            end_char_code: 66,
+            glyph_id: 3,
+        };
+        assert_eq!(
+            group.to_string(),
+            "sstart_char_code: 0041, end_char_code: 0042, glyph_id: 3"
+        );
+        let mapping = UVSMapping {
+            unicode_value: 65,
+            glyph_id: 3,
+        };
+        assert_eq!(mapping.to_string(), "\nunicode_value: 0041 A, glyph_id: 3");
+        let defaults = DefaultUVS {
+            num_unicode_value_ranges: 0,
+            unicode_value_ranges: vec![],
+        };
+        assert_eq!(defaults.to_string(), "num_unicode_value_ranges: 0");
+        let nondefaults = NonDefautUVS {
+            num_unicode_value_ranges: 1,
+            unicode_value_ranges: vec![mapping],
+        };
+        assert_eq!(
+            nondefaults.to_string(),
+            "num_unicode_value_ranges: 1\n\nunicode_value: 0041 A, glyph_id: 3\n"
+        );
+    }
 }

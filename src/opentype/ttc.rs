@@ -9,12 +9,12 @@ pub struct TTCHeader {
     pub(crate) major_version: u16,
     pub(crate) minor_version: u16,
     pub(crate) num_fonts: u32,
-    pub(crate) table_directory: Box<Vec<u32>>,
+    pub(crate) table_directory: Vec<u32>,
     // Version2
     pub(crate) ul_dsig_tag: u32,
     pub(crate) ul_dsig_length: u32,
     pub(crate) ul_dsig_offset: u32,
-    pub(crate) font_collection: Box<Vec<OTFHeader>>,
+    pub(crate) font_collection: Vec<OTFHeader>,
 }
 
 impl TTCHeader {
@@ -24,11 +24,11 @@ impl TTCHeader {
             major_version: 0,
             minor_version: 0,
             num_fonts: 0,
-            table_directory: Box::<Vec<u32>>::default(),
+            table_directory: Vec::new(),
             ul_dsig_tag: 0,
             ul_dsig_length: 0,
             ul_dsig_offset: 0,
-            font_collection: Box::<Vec<OTFHeader>>::default(),
+            font_collection: Vec::new(),
         };
         header.sfnt_version = reader.read_u32_be()?;
         header.major_version = reader.read_u16_be()?;
@@ -61,11 +61,11 @@ impl TTCHeader {
             reader.seek(SeekFrom::Start(header.table_directory[i as usize] as u64))?;
             font_collection.push(OTFHeader::new(reader)?);
         }
-        header.font_collection = Box::new(font_collection);
+        header.font_collection = font_collection;
         Ok(header)
     }
 
-    pub(crate) fn to_string(&self) -> String {
+    fn describe(&self) -> String {
         let mut string = "TTCHeader\n".to_string();
         string += &format!("sfnt_version: {}\n", self.sfnt_version);
         string += &format!("major_version: {}\n", self.major_version);
@@ -87,10 +87,38 @@ impl TTCHeader {
     }
 }
 
+impl std::fmt::Display for TTCHeader {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.describe())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use bin_rs::reader::BytesReader;
+
+    #[test]
+    fn ttc_display_preserves_version_two_fields() {
+        let header = TTCHeader {
+            sfnt_version: 0x7474_6366,
+            major_version: 2,
+            minor_version: 0,
+            num_fonts: 0,
+            table_directory: Vec::new(),
+            ul_dsig_tag: 0x4453_4947,
+            ul_dsig_length: 12,
+            ul_dsig_offset: 256,
+            font_collection: Vec::new(),
+        };
+        let expected = concat!(
+            "TTCHeader\nsfnt_version: 1953784678\nmajor_version: 2\n",
+            "minor_version: 0\nnum_fonts: 0\nul_dsig_tag: 44534947\n",
+            "ul_dsig_length: 12\nul_dsig_offset: 00000100\n",
+        );
+        assert_eq!(header.to_string(), expected);
+        assert_eq!(format!("{header}"), expected);
+    }
 
     #[test]
     fn ttc_header_returns_error_on_truncated_input() {

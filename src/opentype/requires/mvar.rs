@@ -4,7 +4,7 @@ use std::io::{Error, ErrorKind, SeekFrom};
 use super::var_store::ItemVariationStore;
 
 #[derive(Debug, Clone)]
-pub(crate) struct MVAR {
+pub(crate) struct Mvar {
     variation_store: ItemVariationStore,
     records: Vec<ValueRecord>,
 }
@@ -16,7 +16,7 @@ struct ValueRecord {
     delta_set_inner_index: u16,
 }
 
-impl MVAR {
+impl Mvar {
     pub(crate) fn new<R: BinaryReader>(
         reader: &mut R,
         offset: u32,

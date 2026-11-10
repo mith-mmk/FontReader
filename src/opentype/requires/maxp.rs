@@ -5,7 +5,7 @@ use std::{fmt, io::SeekFrom};
 // maxp table Maximum profile
 
 #[derive(Debug, Clone)]
-pub(crate) struct MAXP {
+pub(crate) struct Maxp {
     pub(crate) version: u32,
     pub(crate) num_glyphs: u16,
     // 1.0
@@ -24,13 +24,13 @@ pub(crate) struct MAXP {
     pub(crate) max_component_depth: u16,
 }
 
-impl fmt::Display for MAXP {
+impl fmt::Display for Maxp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.to_string())
+        f.write_str(&self.format_table())
     }
 }
 
-impl MAXP {
+impl Maxp {
     pub(crate) fn new<R: BinaryReader>(
         file: &mut R,
         offest: u32,
@@ -39,7 +39,7 @@ impl MAXP {
         get_maxp(file, offest, length)
     }
 
-    pub(crate) fn to_string(&self) -> String {
+    fn format_table(&self) -> String {
         let mut string = "maxp\n".to_string();
         let major = self.version >> 16;
         let minor = self.version & 0xFFFF;
@@ -85,13 +85,12 @@ impl MAXP {
     }
 }
 
-fn get_maxp<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> Result<MAXP, Error> {
-    let file = file;
+fn get_maxp<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> Result<Maxp, Error> {
     file.seek(SeekFrom::Start(offest as u64))?;
     let version = file.read_u32_be()?;
     let num_glyphs = file.read_u16_be()?;
     if version == 0x00005000 {
-        return Ok(MAXP {
+        return Ok(Maxp {
             version,
             num_glyphs,
             max_points: 0,
@@ -123,7 +122,7 @@ fn get_maxp<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> Result<
     let max_component_elements = file.read_u16_be()?;
     let max_component_depth = file.read_u16_be()?;
 
-    Ok(MAXP {
+    Ok(Maxp {
         version,
         num_glyphs,
         max_points,

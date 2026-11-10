@@ -51,7 +51,7 @@ pub(crate) struct OS2 {
 
 impl fmt::Display for OS2 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.to_string())
+        f.write_str(&self.format_table())
     }
 }
 
@@ -64,7 +64,7 @@ impl OS2 {
         get_os2(file, offest, length)
     }
 
-    pub(crate) fn to_string(&self) -> String {
+    fn format_table(&self) -> String {
         let mut string = "OS/2\n".to_string();
         let version = format!("Version {}\n", self.version);
         string += &version;
@@ -183,7 +183,6 @@ impl OS2 {
 }
 
 fn get_os2<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> Result<OS2, Error> {
-    let file = file;
     file.seek(SeekFrom::Start(offest as u64))?;
     let version = file.read_u16_be()?;
     let x_avg_char_width = file.read_i16_be()?;

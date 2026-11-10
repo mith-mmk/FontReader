@@ -173,7 +173,7 @@ impl FontFace {
             self.variation_axes().len(),
             self.font.get_font_number(),
             self.font.get_font_count(),
-            self.font.font_type.to_string()
+            self.font.font_type
         )
     }
 
@@ -830,9 +830,7 @@ impl FontFamily {
                 };
 
                 if let Some(requested_name) = requested_name.as_deref() {
-                    let Some(face_name) = descriptor.font_name.as_deref() else {
-                        return None;
-                    };
+                    let face_name = descriptor.font_name.as_deref()?;
                     if normalize_font_name(face_name) != requested_name {
                         return None;
                     }

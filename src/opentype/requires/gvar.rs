@@ -12,7 +12,7 @@ pub(crate) struct GlyphVariationResult {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct GVAR {
+pub(crate) struct Gvar {
     data: Vec<u8>,
     axis_count: u16,
     shared_tuples: Vec<f32>,
@@ -39,7 +39,7 @@ struct TupleVariationHeader {
     serialized_data_len: u16,
 }
 
-impl GVAR {
+impl Gvar {
     pub(crate) fn new<R: bin_rs::reader::BinaryReader>(
         reader: &mut R,
         offset: u32,
@@ -395,8 +395,7 @@ fn compute_tuple_scalar(
     end_tuple: Option<&[f32]>,
 ) -> f32 {
     let mut scalar = 1.0f32;
-    for axis in 0..coordinates.len() {
-        let value = coordinates[axis];
+    for (axis, &value) in coordinates.iter().enumerate() {
         let peak = *peak_tuple.get(axis).unwrap_or(&0.0);
         if peak == 0.0 || value == peak {
             continue;
@@ -483,12 +482,7 @@ fn parse_axis_deltas(
         let run_count = (control & 0x3F) as usize + 1;
 
         if deltas_are_zero {
-            for _ in 0..run_count {
-                deltas.push(0.0);
-                if deltas.len() == count {
-                    break;
-                }
-            }
+            deltas.resize((deltas.len() + run_count).min(count), 0.0);
             continue;
         }
 
@@ -560,13 +554,13 @@ fn apply_tuple_to_points(
             }
         }
 
-        for index in point_count..points.len() {
+        for (index, point) in points.iter_mut().enumerate().skip(point_count) {
             let Some((dx, dy)) = explicit.get(index).copied().flatten() else {
                 continue;
             };
             if dx != 0.0 || dy != 0.0 {
-                points[index].0 += dx;
-                points[index].1 += dy;
+                point.0 += dx;
+                point.1 += dy;
                 changed = true;
             }
         }

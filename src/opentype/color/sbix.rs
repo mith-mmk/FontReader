@@ -7,7 +7,7 @@ use base64::{engine::general_purpose, Engine as _};
 use bin_rs::reader::BinaryReader;
 
 #[derive(Debug, Clone)]
-pub(crate) struct SBIX {
+pub(crate) struct Sbix {
     version: u16,
     flags: u16,
     strikes: Vec<Strike>,
@@ -38,7 +38,7 @@ pub(crate) struct RasterGlyphData {
     pub(crate) glyph_data: Vec<u8>,
 }
 
-impl SBIX {
+impl Sbix {
     fn resolve_raster_glyph_in_strike(
         strike: &Strike,
         gid: usize,
@@ -135,7 +135,7 @@ impl SBIX {
         })
     }
 
-    pub(crate) fn to_string(&self) -> String {
+    fn dump_text(&self) -> String {
         let mut string = "SBIX\n".to_string();
         string += &format!("version: {}\n", self.version);
         string += &format!("flags: {}\n", self.flags);
@@ -339,5 +339,11 @@ impl GlyphData {
             graphic_type,
             glyph_data,
         })
+    }
+}
+
+impl std::fmt::Display for Sbix {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.dump_text())
     }
 }

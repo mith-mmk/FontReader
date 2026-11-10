@@ -72,7 +72,7 @@ impl ClassDef {
         }
     }
 
-    pub(crate) fn to_string(&self) -> String {
+    fn dump_text(&self) -> String {
         let mut string = "Class Deffinition\n".to_string();
         match self {
             ClassDef::Format1(class_def) => {
@@ -112,4 +112,10 @@ pub(crate) struct ClassRangeRecord {
     pub(crate) start_glyph_id: u16,
     pub(crate) end_glyph_id: u16,
     pub(crate) class: u16,
+}
+
+impl std::fmt::Display for ClassDef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.dump_text())
+    }
 }

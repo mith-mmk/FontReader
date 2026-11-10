@@ -16,8 +16,8 @@ int16	yMax	Maximum y for coordinate data.
 
 #[derive(Debug, Clone)]
 
-pub(crate) struct GLYF {
-    pub(crate) griphs: Box<Vec<Glyph>>,
+pub(crate) struct Glyf {
+    pub(crate) griphs: Vec<Glyph>,
 }
 
 const ARG_1_AND_2_ARE_WORDS: u16 = 0x0001;
@@ -89,7 +89,7 @@ pub struct ParsedGlyph {
 
 impl fmt::Display for Glyph {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.to_string())
+        f.write_str(&self.format_text())
     }
 }
 
@@ -406,12 +406,10 @@ impl Glyph {
         #[cfg(debug_assertions)]
         {
             svg += "<!-- ";
-            let mut i = 0;
-            for byte in &parsed.instructions {
+            for (i, byte) in parsed.instructions.iter().enumerate() {
                 if i % 16 == 0 {
                     svg += "\n";
                 }
-                i += 1;
                 svg += &format!("{:02x} ", byte);
             }
             svg += " -->\n";
@@ -558,7 +556,7 @@ impl Glyph {
         svg
     }
 
-    pub fn to_string(&self) -> String {
+    fn format_text(&self) -> String {
         let parsed = self.parse();
         let mut string = "glyph\n".to_string();
 
@@ -615,18 +613,18 @@ impl Glyph {
     }
 }
 
-impl fmt::Display for GLYF {
+impl fmt::Display for Glyf {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.to_string())
+        f.write_str(&self.format_text())
     }
 }
 
-impl GLYF {
+impl Glyf {
     pub(crate) fn new<R: BinaryReader>(
         file: &mut R,
         offset: u32,
         length: u32,
-        loca: &loca::LOCA,
+        loca: &loca::Loca,
     ) -> Self {
         get_glyf(file, offset, length, loca)
     }
@@ -698,7 +696,7 @@ impl GLYF {
         svg
     }
 
-    pub(crate) fn to_string(&self) -> String {
+    fn format_text(&self) -> String {
         let mut string = "glyf\n".to_string();
         string += &format!("number of glyphs {}\n", self.griphs.len());
         let max_number = 10;
@@ -1118,7 +1116,7 @@ fn path_commands_to_svg_path(commands: &[PathCommand]) -> String {
     d.trim_end().to_string()
 }
 
-fn get_glyf<R: BinaryReader>(file: &mut R, offset: u32, _length: u32, loca: &loca::LOCA) -> GLYF {
+fn get_glyf<R: BinaryReader>(file: &mut R, offset: u32, _length: u32, loca: &loca::Loca) -> Glyf {
     let loca = loca.clone();
     file.seek(SeekFrom::Start(offset as u64)).unwrap();
     let offsets = loca.offsets.clone();
@@ -1129,9 +1127,7 @@ fn get_glyf<R: BinaryReader>(file: &mut R, offset: u32, _length: u32, loca: &loc
         let glyph = get_glyph(file, offset, length);
         glyphs.push(glyph);
     }
-    GLYF {
-        griphs: Box::new(glyphs),
-    }
+    Glyf { griphs: glyphs }
 }
 
 fn get_glyph<R: BinaryReader>(file: &mut R, offset: u32, length: u32) -> Glyph {
@@ -1148,5 +1144,29 @@ fn get_glyph<R: BinaryReader>(file: &mut R, offset: u32, length: u32) -> Glyph {
         glyphs: Box::new(glyphs),
         offset,
         length,
+    }
+}
+
+#[cfg(test)]
+mod display_tests {
+    use super::*;
+
+    #[test]
+    fn glyph_display_preserves_empty_glyph() {
+        let glyph = Glyph {
+            glyphs: Box::default(),
+            offset: 7,
+            length: 0,
+        };
+        let expected = "glyph\nNumber of Contours 0\nx_min 0\nx_max 0\ny_max 0\ny_min 0\noffset 7\nlength 0\nbuffer length 0\nempty glyph\n";
+        assert_eq!(glyph.to_string(), expected);
+        assert_eq!(format!("{glyph}"), expected);
+        let glyf = Glyf {
+            griphs: vec![glyph],
+        };
+        assert_eq!(
+            glyf.to_string(),
+            format!("glyf\nnumber of glyphs 1\nglyph 0\n{expected}")
+        );
     }
 }

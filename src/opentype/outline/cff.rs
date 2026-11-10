@@ -37,7 +37,7 @@ type Card32 = u32;
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
-pub(crate) struct CFF {
+pub(crate) struct Cff {
     pub(crate) header: Header,
     pub(crate) names: Vec<String>,
     pub(crate) top_dict: Dict, // TopDict
@@ -77,12 +77,23 @@ struct GlyphContext {
     vsindex: u16,
 }
 
+type PrivateDictData = (Option<PrivateDict>, Option<CharString>, f64, f64, u16);
+
+#[derive(Clone, Copy)]
+struct SvgOptions<'a> {
+    fontsize: f64,
+    fontunit: &'a str,
+    layout: &'a FontLayout,
+    sx: f64,
+    sy: f64,
+}
+
 struct ParcePack {
     x: f64,
     y: f64,
     min_x: f64,
     width: Option<f64>,
-    stacks: Box<Vec<f64>>,
+    stacks: Vec<f64>,
     is_first: usize,
     hints: usize,
     subr: Option<CharString>,
@@ -115,7 +126,7 @@ impl Commands {
     }
 }
 
-impl CFF {
+impl Cff {
     fn parse_private_dict<R: BinaryReader>(
         reader: &mut R,
         cff_offset: u64,
@@ -124,7 +135,7 @@ impl CFF {
         fallback_width: f64,
         is_cff2: bool,
         variation_store: Option<&ItemVariationStore>,
-    ) -> Result<(Option<PrivateDict>, Option<CharString>, f64, f64, u16), Box<dyn Error>> {
+    ) -> Result<PrivateDictData, Box<dyn Error>> {
         if private.first().copied().unwrap_or(0) <= 0 {
             return Ok((None, None, fallback_default_width, fallback_width, 0));
         }
@@ -368,11 +379,13 @@ impl CFF {
         self.parse_data(
             gid,
             data,
-            24.0,
-            "pt",
-            layout,
-            0.0,
-            0.0,
+            SvgOptions {
+                fontsize: 24.0,
+                fontunit: "pt",
+                layout,
+                sx: 0.0,
+                sy: 0.0,
+            },
             false,
             context,
             coordinates,
@@ -433,7 +446,7 @@ impl CFF {
     ) -> ParcePack {
         let commands = Box::new(Commands::new());
         let stack_limit = if self.is_cff2 { 513 } else { 48 };
-        let stacks = Box::new(Vec::with_capacity(stack_limit));
+        let stacks = Vec::with_capacity(stack_limit);
         let mut parce_data = ParcePack {
             x: 0.0,
             y: 0.0,
@@ -2252,7 +2265,7 @@ impl CFF {
         sx: f64,
         sy: f64,
     ) -> Result<String, std::io::Error> {
-        self.to_svg_with_coords(gid, fontsize, fontunit, layout, sx, sy, &[])
+        self.to_svg_with_coords(gid, fontsize, fontunit, layout, (sx, sy), &[])
     }
 
     pub(crate) fn to_svg_with_coords(
@@ -2261,8 +2274,7 @@ impl CFF {
         fontsize: f64,
         fontunit: &str,
         layout: &FontLayout,
-        sx: f64,
-        sy: f64,
+        origin: (f64, f64),
         coordinates: &[f32],
     ) -> Result<String, std::io::Error> {
         if gid >= self.char_string.data.data.len() {
@@ -2273,11 +2285,13 @@ impl CFF {
         Ok(self.parse_data(
             gid,
             data,
-            fontsize,
-            fontunit,
-            layout,
-            sx,
-            sy,
+            SvgOptions {
+                fontsize,
+                fontunit,
+                layout,
+                sx: origin.0,
+                sy: origin.1,
+            },
             true,
             context,
             coordinates,
@@ -2289,12 +2303,17 @@ impl CFF {
         #[cfg(debug_assertions)] gid: usize,
         #[cfg(not(debug_assertions))] _gid: usize,
         parce_data: &ParcePack,
-        fontsize: f64,
-        fontunit: &str,
-        layout: &FontLayout,
-        nominal_width: f64,
-        default_width: f64,
+        options: SvgOptions<'_>,
+        context: &GlyphContext,
     ) -> String {
+        let SvgOptions {
+            fontsize,
+            fontunit,
+            layout,
+            ..
+        } = options;
+        let nominal_width = context.width;
+        let default_width = context.default_width;
         match layout {
             FontLayout::Horizontal(layout) => {
                 let line_gap = layout.line_gap;
@@ -2383,27 +2402,16 @@ impl CFF {
         &self,
         gid: usize,
         data: &[u8],
-        fontsize: f64,
-        fontunit: &str,
-        layout: &FontLayout,
-        sx: f64,
-        sy: f64,
+        options: SvgOptions<'_>,
         is_svg: bool,
         context: GlyphContext,
         coordinates: &[f32],
     ) -> String {
+        let SvgOptions { sx, sy, .. } = options;
         let parce_data = self.parse_operations(data, context.clone(), coordinates);
         let commands = &parce_data.commands;
         if is_svg {
-            let mut svg = self.get_svg_header(
-                gid,
-                &parce_data,
-                fontsize,
-                fontunit,
-                layout,
-                context.width,
-                context.default_width,
-            );
+            let mut svg = self.get_svg_header(gid, &parce_data, options, &context);
             let y_pos = self.bbox[3] + self.bbox[1];
             svg += "<path d=\"";
             for operation in commands.operations.iter() {
@@ -2550,16 +2558,15 @@ impl Charsets {
     ) -> Result<(), Box<dyn Error>> {
         let mut i = 1;
         while i < n_glyphs as usize - 1 {
-            let mut sid = reader.read_u16_be()?;
+            let sid = reader.read_u16_be()?;
             let n_left = if self.format == 1 {
                 reader.read_u8()? as usize
             } else {
                 reader.read_u16_be()? as usize
             };
-            for _ in 0..=n_left {
-                self.sid.push(sid);
+            for offset in 0..=n_left {
+                self.sid.push(sid + offset as u16);
                 i += 1;
-                sid += 1;
             }
         }
         Ok(())
@@ -2941,7 +2948,7 @@ impl Dict {
     }
 
     #[allow(dead_code)]
-    pub(crate) fn to_string(&self) -> String {
+    fn format_text(&self) -> String {
         let mut string = String::new();
         for (key, operands) in &self.entries {
             if *key < 256 {
@@ -3105,8 +3112,8 @@ mod tests {
         ItemVariationStore::parse(&data).expect("parse ItemVariationStore")
     }
 
-    fn dummy_cff() -> CFF {
-        CFF {
+    fn dummy_cff() -> Cff {
+        Cff {
             header: Header {
                 major: 2,
                 minor: 0,
@@ -3146,7 +3153,7 @@ mod tests {
             y: 0.0,
             min_x: 0.0,
             width: None,
-            stacks: Box::new(vec![100.0, 20.0, 1.0]),
+            stacks: vec![100.0, 20.0, 1.0],
             is_first: 0,
             hints: 0,
             subr: None,
@@ -3220,5 +3227,25 @@ mod tests {
 
         let std_hw = dict.get_f64(0, 10).expect("StdHW");
         assert!((std_hw - 100.0).abs() < 0.001);
+    }
+}
+
+impl std::fmt::Display for Dict {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.format_text())
+    }
+}
+
+#[cfg(test)]
+mod display_tests {
+    use super::*;
+
+    #[test]
+    fn dict_display_preserves_operands() {
+        let dict = Dict {
+            entries: HashMap::from([(0x0c01, vec![Operand::Integer(7), Operand::Real(2.5)])]),
+        };
+        assert_eq!(dict.to_string(), "12 1 [7,2.5,]\n");
+        assert_eq!(format!("{dict}"), dict.to_string());
     }
 }

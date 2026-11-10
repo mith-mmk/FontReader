@@ -1,2 +1,3 @@
-pub(crate) mod woff;
-pub(crate) use woff::WOFF;
+#[path = "woff.rs"]
+pub(crate) mod container;
+pub(crate) use container::Woff;

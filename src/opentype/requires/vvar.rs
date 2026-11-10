@@ -5,7 +5,7 @@ use super::delta_set::DeltaSetIndexMap;
 use super::var_store::ItemVariationStore;
 
 #[derive(Debug, Clone)]
-pub(crate) struct VVAR {
+pub(crate) struct Vvar {
     data: Vec<u8>,
     variation_store: ItemVariationStore,
     advance_height_mapping_offset: Option<u32>,
@@ -14,7 +14,7 @@ pub(crate) struct VVAR {
     vorg_mapping_offset: Option<u32>,
 }
 
-impl VVAR {
+impl Vvar {
     pub(crate) fn new<R: BinaryReader>(
         reader: &mut R,
         offset: u32,

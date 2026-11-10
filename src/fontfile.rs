@@ -141,7 +141,7 @@ impl FontFile {
             "FontFile\nface_count: {}\ncurrent_face: {}\nformat: {}",
             self.face_count(),
             self.font.get_font_number(),
-            self.font.font_type.to_string()
+            self.font.font_type
         )
     }
 

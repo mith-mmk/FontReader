@@ -11,7 +11,7 @@ fn get_font_type(folder: &std::path::Path) {
         font_files.push(filename);
     }
     let mut fonts = Vec::new();
-    for mut font in font_files {
+    for font in font_files {
         // is dir?
         if font.is_dir() {
             continue;
@@ -23,7 +23,7 @@ fn get_font_type(folder: &std::path::Path) {
         }
         let font_type = font_type.unwrap();
         println!("filename: {:?}", font);
-        println!("fonttype: {}", font_type.to_string());
+        println!("fonttype: {}", font_type);
         fonts.push(font_type);
     }
 }

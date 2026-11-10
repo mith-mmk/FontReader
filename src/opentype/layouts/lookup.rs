@@ -10,14 +10,14 @@ use std::sync::OnceLock;
 #[derive(Debug, Clone)]
 
 pub(crate) struct LookupList {
-    pub(crate) lookups: Box<Vec<Lookup>>,
+    pub(crate) lookups: Vec<Lookup>,
 }
 
 impl LookupList {
-    pub(crate) fn to_string(&self) -> String {
+    fn dump_text(&self) -> String {
         let mut string = format!("LookupCount: {}\n", self.lookups.len());
         for (i, lookup) in self.lookups.iter().enumerate() {
-            string += &format!("Lookup[{}]\n{}\n", i, lookup.to_string());
+            string += &format!("Lookup[{}]\n{}\n", i, lookup);
         }
         string
     }
@@ -31,12 +31,12 @@ pub(crate) struct Lookup {
 }
 
 impl Lookup {
-    pub(crate) fn to_string(&self) -> String {
+    fn dump_text(&self) -> String {
         let mut string = format!("LookupType: {}\n", self.lookup_type);
         string += &format!("LookupFlag: {}\n", self.lookup_flag);
         string += "Subtables:\n";
         for subtable in self.subtables.iter() {
-            string += &format!("{}\n", subtable.to_string());
+            string += &format!("{}\n", subtable);
         }
         string
     }
@@ -198,7 +198,7 @@ impl LookupList {
         }
 
         Ok(Self {
-            lookups: Box::new(lookups_parsed),
+            lookups: lookups_parsed,
         })
     }
 
@@ -1012,17 +1012,14 @@ pub(crate) enum LookupResult {
     None,
 }
 
+type ChainedCoverages = (Vec<Coverage>, Vec<Coverage>, Vec<Coverage>);
+
 impl LookupSubstitution {
-    pub(crate) fn to_string(&self) -> String {
+    fn dump_text(&self) -> String {
         format!("{:?}", self)
     }
 
-    pub(crate) fn get_coverage(
-        &self,
-    ) -> (
-        &Coverage,
-        Option<(Vec<Coverage>, Vec<Coverage>, Vec<Coverage>)>,
-    ) {
+    pub(crate) fn get_coverage(&self) -> (&Coverage, Option<ChainedCoverages>) {
         let coverage = match self {
             Self::Single(single) => &single.coverage,
             Self::Single2(single2) => &single2.coverage,
@@ -1083,11 +1080,7 @@ impl LookupSubstitution {
             LookupSubstitution::Single2(subtable) => {
                 let coverage = &subtable.coverage;
                 if let Some(id) = coverage.contains(glyph_id as usize) {
-                    return subtable
-                        .substitute_glyph_ids
-                        .get(id)
-                        .copied()
-                        .map(|glyph_id| glyph_id);
+                    return subtable.substitute_glyph_ids.get(id).copied();
                 }
             }
             _ => {}
@@ -1447,6 +1440,24 @@ pub(crate) struct ReverseChainSingleSubstitutionFormat1 {
     pub(crate) lookahead_coverages: Vec<Coverage>,
     pub(crate) glyph_count: u16,
     pub(crate) substitute_glyph_ids: Vec<u16>,
+}
+
+impl std::fmt::Display for LookupList {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.dump_text())
+    }
+}
+
+impl std::fmt::Display for Lookup {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.dump_text())
+    }
+}
+
+impl std::fmt::Display for LookupSubstitution {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.dump_text())
+    }
 }
 
 #[cfg(test)]

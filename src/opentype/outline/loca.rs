@@ -3,17 +3,17 @@ use std::{fmt, io::SeekFrom};
 use bin_rs::reader::BinaryReader;
 
 #[derive(Debug, Clone)]
-pub(crate) struct LOCA {
-    pub(crate) offsets: Box<Vec<u32>>,
+pub(crate) struct Loca {
+    pub(crate) offsets: Vec<u32>,
 }
 
-impl fmt::Display for LOCA {
+impl fmt::Display for Loca {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.to_string())
+        f.write_str(&self.format_text())
     }
 }
 
-impl LOCA {
+impl Loca {
     pub(crate) fn new_by_size<R: BinaryReader>(
         file: &mut R,
         offest: u32,
@@ -23,7 +23,7 @@ impl LOCA {
         get_loca_by_size(file, offest, length, index_to_loc_format)
     }
 
-    pub(crate) fn to_string(&self) -> String {
+    fn format_text(&self) -> String {
         let max_length = 10;
         let mut string = "loca\n".to_string();
         let length = if self.offsets.len() < 10 {
@@ -47,7 +47,7 @@ fn get_loca_by_size<R: BinaryReader>(
     offest: u32,
     length: u32,
     index_to_loc_format: usize,
-) -> Result<LOCA, std::io::Error> {
+) -> Result<Loca, std::io::Error> {
     file.seek(SeekFrom::Start(offest as u64))?;
 
     let mut offsets = Vec::new();
@@ -63,7 +63,22 @@ fn get_loca_by_size<R: BinaryReader>(
         offsets.push(offset);
     }
 
-    Ok(LOCA {
-        offsets: Box::new(offsets),
-    })
+    Ok(Loca { offsets })
+}
+
+#[cfg(test)]
+mod display_tests {
+    use super::*;
+
+    #[test]
+    fn loca_display_preserves_offsets() {
+        let loca = Loca {
+            offsets: vec![0, 0xab],
+        };
+        assert_eq!(
+            loca.to_string(),
+            "loca\n\n  0 Offset 00000000\n  1 Offset 000000ab\n"
+        );
+        assert_eq!(format!("{loca}"), loca.to_string());
+    }
 }

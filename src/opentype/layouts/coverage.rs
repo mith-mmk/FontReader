@@ -43,7 +43,7 @@ impl Coverage {
         }
     }
 
-    pub(crate) fn to_string(&self) -> String {
+    fn dump_text(&self) -> String {
         match self {
             Coverage::Format1(coverage) => {
                 let mut string = String::new();
@@ -127,4 +127,10 @@ pub(crate) struct RangeRecord {
     pub(crate) start_glyph_id: u16,
     pub(crate) end_glyph_id: u16,
     pub(crate) start_coverage_index: u16,
+}
+
+impl std::fmt::Display for Coverage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.dump_text())
+    }
 }

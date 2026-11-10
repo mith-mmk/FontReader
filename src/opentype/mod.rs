@@ -23,7 +23,7 @@ pub struct OTFHeader {
     pub(crate) search_range: u16,
     pub(crate) entry_selector: u16,
     pub(crate) range_shift: u16,
-    pub(crate) table_records: Box<Vec<TableRecord>>,
+    pub(crate) table_records: Vec<TableRecord>,
 }
 
 impl OTFHeader {
@@ -59,7 +59,7 @@ impl OTFHeader {
             search_range,
             entry_selector,
             range_shift,
-            table_records: Box::new(table_records),
+            table_records,
         })
     }
 

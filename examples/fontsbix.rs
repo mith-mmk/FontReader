@@ -17,8 +17,8 @@ fn main() {
             println!("\nfont number: {} ", i);
             NameID::iter().into_iter().for_each(|name_id| {
                 let name = font.get_name(name_id, &"ja".to_string());
-                if !name.is_err() {
-                    println!("{:?}: {:?}", name_id, name.unwrap());
+                if let Ok(name) = name {
+                    println!("{:?}: {:?}", name_id, name);
                 }
             });
             #[cfg(debug_assertions)]

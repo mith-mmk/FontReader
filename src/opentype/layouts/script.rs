@@ -13,7 +13,7 @@ pub(crate) struct Script {
 #[derive(Debug, Clone)]
 pub(crate) struct ParsedScript {
     pub(crate) script_tag: u32,
-    pub(crate) language_systems: Box<Vec<LanguageSystemRecord>>,
+    pub(crate) language_systems: Vec<LanguageSystemRecord>,
 }
 
 impl ParsedScript {
@@ -62,11 +62,11 @@ impl ParsedScript {
 
         Ok(Self {
             script_tag: script.script_tag,
-            language_systems: Box::new(language_systems),
+            language_systems,
         })
     }
 
-    pub(crate) fn to_string(&self) -> String {
+    fn dump_text(&self) -> String {
         let mut u8s = [0; 4];
         for i in 0..4 {
             u8s[3 - i] = (self.script_tag >> (i * 8)) as u8;
@@ -83,7 +83,7 @@ impl ParsedScript {
 #[derive(Debug, Clone)]
 pub(crate) struct ScriptList {
     pub(crate) script_count: u16,
-    pub(crate) scripts: Box<Vec<ParsedScript>>,
+    pub(crate) scripts: Vec<ParsedScript>,
 }
 
 impl ScriptList {
@@ -112,7 +112,7 @@ impl ScriptList {
 
         Ok(Self {
             script_count,
-            scripts: Box::new(parced_scripts),
+            scripts: parced_scripts,
         })
     }
 
@@ -124,12 +124,24 @@ impl ScriptList {
             .map(|v| v as _)
     }
 
-    pub(crate) fn to_string(&self) -> String {
+    fn dump_text(&self) -> String {
         let mut string = String::new();
         string += &format!("script count {}\n", self.script_count);
         for script in self.scripts.iter() {
             string += &script.to_string();
         }
         string
+    }
+}
+
+impl std::fmt::Display for ParsedScript {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.dump_text())
+    }
+}
+
+impl std::fmt::Display for ScriptList {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.dump_text())
     }
 }

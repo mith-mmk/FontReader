@@ -13,7 +13,7 @@ pub(crate) struct Feature {
 }
 
 impl Feature {
-    pub(crate) fn to_string(&self) -> String {
+    fn dump_text(&self) -> String {
         let mut bytes = [0; 4];
         for i in 0..4 {
             bytes[3 - i] = (self.feature_tag >> (i * 8)) as u8;
@@ -23,7 +23,7 @@ impl Feature {
         string += &format!("FeatureParams: {:?}\n", self.feature_params);
         string += &format!("LookupListIndices: {:?}\n", self.lookup_list_indices);
         if let Some(feature_params) = &self.feature_params {
-            string += &format!("FeatureParams: {}\n", feature_params.to_string());
+            string += &format!("FeatureParams: {}\n", feature_params);
         }
         string
     }
@@ -35,7 +35,7 @@ pub(crate) struct FeatureParams {
 }
 
 impl FeatureParams {
-    pub(crate) fn to_string(&self) -> String {
+    fn dump_text(&self) -> String {
         let mut string = String::new();
         for param in self.feature_params.iter() {
             string += &format!("{:02X} ", param);
@@ -47,7 +47,7 @@ impl FeatureParams {
 #[derive(Debug, Clone)]
 pub(crate) struct FeatureList {
     pub(crate) feature_count: u16,
-    pub(crate) features: Box<Vec<Feature>>,
+    pub(crate) features: Vec<Feature>,
 }
 
 impl FeatureList {
@@ -111,14 +111,14 @@ impl FeatureList {
 
         Ok(Self {
             feature_count,
-            features: Box::new(features),
+            features,
         })
     }
 
-    pub(crate) fn to_string(&self) -> String {
+    fn dump_text(&self) -> String {
         let mut string = format!("FeatureCount: {}\n", self.feature_count);
         for feature in self.features.iter() {
-            string += &format!("{}\n", feature.to_string());
+            string += &format!("{}\n", feature);
         }
         string
     }
@@ -128,7 +128,7 @@ impl FeatureList {
 pub(crate) struct FeatureVariation {
     pub(crate) major_version: u16,
     pub(crate) minor_version: u16,
-    pub(crate) feature_variations: Box<Vec<FeatureVariationRecord>>,
+    pub(crate) feature_variations: Vec<FeatureVariationRecord>,
 }
 
 #[derive(Debug, Clone)]
@@ -142,8 +142,8 @@ pub(crate) struct FeatureVariations {
     pub(crate) major_version: u16,
     pub(crate) minor_version: u16,
     pub(crate) condition_set_count: u16,
-    pub(crate) condition_sets: Box<Vec<ConditionSet>>,
-    pub(crate) feature_table_substitutions: Box<Vec<FeatureTableSubstitution>>,
+    pub(crate) condition_sets: Vec<ConditionSet>,
+    pub(crate) feature_table_substitutions: Vec<FeatureTableSubstitution>,
 }
 impl FeatureVariations {
     pub(crate) fn new<R: BinaryReader>(
@@ -181,15 +181,15 @@ impl FeatureVariations {
             }
             condition_sets.push(ConditionSet {
                 condition_count,
-                conditions: Box::new(conditions),
+                conditions,
             });
         }
         Ok(Self {
             major_version,
             minor_version,
             condition_set_count,
-            condition_sets: Box::new(condition_sets),
-            feature_table_substitutions: Box::new(feature_table_substitutions),
+            condition_sets,
+            feature_table_substitutions,
         })
     }
 }
@@ -202,7 +202,7 @@ pub(crate) struct FeatureTableSubstitution {
 #[derive(Debug, Clone)]
 pub(crate) struct FeatureVariationRecordList {
     pub(crate) feature_variation_record_count: u16,
-    pub(crate) feature_variation_records: Box<Vec<FeatureVariationRecord>>,
+    pub(crate) feature_variation_records: Vec<FeatureVariationRecord>,
 }
 
 #[derive(Debug, Clone)]
@@ -245,5 +245,46 @@ impl FeatureVariationList {
             feature_variation_count,
             feature_variations,
         })
+    }
+}
+
+impl std::fmt::Display for Feature {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.dump_text())
+    }
+}
+
+impl std::fmt::Display for FeatureParams {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.dump_text())
+    }
+}
+
+impl std::fmt::Display for FeatureList {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.dump_text())
+    }
+}
+
+#[cfg(test)]
+mod display_tests {
+    use super::*;
+
+    #[test]
+    fn display_preserves_feature_list_dump() {
+        let list = FeatureList {
+            feature_count: 1,
+            features: vec![Feature {
+                feature_tag: u32::from_be_bytes(*b"liga"),
+                feature_offset: 0,
+                feature_params: Some(FeatureParams {
+                    feature_params: vec![0, 255],
+                }),
+                lookup_list_indices: vec![2],
+            }],
+        };
+        let expected = "FeatureCount: 1\nFeatureTag: liga\nFeatureParams: Some(FeatureParams { feature_params: [0, 255] })\nLookupListIndices: [2]\nFeatureParams: 00 FF \n\n";
+        assert_eq!(list.to_string(), expected);
+        assert_eq!(format!("{list}"), expected);
     }
 }
