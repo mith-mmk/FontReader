@@ -39,6 +39,13 @@ sha256 = "6993e0af3880af2ebbec5e159ee54762226ed8ed8812f9f9890d7c2e47293dff"
 features = ["vertical-flow", "vhea", "vmtx", "fallback"]
 
 [[fixture]]
+id = "vertical-gsub-format1.ttf"
+source = "tests/fixtures/generate_vertical_gsub.py (fontTools 4.65.0)"
+license = "MIT (project test code)"
+sha256 = "13826e3c77b002909b501fb55bb72c1896e8c7904884254e299b75a26d18cc78"
+features = ["vertical-flow", "GSUB", "vert", "single-substitution-format1"]
+
+[[fixture]]
 id = "gpos-single.ttf"
 source = "generate_gpos_single.py (fontTools 4.65.0; no external font)"
 license = "MIT (project test code)"
