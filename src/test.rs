@@ -1486,7 +1486,7 @@ mod tests {
         let run = crate::text2commands("A\u{0301}B", options.clone()).unwrap();
         assert_eq!(run.glyphs.len(), 3);
         assert_eq!(run.glyphs[1].x, 315.0);
-        assert_eq!(run.glyphs[1].y, 473.0);
+        assert_eq!(run.glyphs[1].y, -527.0);
         assert_eq!(run.glyphs[1].glyph.metrics.advance_x, 25.0);
         assert_eq!(run.glyphs[1].glyph.metrics.advance_y, 5.0);
         assert_eq!(run.glyphs[2].x, 650.0);
@@ -7348,7 +7348,7 @@ mod tests {
             _ => 1.0,
         };
         let expected_dx = attachment.x_placement as f32 * scale;
-        let expected_dy = attachment.y_placement as f32 * scale;
+        let expected_dy = -(attachment.y_placement as f32) * scale;
 
         let actual_dx = run.glyphs[1].x - run.glyphs[0].x;
         let actual_dy = run.glyphs[1].y - run.glyphs[0].y;
@@ -7395,12 +7395,12 @@ mod tests {
         let first_mark_dx = run.glyphs[1].x - run.glyphs[0].x;
         let first_mark_dy = run.glyphs[1].y - run.glyphs[0].y;
         assert!((first_mark_dx - base_attachment.x_placement as f32 * scale).abs() <= 1.0);
-        assert!((first_mark_dy - base_attachment.y_placement as f32 * scale).abs() <= 1.0);
+        assert!((first_mark_dy + base_attachment.y_placement as f32 * scale).abs() <= 1.0);
 
         let second_mark_dx = run.glyphs[2].x - run.glyphs[1].x;
         let second_mark_dy = run.glyphs[2].y - run.glyphs[1].y;
         assert!((second_mark_dx - mark_attachment.x_placement as f32 * scale).abs() <= 1.0);
-        assert!((second_mark_dy - mark_attachment.y_placement as f32 * scale).abs() <= 1.0);
+        assert!((second_mark_dy + mark_attachment.y_placement as f32 * scale).abs() <= 1.0);
         assert_eq!(run.glyphs[1].glyph.metrics.advance_x, 0.0);
         assert_eq!(run.glyphs[2].glyph.metrics.advance_x, 0.0);
     }

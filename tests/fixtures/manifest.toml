@@ -46,6 +46,13 @@ sha256 = "13826e3c77b002909b501fb55bb72c1896e8c7904884254e299b75a26d18cc78"
 features = ["vertical-flow", "GSUB", "vert", "single-substitution-format1"]
 
 [[fixture]]
+id = "mark-coordinates.ttf"
+source = "tests/fixtures/generate_mark_coordinates.py (fontTools 4.65.0)"
+license = "MIT (project test code)"
+sha256 = "ba41b8718860b39e64ed8c6eb34c1cadf10e3204ef5a0b82be0c73964a5c19ba"
+features = ["mark-to-base", "mark-to-mark", "mark-to-ligature", "screen-coordinates"]
+
+[[fixture]]
 id = "gpos-single.ttf"
 source = "generate_gpos_single.py (fontTools 4.65.0; no external font)"
 license = "MIT (project test code)"
