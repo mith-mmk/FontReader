@@ -21,6 +21,10 @@ pub(crate) struct COLR {
 }
 
 impl COLR {
+    pub(crate) fn is_version_zero(&self) -> bool {
+        self.version == 0
+    }
+
     pub(crate) fn new<R: BinaryReader>(reader: &mut R, offset: u32, _: u32) -> Result<Self, Error> {
         reader.seek(SeekFrom::Start(offset as u64))?;
         let version = reader.read_u16_be()?;

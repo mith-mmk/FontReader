@@ -56,7 +56,7 @@ attached by GPOS/GDEF inherit the base glyph's origin translation.
 Synthetic regressions cover punctuation, negative bearings, composites, gvar
 outline/phantom movement, collection face selection, and sfnt/WOFF parity.
 BASE alignment, Unicode orientation, and color
-origins (COLR, sbix, SVG) remain separate work. Color layer offsets and the legacy
+origins outside the static COLR v0 case below remain separate work. The legacy
 raw glyph/SVG APIs are unchanged. TrueType ignores VORG as required by OpenType.
 
 ### GSUB
@@ -155,7 +155,7 @@ Invalid optional VORG (unsupported version, short data, unsorted or duplicate
 records) is ignored and uses the same fallback. TrueType ignores VORG entirely.
 
 This correction requires `cff`; sfnt vertical metrics require `layout` as before.
-Color COLR/sbix/SVG origins, BASE alignment and Unicode orientation remain outside
+Color origins outside the static COLR v0 case below, BASE alignment and Unicode orientation remain outside
 this scope. Horizontal and legacy raw APIs are unchanged.
 Tests use committed MIT synthetic fixtures in `cff-vertical-origin.ttc` and
 `cff-vertical-origin.woff`; provenance and SHA-256 are in `tests/fixtures/manifest.toml`.
@@ -183,3 +183,21 @@ color origins, BASE, Unicode orientation and legacy raw APIs are not extended.
 See the [VORG specification](https://learn.microsoft.com/en-us/typography/opentype/spec/vorg)
 and [VVAR specification](https://learn.microsoft.com/en-us/typography/opentype/spec/vvar).
 Fixture provenance, reproduction and SHA-256: `tests/fixtures/manifest.toml`.
+
+### Static TrueType COLR v0 vertical origins
+
+With `layout` and vhea/vmtx, actually rendered COLR v0/CPAL path layers share the
+base glyph's half horizontal advance and `glyf.yMax + vmtx.topSideBearing` origin.
+An empty base has yMax zero: its TSB is the full origin, not an offset from the
+colored outline union. This follows the [COLR glyph metrics requirements](https://learn.microsoft.com/en-us/typography/opentype/spec/colr#glyph-metrics-and-boundedness).
+Layer paints and composition remain intact; attached monochrome/color marks
+inherit the base translation. Font size/stretch apply once. Bounds, measurement
+and SVG use the translated layers; horizontal and legacy raw APIs are unchanged.
+
+This deliberately does not add origin correction for fonts with fvar (COLR layers
+are not varied yet), COLR v1, CFF color outlines, sbix or SVG tables. Without
+vertical metrics, including builds without `layout`, COLR offsets stay unchanged;
+a rendered-union centering fallback is separate work. Missing CPAL or an unusable
+palette that falls back to monochrome retains its previous origin policy rather
+than treating COLR metadata as evidence of rendered color. Reproducible MIT cases
+are in `colr-vertical-origin.ttc`; the generator and SHA-256 are in the manifest.
