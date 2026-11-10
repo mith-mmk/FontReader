@@ -3,6 +3,17 @@
 This document keeps the implementation-oriented notes that were previously in `README.md`.
 The README now focuses on the public API and runnable examples.
 
+## Unicode vertical-orientation property
+
+`vertical_orientation(char)` exposes Unicode 18.0.0 `Vertical_Orientation` as
+four distinct values (`U`, `R`, `Tu`, `Tr`), without fonts or feature flags.
+`Tr` prefers a transformed upright form and rotates only as a fallback.
+The scalar query does not resolve grapheme clusters or font substitutions and
+does not change existing shaping. Automatic mixed-orientation layout remains
+separate work; references to Unicode orientation below concern layout behavior.
+See the [recipe](api-recipes.md#query-unicode-vertical-orientation) and
+[data provenance](../data/unicode/README.md).
+
 ## Layout support
 
 `layout` is partially implemented.

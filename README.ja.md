@@ -22,6 +22,12 @@ English: [README.md](README.md)
 
 旧来の低レイヤ parser API は `features = ["raw"]` で引き続き利用できます。
 
+フォントに依存しない Unicode 18.0.0 の縦書きプロパティには
+`vertical_orientation(char)` と `VerticalOrientation` を使えます。機能フラグは不要で、
+自動的な混在縦書きのレイアウトは行いません。
+[使用例](doc/api-recipes.ja.md#unicode-の縦書きプロパティを調べる)と
+[Unicode データ・ライセンス](data/unicode/README.md)を参照してください。
+
 ## 対応フォーマット
 
 - TrueType

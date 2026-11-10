@@ -13,6 +13,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - name: unicode-data
+            command: python3 tools/generate_vertical_orientation.py --check
           - name: fmt
             command: cargo fmt --all -- --check
           - name: clippy

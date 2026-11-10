@@ -52,6 +52,34 @@ assert!(svg.contains("<svg"));
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
+## Query Unicode Vertical Orientation
+
+This scalar-property query requires no font or feature flags. The four return
+values preserve Unicode's distinction between orientation and typography:
+
+```rust
+use fontcore::{
+    vertical_orientation, VerticalOrientation as Vo, VERTICAL_ORIENTATION_UNICODE_VERSION,
+};
+
+assert_eq!(VERTICAL_ORIENTATION_UNICODE_VERSION, "18.0.0");
+assert_eq!(vertical_orientation('漢'), Vo::Upright); // U
+assert_eq!(vertical_orientation('A'), Vo::Rotated); // R
+assert_eq!(vertical_orientation('、'), Vo::TransformWithUprightFallback); // Tu
+assert_eq!(vertical_orientation('ー'), Vo::TransformWithRotatedFallback); // Tr
+```
+
+`U` keeps the code-chart orientation; `R` rotates it 90 degrees clockwise.
+`Tu` and `Tr` prefer a typographically transformed vertical form, falling back
+to upright and rotated code-chart glyphs respectively. In particular, `Tr` does
+not mean "always rotate": use the transformed upright form when available.
+
+The query uses pinned Unicode 18.0.0 data, including its unassigned and private-use
+ranges. It does not resolve grapheme clusters, combining marks, variation
+selectors, emoji sequences, font substitutions, or mixed vertical layout, and
+does not change any shaping API. A scalar's property is not its final cluster or
+glyph orientation. [Data provenance and regeneration](../data/unicode/README.md).
+
 ## Sideways LTR Shaping, Measurement, And SVG
 
 For a single horizontal LTR line rotated clockwise as a whole, use the explicit

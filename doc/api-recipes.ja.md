@@ -52,6 +52,32 @@ assert!(svg.contains("<svg"));
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
+## Unicode の縦書きプロパティを調べる
+
+フォントや機能フラグを必要とせず、Unicode スカラー値のプロパティを取得できます。
+向きと縦書き用字形の違いを保持するため、戻り値は次の 4 値です。
+
+```rust
+use fontcore::{
+    vertical_orientation, VerticalOrientation as Vo, VERTICAL_ORIENTATION_UNICODE_VERSION,
+};
+
+assert_eq!(VERTICAL_ORIENTATION_UNICODE_VERSION, "18.0.0");
+assert_eq!(vertical_orientation('漢'), Vo::Upright); // U
+assert_eq!(vertical_orientation('A'), Vo::Rotated); // R
+assert_eq!(vertical_orientation('、'), Vo::TransformWithUprightFallback); // Tu
+assert_eq!(vertical_orientation('ー'), Vo::TransformWithRotatedFallback); // Tr
+```
+
+`U` はコード表と同じ正立、`R` は時計回りに 90 度回転する値です。`Tu` と `Tr` は
+縦書き用の字形を優先し、その字形がないときに、それぞれ正立または回転したコード表の
+字形を用います。特に `Tr` は「常に回転」ではなく、正立の縦書き用字形を優先します。
+
+Unicode 18.0.0 に固定したデータを使い、未割当文字・私用文字の範囲も保持しています。
+書記素クラスタ、結合文字、異体字セレクタ、絵文字列、字形置換、混在縦書きは解決せず、
+既存の shaping API の動作も変えません。文字単位のプロパティは、最終的なクラスタや
+グリフの向きではありません。[データの出典と再生成手順](../data/unicode/README.md)。
+
 ## Sideways LTR の整形・計測・SVG 出力
 
 左から右へ横書きした一行全体を時計回りに回転する場合は、専用の sideways
