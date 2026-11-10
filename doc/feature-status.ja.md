@@ -66,6 +66,16 @@ CFF/CFF2のVORG、VVAR原点map、BASE、Unicode縦方向、COLR/sbix/SVGの色l
 - Type 7 Extension Substitution: パース済み、完全適用は未完
 - Type 8 Reverse Chaining Contextual Single Substitution: パース済み、未適用
 
+### GPOS Single Positioning
+
+- Type 1 SinglePos Format 1/2 と、それを包む Type 9 をパースし、実行する。
+- 既定の実行対象は横組み `kern` / `dist`、縦組み `vkrn` / `dist`。既存の locale / script 選択を利用し、任意 feature 選択や contextual GPOS は追加しない。
+- 静的 ValueRecord の4値を shaping と測定へ反映する。付着する mark の明示 advance も保持し、lookup 間は i32 で加算する。同一 lookup ではゼロ値を含む最初の一致 subtable だけを適用する。
+- SinglePos は GDEF の glyph class、IgnoreBaseGlyphs / IgnoreLigatures / IgnoreMarks、MarkAttachmentType、MarkFilteringSet を尊重する。既存 pair / mark 経路への共通 filtering 統合は含めない。
+- Device / VariationIndex offset は読み進めるが delta は未評価。筆記体接続と Unicode Arabic joining は別の残件。
+- MIT の合成フォント `tests/fixtures/gpos-single.ttf` と byte fixture により、切断入力、不正 coverage / count、lookup 加算、locale、拡縮、縦組み、mark 付着を検証する。広範な実フォント / HarfBuzz 比較は未実施。
+- 仕様: [OpenType GPOS Single Adjustment](https://learn.microsoft.com/en-us/typography/opentype/spec/gpos#lookup-type-1-single-adjustment-positioning-subtable)。
+
 ### GDEF
 
 - パース済み: glyph class definition, attach list, ligature caret list, mark attach class definition, mark glyph sets definition
