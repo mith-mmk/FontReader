@@ -1211,17 +1211,42 @@ impl Font {
         let component_varied = self.current_gvar_component_varied_parsed(glyph_id, coordinates)?;
 
         let horizontal_metric = Some(self.get_h_metrix_with_coords(glyph_id, coordinates));
-        let vertical_metric = self
-            .current_vhea()
-            .map(|_| self.get_v_metrix_with_coords(glyph_id, coordinates));
+        // Phantom points start at default vmtx metrics. VVAR and gvar encode
+        // alternative adjustments to those defaults, not cumulative deltas.
+        let vertical_metric = self.current_vhea().map(|_| {
+            self.current_vmtx()
+                .map(|vmtx| vmtx.get_metrix(glyph_id))
+                .unwrap_or(VerticalMetric {
+                    advance_height: 0,
+                    top_side_bearing: 0,
+                })
+        });
 
-        gvar.apply_to_parsed_glyph_with_metrics(
+        let mut variation = gvar.apply_to_parsed_glyph_with_metrics(
             glyph_id,
             coordinates,
             &component_varied,
             horizontal_metric,
-            vertical_metric,
-        )
+            vertical_metric.clone(),
+        )?;
+        let vvar = if self.current_font == 0 {
+            self.vvar.as_ref()
+        } else {
+            self.more_fonts[self.current_font - 1].vvar.as_ref()
+        };
+        if let (Some(base), Some(metric), Some(vvar)) =
+            (vertical_metric, variation.vertical_metric.as_mut(), vvar)
+        {
+            // Prefer each available VVAR entry, retaining gvar-derived TSB
+            // when its optional mapping is absent. A mapped zero is present.
+            if let Some(delta) = vvar.advance_offset(glyph_id, coordinates) {
+                metric.advance_height = apply_u16_delta(base.advance_height, delta);
+            }
+            if let Some(delta) = vvar.top_side_bearing_offset(glyph_id, coordinates) {
+                metric.top_side_bearing = apply_i16_delta(base.top_side_bearing, delta);
+            }
+        }
+        Some(variation)
     }
 
     fn current_gvar_component_varied_parsed(

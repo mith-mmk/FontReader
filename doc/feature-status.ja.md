@@ -20,6 +20,19 @@ vheaだけがある場合も同じフォールバックです。
 合成fixtureで縦メトリクスの有無とコレクション内のface選択を検証し、外部フォントを必要としません。
 このfallbackとは別に下記のTrueType縦原点補正を行います。Unicode縦方向、約物の回転は別対応です。静的CFFの原点は下記を参照してください。
 
+### TrueTypeの可変縦メトリクス
+
+縦phantom pointは既定の`vmtx`から作り、`gvar`と`VVAR`の同じ変化を二重適用しません。
+有効な`VVAR`のadvance/TSBエントリを項目ごとに優先し、省略されたTSB mapでは
+輪郭boundsの変化も含む`gvar`由来のTSBを維持します。明示されたゼロdeltaも優先します。
+TrueTypeでは`VVAR`の縦原点mapを使いません。
+
+[OpenType VVAR仕様](https://learn.microsoft.com/en-us/typography/opentype/spec/vvar)を参照してください。
+不一致データの優先順位は実装の決定的な選択方針であり、適合するフォント作成例や
+仕様が定めた競合解決規則という意味ではありません。MITの合成fixtureで軸の既定値・中間値・
+最大値、任意map、TTC face、shape・measure・描画boundsを検証します。
+この修正は縦方向のみです。横方向の`HVAR`/`gvar`の相互作用は変更・検証していません。
+
 ### TrueTypeの縦原点
 
 モノクロTrueTypeの描画layerは、横advanceの半分をx原点、
