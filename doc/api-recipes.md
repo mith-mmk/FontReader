@@ -52,6 +52,56 @@ assert!(svg.contains("<svg"));
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
+## Sideways LTR Shaping, Measurement, And SVG
+
+For a single horizontal LTR line rotated clockwise as a whole, use the explicit
+sideways methods. This differs from upright top-to-bottom layout.
+
+```rust
+use fontcore::{FontFile, ShapingPolicy};
+
+let face = FontFile::from_file("fonts/YourFont.ttf")?.current_face()?;
+let engine = face
+    .engine()
+    .with_font_size(32.0)
+    .with_vertical_flow()
+    .with_svg_unit("px");
+
+let run = engine.shape_sideways_ltr("Hello")?;
+let metrics = engine.measure_layout_sideways_ltr("Hello")?;
+let advance = engine.measure_sideways_ltr("Hello")?;
+let svg = engine.render_svg_sideways_ltr("Hello")?;
+
+assert!(!run.glyphs.is_empty());
+assert_eq!(advance, metrics.inline_advance);
+assert!(svg.contains("<svg"));
+assert_eq!(engine.shaping_policy(), ShapingPolicy::TopToBottom);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+Each call overrides LTR, RTL, or top-to-bottom policy only for that call. The
+engine and its options stay unchanged, including style, locale, variant,
+supported variations, size, stretch, and SVG units. Ordinary `shape`, `measure`,
+`measure_layout`, and SVG methods retain their existing behavior.
+
+The run is shaped with horizontal metrics, then rotated 90 degrees clockwise
+about baseline `(0, 0)`, without em-centering. Measurement uses the same rotated
+run: `inline_advance` is the absolute sum of its y advances, `ink_bounds` encloses
+the positioned ink, and `line_bounds` includes each positioned origin and its
+full advance-vector endpoint. `block_extent` is the x extent of `line_bounds`,
+not the font line height. Empty text has no bounds and zero extents; spaces
+retain their horizontal advances rotated into the vertical direction.
+
+Only current-color fill paths without clips are supported. Other paints
+(including solid colors and gradients), strokes, clips, raster layers, or raw
+SVG layers return `std::io::ErrorKind::Unsupported`, without a partial result.
+TAB, CR, LF, VT, FF, NEL, U+2028, and U+2029 return
+`std::io::ErrorKind::InvalidInput`. Split and position lines in the caller.
+This single-face API does not add family fallback, BiDi, automatic mixed
+orientation, or alignment with upright CJK baselines. See
+[feature-status.md](feature-status.md#sideways-ltr-runs) for `vrtr`, coordinate,
+and shaping-support details.
+
 ## RTL Shaping
 
 ```rust

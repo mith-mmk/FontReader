@@ -52,6 +52,55 @@ assert!(svg.contains("<svg"));
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
+## Sideways LTR の整形・計測・SVG 出力
+
+左から右へ横書きした一行全体を時計回りに回転する場合は、専用の sideways
+メソッドを使います。正立した文字を上から下へ配置する縦書きとは異なります。
+
+```rust
+use fontcore::{FontFile, ShapingPolicy};
+
+let face = FontFile::from_file("fonts/YourFont.ttf")?.current_face()?;
+let engine = face
+    .engine()
+    .with_font_size(32.0)
+    .with_vertical_flow()
+    .with_svg_unit("px");
+
+let run = engine.shape_sideways_ltr("Hello")?;
+let metrics = engine.measure_layout_sideways_ltr("Hello")?;
+let advance = engine.measure_sideways_ltr("Hello")?;
+let svg = engine.render_svg_sideways_ltr("Hello")?;
+
+assert!(!run.glyphs.is_empty());
+assert_eq!(advance, metrics.inline_advance);
+assert!(svg.contains("<svg"));
+assert_eq!(engine.shaping_policy(), ShapingPolicy::TopToBottom);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+LTR・RTL・上から下のいずれの設定でも、各呼び出しの間だけ LTR として整形します。
+engine と options は変更せず、style・locale・variant・対応済みの可変軸・
+サイズ・横伸縮・SVG 単位を維持します。通常の `shape`・`measure`・
+`measure_layout`・SVG メソッドの動作は変わりません。
+
+横メトリクスで整形した run を、ベースライン原点 `(0, 0)` の周りに時計回りに
+90 度回転します。em 中央への移動は行いません。計測も同じ回転後の run を使い、
+`inline_advance` は y 方向送り量の合計の絶対値、`ink_bounds` は配置済みの描画範囲です。
+`line_bounds` は各配置原点と、送り量ベクトル全体を足した終点を含みます。
+`block_extent` は `line_bounds` の x 方向の幅であり、フォントの行高ではありません。
+空文字列の bounds はなく、各 extent は 0 です。空白は横送り量を回転した縦方向の
+送り量を保持します。
+
+対応するのは、クリップなし・current-color の塗りつぶし path のみです。
+単色指定やグラデーションを含むほかの paint、stroke、clip、raster、raw SVG layer は
+`std::io::ErrorKind::Unsupported` となり、部分的な結果は返しません。
+TAB・CR・LF・VT・FF・NEL・U+2028・U+2029 は `std::io::ErrorKind::InvalidInput`
+です。複数行への分割と配置は呼び出し側で行ってください。単一 face の API であり、
+family fallback・BiDi・向きが混在する文字列の自動判定・正立 CJK のベースラインとの
+位置合わせは追加しません。`vrtr`、座標、整形の対応範囲は
+[feature-status.ja.md](feature-status.ja.md#sideways-ltr-の-run) を参照してください。
+
 ## RTL shaping
 
 ```rust

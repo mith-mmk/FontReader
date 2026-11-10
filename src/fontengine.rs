@@ -200,6 +200,99 @@ impl<'a> FontEngine<'a> {
         self.text2glyph_run(text)
     }
 
+    /// Shapes one horizontal LTR line, then rotates it 90 degrees clockwise.
+    ///
+    /// This per-call override ignores the engine's current direction without
+    /// changing its options. Horizontal metrics, kerning, ligatures, marks,
+    /// size, stretch, locale, variants, and supported variations are retained.
+    /// With `layout`, only `vrtr` is applied after ordinary GSUB, before metrics
+    /// and GPOS. `vert` and `vrt2` are never selected by this method.
+    ///
+    /// In y-down coordinates the transform is `(x, y) -> (-y, x)`, about
+    /// baseline `(0, 0)`, with no em-centering translation. Positions, paths,
+    /// offsets, advance vectors and bounds are rotated. Font metrics keep
+    /// their horizontal ascent/descent/line gap, with flow set to vertical
+    /// (ascent on the right, descent on the left). The legacy LSB/positive-up
+    /// ascender bearing reference becomes `(bearing_y, -bearing_x)`; use
+    /// bounds for actual ink extents rather than interpreting it as ink.
+    ///
+    /// Only current-color, clip-free fill paths are supported. Other paints,
+    /// strokes, clips, raster or raw SVG layers return `Unsupported`, with no
+    /// partial run. TAB, CR, LF, VT, FF, NEL, U+2028 and U+2029 return
+    /// `InvalidInput`. This is a single-face LTR operation, not BiDi or Unicode
+    /// mixed-orientation layout. Existing horizontal shaping limits apply.
+    pub fn shape_sideways_ltr(&self, text: &str) -> Result<GlyphRun, Error> {
+        if text.chars().any(|ch| {
+            matches!(
+                ch,
+                '\t' | '\r' | '\n' | '\u{000b}' | '\u{000c}' | '\u{0085}' | '\u{2028}' | '\u{2029}'
+            )
+        }) {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "sideways LTR requires one line without tabs or line-break controls",
+            ));
+        }
+        let run = self
+            .face
+            .font()
+            .text2glyph_run_sideways_ltr(text, &self.options())?;
+        rotate_sideways_ltr(run)
+    }
+
+    /// Measures the absolute sum of the rotated run's y advances.
+    pub fn measure_sideways_ltr(&self, text: &str) -> Result<f64, Error> {
+        Ok(self.measure_layout_sideways_ltr(text)?.inline_advance)
+    }
+
+    /// Measures the same rotated run returned by [`Self::shape_sideways_ltr`].
+    ///
+    /// Ink bounds union the positioned glyph bounds. Line bounds union every
+    /// positioned origin and its full advance-vector endpoint; block extent
+    /// is their x extent (not a font line height). Empty runs have no bounds
+    /// and zero extents; spaces retain their horizontal advance, rotated down.
+    pub fn measure_layout_sideways_ltr(&self, text: &str) -> Result<LayoutMetrics, Error> {
+        let run = self.shape_sideways_ltr(text)?;
+        let mut ink_bounds = None;
+        let mut line_bounds = None;
+        let mut inline_advance = 0.0f32;
+        for positioned in &run.glyphs {
+            let metrics = &positioned.glyph.metrics;
+            inline_advance += metrics.advance_y;
+            if let Some(bounds) = metrics.bounds {
+                extend_bounds(
+                    &mut ink_bounds,
+                    positioned.x + bounds.min_x,
+                    positioned.y + bounds.min_y,
+                );
+                extend_bounds(
+                    &mut ink_bounds,
+                    positioned.x + bounds.max_x,
+                    positioned.y + bounds.max_y,
+                );
+            }
+            extend_bounds(&mut line_bounds, positioned.x, positioned.y);
+            extend_bounds(
+                &mut line_bounds,
+                positioned.x + metrics.advance_x,
+                positioned.y + metrics.advance_y,
+            );
+        }
+        Ok(LayoutMetrics {
+            inline_advance: inline_advance.abs() as f64,
+            block_extent: line_bounds
+                .map(|bounds| (bounds.max_x - bounds.min_x).abs() as f64)
+                .unwrap_or(0.0),
+            ink_bounds,
+            line_bounds,
+        })
+    }
+
+    /// Exports [`Self::shape_sideways_ltr`] with the normal SVG ink padding.
+    pub fn render_svg_sideways_ltr(&self, text: &str) -> Result<String, Error> {
+        glyph_run_to_svg(&self.shape_sideways_ltr(text)?, &self.svg_unit)
+    }
+
     /// Shapes text into a [`GlyphRun`].
     pub fn text2glyph_run(&self, text: &str) -> Result<GlyphRun, Error> {
         let mut options = self.options();
@@ -299,6 +392,60 @@ impl<'a> FontEngine<'a> {
     }
 }
 
+fn rotate_sideways_ltr(mut run: GlyphRun) -> Result<GlyphRun, Error> {
+    // Validate the entire run before changing any geometry. Capability-based
+    // scope also permits pathified SVG or foreground COLR that meets it.
+    for positioned in &run.glyphs {
+        for layer in &positioned.glyph.layers {
+            if !matches!(layer, GlyphLayer::Path(path)
+                if path.paint == GlyphPaint::CurrentColor
+                    && path.paint_mode == PathPaintMode::Fill
+                    && path.clip_commands.is_empty())
+            {
+                return Err(Error::new(
+                    ErrorKind::Unsupported,
+                    "sideways LTR supports only current-color, clip-free fill paths",
+                ));
+            }
+        }
+    }
+    for positioned in &mut run.glyphs {
+        (positioned.x, positioned.y) = (-positioned.y, positioned.x);
+        let glyph = &mut positioned.glyph;
+        let metrics = &mut glyph.metrics;
+        (metrics.advance_x, metrics.advance_y) = (-metrics.advance_y, metrics.advance_x);
+        // These legacy fields describe an LSB/positive-up ascender reference,
+        // not a y-down point. Their y-down point is (bearing_x, -bearing_y).
+        (metrics.bearing_x, metrics.bearing_y) = (metrics.bearing_y, -metrics.bearing_x);
+        metrics.bounds = metrics.bounds.map(|bounds| GlyphBounds {
+            min_x: -bounds.max_y,
+            min_y: bounds.min_x,
+            max_x: -bounds.min_y,
+            max_y: bounds.max_x,
+        });
+        if let Some(font) = glyph.font.as_mut() {
+            font.flow = crate::commands::GlyphFlow::Vertical;
+        }
+        for layer in &mut glyph.layers {
+            if let GlyphLayer::Path(path) = layer {
+                (path.offset_x, path.offset_y) = (-path.offset_y, path.offset_x);
+                for command in &mut path.commands {
+                    *command = match *command {
+                        Command::MoveTo(x, y) => Command::MoveTo(-y, x),
+                        Command::Line(x, y) => Command::Line(-y, x),
+                        Command::Bezier((cx, cy), (x, y)) => Command::Bezier((-cy, cx), (-y, x)),
+                        Command::CubicBezier((ax, ay), (bx, by), (x, y)) => {
+                            Command::CubicBezier((-ay, ax), (-by, bx), (-y, x))
+                        }
+                        Command::Close => Command::Close,
+                    };
+                }
+            }
+        }
+    }
+    Ok(run)
+}
+
 fn extend_bounds(bounds: &mut Option<GlyphBounds>, x: f32, y: f32) {
     if let Some(bounds) = bounds.as_mut() {
         bounds.min_x = bounds.min_x.min(x);
@@ -340,6 +487,117 @@ mod tests {
             ShapingPolicy::TopToBottom.text_direction(),
             TextDirection::TopToBottom
         );
+    }
+
+    fn path_run(layer: GlyphLayer) -> GlyphRun {
+        GlyphRun::new(vec![
+            PositionedGlyph::new(
+                crate::Glyph::new(vec![GlyphLayer::Path(crate::PathGlyphLayer::new(
+                    vec![Command::MoveTo(1.0, 2.0)],
+                    GlyphPaint::CurrentColor,
+                ))]),
+                3.0,
+                4.0,
+            ),
+            PositionedGlyph::new(crate::Glyph::new(vec![layer]), 5.0, 6.0),
+        ])
+    }
+
+    #[test]
+    fn sideways_rotation_preserves_offsets_and_all_path_control_points() {
+        let mut path = crate::PathGlyphLayer::new(
+            vec![
+                Command::MoveTo(1.0, 2.0),
+                Command::Line(3.0, 4.0),
+                Command::Bezier((5.0, 6.0), (7.0, 8.0)),
+                Command::CubicBezier((9.0, 10.0), (11.0, 12.0), (13.0, 14.0)),
+                Command::Close,
+            ],
+            GlyphPaint::CurrentColor,
+        );
+        path.offset_x = 15.0;
+        path.offset_y = 16.0;
+        path.fill_rule = FillRule::EvenOdd;
+        let run = rotate_sideways_ltr(path_run(GlyphLayer::Path(path))).unwrap();
+        let glyph = &run.glyphs[1];
+        assert_eq!((glyph.x, glyph.y), (-6.0, 5.0));
+        let GlyphLayer::Path(path) = &glyph.glyph.layers[0] else {
+            panic!("expected path")
+        };
+        assert_eq!((path.offset_x, path.offset_y), (-16.0, 15.0));
+        assert_eq!(path.fill_rule, FillRule::EvenOdd);
+        assert_eq!(
+            format!("{:?}", path.commands),
+            "[MoveTo(-2.0, 1.0), Line(-4.0, 3.0), Bezier((-6.0, 5.0), (-8.0, 7.0)), CubicBezier((-10.0, 9.0), (-12.0, 11.0), (-14.0, 13.0)), Close]"
+        );
+    }
+
+    #[test]
+    fn sideways_rejects_every_unsupported_layer_instead_of_partial_rotation() {
+        let path =
+            crate::PathGlyphLayer::new(vec![Command::MoveTo(1.0, 2.0)], GlyphPaint::CurrentColor);
+        let mut unsupported = Vec::new();
+        let mut clipped = path.clone();
+        clipped.clip_commands.push(Command::Close);
+        unsupported.push(GlyphLayer::Path(clipped));
+        let mut stroke = path.clone();
+        stroke.paint_mode = PathPaintMode::Stroke;
+        unsupported.push(GlyphLayer::Path(stroke));
+        for paint in [
+            GlyphPaint::Solid(0xff12_3456),
+            GlyphPaint::LinearGradient(GlyphLinearGradient {
+                x1: 0.0,
+                y1: 0.0,
+                x2: 1.0,
+                y2: 1.0,
+                units: GlyphGradientUnits::UserSpaceOnUse,
+                transform: [1.0, 0.0, 0.0, 1.0, 0.0, 0.0],
+                spread: GlyphGradientSpread::Pad,
+                stops: vec![],
+            }),
+            GlyphPaint::RadialGradient(GlyphRadialGradient {
+                cx: 0.0,
+                cy: 0.0,
+                r: 1.0,
+                fx: 0.0,
+                fy: 0.0,
+                units: GlyphGradientUnits::UserSpaceOnUse,
+                transform: [1.0, 0.0, 0.0, 1.0, 0.0, 0.0],
+                spread: GlyphGradientSpread::Pad,
+                stops: vec![],
+            }),
+        ] {
+            let mut painted = path.clone();
+            painted.paint = paint;
+            unsupported.push(GlyphLayer::Path(painted));
+        }
+        unsupported.push(GlyphLayer::Raster(RasterGlyphLayer::from_rgba(
+            1,
+            1,
+            vec![0; 4],
+        )));
+        unsupported.push(GlyphLayer::Raster(RasterGlyphLayer::from_encoded(vec![])));
+        #[cfg(feature = "svg-fonts")]
+        unsupported.push(GlyphLayer::Svg(crate::commands::SvgGlyphLayer {
+            document: "<svg/>".to_owned(),
+            view_box_min_x: 0.0,
+            view_box_min_y: 0.0,
+            view_box_width: 1.0,
+            view_box_height: 1.0,
+            width: 1.0,
+            height: 1.0,
+            offset_x: 0.0,
+            offset_y: 0.0,
+        }));
+        for layer in unsupported {
+            let run = path_run(layer);
+            let original = format!("{run:?}");
+            assert_eq!(
+                rotate_sideways_ltr(run.clone()).unwrap_err().kind(),
+                ErrorKind::Unsupported
+            );
+            assert_eq!(format!("{run:?}"), original);
+        }
     }
 
     #[test]
