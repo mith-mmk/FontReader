@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.0.15 - 2026-11-10
+
+### Compatibility and fixes
+
+- Update the published `bin-rs` dependency to 0.0.11.
+- Preserve name-table UTF-16 byte-length handling with the updated reader API, including rejection of odd byte lengths.
+- Read the fixed-size OS/2 PANOSE and vendor-ID fields with the updated reader API’s exact-read method.
+- Add a UTF-16 name-table regression test. The Rust 1.91 minimum and public feature set are unchanged.
+
 ## 0.0.14 - 2026-11-10
 
 ### Compatibility and licensing
