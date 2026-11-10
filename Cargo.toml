@@ -34,7 +34,7 @@ svg-fonts = []
 
 [dependencies]
 # MUST
-bin-rs = "0.0.9"
+bin-rs = "0.0.11"
 num-traits = "0.2"
 num-derive = "0.4"
 # for Woff
