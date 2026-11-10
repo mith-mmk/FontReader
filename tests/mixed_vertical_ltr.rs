@@ -506,3 +506,45 @@ fn upright_advances_join_sideways_without_carrying_upright_placement() {
     close(actual.glyphs[2].x, -28.0);
     close(actual.glyphs[2].y, 204.0);
 }
+
+#[cfg(feature = "layout")]
+#[test]
+fn single_gpos_mixed_groups_keep_advances_without_carrying_placement() {
+    let file = FontFile::from_buffer(include_bytes!("fixtures/gpos-single.ttf")).unwrap();
+    let face = file.current_face().unwrap();
+    for (size, stretch) in [(1000.0, 1.0), (500.0, 2.0)] {
+        let sx = size / 1000.0 * stretch;
+        let sy = size / 1000.0;
+        let options = FontOptions::new(&face)
+            .with_font_size(size)
+            .with_font_stretch(FontStretch(stretch));
+        let engine = face.engine().with_options(options);
+        // U+4E00 is upright but absent; .notdef has advance 1000 and no GPOS.
+        let text = "\u{4e00}A\u{0301}B\u{4e00}A";
+        let run = engine.shape_vertical_mixed_ltr(text).unwrap();
+        let expected = [
+            (0.0, 0.0, 0.0, 1000.0 * sy),
+            (-280.0 * sy, 1000.0 * sy + 10.0 * sx, -40.0 * sy, 630.0 * sx),
+            (227.0 * sy, 1000.0 * sy + 315.0 * sx, -5.0 * sy, 25.0 * sx),
+            (-339.0 * sy, 1000.0 * sy + 650.0 * sx, -8.0 * sy, 593.0 * sx),
+            (-53.0 * sy, 1000.0 * sy + 1248.0 * sx, 0.0, 1000.0 * sy),
+            (
+                -333.0 * sy,
+                2000.0 * sy + 1258.0 * sx,
+                -40.0 * sy,
+                630.0 * sx,
+            ),
+        ];
+        assert_eq!(run.glyphs.len(), expected.len());
+        for (g, (x, y, ax, ay)) in run.glyphs.iter().zip(expected) {
+            close(g.x, x);
+            close(g.y, y);
+            close(g.glyph.metrics.advance_x, ax);
+            close(g.glyph.metrics.advance_y, ay);
+        }
+        close(
+            engine.measure_vertical_mixed_ltr(text).unwrap() as f32,
+            2000.0 * sy + 1878.0 * sx,
+        );
+    }
+}
