@@ -1,19 +1,17 @@
 #![allow(dead_code)]
 
-#[cfg(windows)]
-use std::env;
 use std::path::PathBuf;
 
 pub fn default_font_path() -> String {
     #[cfg(target_os = "windows")]
     {
-        let windir = env::var("windir").unwrap();
+        let windir = std::env::var("windir").unwrap();
         format!("{}\\fonts\\YuGothM.ttc", windir)
     }
 
     #[cfg(target_os = "macos")]
     {
-        let home = env::var("HOME").unwrap();
+        let home = std::env::var("HOME").unwrap();
         format!("{}/Library/Fonts/ヒラギノ角ゴシック W4.ttc", home)
     }
 
@@ -26,7 +24,7 @@ pub fn default_font_path() -> String {
 pub fn default_font_folder() -> String {
     #[cfg(target_os = "windows")]
     {
-        let windir = env::var("windir").unwrap();
+        let windir = std::env::var("windir").unwrap();
         format!("{}\\fonts\\", windir)
     }
 
