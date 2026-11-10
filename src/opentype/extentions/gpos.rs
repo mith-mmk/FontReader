@@ -9,6 +9,8 @@ use crate::opentype::layouts::{
 };
 use bin_rs::reader::BinaryReader;
 
+use super::gdef::{GlyphClass, GDEF};
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub(crate) struct ValueRecord {
     pub(crate) x_placement: i16,
@@ -57,6 +59,24 @@ impl ValueRecord {
     }
 }
 
+// Table fields are i16, but totals across distinct lookups are not.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) struct SingleAdjustment {
+    pub(crate) x_placement: i32,
+    pub(crate) y_placement: i32,
+    pub(crate) x_advance: i32,
+    pub(crate) y_advance: i32,
+}
+
+impl SingleAdjustment {
+    fn add_assign(&mut self, value: ValueRecord) {
+        self.x_placement += i32::from(value.x_placement);
+        self.y_placement += i32::from(value.y_placement);
+        self.x_advance += i32::from(value.x_advance);
+        self.y_advance += i32::from(value.y_advance);
+    }
+}
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub(crate) struct PairAdjustment {
     pub(crate) first: ValueRecord,
@@ -72,6 +92,14 @@ impl PairAdjustment {
     fn is_zero(self) -> bool {
         self.first.is_zero() && self.second.is_zero()
     }
+}
+
+#[derive(Debug, Clone)]
+struct SinglePos {
+    coverage: Coverage,
+    // Format 1 shares one value; Format 2 indexes values by coverage index.
+    values: Vec<ValueRecord>,
+    shared: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -190,6 +218,7 @@ pub(crate) struct MarkAttachmentAdjustment {
 
 #[derive(Debug, Clone)]
 enum PositioningSubtable {
+    Single(SinglePos),
     PairFormat1(PairPosFormat1),
     PairFormat2(PairPosFormat2),
     MarkToBaseFormat1(MarkToBaseFormat1),
@@ -200,6 +229,20 @@ enum PositioningSubtable {
 }
 
 impl PositioningSubtable {
+    fn lookup_single_adjustment(&self, glyph: u16) -> Option<ValueRecord> {
+        match self {
+            Self::Single(single) => {
+                let index = single.coverage.contains(glyph as usize)?;
+                single
+                    .values
+                    .get(if single.shared { 0 } else { index })
+                    .copied()
+            }
+            Self::Extension(extension) => extension.lookup_single_adjustment(glyph),
+            _ => None,
+        }
+    }
+
     fn lookup_pair_adjustment(&self, left: u16, right: u16) -> Option<PairAdjustment> {
         match self {
             PositioningSubtable::PairFormat1(pair) => {
@@ -230,7 +273,8 @@ impl PositioningSubtable {
             PositioningSubtable::Extension(extension) => {
                 extension.lookup_pair_adjustment(left, right)
             }
-            PositioningSubtable::Unsupported
+            PositioningSubtable::Single(_)
+            | PositioningSubtable::Unsupported
             | PositioningSubtable::MarkToBaseFormat1(_)
             | PositioningSubtable::MarkToLigatureFormat1(_)
             | PositioningSubtable::MarkToMarkFormat1(_) => None,
@@ -264,6 +308,7 @@ impl PositioningSubtable {
             | PositioningSubtable::PairFormat2(_)
             | PositioningSubtable::MarkToLigatureFormat1(_)
             | PositioningSubtable::MarkToMarkFormat1(_)
+            | PositioningSubtable::Single(_)
             | PositioningSubtable::Unsupported => None,
         }
     }
@@ -302,6 +347,7 @@ impl PositioningSubtable {
             | PositioningSubtable::PairFormat2(_)
             | PositioningSubtable::MarkToBaseFormat1(_)
             | PositioningSubtable::MarkToMarkFormat1(_)
+            | PositioningSubtable::Single(_)
             | PositioningSubtable::Unsupported => None,
         }
     }
@@ -341,6 +387,7 @@ impl PositioningSubtable {
             | PositioningSubtable::PairFormat2(_)
             | PositioningSubtable::MarkToBaseFormat1(_)
             | PositioningSubtable::MarkToLigatureFormat1(_)
+            | PositioningSubtable::Single(_)
             | PositioningSubtable::Unsupported => None,
         }
     }
@@ -349,7 +396,40 @@ impl PositioningSubtable {
 #[derive(Debug, Clone)]
 struct PositioningLookup {
     lookup_type: u16,
+    lookup_flag: u16,
+    mark_filtering_set: Option<u16>,
     subtables: Vec<PositioningSubtable>,
+}
+
+impl PositioningLookup {
+    // Kept local to the new SinglePos execution path. Pair/mark filtering remains
+    // outside this change until the shared lookup-filter work is integrated.
+    fn includes_single_glyph(&self, glyph: u16, gdef: Option<&GDEF>) -> bool {
+        let Some(gdef) = gdef else { return true };
+        match gdef.glyph_class(glyph) {
+            Some(GlyphClass::Base) => self.lookup_flag & 0x0002 == 0,
+            Some(GlyphClass::Ligature) => self.lookup_flag & 0x0004 == 0,
+            Some(GlyphClass::Mark) => {
+                if self.lookup_flag & 0x0008 != 0 {
+                    return false;
+                }
+                if self.lookup_flag & 0x0010 != 0 {
+                    return self
+                        .mark_filtering_set
+                        .and_then(|index| {
+                            gdef.mark_glyph_sets_def
+                                .as_ref()?
+                                .coverages
+                                .get(index as usize)
+                        })
+                        .is_some_and(|coverage| coverage.contains(glyph as usize).is_some());
+                }
+                let attachment_type = self.lookup_flag >> 8;
+                attachment_type == 0 || gdef.mark_attachment_class(glyph) == Some(attachment_type)
+            }
+            _ => true,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -426,13 +506,18 @@ impl GPOS {
             let lookup_offset = offset + lookup_offset as u64;
             reader.seek(SeekFrom::Start(lookup_offset))?;
             let lookup_type = reader.read_u16_be()?;
-            let _lookup_flag = reader.read_u16_be()?;
+            let lookup_flag = reader.read_u16_be()?;
             let subtable_count = reader.read_u16_be()?;
             let mut subtable_offsets = Vec::with_capacity(subtable_count as usize);
             for _ in 0..subtable_count {
                 subtable_offsets.push(reader.read_u16_be()?);
             }
 
+            let mark_filtering_set = if lookup_flag & 0x0010 != 0 {
+                Some(reader.read_u16_be()?)
+            } else {
+                None
+            };
             let mut subtables = Vec::with_capacity(subtable_offsets.len());
             for subtable_offset in subtable_offsets {
                 subtables.push(Self::parse_subtable(
@@ -444,6 +529,8 @@ impl GPOS {
 
             lookups.push(PositioningLookup {
                 lookup_type,
+                lookup_flag,
+                mark_filtering_set,
                 subtables,
             });
         }
@@ -457,6 +544,7 @@ impl GPOS {
         offset: u64,
     ) -> Result<PositioningSubtable, std::io::Error> {
         match lookup_type {
+            1 => Self::parse_single_adjustment(reader, offset),
             2 => Self::parse_pair_adjustment(reader, offset),
             4 => Self::parse_mark_to_base(reader, offset),
             5 => Self::parse_mark_to_ligature(reader, offset),
@@ -464,6 +552,76 @@ impl GPOS {
             9 => Self::parse_extension(reader, offset),
             _ => Ok(PositioningSubtable::Unsupported),
         }
+    }
+
+    fn parse_single_adjustment<R: BinaryReader>(
+        reader: &mut R,
+        offset: u64,
+    ) -> Result<PositioningSubtable, std::io::Error> {
+        reader.seek(SeekFrom::Start(offset))?;
+        let format = reader.read_u16_be()?;
+        if format != 1 && format != 2 {
+            return Ok(PositioningSubtable::Unsupported);
+        }
+        let coverage_offset = reader.read_u16_be()?;
+        let value_format = reader.read_u16_be()?;
+        if coverage_offset == 0 || value_format & 0xff00 != 0 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "invalid SinglePos coverage offset or reserved ValueFormat bits",
+            ));
+        }
+        let count = if format == 1 {
+            1
+        } else {
+            reader.read_u16_be()?
+        };
+        let mut values = Vec::with_capacity(count as usize);
+        for _ in 0..count {
+            values.push(ValueRecord::parse(reader, value_format)?);
+        }
+        let coverage = Coverage::new(reader, offset + coverage_offset as u64)?;
+        // Validate index arithmetic here before Coverage::contains performs it.
+        let glyph_count = match &coverage {
+            Coverage::Format1(table) => {
+                if table.glyph_ids.windows(2).any(|pair| pair[0] >= pair[1]) {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "SinglePos coverage glyphs must be sorted and unique",
+                    ));
+                }
+                table.glyph_ids.len()
+            }
+            Coverage::Format2(table) => {
+                let mut total = 0usize;
+                let mut previous_end = None;
+                for range in &table.range_records {
+                    if range.start_glyph_id > range.end_glyph_id
+                        || previous_end.is_some_and(|end| end >= range.start_glyph_id)
+                        || range.start_coverage_index as usize != total
+                    {
+                        return Err(std::io::Error::new(
+                            std::io::ErrorKind::InvalidData,
+                            "invalid SinglePos coverage range or index",
+                        ));
+                    }
+                    total += range.end_glyph_id as usize - range.start_glyph_id as usize + 1;
+                    previous_end = Some(range.end_glyph_id);
+                }
+                total
+            }
+        };
+        if format == 2 && glyph_count != values.len() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "SinglePos value count does not match coverage",
+            ));
+        }
+        Ok(PositioningSubtable::Single(SinglePos {
+            coverage,
+            values,
+            shared: format == 1,
+        }))
     }
 
     fn parse_pair_adjustment<R: BinaryReader>(
@@ -1154,6 +1312,40 @@ impl GPOS {
         feature_indices
     }
 
+    /// SinglePos on the default spacing features. Device/variation deltas are
+    /// parsed but not evaluated, consistently with the existing pair path.
+    pub(crate) fn lookup_single_adjustment(
+        &self,
+        glyph: u16,
+        is_vertical: bool,
+        locale: Option<&str>,
+        gdef: Option<&GDEF>,
+    ) -> Option<SingleAdjustment> {
+        let feature_tags = if is_vertical {
+            [*b"vkrn", *b"dist"]
+        } else {
+            [*b"kern", *b"dist"]
+        };
+        let mut result = SingleAdjustment::default();
+        let mut matched = false;
+        for lookup in self.collect_lookups(locale, &feature_tags) {
+            if (lookup.lookup_type != 1 && lookup.lookup_type != 9)
+                || !lookup.includes_single_glyph(glyph, gdef)
+            {
+                continue;
+            }
+            for subtable in &lookup.subtables {
+                if let Some(value) = subtable.lookup_single_adjustment(glyph) {
+                    result.add_assign(value);
+                    matched = true;
+                    // Even a zero value is a match, not a fallback opportunity.
+                    break;
+                }
+            }
+        }
+        matched.then_some(result)
+    }
+
     pub(crate) fn lookup_pair_adjustment(
         &self,
         left: u16,
@@ -1269,6 +1461,278 @@ impl GPOS {
 mod tests {
     use super::*;
     use bin_rs::reader::BytesReader;
+
+    fn single_bytes(format: u16, glyphs: &[u16], values: &[[i16; 4]]) -> Vec<u8> {
+        let mut words = vec![format, 0, 0x000f];
+        if format == 2 {
+            words.push(values.len() as u16);
+        }
+        for value in values {
+            words.extend(value.iter().map(|field| *field as u16));
+        }
+        words[1] = (words.len() * 2) as u16;
+        words.extend([1, glyphs.len() as u16]);
+        words.extend(glyphs);
+        words.iter().flat_map(|word| word.to_be_bytes()).collect()
+    }
+
+    fn parse_single(bytes: &[u8]) -> Result<PositioningSubtable, std::io::Error> {
+        GPOS::parse_subtable(&mut BytesReader::new(bytes), 1, 0)
+    }
+
+    fn single_gpos(subtables: Vec<PositioningSubtable>, flag: u16) -> GPOS {
+        let bytes = include_bytes!("../../../tests/fixtures/gpos-single.bin");
+        let mut gpos = GPOS::new(&mut BytesReader::new(bytes), 0, bytes.len() as u32).unwrap();
+        let kern_index = gpos
+            .features
+            .features
+            .iter()
+            .find(|feature| feature.feature_tag == u32::from_be_bytes(*b"kern"))
+            .unwrap()
+            .lookup_list_indices[0] as usize;
+        for lookup in &mut gpos.lookups {
+            lookup.subtables.clear();
+        }
+        gpos.lookups[kern_index] = PositioningLookup {
+            lookup_type: 1,
+            lookup_flag: flag,
+            mark_filtering_set: None,
+            subtables,
+        };
+        gpos
+    }
+
+    #[test]
+    fn single_format1_shares_all_four_values() {
+        let single = parse_single(&single_bytes(1, &[10, 20], &[[1, -2, 3, -4]])).unwrap();
+        let expected = ValueRecord {
+            x_placement: 1,
+            y_placement: -2,
+            x_advance: 3,
+            y_advance: -4,
+        };
+        assert_eq!(single.lookup_single_adjustment(10), Some(expected));
+        assert_eq!(single.lookup_single_adjustment(20), Some(expected));
+        assert_eq!(single.lookup_single_adjustment(11), None);
+    }
+
+    #[test]
+    fn single_format2_indexes_each_covered_glyph() {
+        let single = parse_single(&single_bytes(
+            2,
+            &[10, 20],
+            &[[1, 2, 3, 4], [-1, -2, -3, -4]],
+        ))
+        .unwrap();
+        assert_eq!(single.lookup_single_adjustment(10).unwrap().x_advance, 3);
+        assert_eq!(single.lookup_single_adjustment(20).unwrap().y_advance, -4);
+        assert!(single.lookup_single_adjustment(21).is_none());
+    }
+
+    #[test]
+    fn single_rejects_inconsistent_coverage_and_reserved_format() {
+        assert!(parse_single(&single_bytes(2, &[10, 20], &[[1, 2, 3, 4]])).is_err());
+        assert!(parse_single(&single_bytes(1, &[20, 10], &[[1, 2, 3, 4]])).is_err());
+        let mut bytes = single_bytes(1, &[10], &[[1, 2, 3, 4]]);
+        bytes[4..6].copy_from_slice(&0x0100u16.to_be_bytes());
+        assert!(parse_single(&bytes).is_err());
+        bytes[4..6].copy_from_slice(&0x000fu16.to_be_bytes());
+        bytes[2..4].copy_from_slice(&0u16.to_be_bytes());
+        assert!(parse_single(&bytes).is_err());
+    }
+
+    #[test]
+    fn single_rejects_every_truncated_prefix() {
+        let bytes = single_bytes(2, &[10, 20], &[[1, 2, 3, 4], [-1, -2, -3, -4]]);
+        for length in 0..bytes.len() {
+            assert!(parse_single(&bytes[..length]).is_err(), "length {length}");
+        }
+        assert!(parse_single(&bytes).is_ok());
+    }
+
+    #[test]
+    fn single_coverage_ranges_cannot_overflow_the_index() {
+        let mut bytes = single_bytes(1, &[10], &[[1, 2, 3, 4]]);
+        bytes.truncate(14);
+        for word in [2u16, 1, 10, 11, 65535] {
+            bytes.extend(word.to_be_bytes());
+        }
+        assert!(parse_single(&bytes).is_err());
+        bytes[22..24].copy_from_slice(&0u16.to_be_bytes());
+        let single = parse_single(&bytes).unwrap();
+        assert_eq!(single.lookup_single_adjustment(11).unwrap().x_advance, 3);
+    }
+
+    #[test]
+    fn single_consumes_device_offsets_without_shifting_the_next_record() {
+        let words = [
+            2u16, 28, 0x001f, 2, 1, 2, 3, 4, 0, 11, 12, 13, 14, 0, 1, 2, 10, 20,
+        ];
+        let bytes: Vec<_> = words.iter().flat_map(|word| word.to_be_bytes()).collect();
+        let single = parse_single(&bytes).unwrap();
+        assert_eq!(single.lookup_single_adjustment(20).unwrap().x_advance, 13);
+    }
+
+    #[test]
+    fn single_extension_uses_the_relative_offset() {
+        let mut bytes = vec![0, 1, 0, 1, 0, 0, 0, 8];
+        bytes.extend(single_bytes(1, &[10], &[[1, 2, 3, 4]]));
+        let extension = GPOS::parse_subtable(&mut BytesReader::new(&bytes), 9, 0).unwrap();
+        let mut gpos = single_gpos(vec![extension], 0);
+        for lookup in &mut gpos.lookups {
+            lookup.lookup_type = 9;
+        }
+        assert_eq!(
+            gpos.lookup_single_adjustment(10, false, None, None)
+                .unwrap()
+                .x_advance,
+            3
+        );
+    }
+
+    #[test]
+    fn single_zero_match_stops_subtable_fallback() {
+        let zero = parse_single(&single_bytes(1, &[10], &[[0; 4]])).unwrap();
+        let nonzero = parse_single(&single_bytes(1, &[10], &[[1; 4]])).unwrap();
+        let gpos = single_gpos(vec![zero, nonzero], 0);
+        assert_eq!(
+            gpos.lookup_single_adjustment(10, false, None, None),
+            Some(SingleAdjustment::default())
+        );
+    }
+
+    #[test]
+    fn single_adds_distinct_lookups_and_deduplicates_shared_lookup() {
+        let single = parse_single(&single_bytes(1, &[10], &[[1, 2, 3, 4]])).unwrap();
+        let mut gpos = single_gpos(vec![single.clone()], 0);
+        let index = gpos.lookups.len() as u16;
+        gpos.lookups.push(PositioningLookup {
+            lookup_type: 1,
+            lookup_flag: 0,
+            mark_filtering_set: None,
+            subtables: vec![single],
+        });
+        for feature in gpos.features.features.iter_mut() {
+            if feature.feature_tag == u32::from_be_bytes(*b"kern") {
+                feature.lookup_list_indices.extend([index, index]);
+            }
+        }
+        assert_eq!(
+            gpos.lookup_single_adjustment(10, false, None, None)
+                .unwrap()
+                .x_advance,
+            6
+        );
+    }
+
+    #[test]
+    fn single_accumulates_beyond_i16_without_saturation() {
+        let mut gpos = single_gpos(vec![], 0);
+        let mut indices = Vec::new();
+        for value in [20000, 20000, -20000] {
+            indices.push(gpos.lookups.len() as u16);
+            gpos.lookups.push(PositioningLookup {
+                lookup_type: 1,
+                lookup_flag: 0,
+                mark_filtering_set: None,
+                subtables: vec![parse_single(&single_bytes(1, &[10], &[[value; 4]])).unwrap()],
+            });
+        }
+        let kern = gpos
+            .features
+            .features
+            .iter_mut()
+            .find(|feature| feature.feature_tag == u32::from_be_bytes(*b"kern"))
+            .unwrap();
+        kern.lookup_list_indices = indices;
+        let adjustment = gpos
+            .lookup_single_adjustment(10, false, None, None)
+            .unwrap();
+        assert_eq!(
+            adjustment,
+            SingleAdjustment {
+                x_placement: 20000,
+                y_placement: 20000,
+                x_advance: 20000,
+                y_advance: 20000
+            }
+        );
+        gpos.lookups.last_mut().unwrap().subtables.clear();
+        assert_eq!(
+            gpos.lookup_single_adjustment(10, false, None, None)
+                .unwrap()
+                .x_advance,
+            40000
+        );
+    }
+
+    #[test]
+    fn single_filters_gdef_classes_and_respects_mark_precedence() {
+        use super::super::gdef::MarkGlyphSetsDef;
+        use crate::opentype::layouts::coverage::{Coverage, CoverageFormat1};
+        let font =
+            crate::load_font_from_buffer(include_bytes!("../../../tests/fixtures/gpos-single.ttf"))
+                .unwrap();
+        let mut gdef = font.font().gdef.clone().unwrap();
+        let single = parse_single(&single_bytes(1, &[1, 4], &[[1; 4]])).unwrap();
+        let mut gpos = single_gpos(vec![single], 0x000a);
+        assert!(gpos
+            .lookup_single_adjustment(1, false, None, Some(&gdef))
+            .is_none());
+        assert!(gpos
+            .lookup_single_adjustment(4, false, None, Some(&gdef))
+            .is_none());
+        assert!(gpos
+            .lookup_single_adjustment(4, false, None, None)
+            .is_some());
+        gdef.mark_glyph_sets_def = Some(MarkGlyphSetsDef {
+            mark_set_table_format: 1,
+            mark_set_count: 1,
+            coverages: vec![Coverage::Format1(CoverageFormat1 {
+                coverage_format: 1,
+                glyph_count: 1,
+                glyph_ids: vec![4],
+            })],
+        });
+        for lookup in &mut gpos.lookups {
+            lookup.lookup_flag = 0x0110;
+            lookup.mark_filtering_set = Some(0);
+        }
+        // The mark set takes precedence over the absent attachment class.
+        assert!(gpos
+            .lookup_single_adjustment(4, false, None, Some(&gdef))
+            .is_some());
+        for lookup in &mut gpos.lookups {
+            lookup.lookup_flag |= 0x0008;
+        }
+        assert!(gpos
+            .lookup_single_adjustment(4, false, None, Some(&gdef))
+            .is_none());
+        for lookup in &mut gpos.lookups {
+            lookup.lookup_flag = 0x0010;
+            lookup.mark_filtering_set = Some(9);
+        }
+        assert!(gpos
+            .lookup_single_adjustment(4, false, None, Some(&gdef))
+            .is_none());
+        use crate::opentype::layouts::coverage::{CoverageFormat2, RangeRecord};
+        gdef.mark_glyph_sets_def.as_mut().unwrap().coverages[0] =
+            Coverage::Format2(CoverageFormat2 {
+                coverage_format: 2,
+                range_count: 1,
+                range_records: vec![RangeRecord {
+                    start_glyph_id: 3,
+                    end_glyph_id: 4,
+                    start_coverage_index: 65535,
+                }],
+            });
+        for lookup in &mut gpos.lookups {
+            lookup.mark_filtering_set = Some(0);
+        }
+        assert!(gpos
+            .lookup_single_adjustment(4, false, None, Some(&gdef))
+            .is_none());
+    }
 
     #[test]
     fn mark_to_base_format1_lookup_returns_anchor_delta() {
