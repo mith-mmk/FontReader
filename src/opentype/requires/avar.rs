@@ -46,9 +46,7 @@ impl AVAR {
                     || !(-1.0..=1.0).contains(&to_coordinate)
                     || map
                         .last()
-                        .is_some_and(|last: &AxisValueMap| {
-                            from_coordinate <= last.from_coordinate
-                        })
+                        .is_some_and(|last: &AxisValueMap| from_coordinate <= last.from_coordinate)
                 {
                     return Err(Error::new(
                         ErrorKind::InvalidData,
@@ -65,9 +63,8 @@ impl AVAR {
 
         for map in &segment_maps {
             let has_required_point = |from: f32, to: f32| {
-                map.iter().any(|record| {
-                    record.from_coordinate == from && record.to_coordinate == to
-                })
+                map.iter()
+                    .any(|record| record.from_coordinate == from && record.to_coordinate == to)
             };
             if !has_required_point(-1.0, -1.0)
                 || !has_required_point(0.0, 0.0)
@@ -192,12 +189,8 @@ mod tests {
 
     #[test]
     fn accepts_sorted_normalized_axis_map() {
-        let avar = AVAR::from_bytes(&avar_with_map(&[
-            (-16384, -16384),
-            (0, 0),
-            (16384, 16384),
-        ]))
-        .expect("valid avar");
+        let avar = AVAR::from_bytes(&avar_with_map(&[(-16384, -16384), (0, 0), (16384, 16384)]))
+            .expect("valid avar");
         let mut coordinates = [0.5];
         avar.map_coordinate(&mut coordinates, 0);
         assert!((coordinates[0] - 0.5).abs() < f32::EPSILON);

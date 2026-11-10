@@ -27,9 +27,9 @@ impl CPAL {
         offset: u32,
         length: u32,
     ) -> Result<Self, std::io::Error> {
-        let table_end = (offset as u64)
-            .checked_add(length as u64)
-            .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "CPAL range overflow"))?;
+        let table_end = (offset as u64).checked_add(length as u64).ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::InvalidData, "CPAL range overflow")
+        })?;
         reader.seek(SeekFrom::Start(offset as u64))?;
         let version = reader.read_u16_be()?;
         let num_palette_entries = reader.read_u16_be()?;
@@ -39,7 +39,9 @@ impl CPAL {
         let index_array_end = (offset as u64)
             .checked_add(12)
             .and_then(|value| value.checked_add((num_palettes as u64).checked_mul(2)?))
-            .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "CPAL index range overflow"))?;
+            .ok_or_else(|| {
+                std::io::Error::new(std::io::ErrorKind::InvalidData, "CPAL index range overflow")
+            })?;
         if index_array_end > table_end {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::UnexpectedEof,
@@ -48,12 +50,25 @@ impl CPAL {
         }
         let color_records_start = (offset as u64)
             .checked_add(color_records_array_offset as u64)
-            .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "CPAL color record offset overflow"))?;
+            .ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "CPAL color record offset overflow",
+                )
+            })?;
         let color_records_end = color_records_start
             .checked_add((num_color_records as u64).checked_mul(4).ok_or_else(|| {
-                std::io::Error::new(std::io::ErrorKind::InvalidData, "CPAL color record count overflow")
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "CPAL color record count overflow",
+                )
             })?)
-            .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "CPAL color record range overflow"))?;
+            .ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "CPAL color record range overflow",
+                )
+            })?;
         if color_records_start > table_end || color_records_end > table_end {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::UnexpectedEof,
@@ -65,9 +80,7 @@ impl CPAL {
             let color_record_index = reader.read_u16_be()?;
             color_record_indices.push(color_record_index);
         }
-        reader.seek(SeekFrom::Start(
-            color_records_start,
-        ))?;
+        reader.seek(SeekFrom::Start(color_records_start))?;
         let mut color_records = Vec::new();
         for _ in 0..num_color_records {
             let color_record = ColorRecord {

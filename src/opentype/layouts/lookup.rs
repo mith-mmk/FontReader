@@ -959,17 +959,11 @@ impl LookupList {
         let coverage = Self::get_coverage(reader, offset + coverage_offset as u64)?;
         let mut backtrack_coverages = Vec::new();
         for coverage_offset in backtrack_coverage_offsets {
-            backtrack_coverages.push(Self::get_coverage(
-                reader,
-                offset + coverage_offset as u64,
-            )?);
+            backtrack_coverages.push(Self::get_coverage(reader, offset + coverage_offset as u64)?);
         }
         let mut lookahead_coverages = Vec::new();
         for coverage_offset in lookahead_coverage_offsets {
-            lookahead_coverages.push(Self::get_coverage(
-                reader,
-                offset + coverage_offset as u64,
-            )?);
+            lookahead_coverages.push(Self::get_coverage(reader, offset + coverage_offset as u64)?);
         }
         Ok(LookupSubstitution::ReverseChainSingle(
             ReverseChainSingleSubstitutionFormat1 {

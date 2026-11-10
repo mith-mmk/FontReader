@@ -387,7 +387,10 @@ impl<'a> FontEngine<'a> {
                 );
             }
             let (end_x, end_y) = if direction.is_vertical() {
-                (positioned.x, positioned.y + positioned.glyph.metrics.advance_y)
+                (
+                    positioned.x,
+                    positioned.y + positioned.glyph.metrics.advance_y,
+                )
             } else {
                 (
                     positioned.x + positioned.glyph.metrics.advance_x,
@@ -739,9 +742,9 @@ mod tests {
         let face = crate::FontFile::from_buffer(include_bytes!(
             "../tests/fixtures/vertical-no-metrics.ttf"
         ))
-            .expect("load font file")
-            .current_face()
-            .expect("current face");
+        .expect("load font file")
+        .current_face()
+        .expect("current face");
         let engine = FontEngine::new(&face).with_jis78().with_vertical_flow();
 
         assert_eq!(engine.font_variant(), FontVariant::Jis78);
@@ -773,7 +776,11 @@ mod tests {
     fn glyph_run_to_svg_writes_gradient_defs() {
         let run = GlyphRun::new(vec![PositionedGlyph::new(
             crate::Glyph::new(vec![GlyphLayer::Path(crate::PathGlyphLayer::new(
-                vec![Command::MoveTo(0.0, 0.0), Command::Line(10.0, 0.0), Command::Close],
+                vec![
+                    Command::MoveTo(0.0, 0.0),
+                    Command::Line(10.0, 0.0),
+                    Command::Close,
+                ],
                 GlyphPaint::LinearGradient(crate::GlyphLinearGradient {
                     x1: 0.0,
                     y1: 0.0,
@@ -810,7 +817,11 @@ mod tests {
     #[test]
     fn glyph_run_to_svg_writes_clip_path_defs() {
         let mut layer = crate::PathGlyphLayer::new(
-            vec![Command::MoveTo(0.0, 0.0), Command::Line(10.0, 0.0), Command::Close],
+            vec![
+                Command::MoveTo(0.0, 0.0),
+                Command::Line(10.0, 0.0),
+                Command::Close,
+            ],
             GlyphPaint::Solid(0xff11_2233),
         );
         layer.clip_commands = vec![
@@ -1089,7 +1100,11 @@ fn normalize_svg_color(color: u32) -> u32 {
     }
 }
 
-fn paint_to_svg_attributes(paint: &GlyphPaint, registry: &mut SvgDefRegistry, attribute: &str) -> String {
+fn paint_to_svg_attributes(
+    paint: &GlyphPaint,
+    registry: &mut SvgDefRegistry,
+    attribute: &str,
+) -> String {
     match paint {
         GlyphPaint::CurrentColor => format!("{attribute}=\"currentColor\""),
         GlyphPaint::Solid(color) => {

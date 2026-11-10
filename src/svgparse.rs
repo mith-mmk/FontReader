@@ -148,14 +148,7 @@ pub(crate) fn svg_to_path_layers(
 
     let mut layers = Vec::new();
     let state = RenderState::default();
-    flatten_node(
-        &root,
-        &defs,
-        &state,
-        scale_x,
-        scale_y,
-        &mut layers,
-    );
+    flatten_node(&root, &defs, &state, scale_x, scale_y, &mut layers);
     layers
 }
 
@@ -383,7 +376,12 @@ fn flatten_node(
         }
         "use" => flatten_use(element, defs, next_state, scale_x, scale_y, out),
         "path" | "rect" | "circle" | "ellipse" | "line" | "polyline" | "polygon" => {
-            out.extend(element_to_path_layers(element, &next_state, scale_x, scale_y));
+            out.extend(element_to_path_layers(
+                element,
+                &next_state,
+                scale_x,
+                scale_y,
+            ));
         }
         _ => {}
     }
@@ -528,10 +526,18 @@ fn resolve_combined_clip_commands(
 ) -> Vec<Command> {
     let mut commands = Vec::new();
     if let Some(clip_path) = clip_path {
-        commands.extend(resolve_clip_spec_commands(clip_path, bounds, element_transform));
+        commands.extend(resolve_clip_spec_commands(
+            clip_path,
+            bounds,
+            element_transform,
+        ));
     }
     if let Some(mask_path) = mask_path {
-        commands.extend(resolve_clip_spec_commands(mask_path, bounds, element_transform));
+        commands.extend(resolve_clip_spec_commands(
+            mask_path,
+            bounds,
+            element_transform,
+        ));
     }
     commands
 }
@@ -597,29 +603,30 @@ fn resolve_radial_gradient(
     element_transform: Transform2D,
 ) -> GlyphRadialGradient {
     let matrix = matrix_from_array(gradient.transform);
-    let (cx, cy, fx, fy, radius) = if matches!(gradient.units, GlyphGradientUnits::ObjectBoundingBox) {
-        let (min_x, min_y, max_x, max_y) = bounds.unwrap_or((0.0, 0.0, 0.0, 0.0));
-        let width = max_x - min_x;
-        let height = max_y - min_y;
-        let scale = width.abs().max(height.abs());
-        (
-            min_x + gradient.cx * width,
-            min_y + gradient.cy * height,
-            min_x + gradient.fx * width,
-            min_y + gradient.fy * height,
-            gradient.r * scale,
-        )
-    } else {
-        let center = element_transform.apply(gradient.cx, gradient.cy);
-        let focus = element_transform.apply(gradient.fx, gradient.fy);
-        (
-            center.0,
-            center.1,
-            focus.0,
-            focus.1,
-            gradient.r * transform_max_scale(element_transform),
-        )
-    };
+    let (cx, cy, fx, fy, radius) =
+        if matches!(gradient.units, GlyphGradientUnits::ObjectBoundingBox) {
+            let (min_x, min_y, max_x, max_y) = bounds.unwrap_or((0.0, 0.0, 0.0, 0.0));
+            let width = max_x - min_x;
+            let height = max_y - min_y;
+            let scale = width.abs().max(height.abs());
+            (
+                min_x + gradient.cx * width,
+                min_y + gradient.cy * height,
+                min_x + gradient.fx * width,
+                min_y + gradient.fy * height,
+                gradient.r * scale,
+            )
+        } else {
+            let center = element_transform.apply(gradient.cx, gradient.cy);
+            let focus = element_transform.apply(gradient.fx, gradient.fy);
+            (
+                center.0,
+                center.1,
+                focus.0,
+                focus.1,
+                gradient.r * transform_max_scale(element_transform),
+            )
+        };
     let center = matrix.apply(cx, cy);
     let focus = matrix.apply(fx, fy);
     gradient.cx = center.0;
@@ -653,7 +660,9 @@ fn command_bounds(commands: &[Command]) -> Option<(f32, f32, f32, f32)> {
     let mut bounds = None;
     for command in commands {
         match command {
-            Command::MoveTo(x, y) | Command::Line(x, y) => extend_command_bounds(&mut bounds, *x, *y),
+            Command::MoveTo(x, y) | Command::Line(x, y) => {
+                extend_command_bounds(&mut bounds, *x, *y)
+            }
             Command::Bezier((cx, cy), (x, y)) => {
                 extend_command_bounds(&mut bounds, *cx, *cy);
                 extend_command_bounds(&mut bounds, *x, *y);
@@ -812,10 +821,12 @@ fn parse_gradient(
     scale_y: f32,
 ) -> Option<GlyphPaint> {
     match element.name.as_str() {
-        "lineargradient" => parse_linear_gradient(element, defs, scale_x, scale_y)
-            .map(GlyphPaint::LinearGradient),
-        "radialgradient" => parse_radial_gradient(element, defs, scale_x, scale_y)
-            .map(GlyphPaint::RadialGradient),
+        "lineargradient" => {
+            parse_linear_gradient(element, defs, scale_x, scale_y).map(GlyphPaint::LinearGradient)
+        }
+        "radialgradient" => {
+            parse_radial_gradient(element, defs, scale_x, scale_y).map(GlyphPaint::RadialGradient)
+        }
         _ => None,
     }
 }
@@ -845,11 +856,23 @@ fn parse_linear_gradient(
             })
         })
     });
-    let units = gradient_units(element, inherited, inherited_gradient.as_ref().map(|g| g.units));
-    let x1 = gradient_number(element, inherited, "x1").or_else(|| inherited_gradient.as_ref().map(|g| g.x1)).unwrap_or(0.0);
-    let y1 = gradient_number(element, inherited, "y1").or_else(|| inherited_gradient.as_ref().map(|g| g.y1)).unwrap_or(0.0);
-    let x2 = gradient_number(element, inherited, "x2").or_else(|| inherited_gradient.as_ref().map(|g| g.x2)).unwrap_or(1.0);
-    let y2 = gradient_number(element, inherited, "y2").or_else(|| inherited_gradient.as_ref().map(|g| g.y2)).unwrap_or(0.0);
+    let units = gradient_units(
+        element,
+        inherited,
+        inherited_gradient.as_ref().map(|g| g.units),
+    );
+    let x1 = gradient_number(element, inherited, "x1")
+        .or_else(|| inherited_gradient.as_ref().map(|g| g.x1))
+        .unwrap_or(0.0);
+    let y1 = gradient_number(element, inherited, "y1")
+        .or_else(|| inherited_gradient.as_ref().map(|g| g.y1))
+        .unwrap_or(0.0);
+    let x2 = gradient_number(element, inherited, "x2")
+        .or_else(|| inherited_gradient.as_ref().map(|g| g.x2))
+        .unwrap_or(1.0);
+    let y2 = gradient_number(element, inherited, "y2")
+        .or_else(|| inherited_gradient.as_ref().map(|g| g.y2))
+        .unwrap_or(0.0);
     let (x1, y1, x2, y2) = if matches!(units, GlyphGradientUnits::UserSpaceOnUse) {
         (x1 * scale_x, y1 * scale_y, x2 * scale_x, y2 * scale_y)
     } else {
@@ -897,13 +920,28 @@ fn parse_radial_gradient(
     scale_y: f32,
 ) -> Option<GlyphRadialGradient> {
     let inherited = gradient_reference(element, defs);
-    let inherited_gradient = inherited.and_then(|gradient| parse_radial_gradient(gradient, defs, scale_x, scale_y));
-    let units = gradient_units(element, inherited, inherited_gradient.as_ref().map(|g| g.units));
-    let cx = gradient_number(element, inherited, "cx").or_else(|| inherited_gradient.as_ref().map(|g| g.cx)).unwrap_or(0.5);
-    let cy = gradient_number(element, inherited, "cy").or_else(|| inherited_gradient.as_ref().map(|g| g.cy)).unwrap_or(0.5);
-    let r = gradient_number(element, inherited, "r").or_else(|| inherited_gradient.as_ref().map(|g| g.r)).unwrap_or(0.5);
-    let fx = gradient_number(element, inherited, "fx").or_else(|| inherited_gradient.as_ref().map(|g| g.fx)).unwrap_or(cx);
-    let fy = gradient_number(element, inherited, "fy").or_else(|| inherited_gradient.as_ref().map(|g| g.fy)).unwrap_or(cy);
+    let inherited_gradient =
+        inherited.and_then(|gradient| parse_radial_gradient(gradient, defs, scale_x, scale_y));
+    let units = gradient_units(
+        element,
+        inherited,
+        inherited_gradient.as_ref().map(|g| g.units),
+    );
+    let cx = gradient_number(element, inherited, "cx")
+        .or_else(|| inherited_gradient.as_ref().map(|g| g.cx))
+        .unwrap_or(0.5);
+    let cy = gradient_number(element, inherited, "cy")
+        .or_else(|| inherited_gradient.as_ref().map(|g| g.cy))
+        .unwrap_or(0.5);
+    let r = gradient_number(element, inherited, "r")
+        .or_else(|| inherited_gradient.as_ref().map(|g| g.r))
+        .unwrap_or(0.5);
+    let fx = gradient_number(element, inherited, "fx")
+        .or_else(|| inherited_gradient.as_ref().map(|g| g.fx))
+        .unwrap_or(cx);
+    let fy = gradient_number(element, inherited, "fy")
+        .or_else(|| inherited_gradient.as_ref().map(|g| g.fy))
+        .unwrap_or(cy);
     let (cx, cy, fx, fy, r) = if matches!(units, GlyphGradientUnits::UserSpaceOnUse) {
         (
             cx * scale_x,
@@ -1112,7 +1150,9 @@ fn collect_gradient_stops(element: &SvgElement) -> Vec<GlyphGradientStop> {
 }
 
 fn apply_alpha(color: u32, opacity: f32) -> u32 {
-    let alpha = (((color >> 24) & 0xff) as f32 * opacity).round().clamp(0.0, 255.0) as u32;
+    let alpha = (((color >> 24) & 0xff) as f32 * opacity)
+        .round()
+        .clamp(0.0, 255.0) as u32;
     (color & 0x00ff_ffff) | (alpha << 24)
 }
 
@@ -1347,7 +1387,11 @@ fn parse_hex_color(hex: &str) -> Option<u32> {
 fn parse_number_or_percent(value: &str) -> Option<f32> {
     let trimmed = value.trim();
     if let Some(percent) = trimmed.strip_suffix('%') {
-        return percent.trim().parse::<f32>().ok().map(|value| value / 100.0);
+        return percent
+            .trim()
+            .parse::<f32>()
+            .ok()
+            .map(|value| value / 100.0);
     }
     parse_number(trimmed)
 }
@@ -2060,8 +2104,12 @@ mod tests {
         let document = "<svg><path d=\"M1 0 L3 0\" transform=\"rotate(90)\"/></svg>";
         let layers = svg_to_path_layers(document, 1.0, 1.0);
         assert_eq!(layers.len(), 1);
-        assert!(matches!(layers[0].commands[0], Command::MoveTo(x, y) if x.abs() < 0.01 && (y - 1.0).abs() < 0.01));
-        assert!(matches!(layers[0].commands[1], Command::Line(x, y) if x.abs() < 0.01 && (y - 3.0).abs() < 0.01));
+        assert!(
+            matches!(layers[0].commands[0], Command::MoveTo(x, y) if x.abs() < 0.01 && (y - 1.0).abs() < 0.01)
+        );
+        assert!(
+            matches!(layers[0].commands[1], Command::Line(x, y) if x.abs() < 0.01 && (y - 3.0).abs() < 0.01)
+        );
     }
 
     #[test]
@@ -2069,8 +2117,12 @@ mod tests {
         let document = "<svg><path d=\"M2 1 L4 1\" transform=\"rotate(90 2 1)\"/></svg>";
         let layers = svg_to_path_layers(document, 1.0, 1.0);
         assert_eq!(layers.len(), 1);
-        assert!(matches!(layers[0].commands[0], Command::MoveTo(x, y) if (x - 2.0).abs() < 0.01 && (y - 1.0).abs() < 0.01));
-        assert!(matches!(layers[0].commands[1], Command::Line(x, y) if (x - 2.0).abs() < 0.01 && (y - 3.0).abs() < 0.01));
+        assert!(
+            matches!(layers[0].commands[0], Command::MoveTo(x, y) if (x - 2.0).abs() < 0.01 && (y - 1.0).abs() < 0.01)
+        );
+        assert!(
+            matches!(layers[0].commands[1], Command::Line(x, y) if (x - 2.0).abs() < 0.01 && (y - 3.0).abs() < 0.01)
+        );
     }
 
     #[test]
@@ -2078,8 +2130,12 @@ mod tests {
         let document = "<svg><path d=\"M0 1 L0 3\" transform=\"skewX(45)\"/></svg>";
         let layers = svg_to_path_layers(document, 1.0, 1.0);
         assert_eq!(layers.len(), 1);
-        assert!(matches!(layers[0].commands[0], Command::MoveTo(x, y) if (x - 1.0).abs() < 0.01 && (y - 1.0).abs() < 0.01));
-        assert!(matches!(layers[0].commands[1], Command::Line(x, y) if (x - 3.0).abs() < 0.01 && (y - 3.0).abs() < 0.01));
+        assert!(
+            matches!(layers[0].commands[0], Command::MoveTo(x, y) if (x - 1.0).abs() < 0.01 && (y - 1.0).abs() < 0.01)
+        );
+        assert!(
+            matches!(layers[0].commands[1], Command::Line(x, y) if (x - 3.0).abs() < 0.01 && (y - 3.0).abs() < 0.01)
+        );
     }
 
     #[test]
@@ -2087,8 +2143,12 @@ mod tests {
         let document = "<svg><path d=\"M1 0 L3 0\" transform=\"skewY(45)\"/></svg>";
         let layers = svg_to_path_layers(document, 1.0, 1.0);
         assert_eq!(layers.len(), 1);
-        assert!(matches!(layers[0].commands[0], Command::MoveTo(x, y) if (x - 1.0).abs() < 0.01 && (y - 1.0).abs() < 0.01));
-        assert!(matches!(layers[0].commands[1], Command::Line(x, y) if (x - 3.0).abs() < 0.01 && (y - 3.0).abs() < 0.01));
+        assert!(
+            matches!(layers[0].commands[0], Command::MoveTo(x, y) if (x - 1.0).abs() < 0.01 && (y - 1.0).abs() < 0.01)
+        );
+        assert!(
+            matches!(layers[0].commands[1], Command::Line(x, y) if (x - 3.0).abs() < 0.01 && (y - 3.0).abs() < 0.01)
+        );
     }
 
     #[test]
@@ -2126,7 +2186,10 @@ mod tests {
         let layers = svg_to_path_layers(document, 1.0, 1.0);
 
         assert_eq!(layers.len(), 1);
-        assert!(matches!(layers[0].paint_mode, crate::commands::PathPaintMode::Stroke));
+        assert!(matches!(
+            layers[0].paint_mode,
+            crate::commands::PathPaintMode::Stroke
+        ));
         assert_eq!(layers[0].stroke_width, 2.0);
     }
 
@@ -2260,7 +2323,9 @@ mod tests {
         assert!(svg_requires_svg_fallback("<svg><mask id=\"m\"/></svg>"));
         assert!(svg_requires_svg_fallback("<svg><pattern id=\"p\"/></svg>"));
         assert!(svg_requires_svg_fallback("<svg><filter id=\"f\"/></svg>"));
-        assert!(!svg_requires_svg_fallback("<svg><path d=\"M0 0 L1 1\"/></svg>"));
+        assert!(!svg_requires_svg_fallback(
+            "<svg><path d=\"M0 0 L1 1\"/></svg>"
+        ));
     }
 
     #[test]
@@ -2305,7 +2370,10 @@ mod tests {
 
         assert_eq!(layers.len(), 1);
         assert!(!layers[0].clip_commands.is_empty());
-        assert!(matches!(layers[0].clip_commands[0], Command::MoveTo(2.0, 6.0)));
+        assert!(matches!(
+            layers[0].clip_commands[0],
+            Command::MoveTo(2.0, 6.0)
+        ));
     }
 
     #[test]
@@ -2322,7 +2390,10 @@ mod tests {
         let layers = svg_to_path_layers(document, 2.0, 3.0);
 
         assert_eq!(layers.len(), 1);
-        assert!(matches!(layers[0].clip_commands[0], Command::MoveTo(4.0, 9.0)));
+        assert!(matches!(
+            layers[0].clip_commands[0],
+            Command::MoveTo(4.0, 9.0)
+        ));
     }
 
     #[test]
@@ -2336,7 +2407,10 @@ mod tests {
         let layers = svg_to_path_layers(document, 1.0, 1.0);
         assert_eq!(layers.len(), 1);
         assert!(!layers[0].clip_commands.is_empty());
-        assert!(matches!(layers[0].clip_commands[0], Command::MoveTo(2.0, 3.0)));
+        assert!(matches!(
+            layers[0].clip_commands[0],
+            Command::MoveTo(2.0, 3.0)
+        ));
     }
 
     #[test]
@@ -2349,6 +2423,9 @@ mod tests {
         );
         let layers = svg_to_path_layers(document, 1.0, 1.0);
         assert_eq!(layers.len(), 1);
-        assert!(matches!(layers[0].clip_commands[0], Command::MoveTo(12.0, 23.0)));
+        assert!(matches!(
+            layers[0].clip_commands[0],
+            Command::MoveTo(12.0, 23.0)
+        ));
     }
 }

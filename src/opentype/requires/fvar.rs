@@ -69,11 +69,12 @@ impl FVAR {
                 "fvar axis array exceeds table bounds",
             ));
         }
-        let minimum_instance_size = 4usize
-            .checked_add(axis_count.checked_mul(4).ok_or_else(|| {
-                Error::new(ErrorKind::InvalidData, "fvar instance size overflow")
-            })?)
-            .ok_or_else(|| Error::new(ErrorKind::InvalidData, "fvar instance size overflow"))?;
+        let minimum_instance_size =
+            4usize
+                .checked_add(axis_count.checked_mul(4).ok_or_else(|| {
+                    Error::new(ErrorKind::InvalidData, "fvar instance size overflow")
+                })?)
+                .ok_or_else(|| Error::new(ErrorKind::InvalidData, "fvar instance size overflow"))?;
         if instance_count > 0 && instance_size < minimum_instance_size {
             return Err(Error::new(
                 ErrorKind::InvalidData,
@@ -84,7 +85,12 @@ impl FVAR {
             .checked_add(instance_count.checked_mul(instance_size).ok_or_else(|| {
                 Error::new(ErrorKind::InvalidData, "fvar instance array size overflow")
             })?)
-            .ok_or_else(|| Error::new(ErrorKind::InvalidData, "fvar instance array offset overflow"))?;
+            .ok_or_else(|| {
+                Error::new(
+                    ErrorKind::InvalidData,
+                    "fvar instance array offset overflow",
+                )
+            })?;
         if instance_end > data.len() {
             return Err(Error::new(
                 ErrorKind::UnexpectedEof,
@@ -224,12 +230,7 @@ mod tests {
     #[test]
     fn rejects_axis_range_without_default_value() {
         let mut bytes = vec![
-            0x00, 0x01, 0x00, 0x00,
-            0x00, 0x10,
-            0x00, 0x00,
-            0x00, 0x01,
-            0x00, 0x14,
-            0x00, 0x00,
+            0x00, 0x01, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x01, 0x00, 0x14, 0x00, 0x00,
             0x00, 0x00,
         ];
         bytes.extend_from_slice(&axis_record(2, 1, 3, 0));
@@ -240,12 +241,7 @@ mod tests {
     #[test]
     fn rejects_truncated_instance_array() {
         let mut bytes = vec![
-            0x00, 0x01, 0x00, 0x00,
-            0x00, 0x10,
-            0x00, 0x00,
-            0x00, 0x01,
-            0x00, 0x14,
-            0x00, 0x01,
+            0x00, 0x01, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x01, 0x00, 0x14, 0x00, 0x01,
             0x00, 0x18,
         ];
         bytes.extend_from_slice(&axis_record(0, 1, 2, 0));
@@ -256,12 +252,7 @@ mod tests {
     #[test]
     fn rejects_instance_record_without_all_axis_coordinates() {
         let mut bytes = vec![
-            0x00, 0x01, 0x00, 0x00,
-            0x00, 0x10,
-            0x00, 0x00,
-            0x00, 0x01,
-            0x00, 0x14,
-            0x00, 0x01,
+            0x00, 0x01, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x01, 0x00, 0x14, 0x00, 0x01,
             0x00, 0x08,
         ];
         bytes.extend_from_slice(&axis_record(0, 1, 2, 0));

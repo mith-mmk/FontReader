@@ -181,13 +181,13 @@ impl CmapEncodings {
     }
 
     pub(crate) fn get_glyph_position_from_uvs(&self, code_number: u32, vs: u32) -> u32 {
-        let Some(format14) = self
-            .cmap_encodings
-            .iter()
-            .find_map(|encoding| match encoding.cmap_subtable.as_ref() {
-                CmapSubtable::Format14(format14) => Some(format14),
-                _ => None,
-            })
+        let Some(format14) =
+            self.cmap_encodings
+                .iter()
+                .find_map(|encoding| match encoding.cmap_subtable.as_ref() {
+                    CmapSubtable::Format14(format14) => Some(format14),
+                    _ => None,
+                })
         else {
             return self.get_glyph_position(code_number);
         };

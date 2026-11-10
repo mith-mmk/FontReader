@@ -377,10 +377,10 @@ impl MarkGlyphSetsDef {
             let coverage_offset = table_offset
                 .checked_add(*coverage_offset as u64)
                 .ok_or_else(|| {
-                std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
-                    "GDEF MarkGlyphSets coverage offset overflow",
-                )
+                    std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "GDEF MarkGlyphSets coverage offset overflow",
+                    )
                 })?;
             coverages.push(Coverage::new(reader, coverage_offset)?);
         }

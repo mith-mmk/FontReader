@@ -452,10 +452,7 @@ mod tests {
     }
 
     #[cfg(feature = "layout")]
-    fn build_lookup_record_with_subtables(
-        lookup_type: u16,
-        subtables: Vec<Vec<u8>>,
-    ) -> Vec<u8> {
+    fn build_lookup_record_with_subtables(lookup_type: u16, subtables: Vec<Vec<u8>>) -> Vec<u8> {
         let mut buffer = Vec::new();
         push_u16(&mut buffer, lookup_type);
         push_u16(&mut buffer, 0);
@@ -2007,7 +2004,10 @@ mod tests {
             &[(*b"isol", &[0])],
             vec![lookup_single_record(10, 100)],
         ));
-        assert_eq!(invalid_feature.lookup_joining_forms(10, None).isolated, None);
+        assert_eq!(
+            invalid_feature.lookup_joining_forms(10, None).isolated,
+            None
+        );
 
         let invalid_lookup = parse_gsub(build_gsub_table_with_scripted_features(
             &[(*b"DFLT", 0xFFFF, &[0])],
@@ -3702,7 +3702,10 @@ mod tests {
                 let svg = font
                     .text2svg(sequence, 32.0, "px")
                     .unwrap_or_else(|err| panic!("render {font_name} {sequence:?}: {err}"));
-                assert!(svg.contains("<svg"), "expected svg output for {font_name} {sequence:?}");
+                assert!(
+                    svg.contains("<svg"),
+                    "expected svg output for {font_name} {sequence:?}"
+                );
                 return;
             }
         }
@@ -4031,2109 +4034,2092 @@ mod tests {
     mod external_corpus {
         use super::*;
 
-    fn real_variation_sequence(font: &crate::LoadedFont) -> (String, usize) {
-        let cmap = font.font().cmap.as_ref().expect("cmap");
-        let format14 = cmap
-            .cmap_encodings
-            .iter()
-            .find_map(|encoding| match encoding.cmap_subtable.as_ref() {
-                CmapSubtable::Format14(format14) => Some(format14),
-                _ => None,
-            })
-            .expect("expected format 14 cmap");
-        let var_selector_record = format14
-            .var_selector_records
-            .first()
-            .expect("expected at least one var selector record");
-        let mapping = var_selector_record
-            .non_default_uvs
-            .unicode_value_ranges
-            .first()
-            .expect("expected at least one UVS mapping");
-        let text = format!(
-            "{}{}",
-            char::from_u32(mapping.unicode_value).expect("unicode scalar"),
-            char::from_u32(var_selector_record.var_selector).expect("variation selector")
-        );
-        (text, mapping.glyph_id as usize)
-    }
-
-    #[test]
-    fn fontload_from_file_works() {
-        let path = sample_font_path();
-        let font = crate::fontload_file(&path).expect("load from file");
-        assert!(font.font().get_font_count() >= 1);
-        assert!(!font.font().get_info().is_err());
-    }
-
-    #[test]
-    fn fontload_from_buffer_works() {
-        let path = sample_font_path();
-        let bytes = std::fs::read(&path).expect("read font bytes");
-        let font = crate::fontload_buffer(&bytes).expect("load from buffer");
-        assert!(font.font().get_font_count() >= 1);
-    }
-
-    #[test]
-    fn load_font_from_buffer_alias_works() {
-        let path = sample_font_path();
-        let bytes = std::fs::read(&path).expect("read font bytes");
-        let font = crate::load_font_from_buffer(&bytes).expect("load from buffer alias");
-        assert!(font.font().get_font_count() >= 1);
-    }
-
-    #[test]
-    fn load_font_from_source_buffer_works() {
-        let path = sample_font_path();
-        let bytes = std::fs::read(&path).expect("read font bytes");
-        let font = crate::load_font(crate::FontSource::Buffer(&bytes)).expect("load source buffer");
-        assert!(font.font().get_font_count() >= 1);
-    }
-
-    #[test]
-    fn fontload_from_collection_file_works() {
-        let font = crate::fontload_file(collection_font_path()).expect("load font collection");
-        assert!(font.font().get_font_count() > 1);
-    }
-
-    #[test]
-    fn truetype_consecutive_off_curve_points_stay_quadratic() {
-        let parsed = ParsedGlyph {
-            number_of_contours: 1,
-            x_min: 0,
-            y_min: 0,
-            x_max: 30,
-            y_max: 10,
-            offset: 0,
-            length: 0,
-            end_pts_of_contours: vec![3],
-            instructions: Vec::new(),
-            flags: vec![0, 0, 0, 0],
-            xs: vec![0, 10, 10, 10],
-            ys: vec![0, 10, 0, -10],
-            on_curves: vec![true, false, false, true],
-        };
-
-        let commands = crate::opentype::outline::glyf::Glyph::to_path_commands_parsed(
-            &parsed,
-            &crate::fontreader::FontLayout::Unknown,
-            0.0,
-            0.0,
-        );
-
-        assert!(matches!(commands[0], crate::PathCommand::MoveTo { .. }));
-        assert!(matches!(commands[1], crate::PathCommand::QuadTo { .. }));
-        assert!(matches!(commands[2], crate::PathCommand::QuadTo { .. }));
-        assert!(matches!(commands[3], crate::PathCommand::ClosePath));
-
-        let svg = crate::opentype::outline::glyf::Glyph::get_svg_path_parsed(
-            &parsed,
-            &crate::fontreader::FontLayout::Unknown,
-            0.0,
-            0.0,
-        );
-        assert_eq!(svg.matches('Q').count(), 2);
-        assert!(!svg.contains('T'));
-    }
-
-    #[test]
-    fn fontload_from_collection_buffer_works() {
-        let bytes = std::fs::read(collection_font_path()).expect("read collection bytes");
-        let font = crate::fontload_buffer(&bytes).expect("load font collection from buffer");
-        assert!(font.font().get_font_count() > 1);
-    }
-
-    #[test]
-    fn font_family_add_loaded_font_expands_collection_faces() {
-        let path = yu_gothic_regular_collection_path();
-        if !path.exists() {
-            return;
+        fn real_variation_sequence(font: &crate::LoadedFont) -> (String, usize) {
+            let cmap = font.font().cmap.as_ref().expect("cmap");
+            let format14 = cmap
+                .cmap_encodings
+                .iter()
+                .find_map(|encoding| match encoding.cmap_subtable.as_ref() {
+                    CmapSubtable::Format14(format14) => Some(format14),
+                    _ => None,
+                })
+                .expect("expected format 14 cmap");
+            let var_selector_record = format14
+                .var_selector_records
+                .first()
+                .expect("expected at least one var selector record");
+            let mapping = var_selector_record
+                .non_default_uvs
+                .unicode_value_ranges
+                .first()
+                .expect("expected at least one UVS mapping");
+            let text = format!(
+                "{}{}",
+                char::from_u32(mapping.unicode_value).expect("unicode scalar"),
+                char::from_u32(var_selector_record.var_selector).expect("variation selector")
+            );
+            (text, mapping.glyph_id as usize)
         }
 
-        let font = crate::load_font_from_file(&path).expect("load Yu Gothic TTC");
-        let face_count = font.font().get_font_count();
-        assert!(face_count > 1, "expected TTC with multiple faces");
-
-        let mut family = crate::FontFamily::new("Yu Gothic");
-        family.add_loaded_font(font);
-
-        assert_eq!(family.cached_faces_len(), face_count);
-    }
-
-    #[test]
-    fn font_family_resolves_yu_gothic_face_from_collection() {
-        let path = yu_gothic_regular_collection_path();
-        if !path.exists() {
-            return;
+        #[test]
+        fn fontload_from_file_works() {
+            let path = sample_font_path();
+            let font = crate::fontload_file(&path).expect("load from file");
+            assert!(font.font().get_font_count() >= 1);
+            assert!(!font.font().get_info().is_err());
         }
 
-        let font = crate::load_font_from_file(&path).expect("load Yu Gothic TTC");
-        let mut family = crate::FontFamily::new("Yu Gothic");
-        family.add_loaded_font(font);
-
-        let descriptor = family
-            .resolve_descriptor(
-                Some("Yu Gothic"),
-                None,
-                crate::FontWeight::NORMAL,
-                crate::FontStyle::Normal,
-                crate::FontStretch::default(),
-            )
-            .expect("resolve Yu Gothic face");
-
-        assert_eq!(descriptor.family_name, "Yu Gothic");
-    }
-
-    #[test]
-    #[cfg(feature = "layout")]
-    fn yu_gothic_does_not_replace_masu_with_square_masu_by_default() {
-        let Some(font) = yu_gothic_font() else {
-            return;
-        };
-
-        let glyph_ids = font
-            .font()
-            .debug_shape_glyph_ids("ます", Some("ja-JP"))
-            .expect("shape Yu Gothic glyph ids");
-        assert_eq!(
-            glyph_ids.len(),
-            2,
-            "default shaping should keep ます as two glyphs"
-        );
-
-        let cmap = font.font().cmap.as_ref().expect("Yu Gothic cmap");
-        let square_masu = cmap.get_glyph_position('〼' as u32) as usize;
-        assert_ne!(
-            glyph_ids[0], square_masu,
-            "must not substitute to 〼 by default"
-        );
-    }
-
-    #[test]
-    #[cfg(feature = "layout")]
-    fn yu_gothic_masu_ligature_is_discretionary_not_default() {
-        let Some(font) = yu_gothic_font() else {
-            return;
-        };
-        let Some(gsub) = font.font().gsub.as_ref() else {
-            return;
-        };
-        let cmap = font.font().cmap.as_ref().expect("Yu Gothic cmap");
-
-        let glyph_ids = vec![
-            cmap.get_glyph_position('ま' as u32) as usize,
-            cmap.get_glyph_position('す' as u32) as usize,
-        ];
-        let square_masu = cmap.get_glyph_position('〼' as u32) as usize;
-
-        let default_liga = gsub.lookup_liga_sequence(&glyph_ids);
-        assert_ne!(default_liga, Some(square_masu));
-
-        let dlig = gsub.lookup_discretionary_liga_sequence(&glyph_ids);
-        if let Some(discretionary) = dlig {
-            assert_eq!(discretionary, square_masu);
-        }
-    }
-
-    #[test]
-    fn fontload_from_woff2_file_works() {
-        let path = woff2_font_path();
-        let font = crate::fontload_file(&path).expect("load woff2 from file");
-        let svg = font.text2svg("A", 24.0, "px").expect("render woff2 text");
-        assert!(svg.starts_with("<svg"));
-    }
-
-    #[test]
-    fn fira_sans_post_table_to_string_does_not_panic() {
-        let path = fira_sans_regular_path();
-        let font = crate::load_font_from_file(&path).expect("load Fira Sans");
-        let post = font.font().post.as_ref().expect("Fira Sans post table");
-        let dump = post.to_string();
-
-        assert!(dump.starts_with("post\n"));
-        assert!(dump.contains("Version"));
-    }
-
-    #[test]
-    fn fira_sans_svg_viewbox_keeps_padding_for_o() {
-        let path = fira_sans_black_path();
-        let font = crate::load_font_from_file(&path).expect("load Fira Sans Black");
-        let run = font
-            .text2glyph_run("O", crate::FontOptions::new(&font).with_font_size(64.0))
-            .expect("shape O");
-        let svg = font.text2svg("O", 64.0, "px").expect("svg O");
-
-        let view_box = svg
-            .split("viewBox=\"")
-            .nth(1)
-            .and_then(|rest| rest.split('"').next())
-            .expect("viewBox");
-        let values: Vec<f32> = view_box
-            .split_whitespace()
-            .map(|value| value.parse::<f32>().expect("numeric viewBox component"))
-            .collect();
-        assert_eq!(values.len(), 4);
-
-        let glyph = &run.glyphs[0];
-        let bounds = glyph.glyph.metrics.bounds.expect("glyph bounds");
-        let min_x = bounds.min_x + glyph.x;
-        let min_y = bounds.min_y + glyph.y;
-        let width = bounds.max_x - bounds.min_x;
-        let height = bounds.max_y - bounds.min_y;
-
-        assert!(values[0] < min_x, "viewBox should add left/right padding");
-        assert!(values[1] < min_y, "viewBox should add top/bottom padding");
-        assert!(
-            values[2] > width,
-            "viewBox width should exceed glyph bounds"
-        );
-        assert!(
-            values[3] > height,
-            "viewBox height should exceed glyph bounds"
-        );
-    }
-
-    #[test]
-    fn fontload_from_woff2_buffer_works() {
-        let path = woff2_font_path();
-        let bytes = std::fs::read(&path).expect("read woff2 bytes");
-        let font = crate::fontload_buffer(&bytes).expect("load woff2 from buffer");
-        let svg = font.text2svg("A", 24.0, "px").expect("render woff2 text");
-        assert!(svg.contains("<svg"));
-    }
-
-    #[test]
-    fn chunked_font_buffer_reports_missing_ranges() {
-        let mut buffer = crate::ChunkedFontBuffer::new(10).expect("create chunked buffer");
-        assert_eq!(buffer.missing_ranges(), vec![(0, 10)]);
-
-        buffer.append(2, &[1, 2, 3]).expect("append middle chunk");
-        assert_eq!(buffer.filled_len(), 3);
-        assert_eq!(buffer.missing_ranges(), vec![(0, 2), (5, 10)]);
-
-        buffer.append(0, &[9, 8]).expect("append front chunk");
-        buffer
-            .append(5, &[7, 6, 5, 4, 3])
-            .expect("append tail chunk");
-        assert!(buffer.is_complete());
-        assert!(buffer.missing_ranges().is_empty());
-    }
-
-    #[test]
-    fn chunked_font_buffer_reassembles_woff2_out_of_order() {
-        let bytes = std::fs::read(woff2_font_path()).expect("read woff2 bytes");
-        let mut buffer =
-            crate::ChunkedFontBuffer::new(bytes.len()).expect("create chunked font buffer");
-        let chunk_size = (bytes.len() / 5).max(1);
-        let mut chunks = Vec::new();
-        let mut offset = 0usize;
-        while offset < bytes.len() {
-            let end = (offset + chunk_size).min(bytes.len());
-            chunks.push((offset, bytes[offset..end].to_vec()));
-            offset = end;
+        #[test]
+        fn fontload_from_buffer_works() {
+            let path = sample_font_path();
+            let bytes = std::fs::read(&path).expect("read font bytes");
+            let font = crate::fontload_buffer(&bytes).expect("load from buffer");
+            assert!(font.font().get_font_count() >= 1);
         }
 
-        for (offset, chunk) in chunks.into_iter().rev() {
-            buffer.append(offset, &chunk).expect("append chunk");
+        #[test]
+        fn load_font_from_buffer_alias_works() {
+            let path = sample_font_path();
+            let bytes = std::fs::read(&path).expect("read font bytes");
+            let font = crate::load_font_from_buffer(&bytes).expect("load from buffer alias");
+            assert!(font.font().get_font_count() >= 1);
         }
 
-        assert!(buffer.is_complete());
-        let font = buffer.into_loaded_font().expect("load reconstructed woff2");
-        let svg = font
-            .text2svg("A", 24.0, "px")
-            .expect("render reconstructed woff2");
-        assert!(svg.contains("<svg"));
-    }
-
-    #[test]
-    fn chunked_font_buffer_rejects_incomplete_decode() {
-        let bytes = std::fs::read(woff2_font_path()).expect("read woff2 bytes");
-        let mut buffer =
-            crate::ChunkedFontBuffer::new(bytes.len()).expect("create chunked font buffer");
-        let halfway = bytes.len() / 2;
-        buffer
-            .append(0, &bytes[..halfway])
-            .expect("append partial bytes");
-
-        match buffer.load_font() {
-            Ok(_) => panic!("incomplete buffer should not decode"),
-            Err(err) => assert_eq!(err.kind(), std::io::ErrorKind::WouldBlock),
+        #[test]
+        fn load_font_from_source_buffer_works() {
+            let path = sample_font_path();
+            let bytes = std::fs::read(&path).expect("read font bytes");
+            let font =
+                crate::load_font(crate::FontSource::Buffer(&bytes)).expect("load source buffer");
+            assert!(font.font().get_font_count() >= 1);
         }
-    }
 
-    #[test]
-    fn chunked_font_buffer_rejects_conflicting_overlaps() {
-        let mut buffer = crate::ChunkedFontBuffer::new(8).expect("create chunked buffer");
-        buffer.append(2, &[1, 2, 3]).expect("append initial bytes");
-        let err = buffer
-            .append(3, &[9, 3])
-            .expect_err("overlapping conflicting bytes should fail");
-        assert_eq!(err.kind(), std::io::ErrorKind::InvalidData);
-    }
+        #[test]
+        fn fontload_from_collection_file_works() {
+            let font = crate::fontload_file(collection_font_path()).expect("load font collection");
+            assert!(font.font().get_font_count() > 1);
+        }
 
-    #[test]
-    fn font_family_selects_best_cached_face() {
-        let regular =
-            crate::load_font_from_file(fira_sans_regular_path()).expect("load regular fira sans");
-        let black =
-            crate::load_font_from_file(fira_sans_black_path()).expect("load black fira sans");
+        #[test]
+        fn truetype_consecutive_off_curve_points_stay_quadratic() {
+            let parsed = ParsedGlyph {
+                number_of_contours: 1,
+                x_min: 0,
+                y_min: 0,
+                x_max: 30,
+                y_max: 10,
+                offset: 0,
+                length: 0,
+                end_pts_of_contours: vec![3],
+                instructions: Vec::new(),
+                flags: vec![0, 0, 0, 0],
+                xs: vec![0, 10, 10, 10],
+                ys: vec![0, 10, 0, -10],
+                on_curves: vec![true, false, false, true],
+            };
 
-        let mut family = crate::FontFamily::new("Fira Sans");
-        family.add_face(
-            crate::FontFaceDescriptor::new("Fira Sans")
-                .with_font_name("Fira Sans Regular")
-                .with_font_weight(crate::FontWeight::NORMAL),
-            regular,
-        );
-        family.add_face(
-            crate::FontFaceDescriptor::new("Fira Sans")
-                .with_font_name("Fira Sans Black")
-                .with_font_weight(crate::FontWeight::BLACK),
-            black,
-        );
+            let commands = crate::opentype::outline::glyf::Glyph::to_path_commands_parsed(
+                &parsed,
+                &crate::fontreader::FontLayout::Unknown,
+                0.0,
+                0.0,
+            );
 
-        let descriptor = family
-            .resolve_descriptor(
-                Some("Fira Sans"),
-                None,
-                crate::FontWeight::BLACK,
-                crate::FontStyle::Normal,
-                crate::FontStretch::NORMAL,
-            )
-            .expect("resolve cached face");
-        assert_eq!(descriptor.font_name.as_deref(), Some("Fira Sans Black"));
+            assert!(matches!(commands[0], crate::PathCommand::MoveTo { .. }));
+            assert!(matches!(commands[1], crate::PathCommand::QuadTo { .. }));
+            assert!(matches!(commands[2], crate::PathCommand::QuadTo { .. }));
+            assert!(matches!(commands[3], crate::PathCommand::ClosePath));
 
-        let run = crate::text2commands(
-            "A",
-            crate::FontOptions::from_family(&family)
-                .with_font_family("Fira Sans")
-                .with_font_weight(crate::FontWeight::BLACK)
-                .with_font_size(24.0),
-        )
-        .expect("render from family");
-        assert_eq!(run.glyphs.len(), 1);
+            let svg = crate::opentype::outline::glyf::Glyph::get_svg_path_parsed(
+                &parsed,
+                &crate::fontreader::FontLayout::Unknown,
+                0.0,
+                0.0,
+            );
+            assert_eq!(svg.matches('Q').count(), 2);
+            assert!(!svg.contains('T'));
+        }
 
-        let run = family
-            .text2commands(
+        #[test]
+        fn fontload_from_collection_buffer_works() {
+            let bytes = std::fs::read(collection_font_path()).expect("read collection bytes");
+            let font = crate::fontload_buffer(&bytes).expect("load font collection from buffer");
+            assert!(font.font().get_font_count() > 1);
+        }
+
+        #[test]
+        fn font_family_add_loaded_font_expands_collection_faces() {
+            let path = yu_gothic_regular_collection_path();
+            if !path.exists() {
+                return;
+            }
+
+            let font = crate::load_font_from_file(&path).expect("load Yu Gothic TTC");
+            let face_count = font.font().get_font_count();
+            assert!(face_count > 1, "expected TTC with multiple faces");
+
+            let mut family = crate::FontFamily::new("Yu Gothic");
+            family.add_loaded_font(font);
+
+            assert_eq!(family.cached_faces_len(), face_count);
+        }
+
+        #[test]
+        fn font_family_resolves_yu_gothic_face_from_collection() {
+            let path = yu_gothic_regular_collection_path();
+            if !path.exists() {
+                return;
+            }
+
+            let font = crate::load_font_from_file(&path).expect("load Yu Gothic TTC");
+            let mut family = crate::FontFamily::new("Yu Gothic");
+            family.add_loaded_font(font);
+
+            let descriptor = family
+                .resolve_descriptor(
+                    Some("Yu Gothic"),
+                    None,
+                    crate::FontWeight::NORMAL,
+                    crate::FontStyle::Normal,
+                    crate::FontStretch::default(),
+                )
+                .expect("resolve Yu Gothic face");
+
+            assert_eq!(descriptor.family_name, "Yu Gothic");
+        }
+
+        #[test]
+        #[cfg(feature = "layout")]
+        fn yu_gothic_does_not_replace_masu_with_square_masu_by_default() {
+            let Some(font) = yu_gothic_font() else {
+                return;
+            };
+
+            let glyph_ids = font
+                .font()
+                .debug_shape_glyph_ids("ます", Some("ja-JP"))
+                .expect("shape Yu Gothic glyph ids");
+            assert_eq!(
+                glyph_ids.len(),
+                2,
+                "default shaping should keep ます as two glyphs"
+            );
+
+            let cmap = font.font().cmap.as_ref().expect("Yu Gothic cmap");
+            let square_masu = cmap.get_glyph_position('〼' as u32) as usize;
+            assert_ne!(
+                glyph_ids[0], square_masu,
+                "must not substitute to 〼 by default"
+            );
+        }
+
+        #[test]
+        #[cfg(feature = "layout")]
+        fn yu_gothic_masu_ligature_is_discretionary_not_default() {
+            let Some(font) = yu_gothic_font() else {
+                return;
+            };
+            let Some(gsub) = font.font().gsub.as_ref() else {
+                return;
+            };
+            let cmap = font.font().cmap.as_ref().expect("Yu Gothic cmap");
+
+            let glyph_ids = vec![
+                cmap.get_glyph_position('ま' as u32) as usize,
+                cmap.get_glyph_position('す' as u32) as usize,
+            ];
+            let square_masu = cmap.get_glyph_position('〼' as u32) as usize;
+
+            let default_liga = gsub.lookup_liga_sequence(&glyph_ids);
+            assert_ne!(default_liga, Some(square_masu));
+
+            let dlig = gsub.lookup_discretionary_liga_sequence(&glyph_ids);
+            if let Some(discretionary) = dlig {
+                assert_eq!(discretionary, square_masu);
+            }
+        }
+
+        #[test]
+        fn fontload_from_woff2_file_works() {
+            let path = woff2_font_path();
+            let font = crate::fontload_file(&path).expect("load woff2 from file");
+            let svg = font.text2svg("A", 24.0, "px").expect("render woff2 text");
+            assert!(svg.starts_with("<svg"));
+        }
+
+        #[test]
+        fn fira_sans_post_table_to_string_does_not_panic() {
+            let path = fira_sans_regular_path();
+            let font = crate::load_font_from_file(&path).expect("load Fira Sans");
+            let post = font.font().post.as_ref().expect("Fira Sans post table");
+            let dump = post.to_string();
+
+            assert!(dump.starts_with("post\n"));
+            assert!(dump.contains("Version"));
+        }
+
+        #[test]
+        fn fira_sans_svg_viewbox_keeps_padding_for_o() {
+            let path = fira_sans_black_path();
+            let font = crate::load_font_from_file(&path).expect("load Fira Sans Black");
+            let run = font
+                .text2glyph_run("O", crate::FontOptions::new(&font).with_font_size(64.0))
+                .expect("shape O");
+            let svg = font.text2svg("O", 64.0, "px").expect("svg O");
+
+            let view_box = svg
+                .split("viewBox=\"")
+                .nth(1)
+                .and_then(|rest| rest.split('"').next())
+                .expect("viewBox");
+            let values: Vec<f32> = view_box
+                .split_whitespace()
+                .map(|value| value.parse::<f32>().expect("numeric viewBox component"))
+                .collect();
+            assert_eq!(values.len(), 4);
+
+            let glyph = &run.glyphs[0];
+            let bounds = glyph.glyph.metrics.bounds.expect("glyph bounds");
+            let min_x = bounds.min_x + glyph.x;
+            let min_y = bounds.min_y + glyph.y;
+            let width = bounds.max_x - bounds.min_x;
+            let height = bounds.max_y - bounds.min_y;
+
+            assert!(values[0] < min_x, "viewBox should add left/right padding");
+            assert!(values[1] < min_y, "viewBox should add top/bottom padding");
+            assert!(
+                values[2] > width,
+                "viewBox width should exceed glyph bounds"
+            );
+            assert!(
+                values[3] > height,
+                "viewBox height should exceed glyph bounds"
+            );
+        }
+
+        #[test]
+        fn fontload_from_woff2_buffer_works() {
+            let path = woff2_font_path();
+            let bytes = std::fs::read(&path).expect("read woff2 bytes");
+            let font = crate::fontload_buffer(&bytes).expect("load woff2 from buffer");
+            let svg = font.text2svg("A", 24.0, "px").expect("render woff2 text");
+            assert!(svg.contains("<svg"));
+        }
+
+        #[test]
+        fn chunked_font_buffer_reports_missing_ranges() {
+            let mut buffer = crate::ChunkedFontBuffer::new(10).expect("create chunked buffer");
+            assert_eq!(buffer.missing_ranges(), vec![(0, 10)]);
+
+            buffer.append(2, &[1, 2, 3]).expect("append middle chunk");
+            assert_eq!(buffer.filled_len(), 3);
+            assert_eq!(buffer.missing_ranges(), vec![(0, 2), (5, 10)]);
+
+            buffer.append(0, &[9, 8]).expect("append front chunk");
+            buffer
+                .append(5, &[7, 6, 5, 4, 3])
+                .expect("append tail chunk");
+            assert!(buffer.is_complete());
+            assert!(buffer.missing_ranges().is_empty());
+        }
+
+        #[test]
+        fn chunked_font_buffer_reassembles_woff2_out_of_order() {
+            let bytes = std::fs::read(woff2_font_path()).expect("read woff2 bytes");
+            let mut buffer =
+                crate::ChunkedFontBuffer::new(bytes.len()).expect("create chunked font buffer");
+            let chunk_size = (bytes.len() / 5).max(1);
+            let mut chunks = Vec::new();
+            let mut offset = 0usize;
+            while offset < bytes.len() {
+                let end = (offset + chunk_size).min(bytes.len());
+                chunks.push((offset, bytes[offset..end].to_vec()));
+                offset = end;
+            }
+
+            for (offset, chunk) in chunks.into_iter().rev() {
+                buffer.append(offset, &chunk).expect("append chunk");
+            }
+
+            assert!(buffer.is_complete());
+            let font = buffer.into_loaded_font().expect("load reconstructed woff2");
+            let svg = font
+                .text2svg("A", 24.0, "px")
+                .expect("render reconstructed woff2");
+            assert!(svg.contains("<svg"));
+        }
+
+        #[test]
+        fn chunked_font_buffer_rejects_incomplete_decode() {
+            let bytes = std::fs::read(woff2_font_path()).expect("read woff2 bytes");
+            let mut buffer =
+                crate::ChunkedFontBuffer::new(bytes.len()).expect("create chunked font buffer");
+            let halfway = bytes.len() / 2;
+            buffer
+                .append(0, &bytes[..halfway])
+                .expect("append partial bytes");
+
+            match buffer.load_font() {
+                Ok(_) => panic!("incomplete buffer should not decode"),
+                Err(err) => assert_eq!(err.kind(), std::io::ErrorKind::WouldBlock),
+            }
+        }
+
+        #[test]
+        fn chunked_font_buffer_rejects_conflicting_overlaps() {
+            let mut buffer = crate::ChunkedFontBuffer::new(8).expect("create chunked buffer");
+            buffer.append(2, &[1, 2, 3]).expect("append initial bytes");
+            let err = buffer
+                .append(3, &[9, 3])
+                .expect_err("overlapping conflicting bytes should fail");
+            assert_eq!(err.kind(), std::io::ErrorKind::InvalidData);
+        }
+
+        #[test]
+        fn font_family_selects_best_cached_face() {
+            let regular = crate::load_font_from_file(fira_sans_regular_path())
+                .expect("load regular fira sans");
+            let black =
+                crate::load_font_from_file(fira_sans_black_path()).expect("load black fira sans");
+
+            let mut family = crate::FontFamily::new("Fira Sans");
+            family.add_face(
+                crate::FontFaceDescriptor::new("Fira Sans")
+                    .with_font_name("Fira Sans Regular")
+                    .with_font_weight(crate::FontWeight::NORMAL),
+                regular,
+            );
+            family.add_face(
+                crate::FontFaceDescriptor::new("Fira Sans")
+                    .with_font_name("Fira Sans Black")
+                    .with_font_weight(crate::FontWeight::BLACK),
+                black,
+            );
+
+            let descriptor = family
+                .resolve_descriptor(
+                    Some("Fira Sans"),
+                    None,
+                    crate::FontWeight::BLACK,
+                    crate::FontStyle::Normal,
+                    crate::FontStretch::NORMAL,
+                )
+                .expect("resolve cached face");
+            assert_eq!(descriptor.font_name.as_deref(), Some("Fira Sans Black"));
+
+            let run = crate::text2commands(
                 "A",
-                family
-                    .options()
+                crate::FontOptions::from_family(&family)
+                    .with_font_family("Fira Sans")
                     .with_font_weight(crate::FontWeight::BLACK)
                     .with_font_size(24.0),
             )
-            .expect("render from family method");
-        assert_eq!(run.glyphs.len(), 1);
+            .expect("render from family");
+            assert_eq!(run.glyphs.len(), 1);
 
-        let svg = family.text2svg("A", 24.0, "px").expect("svg from family");
-        assert!(svg.starts_with("<svg"));
+            let run = family
+                .text2commands(
+                    "A",
+                    family
+                        .options()
+                        .with_font_weight(crate::FontWeight::BLACK)
+                        .with_font_size(24.0),
+                )
+                .expect("render from family method");
+            assert_eq!(run.glyphs.len(), 1);
 
-        let width = family.measure("A").expect("measure from family");
-        assert!(width > 0.0);
-    }
+            let svg = family.text2svg("A", 24.0, "px").expect("svg from family");
+            assert!(svg.starts_with("<svg"));
 
-    #[test]
-    fn font_family_promotes_chunked_face_into_cache() {
-        let bytes = std::fs::read(woff2_font_path()).expect("read woff2 bytes");
-        let mut family = crate::FontFamily::new("Noto Sans");
-        family
-            .begin_chunked_face(
-                "noto-regular",
-                crate::FontFaceDescriptor::new("Noto Sans")
-                    .with_font_name("Noto Sans WOFF2")
-                    .with_font_weight(crate::FontWeight::NORMAL),
-                bytes.len(),
+            let width = family.measure("A").expect("measure from family");
+            assert!(width > 0.0);
+        }
+
+        #[test]
+        fn font_family_promotes_chunked_face_into_cache() {
+            let bytes = std::fs::read(woff2_font_path()).expect("read woff2 bytes");
+            let mut family = crate::FontFamily::new("Noto Sans");
+            family
+                .begin_chunked_face(
+                    "noto-regular",
+                    crate::FontFaceDescriptor::new("Noto Sans")
+                        .with_font_name("Noto Sans WOFF2")
+                        .with_font_weight(crate::FontWeight::NORMAL),
+                    bytes.len(),
+                )
+                .expect("begin chunked face");
+
+            let split = bytes.len() / 3;
+            family
+                .append_chunk("noto-regular", split, &bytes[split..split * 2])
+                .expect("append middle chunk");
+            assert!(!family
+                .missing_ranges("noto-regular")
+                .expect("missing ranges")
+                .is_empty());
+            family
+                .append_chunk("noto-regular", 0, &bytes[..split])
+                .expect("append first chunk");
+            family
+                .append_chunk("noto-regular", split * 2, &bytes[split * 2..])
+                .expect("append tail chunk");
+
+            let font = family
+                .finalize_chunked_face("noto-regular")
+                .expect("finalize chunked face");
+            let width = font.measure("A").expect("measure finalized font");
+            assert!(width > 0.0);
+            assert_eq!(family.pending_faces_len(), 0);
+            assert_eq!(family.cached_faces_len(), 1);
+        }
+
+        #[test]
+        fn font_family_falls_back_to_cached_face_per_glyph() {
+            let regular = crate::load_font_from_file(fira_sans_regular_path())
+                .expect("load regular fira sans");
+            let emoji =
+                crate::load_font_from_file(segoe_emoji_font_path()).expect("load segoe emoji");
+
+            let mut family = crate::FontFamily::new("Fira Sans");
+            family.add_loaded_font(regular);
+            family.add_loaded_font(emoji);
+
+            let run = crate::text2commands(
+                "A🥺B",
+                crate::FontOptions::from_family(&family)
+                    .with_font_family("Fira Sans")
+                    .with_font_size(32.0),
             )
-            .expect("begin chunked face");
+            .expect("render mixed fallback text");
 
-        let split = bytes.len() / 3;
-        family
-            .append_chunk("noto-regular", split, &bytes[split..split * 2])
-            .expect("append middle chunk");
-        assert!(!family
-            .missing_ranges("noto-regular")
-            .expect("missing ranges")
-            .is_empty());
-        family
-            .append_chunk("noto-regular", 0, &bytes[..split])
-            .expect("append first chunk");
-        family
-            .append_chunk("noto-regular", split * 2, &bytes[split * 2..])
-            .expect("append tail chunk");
-
-        let font = family
-            .finalize_chunked_face("noto-regular")
-            .expect("finalize chunked face");
-        let width = font.measure("A").expect("measure finalized font");
-        assert!(width > 0.0);
-        assert_eq!(family.pending_faces_len(), 0);
-        assert_eq!(family.cached_faces_len(), 1);
-    }
-
-    #[test]
-    fn font_family_falls_back_to_cached_face_per_glyph() {
-        let regular =
-            crate::load_font_from_file(fira_sans_regular_path()).expect("load regular fira sans");
-        let emoji = crate::load_font_from_file(segoe_emoji_font_path()).expect("load segoe emoji");
-
-        let mut family = crate::FontFamily::new("Fira Sans");
-        family.add_loaded_font(regular);
-        family.add_loaded_font(emoji);
-
-        let run = crate::text2commands(
-            "A🥺B",
-            crate::FontOptions::from_family(&family)
-                .with_font_family("Fira Sans")
-                .with_font_size(32.0),
-        )
-        .expect("render mixed fallback text");
-
-        assert_eq!(run.glyphs.len(), 3);
-        assert!(matches!(
-            run.glyphs[1].glyph.layers.first(),
-            Some(crate::GlyphLayer::Path(layer))
-                if !layer.commands.is_empty()
-                    && matches!(&layer.paint, crate::GlyphPaint::Solid(_))
-        ));
-    }
-
-    #[test]
-    fn font_family_text2svg_uses_fallback_layers() {
-        let regular =
-            crate::load_font_from_file(fira_sans_regular_path()).expect("load regular fira sans");
-        let emoji = crate::load_font_from_file(segoe_emoji_font_path()).expect("load segoe emoji");
-
-        let mut family = crate::FontFamily::new("Fira Sans");
-        family.add_loaded_font(regular);
-        family.add_loaded_font(emoji);
-
-        let svg = family
-            .text2svg("A🥺B", 32.0, "px")
-            .expect("render mixed fallback svg");
-        assert!(svg.starts_with("<svg"));
-        assert!(svg.contains("fill=\"#"));
-    }
-
-    #[test]
-    fn font_family_prefers_primary_font_for_plain_digits_over_sbix_fallback() {
-        let regular =
-            crate::load_font_from_file(fira_sans_regular_path()).expect("load regular fira sans");
-        let sbix = crate::load_font_from_file(twemoji_sbix_font_path()).expect("load twemoji sbix");
-
-        let mut family = crate::FontFamily::new("Fira Sans");
-        family.add_loaded_font(regular);
-        family.add_loaded_font(sbix);
-
-        let run = crate::text2commands(
-            "123",
-            crate::FontOptions::from_family(&family)
-                .with_font_family("Fira Sans")
-                .with_font_size(32.0),
-        )
-        .expect("render plain digits with fallback family");
-
-        assert_eq!(run.glyphs.len(), 3);
-        for glyph in &run.glyphs {
-            match glyph.glyph.layers.first() {
-                Some(crate::GlyphLayer::Path(layer)) => assert!(!layer.commands.is_empty()),
-                Some(crate::GlyphLayer::Raster(_)) => {
-                    panic!("plain digits should not fall back to sbix raster glyphs")
-                }
-                #[cfg(feature = "svg-fonts")]
-                Some(crate::GlyphLayer::Svg(_)) => {
-                    panic!("plain digits should not fall back to SVG glyph layers")
-                }
-                None => panic!("expected digit layer"),
-            }
+            assert_eq!(run.glyphs.len(), 3);
+            assert!(matches!(
+                run.glyphs[1].glyph.layers.first(),
+                Some(crate::GlyphLayer::Path(layer))
+                    if !layer.commands.is_empty()
+                        && matches!(&layer.paint, crate::GlyphPaint::Solid(_))
+            ));
         }
-    }
 
-    #[test]
-    #[cfg(feature = "svg-fonts")]
-    fn font_family_prefers_outline_face_for_plain_digits_over_svg_fallback_even_if_svg_face_is_first() {
-        let regular =
-            crate::load_font_from_file(fira_sans_regular_path()).expect("load regular fira sans");
-        let bytes = std::fs::read(noto_color_emoji_font_path()).expect("read noto color emoji");
-        let svg_emoji = crate::load_font_from_buffer(&bytes).expect("load noto color emoji");
+        #[test]
+        fn font_family_text2svg_uses_fallback_layers() {
+            let regular = crate::load_font_from_file(fira_sans_regular_path())
+                .expect("load regular fira sans");
+            let emoji =
+                crate::load_font_from_file(segoe_emoji_font_path()).expect("load segoe emoji");
 
-        let mut family = crate::FontFamily::new("Mixed");
-        family.add_loaded_font(svg_emoji);
-        family.add_loaded_font(regular);
+            let mut family = crate::FontFamily::new("Fira Sans");
+            family.add_loaded_font(regular);
+            family.add_loaded_font(emoji);
 
-        let options = crate::FontOptions::from_family(&family).with_font_size(32.0);
-        let face_indices = family
-            .debug_face_indices_for_text("123", options.clone())
-            .expect("resolve face indices");
-        assert_eq!(face_indices, vec![1, 1, 1]);
-
-        let run = crate::text2commands("123", options).expect("render plain digits with svg fallback family");
-        assert_eq!(run.glyphs.len(), 3);
-        for glyph in &run.glyphs {
-            match glyph.glyph.layers.first() {
-                Some(crate::GlyphLayer::Path(layer)) => assert!(!layer.commands.is_empty()),
-                Some(crate::GlyphLayer::Raster(_)) => {
-                    panic!("plain digits should not fall back to raster glyph layers")
-                }
-                #[cfg(feature = "svg-fonts")]
-                Some(crate::GlyphLayer::Svg(_)) => {
-                    panic!("plain digits should not fall back to SVG glyph layers")
-                }
-                None => panic!("expected digit layer"),
-            }
+            let svg = family
+                .text2svg("A🥺B", 32.0, "px")
+                .expect("render mixed fallback svg");
+            assert!(svg.starts_with("<svg"));
+            assert!(svg.contains("fill=\"#"));
         }
-    }
 
-    #[test]
-    #[cfg(feature = "svg-fonts")]
-    fn font_family_prefers_svg_face_for_keycap_cluster_even_if_outline_face_is_available() {
-        let regular =
-            crate::load_font_from_file(fira_sans_regular_path()).expect("load regular fira sans");
-        let bytes = std::fs::read(noto_color_emoji_font_path()).expect("read noto color emoji");
-        let svg_emoji = crate::load_font_from_buffer(&bytes).expect("load noto color emoji");
+        #[test]
+        fn font_family_prefers_primary_font_for_plain_digits_over_sbix_fallback() {
+            let regular = crate::load_font_from_file(fira_sans_regular_path())
+                .expect("load regular fira sans");
+            let sbix =
+                crate::load_font_from_file(twemoji_sbix_font_path()).expect("load twemoji sbix");
 
-        let mut family = crate::FontFamily::new("Mixed");
-        family.add_loaded_font(svg_emoji);
-        family.add_loaded_font(regular);
+            let mut family = crate::FontFamily::new("Fira Sans");
+            family.add_loaded_font(regular);
+            family.add_loaded_font(sbix);
 
-        let options = crate::FontOptions::from_family(&family).with_font_size(32.0);
-        let face_indices = family
-            .debug_face_indices_for_text("1️⃣", options.clone())
-            .expect("resolve keycap face indices");
-        assert_eq!(face_indices, vec![0]);
+            let run = crate::text2commands(
+                "123",
+                crate::FontOptions::from_family(&family)
+                    .with_font_family("Fira Sans")
+                    .with_font_size(32.0),
+            )
+            .expect("render plain digits with fallback family");
 
-        let run = crate::text2commands("1️⃣", options).expect("render keycap with svg fallback family");
-        assert_eq!(run.glyphs.len(), 1);
-        assert!(
-            run.glyphs[0].glyph.layers.iter().any(|layer| {
-                matches!(layer, crate::GlyphLayer::Path(path) if !path.commands.is_empty())
-                    || matches!(layer, crate::GlyphLayer::Svg(svg) if !svg.document.is_empty())
-            }),
-            "expected keycap cluster to use svg emoji face"
-        );
-    }
-
-    #[test]
-    fn sbix_font_prefers_outline_for_plain_digit() {
-        let font = crate::load_font_from_file(twemoji_sbix_font_path()).expect("load twemoji sbix");
-
-        let plain_digit = font.font().text2command("1").expect("render plain digit");
-        assert_eq!(plain_digit.len(), 1);
-        assert!(plain_digit[0].bitmap.is_none());
-        assert!(!plain_digit[0].commands.is_empty());
-    }
-
-    #[test]
-    fn fontload_from_woff_file_works() {
-        let path = woff_font_path();
-        let font = match crate::fontload_file(&path) {
-            Ok(font) => font,
-            Err(error) if error.to_string().contains("checksum does not match origChecksum") => {
-                return;
-            }
-            Err(error) => panic!("load woff font: {error}"),
-        };
-        let svg = font.text2svg("A", 24.0, "px").expect("render woff text");
-        assert!(svg.contains("<svg"));
-    }
-
-    #[test]
-    #[cfg(feature = "cff")]
-    fn cff_cid_font_renders_svg() {
-        let font = crate::fontload_file(cff_font_path()).expect("load cff font");
-        let svg = font
-            .font()
-            .get_svg('漢', 24.0, "px")
-            .expect("render cff text");
-        assert!(svg.contains("<svg"));
-        assert!(svg.contains("<path"));
-    }
-
-    #[test]
-    fn fontload_from_source_file_works() {
-        let path = sample_font_path();
-        let font = crate::fontload(crate::FontSource::File(path.as_path())).expect("load source");
-        assert!(font.font().get_font_count() >= 1);
-    }
-
-    #[test]
-    fn text_to_command_and_svg_and_measure_work() {
-        let path = sample_font_path();
-        let font = crate::fontload_file(&path).expect("load font");
-
-        let commands = font.font().text2command("A").expect("text2command");
-        assert_eq!(commands.len(), 1);
-        assert!(commands[0].advance_width > 0.0);
-        assert!(!commands[0].commands.is_empty());
-
-        let svg = font.text2svg("A", 24.0, "px").expect("text2svg");
-        assert!(svg.starts_with("<svg"));
-        assert!(svg.contains("<path"));
-
-        let width = font.measure("A").expect("measure");
-        assert!(width > 0.0);
-        let two_line_width = font.measure("A\nB").expect("measure multiline");
-        assert!(two_line_width >= width);
-    }
-
-    #[test]
-    #[cfg(debug_assertions)]
-    fn raw_table_dump_smoke_across_fixture_corpus() {
-        let paths = fixture_engine_corpus_paths();
-        let (dumped_faces, failures) = run_raw_dump_smoke_for_paths(&paths);
-
-        assert!(
-            failures.is_empty(),
-            "raw table dump smoke failures:\n{}",
-            failures.join("\n")
-        );
-        assert!(
-            dumped_faces >= 32,
-            "expected to dump at least 32 faces, dumped {dumped_faces}"
-        );
-    }
-
-    #[test]
-    fn public_api_metadata_smoke_across_fixture_corpus() {
-        let paths = fixture_font_corpus_paths();
-        let mut checked_files = 0usize;
-        let mut checked_faces = 0usize;
-        let mut skipped = 0usize;
-        let mut failures = Vec::new();
-
-        for path in &paths {
-            let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                let file = crate::FontFile::from_file(path)
-                    .map_err(|err| format!("FontFile::from_file failed: {err}"))?;
-                if file.face_count() == 0 {
-                    return Err("face_count was zero".to_string());
-                }
-                if !file.dump().contains("FontFile") {
-                    return Err("dump() did not include FontFile header".to_string());
-                }
-
-                let faces = file
-                    .faces()
-                    .map_err(|err| format!("faces() failed: {err}"))?;
-                if faces.len() != file.face_count() {
-                    return Err(format!(
-                        "faces().len()={} did not match face_count()={}",
-                        faces.len(),
-                        file.face_count()
-                    ));
-                }
-
-                for face in &faces {
-                    let family = face.family();
-                    let full_name = face.full_name();
-                    if family.trim().is_empty() && full_name.trim().is_empty() {
-                        return Err("family() and full_name() were both empty".to_string());
+            assert_eq!(run.glyphs.len(), 3);
+            for glyph in &run.glyphs {
+                match glyph.glyph.layers.first() {
+                    Some(crate::GlyphLayer::Path(layer)) => assert!(!layer.commands.is_empty()),
+                    Some(crate::GlyphLayer::Raster(_)) => {
+                        panic!("plain digits should not fall back to sbix raster glyphs")
                     }
-                    if !face.dump().contains("FontFace") {
-                        return Err("face.dump() did not include FontFace header".to_string());
+                    #[cfg(feature = "svg-fonts")]
+                    Some(crate::GlyphLayer::Svg(_)) => {
+                        panic!("plain digits should not fall back to SVG glyph layers")
                     }
+                    None => panic!("expected digit layer"),
                 }
-
-                Ok::<usize, String>(faces.len())
-            }));
-
-            match outcome {
-                Ok(Ok(face_count)) => {
-                    checked_files += 1;
-                    checked_faces += face_count;
-                }
-                Ok(Err(err)) if should_skip_corpus_error(path, &err) => skipped += 1,
-                Ok(Err(err)) => failures.push(format!("{}: {}", path.display(), err)),
-                Err(_) => failures.push(format!("{}: panic", path.display())),
             }
         }
 
-        assert!(
-            failures.is_empty(),
-            "public API metadata smoke failures:\n{}",
-            failures.join("\n")
-        );
-        assert_eq!(
-            checked_files + skipped,
-            paths.len(),
-            "expected every fixture font to either load or be skipped explicitly"
-        );
-        assert!(
-            checked_files >= 700,
-            "expected to load at least 700 fixture fonts, loaded {checked_files}"
-        );
-        assert!(
-            checked_faces >= checked_files,
-            "expected at least one face per loaded font file"
-        );
-    }
+        #[test]
+        #[cfg(feature = "svg-fonts")]
+        fn font_family_prefers_outline_face_for_plain_digits_over_svg_fallback_even_if_svg_face_is_first(
+        ) {
+            let regular = crate::load_font_from_file(fira_sans_regular_path())
+                .expect("load regular fira sans");
+            let bytes = std::fs::read(noto_color_emoji_font_path()).expect("read noto color emoji");
+            let svg_emoji = crate::load_font_from_buffer(&bytes).expect("load noto color emoji");
 
-    #[test]
-    fn public_api_engine_smoke_across_fixture_corpus() {
-        let paths = fixture_engine_corpus_paths();
-        let (shaped, svg_successes, skipped, failures) = run_public_api_smoke_for_paths(&paths);
+            let mut family = crate::FontFamily::new("Mixed");
+            family.add_loaded_font(svg_emoji);
+            family.add_loaded_font(regular);
 
-        assert!(
-            failures.is_empty(),
-            "public API engine smoke failures:\n{}",
-            failures.join("\n")
-        );
-        assert!(
-            shaped >= 96,
-            "expected to shape at least 96 fixture fonts, shaped {shaped}"
-        );
-        assert!(
+            let options = crate::FontOptions::from_family(&family).with_font_size(32.0);
+            let face_indices = family
+                .debug_face_indices_for_text("123", options.clone())
+                .expect("resolve face indices");
+            assert_eq!(face_indices, vec![1, 1, 1]);
+
+            let run = crate::text2commands("123", options)
+                .expect("render plain digits with svg fallback family");
+            assert_eq!(run.glyphs.len(), 3);
+            for glyph in &run.glyphs {
+                match glyph.glyph.layers.first() {
+                    Some(crate::GlyphLayer::Path(layer)) => assert!(!layer.commands.is_empty()),
+                    Some(crate::GlyphLayer::Raster(_)) => {
+                        panic!("plain digits should not fall back to raster glyph layers")
+                    }
+                    #[cfg(feature = "svg-fonts")]
+                    Some(crate::GlyphLayer::Svg(_)) => {
+                        panic!("plain digits should not fall back to SVG glyph layers")
+                    }
+                    None => panic!("expected digit layer"),
+                }
+            }
+        }
+
+        #[test]
+        #[cfg(feature = "svg-fonts")]
+        fn font_family_prefers_svg_face_for_keycap_cluster_even_if_outline_face_is_available() {
+            let regular = crate::load_font_from_file(fira_sans_regular_path())
+                .expect("load regular fira sans");
+            let bytes = std::fs::read(noto_color_emoji_font_path()).expect("read noto color emoji");
+            let svg_emoji = crate::load_font_from_buffer(&bytes).expect("load noto color emoji");
+
+            let mut family = crate::FontFamily::new("Mixed");
+            family.add_loaded_font(svg_emoji);
+            family.add_loaded_font(regular);
+
+            let options = crate::FontOptions::from_family(&family).with_font_size(32.0);
+            let face_indices = family
+                .debug_face_indices_for_text("1️⃣", options.clone())
+                .expect("resolve keycap face indices");
+            assert_eq!(face_indices, vec![0]);
+
+            let run = crate::text2commands("1️⃣", options)
+                .expect("render keycap with svg fallback family");
+            assert_eq!(run.glyphs.len(), 1);
+            assert!(
+                run.glyphs[0].glyph.layers.iter().any(|layer| {
+                    matches!(layer, crate::GlyphLayer::Path(path) if !path.commands.is_empty())
+                        || matches!(layer, crate::GlyphLayer::Svg(svg) if !svg.document.is_empty())
+                }),
+                "expected keycap cluster to use svg emoji face"
+            );
+        }
+
+        #[test]
+        fn sbix_font_prefers_outline_for_plain_digit() {
+            let font =
+                crate::load_font_from_file(twemoji_sbix_font_path()).expect("load twemoji sbix");
+
+            let plain_digit = font.font().text2command("1").expect("render plain digit");
+            assert_eq!(plain_digit.len(), 1);
+            assert!(plain_digit[0].bitmap.is_none());
+            assert!(!plain_digit[0].commands.is_empty());
+        }
+
+        #[test]
+        fn fontload_from_woff_file_works() {
+            let path = woff_font_path();
+            let font = match crate::fontload_file(&path) {
+                Ok(font) => font,
+                Err(error)
+                    if error
+                        .to_string()
+                        .contains("checksum does not match origChecksum") =>
+                {
+                    return;
+                }
+                Err(error) => panic!("load woff font: {error}"),
+            };
+            let svg = font.text2svg("A", 24.0, "px").expect("render woff text");
+            assert!(svg.contains("<svg"));
+        }
+
+        #[test]
+        #[cfg(feature = "cff")]
+        fn cff_cid_font_renders_svg() {
+            let font = crate::fontload_file(cff_font_path()).expect("load cff font");
+            let svg = font
+                .font()
+                .get_svg('漢', 24.0, "px")
+                .expect("render cff text");
+            assert!(svg.contains("<svg"));
+            assert!(svg.contains("<path"));
+        }
+
+        #[test]
+        fn fontload_from_source_file_works() {
+            let path = sample_font_path();
+            let font =
+                crate::fontload(crate::FontSource::File(path.as_path())).expect("load source");
+            assert!(font.font().get_font_count() >= 1);
+        }
+
+        #[test]
+        fn text_to_command_and_svg_and_measure_work() {
+            let path = sample_font_path();
+            let font = crate::fontload_file(&path).expect("load font");
+
+            let commands = font.font().text2command("A").expect("text2command");
+            assert_eq!(commands.len(), 1);
+            assert!(commands[0].advance_width > 0.0);
+            assert!(!commands[0].commands.is_empty());
+
+            let svg = font.text2svg("A", 24.0, "px").expect("text2svg");
+            assert!(svg.starts_with("<svg"));
+            assert!(svg.contains("<path"));
+
+            let width = font.measure("A").expect("measure");
+            assert!(width > 0.0);
+            let two_line_width = font.measure("A\nB").expect("measure multiline");
+            assert!(two_line_width >= width);
+        }
+
+        #[test]
+        #[cfg(debug_assertions)]
+        fn raw_table_dump_smoke_across_fixture_corpus() {
+            let paths = fixture_engine_corpus_paths();
+            let (dumped_faces, failures) = run_raw_dump_smoke_for_paths(&paths);
+
+            assert!(
+                failures.is_empty(),
+                "raw table dump smoke failures:\n{}",
+                failures.join("\n")
+            );
+            assert!(
+                dumped_faces >= 32,
+                "expected to dump at least 32 faces, dumped {dumped_faces}"
+            );
+        }
+
+        #[test]
+        fn public_api_metadata_smoke_across_fixture_corpus() {
+            let paths = fixture_font_corpus_paths();
+            let mut checked_files = 0usize;
+            let mut checked_faces = 0usize;
+            let mut skipped = 0usize;
+            let mut failures = Vec::new();
+
+            for path in &paths {
+                let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    let file = crate::FontFile::from_file(path)
+                        .map_err(|err| format!("FontFile::from_file failed: {err}"))?;
+                    if file.face_count() == 0 {
+                        return Err("face_count was zero".to_string());
+                    }
+                    if !file.dump().contains("FontFile") {
+                        return Err("dump() did not include FontFile header".to_string());
+                    }
+
+                    let faces = file
+                        .faces()
+                        .map_err(|err| format!("faces() failed: {err}"))?;
+                    if faces.len() != file.face_count() {
+                        return Err(format!(
+                            "faces().len()={} did not match face_count()={}",
+                            faces.len(),
+                            file.face_count()
+                        ));
+                    }
+
+                    for face in &faces {
+                        let family = face.family();
+                        let full_name = face.full_name();
+                        if family.trim().is_empty() && full_name.trim().is_empty() {
+                            return Err("family() and full_name() were both empty".to_string());
+                        }
+                        if !face.dump().contains("FontFace") {
+                            return Err("face.dump() did not include FontFace header".to_string());
+                        }
+                    }
+
+                    Ok::<usize, String>(faces.len())
+                }));
+
+                match outcome {
+                    Ok(Ok(face_count)) => {
+                        checked_files += 1;
+                        checked_faces += face_count;
+                    }
+                    Ok(Err(err)) if should_skip_corpus_error(path, &err) => skipped += 1,
+                    Ok(Err(err)) => failures.push(format!("{}: {}", path.display(), err)),
+                    Err(_) => failures.push(format!("{}: panic", path.display())),
+                }
+            }
+
+            assert!(
+                failures.is_empty(),
+                "public API metadata smoke failures:\n{}",
+                failures.join("\n")
+            );
+            assert_eq!(
+                checked_files + skipped,
+                paths.len(),
+                "expected every fixture font to either load or be skipped explicitly"
+            );
+            assert!(
+                checked_files >= 700,
+                "expected to load at least 700 fixture fonts, loaded {checked_files}"
+            );
+            assert!(
+                checked_faces >= checked_files,
+                "expected at least one face per loaded font file"
+            );
+        }
+
+        #[test]
+        fn public_api_engine_smoke_across_fixture_corpus() {
+            let paths = fixture_engine_corpus_paths();
+            let (shaped, svg_successes, skipped, failures) = run_public_api_smoke_for_paths(&paths);
+
+            assert!(
+                failures.is_empty(),
+                "public API engine smoke failures:\n{}",
+                failures.join("\n")
+            );
+            assert!(
+                shaped >= 96,
+                "expected to shape at least 96 fixture fonts, shaped {shaped}"
+            );
+            assert!(
             svg_successes >= 64,
             "expected SVG export to succeed for at least 64 fixture fonts, succeeded {svg_successes}"
         );
-        assert!(
-            skipped <= 64,
-            "expected only a limited number of corpus fonts to be skipped, skipped {skipped}"
-        );
-    }
-
-    #[test]
-    #[cfg(feature = "cff")]
-    fn public_api_cff_smoke_across_otf_fixture_corpus() {
-        let paths = existing_paths(
-            fixture_font_corpus_paths()
-                .into_iter()
-                .filter(|path| {
-                    path.extension()
-                        .and_then(|ext| ext.to_str())
-                        .map(|ext| ext.eq_ignore_ascii_case("otf"))
-                        .unwrap_or(false)
-                })
-                .collect(),
-        );
-        let (shaped, svg_successes, skipped, failures) = run_public_api_smoke_for_paths(&paths);
-
-        assert!(
-            failures.is_empty(),
-            "public API CFF smoke failures:\n{}",
-            failures.join("\n")
-        );
-        assert!(
-            shaped >= 12,
-            "expected to shape at least 12 OTF fixtures, shaped {shaped}"
-        );
-        assert!(
-            svg_successes >= 10,
-            "expected SVG export for at least 10 OTF fixtures, succeeded {svg_successes}"
-        );
-        assert!(
-            skipped <= 4,
-            "expected at most 4 OTF fixtures to be skipped"
-        );
-    }
-
-    #[test]
-    #[cfg(feature = "cff")]
-    fn public_api_cff2_smoke_across_real_fixtures() {
-        let paths = cff2_fixture_paths();
-        if paths.is_empty() {
-            return;
-        }
-        let (shaped, svg_successes, skipped, failures) = run_public_api_smoke_for_paths(&paths);
-
-        assert!(
-            failures.is_empty(),
-            "public API CFF2 smoke failures:\n{}",
-            failures.join("\n")
-        );
-        assert!(
-            shaped >= 1,
-            "expected to shape at least one CFF2 fixture, shaped {shaped}"
-        );
-        assert!(
-            svg_successes >= 1,
-            "expected SVG export for at least one CFF2 fixture, succeeded {svg_successes}"
-        );
-        assert!(
-            skipped <= 1,
-            "expected at most one CFF2 fixture to be skipped"
-        );
-    }
-
-    #[test]
-    fn source_serif_variable_fonts_are_not_cff2_fixtures() {
-        let paths = source_serif_variable_paths();
-        assert!(
-            !paths.is_empty(),
-            "expected Source Serif variable fixtures to exist"
-        );
-
-        for path in paths {
             assert!(
-                !font_file_has_sfnt_table(&path, b"CFF2"),
-                "{} should not be classified as CFF2",
-                path.display()
-            );
-            assert!(
-                font_file_has_sfnt_table(&path, b"glyf"),
-                "{} should expose a glyf table",
-                path.display()
-            );
-            assert!(
-                font_file_has_sfnt_table(&path, b"gvar"),
-                "{} should expose a gvar table",
-                path.display()
+                skipped <= 64,
+                "expected only a limited number of corpus fonts to be skipped, skipped {skipped}"
             );
         }
-    }
 
-    #[test]
-    fn public_api_metadata_smoke_across_variable_font_fixtures() {
-        let paths = variable_font_fixture_paths();
-        let mut loaded = 0usize;
-        let mut skipped = 0usize;
-        let mut failures = Vec::new();
+        #[test]
+        #[cfg(feature = "cff")]
+        fn public_api_cff_smoke_across_otf_fixture_corpus() {
+            let paths = existing_paths(
+                fixture_font_corpus_paths()
+                    .into_iter()
+                    .filter(|path| {
+                        path.extension()
+                            .and_then(|ext| ext.to_str())
+                            .map(|ext| ext.eq_ignore_ascii_case("otf"))
+                            .unwrap_or(false)
+                    })
+                    .collect(),
+            );
+            let (shaped, svg_successes, skipped, failures) = run_public_api_smoke_for_paths(&paths);
 
-        for path in &paths {
-            let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                let file = crate::FontFile::from_file(path)
-                    .map_err(|err| format!("FontFile::from_file failed: {err}"))?;
-                if file.face_count() == 0 {
-                    return Err("face_count was zero".to_string());
-                }
-                Ok::<(), String>(())
-            }));
+            assert!(
+                failures.is_empty(),
+                "public API CFF smoke failures:\n{}",
+                failures.join("\n")
+            );
+            assert!(
+                shaped >= 12,
+                "expected to shape at least 12 OTF fixtures, shaped {shaped}"
+            );
+            assert!(
+                svg_successes >= 10,
+                "expected SVG export for at least 10 OTF fixtures, succeeded {svg_successes}"
+            );
+            assert!(
+                skipped <= 4,
+                "expected at most 4 OTF fixtures to be skipped"
+            );
+        }
 
-            match outcome {
-                Ok(Ok(())) => loaded += 1,
-                Ok(Err(err)) if should_skip_corpus_error(path, &err) => skipped += 1,
-                Ok(Err(err)) => failures.push(format!("{}: {}", path.display(), err)),
-                Err(_) => failures.push(format!("{}: panic", path.display())),
+        #[test]
+        #[cfg(feature = "cff")]
+        fn public_api_cff2_smoke_across_real_fixtures() {
+            let paths = cff2_fixture_paths();
+            if paths.is_empty() {
+                return;
+            }
+            let (shaped, svg_successes, skipped, failures) = run_public_api_smoke_for_paths(&paths);
+
+            assert!(
+                failures.is_empty(),
+                "public API CFF2 smoke failures:\n{}",
+                failures.join("\n")
+            );
+            assert!(
+                shaped >= 1,
+                "expected to shape at least one CFF2 fixture, shaped {shaped}"
+            );
+            assert!(
+                svg_successes >= 1,
+                "expected SVG export for at least one CFF2 fixture, succeeded {svg_successes}"
+            );
+            assert!(
+                skipped <= 1,
+                "expected at most one CFF2 fixture to be skipped"
+            );
+        }
+
+        #[test]
+        fn source_serif_variable_fonts_are_not_cff2_fixtures() {
+            let paths = source_serif_variable_paths();
+            assert!(
+                !paths.is_empty(),
+                "expected Source Serif variable fixtures to exist"
+            );
+
+            for path in paths {
+                assert!(
+                    !font_file_has_sfnt_table(&path, b"CFF2"),
+                    "{} should not be classified as CFF2",
+                    path.display()
+                );
+                assert!(
+                    font_file_has_sfnt_table(&path, b"glyf"),
+                    "{} should expose a glyf table",
+                    path.display()
+                );
+                assert!(
+                    font_file_has_sfnt_table(&path, b"gvar"),
+                    "{} should expose a gvar table",
+                    path.display()
+                );
             }
         }
 
-        assert!(
-            failures.is_empty(),
-            "variable font metadata smoke failures:\n{}",
-            failures.join("\n")
-        );
-        assert_eq!(loaded + skipped, paths.len());
-        assert!(
-            loaded >= 8,
-            "expected to load at least 8 variable font fixtures, loaded {loaded}"
-        );
-    }
+        #[test]
+        fn public_api_metadata_smoke_across_variable_font_fixtures() {
+            let paths = variable_font_fixture_paths();
+            let mut loaded = 0usize;
+            let mut skipped = 0usize;
+            let mut failures = Vec::new();
 
-    #[test]
-    fn public_api_engine_smoke_across_variable_font_fixtures() {
-        let paths = variable_font_fixture_paths();
-        let (shaped, svg_successes, skipped, failures) = run_public_api_smoke_for_paths(&paths);
+            for path in &paths {
+                let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    let file = crate::FontFile::from_file(path)
+                        .map_err(|err| format!("FontFile::from_file failed: {err}"))?;
+                    if file.face_count() == 0 {
+                        return Err("face_count was zero".to_string());
+                    }
+                    Ok::<(), String>(())
+                }));
 
-        assert!(
-            failures.is_empty(),
-            "variable font engine smoke failures:\n{}",
-            failures.join("\n")
-        );
-        assert!(
-            shaped >= 8,
-            "expected to shape at least 8 variable font fixtures, shaped {shaped}"
-        );
-        assert!(
+                match outcome {
+                    Ok(Ok(())) => loaded += 1,
+                    Ok(Err(err)) if should_skip_corpus_error(path, &err) => skipped += 1,
+                    Ok(Err(err)) => failures.push(format!("{}: {}", path.display(), err)),
+                    Err(_) => failures.push(format!("{}: panic", path.display())),
+                }
+            }
+
+            assert!(
+                failures.is_empty(),
+                "variable font metadata smoke failures:\n{}",
+                failures.join("\n")
+            );
+            assert_eq!(loaded + skipped, paths.len());
+            assert!(
+                loaded >= 8,
+                "expected to load at least 8 variable font fixtures, loaded {loaded}"
+            );
+        }
+
+        #[test]
+        fn public_api_engine_smoke_across_variable_font_fixtures() {
+            let paths = variable_font_fixture_paths();
+            let (shaped, svg_successes, skipped, failures) = run_public_api_smoke_for_paths(&paths);
+
+            assert!(
+                failures.is_empty(),
+                "variable font engine smoke failures:\n{}",
+                failures.join("\n")
+            );
+            assert!(
+                shaped >= 8,
+                "expected to shape at least 8 variable font fixtures, shaped {shaped}"
+            );
+            assert!(
             svg_successes >= 6,
             "expected SVG export for at least 6 variable font fixtures, succeeded {svg_successes}"
         );
-        assert!(
-            skipped <= 8,
-            "expected at most 8 variable font fixtures to be skipped"
-        );
-    }
+            assert!(
+                skipped <= 8,
+                "expected at most 8 variable font fixtures to be skipped"
+            );
+        }
 
-    #[test]
-    fn public_api_exposes_variable_font_axes_for_real_fixtures() {
-        let paths = variable_font_fixture_paths();
-        let mut variable_faces = 0usize;
-        let mut named_axes = 0usize;
-        let mut failures = Vec::new();
+        #[test]
+        fn public_api_exposes_variable_font_axes_for_real_fixtures() {
+            let paths = variable_font_fixture_paths();
+            let mut variable_faces = 0usize;
+            let mut named_axes = 0usize;
+            let mut failures = Vec::new();
 
-        for path in &paths {
+            for path in &paths {
+                let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    let face = crate::FontFile::from_file(path)
+                        .map_err(|err| format!("FontFile::from_file failed: {err}"))?
+                        .current_face()
+                        .map_err(|err| format!("current_face failed: {err}"))?;
+
+                    let axes = face.variation_axes();
+                    if !face.is_variable() {
+                        return Err("face.is_variable() returned false".to_string());
+                    }
+                    if axes.is_empty() {
+                        return Err("variation_axes() was empty".to_string());
+                    }
+                    if axes.iter().any(|axis| axis.tag.len() != 4) {
+                        return Err("variation axis tag was not 4 bytes".to_string());
+                    }
+
+                    let named_axes = axes
+                        .iter()
+                        .filter(|axis| !axis.name.as_deref().unwrap_or("").trim().is_empty())
+                        .count();
+
+                    Ok::<(usize, usize), String>((1, named_axes))
+                }));
+
+                match outcome {
+                    Ok(Ok((faces, axis_names))) => {
+                        variable_faces += faces;
+                        named_axes += axis_names;
+                    }
+                    Ok(Err(err)) => failures.push(format!("{}: {}", path.display(), err)),
+                    Err(_) => failures.push(format!("{}: panic", path.display())),
+                }
+            }
+
+            assert!(
+                failures.is_empty(),
+                "variable axis exposure failures:\n{}",
+                failures.join("\n")
+            );
+            assert!(
+                variable_faces >= 8,
+                "expected at least 8 variable faces, found {variable_faces}"
+            );
+            assert!(
+                named_axes >= 4,
+                "expected some named variable axes, found {named_axes}"
+            );
+        }
+
+        #[test]
+        #[cfg(feature = "layout")]
+        fn raw_vhea_dump_returns_placeholder_when_table_is_missing() {
+            let path = test_fonts_dir()
+                .join("source")
+                .join("SourceSerif4-Italic-VariableFont_opsz,wght.ttf");
+            if !path.exists() {
+                return;
+            }
+
             let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                let face = crate::FontFile::from_file(path)
-                    .map_err(|err| format!("FontFile::from_file failed: {err}"))?
-                    .current_face()
-                    .map_err(|err| format!("current_face failed: {err}"))?;
-
-                let axes = face.variation_axes();
-                if !face.is_variable() {
-                    return Err("face.is_variable() returned false".to_string());
-                }
-                if axes.is_empty() {
-                    return Err("variation_axes() was empty".to_string());
-                }
-                if axes.iter().any(|axis| axis.tag.len() != 4) {
-                    return Err("variation axis tag was not 4 bytes".to_string());
-                }
-
-                let named_axes = axes
-                    .iter()
-                    .filter(|axis| !axis.name.as_deref().unwrap_or("").trim().is_empty())
-                    .count();
-
-                Ok::<(usize, usize), String>((1, named_axes))
+                let mut font = crate::Font::get_font_from_file(&path)
+                    .map_err(|err| format!("get_font_from_file failed: {err}"))?;
+                font.set_font(0)
+                    .map_err(|err| format!("set_font failed: {err}"))?;
+                Ok::<String, String>(font.get_vhea_raw())
             }));
 
             match outcome {
-                Ok(Ok((faces, axis_names))) => {
-                    variable_faces += faces;
-                    named_axes += axis_names;
-                }
-                Ok(Err(err)) => failures.push(format!("{}: {}", path.display(), err)),
-                Err(_) => failures.push(format!("{}: panic", path.display())),
+                Ok(Ok(vhea)) => assert_eq!(vhea, "vhea is none"),
+                Ok(Err(err)) => panic!("failed to dump vhea table: {err}"),
+                Err(_) => panic!("get_vhea_raw panicked for {}", path.display()),
             }
         }
 
-        assert!(
-            failures.is_empty(),
-            "variable axis exposure failures:\n{}",
-            failures.join("\n")
-        );
-        assert!(
-            variable_faces >= 8,
-            "expected at least 8 variable faces, found {variable_faces}"
-        );
-        assert!(
-            named_axes >= 4,
-            "expected some named variable axes, found {named_axes}"
-        );
-    }
-
-    #[test]
-    #[cfg(feature = "layout")]
-    fn raw_vhea_dump_returns_placeholder_when_table_is_missing() {
-        let path = test_fonts_dir()
-            .join("source")
-            .join("SourceSerif4-Italic-VariableFont_opsz,wght.ttf");
-        if !path.exists() {
-            return;
-        }
-
-        let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            let mut font = crate::Font::get_font_from_file(&path)
-                .map_err(|err| format!("get_font_from_file failed: {err}"))?;
-            font.set_font(0)
-                .map_err(|err| format!("set_font failed: {err}"))?;
-            Ok::<String, String>(font.get_vhea_raw())
-        }));
-
-        match outcome {
-            Ok(Ok(vhea)) => assert_eq!(vhea, "vhea is none"),
-            Ok(Err(err)) => panic!("failed to dump vhea table: {err}"),
-            Err(_) => panic!("get_vhea_raw panicked for {}", path.display()),
-        }
-    }
-
-    #[test]
-    fn raw_color_dump_returns_placeholders_when_tables_are_missing() {
-        let path = test_fonts_dir()
-            .join("source")
-            .join("SourceSerif4-Italic-VariableFont_opsz,wght.ttf");
-        if !path.exists() {
-            return;
-        }
-
-        let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            let mut font = crate::Font::get_font_from_file(&path)
-                .map_err(|err| format!("get_font_from_file failed: {err}"))?;
-            font.set_font(0)
-                .map_err(|err| format!("set_font failed: {err}"))?;
-            Ok::<(String, String), String>((font.get_colr_raw(), font.get_cpal_raw()))
-        }));
-
-        match outcome {
-            Ok(Ok((colr, cpal))) => {
-                assert_eq!(colr, "colr is none");
-                assert_eq!(cpal, "cpal is none");
+        #[test]
+        fn raw_color_dump_returns_placeholders_when_tables_are_missing() {
+            let path = test_fonts_dir()
+                .join("source")
+                .join("SourceSerif4-Italic-VariableFont_opsz,wght.ttf");
+            if !path.exists() {
+                return;
             }
-            Ok(Err(err)) => panic!("failed to dump color tables: {err}"),
-            Err(_) => panic!("color raw dump panicked for {}", path.display()),
-        }
-    }
 
-    #[test]
-    fn variable_width_axis_changes_measure_on_real_fonts() {
-        let paths = variable_font_fixture_paths();
-        let mut exercised = 0usize;
-        let mut failures = Vec::new();
-
-        for path in &paths {
             let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                let face = crate::FontFile::from_file(path)
-                    .map_err(|err| format!("FontFile::from_file failed: {err}"))?
-                    .current_face()
-                    .map_err(|err| format!("current_face failed: {err}"))?;
-                let Some(axis) = face
-                    .variation_axes()
-                    .into_iter()
-                    .find(|axis| axis.tag == "wdth")
-                else {
-                    return Ok::<bool, String>(false);
-                };
-
-                if (axis.max_value - axis.min_value).abs() < 0.1 {
-                    return Err("wdth axis had no measurable range".to_string());
-                }
-
-                let engine = face.engine().with_font_size(32.0);
-                let narrow = engine
-                    .clone()
-                    .with_variation("wdth", axis.min_value)
-                    .measure("Hello")
-                    .map_err(|err| format!("measure narrow failed: {err}"))?;
-                let wide = engine
-                    .clone()
-                    .with_variation("wdth", axis.max_value)
-                    .measure("Hello")
-                    .map_err(|err| format!("measure wide failed: {err}"))?;
-
-                if (wide - narrow).abs() <= 0.5 {
-                    return Err(format!(
-                        "wdth axis did not change measure enough: narrow={narrow} wide={wide}"
-                    ));
-                }
-
-                Ok(true)
+                let mut font = crate::Font::get_font_from_file(&path)
+                    .map_err(|err| format!("get_font_from_file failed: {err}"))?;
+                font.set_font(0)
+                    .map_err(|err| format!("set_font failed: {err}"))?;
+                Ok::<(String, String), String>((font.get_colr_raw(), font.get_cpal_raw()))
             }));
 
             match outcome {
-                Ok(Ok(true)) => exercised += 1,
-                Ok(Ok(false)) => {}
-                Ok(Err(err)) => failures.push(format!("{}: {}", path.display(), err)),
-                Err(_) => failures.push(format!("{}: panic", path.display())),
+                Ok(Ok((colr, cpal))) => {
+                    assert_eq!(colr, "colr is none");
+                    assert_eq!(cpal, "cpal is none");
+                }
+                Ok(Err(err)) => panic!("failed to dump color tables: {err}"),
+                Err(_) => panic!("color raw dump panicked for {}", path.display()),
             }
         }
 
-        assert!(
-            failures.is_empty(),
-            "variable width axis failures:\n{}",
-            failures.join("\n")
-        );
-        assert!(
-            exercised >= 3,
-            "expected to exercise at least 3 wdth variable fonts, exercised {exercised}"
-        );
-    }
+        #[test]
+        fn variable_width_axis_changes_measure_on_real_fonts() {
+            let paths = variable_font_fixture_paths();
+            let mut exercised = 0usize;
+            let mut failures = Vec::new();
 
-    #[test]
-    fn variable_axes_change_outline_signature_on_real_fonts() {
-        fn outline_signature(run: &crate::GlyphRun) -> Option<String> {
-            let mut signature = String::new();
-            let mut saw_path = false;
-            for glyph in &run.glyphs {
-                let Some(bounds) = glyph.glyph.metrics.bounds else {
-                    continue;
-                };
-                for layer in &glyph.glyph.layers {
-                    let crate::GlyphLayer::Path(path) = layer else {
+            for path in &paths {
+                let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    let face = crate::FontFile::from_file(path)
+                        .map_err(|err| format!("FontFile::from_file failed: {err}"))?
+                        .current_face()
+                        .map_err(|err| format!("current_face failed: {err}"))?;
+                    let Some(axis) = face
+                        .variation_axes()
+                        .into_iter()
+                        .find(|axis| axis.tag == "wdth")
+                    else {
+                        return Ok::<bool, String>(false);
+                    };
+
+                    if (axis.max_value - axis.min_value).abs() < 0.1 {
+                        return Err("wdth axis had no measurable range".to_string());
+                    }
+
+                    let engine = face.engine().with_font_size(32.0);
+                    let narrow = engine
+                        .clone()
+                        .with_variation("wdth", axis.min_value)
+                        .measure("Hello")
+                        .map_err(|err| format!("measure narrow failed: {err}"))?;
+                    let wide = engine
+                        .clone()
+                        .with_variation("wdth", axis.max_value)
+                        .measure("Hello")
+                        .map_err(|err| format!("measure wide failed: {err}"))?;
+
+                    if (wide - narrow).abs() <= 0.5 {
+                        return Err(format!(
+                            "wdth axis did not change measure enough: narrow={narrow} wide={wide}"
+                        ));
+                    }
+
+                    Ok(true)
+                }));
+
+                match outcome {
+                    Ok(Ok(true)) => exercised += 1,
+                    Ok(Ok(false)) => {}
+                    Ok(Err(err)) => failures.push(format!("{}: {}", path.display(), err)),
+                    Err(_) => failures.push(format!("{}: panic", path.display())),
+                }
+            }
+
+            assert!(
+                failures.is_empty(),
+                "variable width axis failures:\n{}",
+                failures.join("\n")
+            );
+            assert!(
+                exercised >= 3,
+                "expected to exercise at least 3 wdth variable fonts, exercised {exercised}"
+            );
+        }
+
+        #[test]
+        fn variable_axes_change_outline_signature_on_real_fonts() {
+            fn outline_signature(run: &crate::GlyphRun) -> Option<String> {
+                let mut signature = String::new();
+                let mut saw_path = false;
+                for glyph in &run.glyphs {
+                    let Some(bounds) = glyph.glyph.metrics.bounds else {
                         continue;
                     };
-                    saw_path = true;
-                    signature.push_str(&format!(
-                        "B{:.1},{:.1},{:.1},{:.1}|",
-                        bounds.min_x, bounds.min_y, bounds.max_x, bounds.max_y
-                    ));
-                    for command in &path.commands {
-                        match command {
-                            crate::Command::MoveTo(x, y) => {
-                                signature.push_str(&format!("M{:.1},{:.1};", x, y));
+                    for layer in &glyph.glyph.layers {
+                        let crate::GlyphLayer::Path(path) = layer else {
+                            continue;
+                        };
+                        saw_path = true;
+                        signature.push_str(&format!(
+                            "B{:.1},{:.1},{:.1},{:.1}|",
+                            bounds.min_x, bounds.min_y, bounds.max_x, bounds.max_y
+                        ));
+                        for command in &path.commands {
+                            match command {
+                                crate::Command::MoveTo(x, y) => {
+                                    signature.push_str(&format!("M{:.1},{:.1};", x, y));
+                                }
+                                crate::Command::Line(x, y) => {
+                                    signature.push_str(&format!("L{:.1},{:.1};", x, y));
+                                }
+                                crate::Command::Bezier((cx, cy), (x, y)) => {
+                                    signature.push_str(&format!(
+                                        "Q{:.1},{:.1},{:.1},{:.1};",
+                                        cx, cy, x, y
+                                    ));
+                                }
+                                crate::Command::CubicBezier((cx1, cy1), (cx2, cy2), (x, y)) => {
+                                    signature.push_str(&format!(
+                                        "C{:.1},{:.1},{:.1},{:.1},{:.1},{:.1};",
+                                        cx1, cy1, cx2, cy2, x, y
+                                    ));
+                                }
+                                crate::Command::Close => signature.push_str("Z;"),
                             }
-                            crate::Command::Line(x, y) => {
-                                signature.push_str(&format!("L{:.1},{:.1};", x, y));
-                            }
-                            crate::Command::Bezier((cx, cy), (x, y)) => {
-                                signature
-                                    .push_str(&format!("Q{:.1},{:.1},{:.1},{:.1};", cx, cy, x, y));
-                            }
-                            crate::Command::CubicBezier((cx1, cy1), (cx2, cy2), (x, y)) => {
-                                signature.push_str(&format!(
-                                    "C{:.1},{:.1},{:.1},{:.1},{:.1},{:.1};",
-                                    cx1, cy1, cx2, cy2, x, y
-                                ));
-                            }
-                            crate::Command::Close => signature.push_str("Z;"),
                         }
                     }
                 }
-            }
 
-            if saw_path {
-                Some(signature)
-            } else {
-                None
-            }
-        }
-
-        let paths = variable_font_fixture_paths();
-        let mut exercised = 0usize;
-        let mut failures = Vec::new();
-
-        for path in &paths {
-            let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                let face = crate::FontFile::from_file(path)
-                    .map_err(|err| format!("FontFile::from_file failed: {err}"))?
-                    .current_face()
-                    .map_err(|err| format!("current_face failed: {err}"))?;
-                let Some(axis) = face.variation_axes().into_iter().find(|axis| {
-                    matches!(axis.tag.as_str(), "wdth" | "wght")
-                        && (axis.max_value - axis.min_value).abs() >= 0.1
-                }) else {
-                    return Ok::<bool, String>(false);
-                };
-                let Some((sample, locale, policy)) = public_api_smoke_sample(&face) else {
-                    return Ok(false);
-                };
-
-                let mut engine = face
-                    .engine()
-                    .with_font_size(72.0)
-                    .with_shaping_policy(policy);
-                if let Some(locale) = locale {
-                    engine = engine.with_locale(locale);
+                if saw_path {
+                    Some(signature)
+                } else {
+                    None
                 }
-
-                let low = engine
-                    .clone()
-                    .with_variation(&axis.tag, axis.min_value)
-                    .shape(&sample)
-                    .map_err(|err| format!("low variation shape failed: {err}"))?;
-                let high = engine
-                    .clone()
-                    .with_variation(&axis.tag, axis.max_value)
-                    .shape(&sample)
-                    .map_err(|err| format!("high variation shape failed: {err}"))?;
-
-                let low_signature = outline_signature(&low)
-                    .ok_or_else(|| "missing outline at low value".to_string())?;
-                let high_signature = outline_signature(&high)
-                    .ok_or_else(|| "missing outline at high value".to_string())?;
-
-                if low_signature == high_signature {
-                    return Err(format!(
-                        "{} axis did not change outline signature for sample {:?}",
-                        axis.tag, sample
-                    ));
-                }
-
-                Ok(true)
-            }));
-
-            match outcome {
-                Ok(Ok(true)) => exercised += 1,
-                Ok(Ok(false)) => {}
-                Ok(Err(err)) => failures.push(format!("{}: {}", path.display(), err)),
-                Err(_) => failures.push(format!("{}: panic", path.display())),
             }
-        }
 
-        assert!(
-            failures.is_empty(),
-            "variable outline signature failures:\n{}",
-            failures.join("\n")
-        );
-        assert!(
+            let paths = variable_font_fixture_paths();
+            let mut exercised = 0usize;
+            let mut failures = Vec::new();
+
+            for path in &paths {
+                let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    let face = crate::FontFile::from_file(path)
+                        .map_err(|err| format!("FontFile::from_file failed: {err}"))?
+                        .current_face()
+                        .map_err(|err| format!("current_face failed: {err}"))?;
+                    let Some(axis) = face.variation_axes().into_iter().find(|axis| {
+                        matches!(axis.tag.as_str(), "wdth" | "wght")
+                            && (axis.max_value - axis.min_value).abs() >= 0.1
+                    }) else {
+                        return Ok::<bool, String>(false);
+                    };
+                    let Some((sample, locale, policy)) = public_api_smoke_sample(&face) else {
+                        return Ok(false);
+                    };
+
+                    let mut engine = face
+                        .engine()
+                        .with_font_size(72.0)
+                        .with_shaping_policy(policy);
+                    if let Some(locale) = locale {
+                        engine = engine.with_locale(locale);
+                    }
+
+                    let low = engine
+                        .clone()
+                        .with_variation(&axis.tag, axis.min_value)
+                        .shape(&sample)
+                        .map_err(|err| format!("low variation shape failed: {err}"))?;
+                    let high = engine
+                        .clone()
+                        .with_variation(&axis.tag, axis.max_value)
+                        .shape(&sample)
+                        .map_err(|err| format!("high variation shape failed: {err}"))?;
+
+                    let low_signature = outline_signature(&low)
+                        .ok_or_else(|| "missing outline at low value".to_string())?;
+                    let high_signature = outline_signature(&high)
+                        .ok_or_else(|| "missing outline at high value".to_string())?;
+
+                    if low_signature == high_signature {
+                        return Err(format!(
+                            "{} axis did not change outline signature for sample {:?}",
+                            axis.tag, sample
+                        ));
+                    }
+
+                    Ok(true)
+                }));
+
+                match outcome {
+                    Ok(Ok(true)) => exercised += 1,
+                    Ok(Ok(false)) => {}
+                    Ok(Err(err)) => failures.push(format!("{}: {}", path.display(), err)),
+                    Err(_) => failures.push(format!("{}: panic", path.display())),
+                }
+            }
+
+            assert!(
+                failures.is_empty(),
+                "variable outline signature failures:\n{}",
+                failures.join("\n")
+            );
+            assert!(
             exercised >= 6,
             "expected to exercise at least 6 variable fonts with outline changes, exercised {exercised}"
         );
-    }
+        }
 
-    #[test]
-    fn source_serif_composite_gvar_changes_outline_signature() {
-        fn outline_signature(run: &crate::GlyphRun) -> Option<String> {
-            let mut signature = String::new();
-            let mut saw_path = false;
-            for glyph in &run.glyphs {
-                for layer in &glyph.glyph.layers {
-                    let crate::GlyphLayer::Path(path) = layer else {
-                        continue;
-                    };
-                    saw_path = true;
-                    for command in &path.commands {
-                        match command {
-                            crate::Command::MoveTo(x, y) => {
-                                signature.push_str(&format!("M{:.1},{:.1};", x, y));
+        #[test]
+        fn source_serif_composite_gvar_changes_outline_signature() {
+            fn outline_signature(run: &crate::GlyphRun) -> Option<String> {
+                let mut signature = String::new();
+                let mut saw_path = false;
+                for glyph in &run.glyphs {
+                    for layer in &glyph.glyph.layers {
+                        let crate::GlyphLayer::Path(path) = layer else {
+                            continue;
+                        };
+                        saw_path = true;
+                        for command in &path.commands {
+                            match command {
+                                crate::Command::MoveTo(x, y) => {
+                                    signature.push_str(&format!("M{:.1},{:.1};", x, y));
+                                }
+                                crate::Command::Line(x, y) => {
+                                    signature.push_str(&format!("L{:.1},{:.1};", x, y));
+                                }
+                                crate::Command::Bezier((cx, cy), (x, y)) => {
+                                    signature.push_str(&format!(
+                                        "Q{:.1},{:.1},{:.1},{:.1};",
+                                        cx, cy, x, y
+                                    ));
+                                }
+                                crate::Command::CubicBezier((cx1, cy1), (cx2, cy2), (x, y)) => {
+                                    signature.push_str(&format!(
+                                        "C{:.1},{:.1},{:.1},{:.1},{:.1},{:.1};",
+                                        cx1, cy1, cx2, cy2, x, y
+                                    ));
+                                }
+                                crate::Command::Close => signature.push_str("Z;"),
                             }
-                            crate::Command::Line(x, y) => {
-                                signature.push_str(&format!("L{:.1},{:.1};", x, y));
-                            }
-                            crate::Command::Bezier((cx, cy), (x, y)) => {
-                                signature
-                                    .push_str(&format!("Q{:.1},{:.1},{:.1},{:.1};", cx, cy, x, y));
-                            }
-                            crate::Command::CubicBezier((cx1, cy1), (cx2, cy2), (x, y)) => {
-                                signature.push_str(&format!(
-                                    "C{:.1},{:.1},{:.1},{:.1},{:.1},{:.1};",
-                                    cx1, cy1, cx2, cy2, x, y
-                                ));
-                            }
-                            crate::Command::Close => signature.push_str("Z;"),
                         }
                     }
                 }
+
+                if saw_path {
+                    Some(signature)
+                } else {
+                    None
+                }
             }
 
-            if saw_path {
-                Some(signature)
-            } else {
-                None
+            let path = test_fonts_dir()
+                .join("source")
+                .join("SourceSerif4-VariableFont_opsz,wght.ttf");
+            if !path.exists() {
+                return;
             }
+
+            let mut raw_font = crate::Font::get_font_from_file(&path).expect("load Source Serif");
+            raw_font.set_font(0).expect("select Source Serif face");
+            let cmap = raw_font.cmap.as_ref().expect("Source Serif cmap");
+            let glyph_id = cmap.get_glyph_position('Á' as u32) as usize;
+            assert!(glyph_id > 0, "expected Source Serif to resolve Á");
+            let glyf = raw_font.glyf.as_ref().expect("Source Serif glyf");
+            let source_glyph = glyf.get_glyph(glyph_id).expect("Source Serif glyph");
+            assert!(
+                source_glyph.parse().number_of_contours < 0,
+                "expected Á to be a composite glyph in Source Serif"
+            );
+            let flattened = glyf
+                .parse_glyph(glyph_id)
+                .expect("flatten Source Serif composite glyph");
+            assert!(
+                flattened.number_of_contours > 0,
+                "expected flattened composite glyph to expose contours"
+            );
+
+            let face = crate::FontFile::from_file(&path)
+                .expect("load Source Serif as FontFile")
+                .current_face()
+                .expect("load Source Serif face");
+            let axis = face
+                .variation_axes()
+                .into_iter()
+                .find(|axis| axis.tag == "wght")
+                .expect("Source Serif wght axis");
+
+            let engine = face.engine().with_font_size(72.0);
+            let low = engine
+                .clone()
+                .with_variation("wght", axis.min_value)
+                .shape("Á")
+                .expect("shape low-weight composite glyph");
+            let high = engine
+                .clone()
+                .with_variation("wght", axis.max_value)
+                .shape("Á")
+                .expect("shape high-weight composite glyph");
+
+            let low_signature = outline_signature(&low).expect("low-weight outline signature");
+            let high_signature = outline_signature(&high).expect("high-weight outline signature");
+            assert_ne!(
+                low_signature, high_signature,
+                "expected Source Serif composite glyph outline to vary across weight axis"
+            );
         }
 
-        let path = test_fonts_dir()
-            .join("source")
-            .join("SourceSerif4-VariableFont_opsz,wght.ttf");
-        if !path.exists() {
-            return;
-        }
+        #[test]
+        fn source_serif_variable_metrics_change_glyph_advance_and_bearing() {
+            let path = test_fonts_dir()
+                .join("source")
+                .join("SourceSerif4-VariableFont_opsz,wght.ttf");
+            if !path.exists() {
+                return;
+            }
 
-        let mut raw_font = crate::Font::get_font_from_file(&path).expect("load Source Serif");
-        raw_font.set_font(0).expect("select Source Serif face");
-        let cmap = raw_font.cmap.as_ref().expect("Source Serif cmap");
-        let glyph_id = cmap.get_glyph_position('Á' as u32) as usize;
-        assert!(glyph_id > 0, "expected Source Serif to resolve Á");
-        let glyf = raw_font.glyf.as_ref().expect("Source Serif glyf");
-        let source_glyph = glyf.get_glyph(glyph_id).expect("Source Serif glyph");
-        assert!(
-            source_glyph.parse().number_of_contours < 0,
-            "expected Á to be a composite glyph in Source Serif"
-        );
-        let flattened = glyf
-            .parse_glyph(glyph_id)
-            .expect("flatten Source Serif composite glyph");
-        assert!(
-            flattened.number_of_contours > 0,
-            "expected flattened composite glyph to expose contours"
-        );
+            assert!(
+                font_file_has_sfnt_table(&path, b"gvar"),
+                "{} should expose gvar",
+                path.display()
+            );
 
-        let face = crate::FontFile::from_file(&path)
-            .expect("load Source Serif as FontFile")
-            .current_face()
-            .expect("load Source Serif face");
-        let axis = face
-            .variation_axes()
-            .into_iter()
-            .find(|axis| axis.tag == "wght")
-            .expect("Source Serif wght axis");
+            let face = crate::FontFile::from_file(&path)
+                .expect("load Source Serif as FontFile")
+                .current_face()
+                .expect("load Source Serif face");
+            let axis = face
+                .variation_axes()
+                .into_iter()
+                .find(|axis| axis.tag == "wght")
+                .expect("Source Serif wght axis");
+            let engine = face.engine().with_font_size(72.0);
+            let low = engine
+                .clone()
+                .with_variation("wght", axis.min_value)
+                .shape("A")
+                .expect("shape low-weight A");
+            let high = engine
+                .clone()
+                .with_variation("wght", axis.max_value)
+                .shape("A")
+                .expect("shape high-weight A");
 
-        let engine = face.engine().with_font_size(72.0);
-        let low = engine
-            .clone()
-            .with_variation("wght", axis.min_value)
-            .shape("Á")
-            .expect("shape low-weight composite glyph");
-        let high = engine
-            .clone()
-            .with_variation("wght", axis.max_value)
-            .shape("Á")
-            .expect("shape high-weight composite glyph");
+            let low_metrics = low.glyphs.first().expect("low-weight glyph").glyph.metrics;
+            let high_metrics = high
+                .glyphs
+                .first()
+                .expect("high-weight glyph")
+                .glyph
+                .metrics;
 
-        let low_signature = outline_signature(&low).expect("low-weight outline signature");
-        let high_signature = outline_signature(&high).expect("high-weight outline signature");
-        assert_ne!(
-            low_signature, high_signature,
-            "expected Source Serif composite glyph outline to vary across weight axis"
-        );
-    }
+            let low_advance = low_metrics.advance_x;
+            let high_advance = high_metrics.advance_x;
+            let low_lsb = low_metrics.bearing_x;
+            let high_lsb = high_metrics.bearing_x;
 
-    #[test]
-    fn source_serif_variable_metrics_change_glyph_advance_and_bearing() {
-        let path = test_fonts_dir()
-            .join("source")
-            .join("SourceSerif4-VariableFont_opsz,wght.ttf");
-        if !path.exists() {
-            return;
-        }
-
-        assert!(
-            font_file_has_sfnt_table(&path, b"gvar"),
-            "{} should expose gvar",
-            path.display()
-        );
-
-        let face = crate::FontFile::from_file(&path)
-            .expect("load Source Serif as FontFile")
-            .current_face()
-            .expect("load Source Serif face");
-        let axis = face
-            .variation_axes()
-            .into_iter()
-            .find(|axis| axis.tag == "wght")
-            .expect("Source Serif wght axis");
-        let engine = face.engine().with_font_size(72.0);
-        let low = engine
-            .clone()
-            .with_variation("wght", axis.min_value)
-            .shape("A")
-            .expect("shape low-weight A");
-        let high = engine
-            .clone()
-            .with_variation("wght", axis.max_value)
-            .shape("A")
-            .expect("shape high-weight A");
-
-        let low_metrics = low.glyphs.first().expect("low-weight glyph").glyph.metrics;
-        let high_metrics = high
-            .glyphs
-            .first()
-            .expect("high-weight glyph")
-            .glyph
-            .metrics;
-
-        let low_advance = low_metrics.advance_x;
-        let high_advance = high_metrics.advance_x;
-        let low_lsb = low_metrics.bearing_x;
-        let high_lsb = high_metrics.bearing_x;
-
-        assert!(
+            assert!(
             low_advance != high_advance || low_lsb != high_lsb,
             "expected variable metrics to change horizontal glyph metrics: low=({low_advance}, {low_lsb}) high=({high_advance}, {high_lsb})"
         );
-    }
+        }
 
-    #[test]
-    fn source_serif_otf_metadata_loads_without_layout_panic() {
-        for path in source_serif_otf_paths() {
-            let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                let file = crate::FontFile::from_file(&path)
-                    .map_err(|err| format!("FontFile::from_file failed: {err}"))?;
-                let face = file
-                    .current_face()
-                    .map_err(|err| format!("current_face failed: {err}"))?;
-                Ok::<(String, String), String>((face.family(), face.full_name()))
-            }));
+        #[test]
+        fn source_serif_otf_metadata_loads_without_layout_panic() {
+            for path in source_serif_otf_paths() {
+                let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    let file = crate::FontFile::from_file(&path)
+                        .map_err(|err| format!("FontFile::from_file failed: {err}"))?;
+                    let face = file
+                        .current_face()
+                        .map_err(|err| format!("current_face failed: {err}"))?;
+                    Ok::<(String, String), String>((face.family(), face.full_name()))
+                }));
 
-            match outcome {
-                Ok(Ok((family, full_name))) => {
-                    assert!(
-                        family.contains("Source Serif 4"),
-                        "unexpected family for {}: {}",
-                        path.display(),
-                        family
-                    );
-                    assert!(
-                        full_name.contains("Black"),
-                        "unexpected full name for {}: {}",
-                        path.display(),
-                        full_name
-                    );
+                match outcome {
+                    Ok(Ok((family, full_name))) => {
+                        assert!(
+                            family.contains("Source Serif 4"),
+                            "unexpected family for {}: {}",
+                            path.display(),
+                            family
+                        );
+                        assert!(
+                            full_name.contains("Black"),
+                            "unexpected full name for {}: {}",
+                            path.display(),
+                            full_name
+                        );
+                    }
+                    Ok(Err(err)) => panic!("failed to load {}: {}", path.display(), err),
+                    Err(_) => panic!("loading {} panicked", path.display()),
                 }
-                Ok(Err(err)) => panic!("failed to load {}: {}", path.display(), err),
-                Err(_) => panic!("loading {} panicked", path.display()),
-            }
-        }
-    }
-
-    #[test]
-    fn text2command_supports_sbix_bitmap_glyphs() {
-        let path = first_real_sbix_font_path().expect("load real sbix font");
-        let bytes = std::fs::read(&path).expect("read sbix font");
-        let font = crate::load_font_from_buffer(&bytes).expect("load sbix font");
-        let commands = font.font().text2command("🥺").expect("text2command sbix");
-
-        assert_eq!(commands.len(), 1);
-        assert!(commands[0].commands.is_empty());
-        let bitmap = commands[0].bitmap.as_ref().expect("bitmap payload");
-        assert!(matches!(
-            bitmap.format,
-            crate::fontreader::BitmapGlyphFormat::Png | crate::fontreader::BitmapGlyphFormat::Jpeg
-        ));
-        assert!(!bitmap.data.is_empty());
-
-        let svg = font.text2svg("🥺", 32.0, "px").expect("svg from sbix");
-        assert!(svg.contains("<image"));
-        assert!(svg.contains("data:image/"));
-    }
-
-    #[test]
-    fn glyph_run_sbix_bitmap_keeps_display_size() {
-        let path = first_real_sbix_font_path().expect("load real sbix font");
-        let bytes = std::fs::read(&path).expect("read sbix font");
-        let font = crate::load_font_from_buffer(&bytes).expect("load sbix font");
-        let run = font
-            .text2glyph_run(
-                "🥺",
-                crate::FontOptions::from_font_ref(crate::FontRef::Loaded(&font))
-                    .with_font_size(32.0),
-            )
-            .expect("glyph run sbix");
-
-        assert_eq!(run.glyphs.len(), 1);
-        match run.glyphs[0].glyph.layers.first() {
-            Some(crate::GlyphLayer::Raster(layer)) => {
-                assert!(layer.width.unwrap_or(0) > 0);
-                assert!(layer.height.unwrap_or(0) > 0);
-            }
-            _ => panic!("expected raster glyph layer"),
-        }
-    }
-
-    #[test]
-    fn twemoji_sbix_woff2_loads_without_oob_and_renders_bitmap() {
-        let path = twemoji_sbix_font_path();
-        assert!(path.exists(), "missing Twemoji sbix fixture");
-
-        let bytes = std::fs::read(&path).expect("read Twemoji sbix font");
-        let font = crate::load_font_from_buffer(&bytes).expect("load Twemoji sbix font");
-
-        let mut rendered = None;
-        for sequence in emoji_ligature_sequence_candidates()
-            .into_iter()
-            .chain(["🥺", "😀", "👍", "❤️"].into_iter())
-        {
-            let Ok(commands) = font.font().text2command(sequence) else {
-                continue;
-            };
-            if commands.iter().any(|glyph| glyph.bitmap.is_some()) {
-                rendered = Some((sequence, commands));
-                break;
             }
         }
 
-        let (sequence, commands) = rendered.expect("render any bitmap glyph from Twemoji sbix");
-        assert!(!commands.is_empty());
-        assert!(commands.iter().any(|glyph| glyph.bitmap.is_some()));
+        #[test]
+        fn text2command_supports_sbix_bitmap_glyphs() {
+            let path = first_real_sbix_font_path().expect("load real sbix font");
+            let bytes = std::fs::read(&path).expect("read sbix font");
+            let font = crate::load_font_from_buffer(&bytes).expect("load sbix font");
+            let commands = font.font().text2command("🥺").expect("text2command sbix");
 
-        let svg = font
-            .text2svg(sequence, 32.0, "px")
-            .expect("svg from Twemoji sbix");
-        assert!(svg.contains("data:image/"));
-    }
+            assert_eq!(commands.len(), 1);
+            assert!(commands[0].commands.is_empty());
+            let bitmap = commands[0].bitmap.as_ref().expect("bitmap payload");
+            assert!(matches!(
+                bitmap.format,
+                crate::fontreader::BitmapGlyphFormat::Png
+                    | crate::fontreader::BitmapGlyphFormat::Jpeg
+            ));
+            assert!(!bitmap.data.is_empty());
 
-    #[test]
-    fn parse_text_units_for_fallback_keeps_emoji_clusters_together() {
-        for text in ["👩‍💻", "👨‍👩‍👧‍👦", "🇯🇵", "1️⃣"] {
-            let units = crate::fontreader::Font::parse_text_units_for_fallback(text);
-            assert_eq!(units.len(), 1, "cluster should stay whole for {text:?}");
-            match &units[0] {
-                crate::fontreader::ParsedTextUnit::Glyph { text: parsed, .. } => {
-                    assert_eq!(parsed, text);
+            let svg = font.text2svg("🥺", 32.0, "px").expect("svg from sbix");
+            assert!(svg.contains("<image"));
+            assert!(svg.contains("data:image/"));
+        }
+
+        #[test]
+        fn glyph_run_sbix_bitmap_keeps_display_size() {
+            let path = first_real_sbix_font_path().expect("load real sbix font");
+            let bytes = std::fs::read(&path).expect("read sbix font");
+            let font = crate::load_font_from_buffer(&bytes).expect("load sbix font");
+            let run = font
+                .text2glyph_run(
+                    "🥺",
+                    crate::FontOptions::from_font_ref(crate::FontRef::Loaded(&font))
+                        .with_font_size(32.0),
+                )
+                .expect("glyph run sbix");
+
+            assert_eq!(run.glyphs.len(), 1);
+            match run.glyphs[0].glyph.layers.first() {
+                Some(crate::GlyphLayer::Raster(layer)) => {
+                    assert!(layer.width.unwrap_or(0) > 0);
+                    assert!(layer.height.unwrap_or(0) > 0);
                 }
-                _ => panic!("expected glyph unit for {text:?}"),
+                _ => panic!("expected raster glyph layer"),
             }
         }
-    }
 
-    #[test]
-    fn parse_text_units_for_fallback_keeps_combining_mark_clusters_together() {
-        for text in ["e\u{0301}", "は\u{3099}", "ب\u{0650}", "\u{0F40}\u{0F72}"] {
-            let units = crate::fontreader::Font::parse_text_units_for_fallback(text);
-            assert_eq!(
-                units.len(),
-                1,
-                "combining cluster should stay whole for {text:?}"
-            );
-            match &units[0] {
-                crate::fontreader::ParsedTextUnit::Glyph { text: parsed, .. } => {
-                    assert_eq!(parsed, text);
+        #[test]
+        fn twemoji_sbix_woff2_loads_without_oob_and_renders_bitmap() {
+            let path = twemoji_sbix_font_path();
+            assert!(path.exists(), "missing Twemoji sbix fixture");
+
+            let bytes = std::fs::read(&path).expect("read Twemoji sbix font");
+            let font = crate::load_font_from_buffer(&bytes).expect("load Twemoji sbix font");
+
+            let mut rendered = None;
+            for sequence in emoji_ligature_sequence_candidates()
+                .into_iter()
+                .chain(["🥺", "😀", "👍", "❤️"].into_iter())
+            {
+                let Ok(commands) = font.font().text2command(sequence) else {
+                    continue;
+                };
+                if commands.iter().any(|glyph| glyph.bitmap.is_some()) {
+                    rendered = Some((sequence, commands));
+                    break;
                 }
-                _ => panic!("expected glyph unit for {text:?}"),
             }
+
+            let (sequence, commands) = rendered.expect("render any bitmap glyph from Twemoji sbix");
+            assert!(!commands.is_empty());
+            assert!(commands.iter().any(|glyph| glyph.bitmap.is_some()));
+
+            let svg = font
+                .text2svg(sequence, 32.0, "px")
+                .expect("svg from Twemoji sbix");
+            assert!(svg.contains("data:image/"));
         }
-    }
 
-    #[test]
-    fn loaded_font_text2glyph_run_keeps_real_emoji_ligature_cluster() {
-        let (path, sequence) =
-            first_real_emoji_ligature().expect("find real emoji ligature fixture");
-        let font = crate::load_font_from_file(path).expect("load emoji ligature font");
-
-        let run = font
-            .text2glyph_run(
-                sequence,
-                crate::FontOptions::from_font_ref(crate::FontRef::Loaded(&font))
-                    .with_font_size(32.0),
-            )
-            .expect("shape emoji ligature");
-
-        assert_eq!(run.glyphs.len(), 1, "expected a single ligature glyph");
-        assert!(!run.glyphs[0].glyph.layers.is_empty());
-    }
-
-    #[test]
-    fn legacy_text2command_keeps_real_emoji_ligature_cluster() {
-        let (path, sequence) =
-            first_real_emoji_ligature_for_legacy().expect("find legacy emoji ligature fixture");
-        let font = crate::load_font_from_file(path).expect("load emoji ligature font");
-
-        let commands = font
-            .font()
-            .text2command(sequence)
-            .expect("legacy emoji ligature");
-        assert_eq!(commands.len(), 1, "expected a single ligature glyph");
-        assert!(commands[0].bitmap.is_some() || !commands[0].commands.is_empty());
-    }
-
-    #[test]
-    fn font_family_fallback_keeps_real_emoji_ligature_cluster() {
-        let regular =
-            crate::load_font_from_file(fira_sans_regular_path()).expect("load regular fira sans");
-        let (path, sequence) =
-            first_real_emoji_ligature().expect("find real emoji ligature fixture");
-        let emoji = crate::load_font_from_file(path).expect("load emoji ligature font");
-
-        let mut family = crate::FontFamily::new("Fira Sans");
-        family.add_loaded_font(regular);
-        family.add_loaded_font(emoji);
-
-        let text = format!("A{}B", sequence);
-        let run = crate::text2commands(
-            &text,
-            crate::FontOptions::from_family(&family)
-                .with_font_family("Fira Sans")
-                .with_font_size(32.0),
-        )
-        .expect("render mixed fallback ligature text");
-
-        assert_eq!(
-            run.glyphs.len(),
-            3,
-            "emoji ligature cluster should stay a single glyph"
-        );
-        assert!(!run.glyphs[1].glyph.layers.is_empty());
-    }
-
-    #[test]
-    #[cfg(feature = "layout")]
-    fn loaded_font_text2glyph_run_shapes_police_officer_female_emoji_when_supported() {
-        let sequence = "👮🏻‍♀️";
-
-        for path in emoji_ligature_font_candidates() {
-            if !path.exists() {
-                continue;
-            }
-            let font = crate::load_font_from_file(&path).expect("load emoji ligature font");
-            let Ok(run) = font.text2glyph_run(
-                sequence,
-                crate::FontOptions::from_font_ref(crate::FontRef::Loaded(&font))
-                    .with_font_size(32.0),
-            ) else {
-                continue;
-            };
-            if run.glyphs.len() == 1 {
-                assert!(!run.glyphs[0].glyph.layers.is_empty());
-                return;
+        #[test]
+        fn parse_text_units_for_fallback_keeps_emoji_clusters_together() {
+            for text in ["👩‍💻", "👨‍👩‍👧‍👦", "🇯🇵", "1️⃣"] {
+                let units = crate::fontreader::Font::parse_text_units_for_fallback(text);
+                assert_eq!(units.len(), 1, "cluster should stay whole for {text:?}");
+                match &units[0] {
+                    crate::fontreader::ParsedTextUnit::Glyph { text: parsed, .. } => {
+                        assert_eq!(parsed, text);
+                    }
+                    _ => panic!("expected glyph unit for {text:?}"),
+                }
             }
         }
 
-        panic!("expected at least one real font to shape 👮🏻‍♀️ as a single glyph");
-    }
-
-    #[test]
-    #[cfg(feature = "layout")]
-    fn font_family_fallback_keeps_police_officer_female_emoji_cluster_when_supported() {
-        let sequence = "👮🏻‍♀️";
-
-        for path in emoji_ligature_font_candidates() {
-            if !path.exists() {
-                continue;
+        #[test]
+        fn parse_text_units_for_fallback_keeps_combining_mark_clusters_together() {
+            for text in ["e\u{0301}", "は\u{3099}", "ب\u{0650}", "\u{0F40}\u{0F72}"] {
+                let units = crate::fontreader::Font::parse_text_units_for_fallback(text);
+                assert_eq!(
+                    units.len(),
+                    1,
+                    "combining cluster should stay whole for {text:?}"
+                );
+                match &units[0] {
+                    crate::fontreader::ParsedTextUnit::Glyph { text: parsed, .. } => {
+                        assert_eq!(parsed, text);
+                    }
+                    _ => panic!("expected glyph unit for {text:?}"),
+                }
             }
+        }
+
+        #[test]
+        fn loaded_font_text2glyph_run_keeps_real_emoji_ligature_cluster() {
+            let (path, sequence) =
+                first_real_emoji_ligature().expect("find real emoji ligature fixture");
+            let font = crate::load_font_from_file(path).expect("load emoji ligature font");
+
+            let run = font
+                .text2glyph_run(
+                    sequence,
+                    crate::FontOptions::from_font_ref(crate::FontRef::Loaded(&font))
+                        .with_font_size(32.0),
+                )
+                .expect("shape emoji ligature");
+
+            assert_eq!(run.glyphs.len(), 1, "expected a single ligature glyph");
+            assert!(!run.glyphs[0].glyph.layers.is_empty());
+        }
+
+        #[test]
+        fn legacy_text2command_keeps_real_emoji_ligature_cluster() {
+            let (path, sequence) =
+                first_real_emoji_ligature_for_legacy().expect("find legacy emoji ligature fixture");
+            let font = crate::load_font_from_file(path).expect("load emoji ligature font");
+
+            let commands = font
+                .font()
+                .text2command(sequence)
+                .expect("legacy emoji ligature");
+            assert_eq!(commands.len(), 1, "expected a single ligature glyph");
+            assert!(commands[0].bitmap.is_some() || !commands[0].commands.is_empty());
+        }
+
+        #[test]
+        fn font_family_fallback_keeps_real_emoji_ligature_cluster() {
             let regular = crate::load_font_from_file(fira_sans_regular_path())
                 .expect("load regular fira sans");
-            let emoji = crate::load_font_from_file(&path).expect("load emoji font");
+            let (path, sequence) =
+                first_real_emoji_ligature().expect("find real emoji ligature fixture");
+            let emoji = crate::load_font_from_file(path).expect("load emoji ligature font");
 
             let mut family = crate::FontFamily::new("Fira Sans");
             family.add_loaded_font(regular);
             family.add_loaded_font(emoji);
 
             let text = format!("A{}B", sequence);
-            let Ok(run) = crate::text2commands(
+            let run = crate::text2commands(
                 &text,
                 crate::FontOptions::from_family(&family)
                     .with_font_family("Fira Sans")
                     .with_font_size(32.0),
-            ) else {
-                continue;
-            };
+            )
+            .expect("render mixed fallback ligature text");
 
-            if run.glyphs.len() == 3 {
-                assert!(!run.glyphs[1].glyph.layers.is_empty());
-                return;
-            }
+            assert_eq!(
+                run.glyphs.len(),
+                3,
+                "emoji ligature cluster should stay a single glyph"
+            );
+            assert!(!run.glyphs[1].glyph.layers.is_empty());
         }
 
-        panic!("expected at least one fallback family to keep 👮🏻‍♀️ as a single glyph cluster");
-    }
+        #[test]
+        #[cfg(feature = "layout")]
+        fn loaded_font_text2glyph_run_shapes_police_officer_female_emoji_when_supported() {
+            let sequence = "👮🏻‍♀️";
 
-    #[test]
-    fn load_font_from_padded_woff2_buffer_uses_declared_length() {
-        let path = twemoji_sbix_font_path();
-        assert!(path.exists(), "missing Twemoji sbix fixture");
-
-        let mut bytes = std::fs::read(&path).expect("read woff2 font");
-        let original_len = bytes.len();
-        bytes.extend_from_slice(&[0xde, 0xad, 0xbe, 0xef, 0, 1, 2, 3]);
-
-        let font = crate::load_font_from_buffer(&bytes).expect("load padded woff2 buffer");
-        let commands = font
-            .font()
-            .text2command("🥺")
-            .expect("render from padded woff2 buffer");
-        assert!(!commands.is_empty());
-        assert!(commands.iter().any(|glyph| glyph.bitmap.is_some()));
-        assert!(bytes.len() > original_len);
-    }
-
-    #[test]
-    #[ignore]
-    fn investigate_police_officer_female_emoji_ligature() {
-        let sequence = "👮🏻‍♀️";
-
-        for path in emoji_ligature_font_candidates() {
-            if !path.exists() {
-                continue;
+            for path in emoji_ligature_font_candidates() {
+                if !path.exists() {
+                    continue;
+                }
+                let font = crate::load_font_from_file(&path).expect("load emoji ligature font");
+                let Ok(run) = font.text2glyph_run(
+                    sequence,
+                    crate::FontOptions::from_font_ref(crate::FontRef::Loaded(&font))
+                        .with_font_size(32.0),
+                ) else {
+                    continue;
+                };
+                if run.glyphs.len() == 1 {
+                    assert!(!run.glyphs[0].glyph.layers.is_empty());
+                    return;
+                }
             }
-            let font = crate::load_font_from_file(&path).expect("load candidate font");
-            let glyph_ids = font
+
+            panic!("expected at least one real font to shape 👮🏻‍♀️ as a single glyph");
+        }
+
+        #[test]
+        #[cfg(feature = "layout")]
+        fn font_family_fallback_keeps_police_officer_female_emoji_cluster_when_supported() {
+            let sequence = "👮🏻‍♀️";
+
+            for path in emoji_ligature_font_candidates() {
+                if !path.exists() {
+                    continue;
+                }
+                let regular = crate::load_font_from_file(fira_sans_regular_path())
+                    .expect("load regular fira sans");
+                let emoji = crate::load_font_from_file(&path).expect("load emoji font");
+
+                let mut family = crate::FontFamily::new("Fira Sans");
+                family.add_loaded_font(regular);
+                family.add_loaded_font(emoji);
+
+                let text = format!("A{}B", sequence);
+                let Ok(run) = crate::text2commands(
+                    &text,
+                    crate::FontOptions::from_family(&family)
+                        .with_font_family("Fira Sans")
+                        .with_font_size(32.0),
+                ) else {
+                    continue;
+                };
+
+                if run.glyphs.len() == 3 {
+                    assert!(!run.glyphs[1].glyph.layers.is_empty());
+                    return;
+                }
+            }
+
+            panic!("expected at least one fallback family to keep 👮🏻‍♀️ as a single glyph cluster");
+        }
+
+        #[test]
+        fn load_font_from_padded_woff2_buffer_uses_declared_length() {
+            let path = twemoji_sbix_font_path();
+            assert!(path.exists(), "missing Twemoji sbix fixture");
+
+            let mut bytes = std::fs::read(&path).expect("read woff2 font");
+            let original_len = bytes.len();
+            bytes.extend_from_slice(&[0xde, 0xad, 0xbe, 0xef, 0, 1, 2, 3]);
+
+            let font = crate::load_font_from_buffer(&bytes).expect("load padded woff2 buffer");
+            let commands = font
                 .font()
-                .debug_shape_glyph_ids(sequence, None)
-                .expect("debug shape glyph ids");
-            let ccmp_applied = glyph_ids
-                .iter()
-                .copied()
-                .enumerate()
-                .map(|(index, glyph_id)| (glyph_id, index))
-                .collect::<Vec<_>>();
-            #[cfg(feature = "layout")]
-            let mut ccmp_applied = ccmp_applied;
-            #[cfg(feature = "layout")]
-            let liga = font.font().gsub.as_ref().and_then(|gsub| {
-                gsub.apply_ccmp_sequence(&mut ccmp_applied);
-                gsub.lookup_liga_sequence(
-                    &ccmp_applied
-                        .iter()
-                        .map(|(glyph_id, _)| *glyph_id)
-                        .collect::<Vec<_>>(),
-                )
-            });
-            #[cfg(feature = "layout")]
-            let rlig = font.font().gsub.as_ref().and_then(|gsub| {
-                gsub.lookup_rlig_sequence(
-                    &ccmp_applied
-                        .iter()
-                        .map(|(glyph_id, _)| *glyph_id)
-                        .collect::<Vec<_>>(),
-                    None,
-                )
-            });
-            #[cfg(not(feature = "layout"))]
-            let liga: Option<usize> = None;
-            #[cfg(not(feature = "layout"))]
-            let rlig: Option<usize> = None;
-            let run = font.text2glyph_run(
-                sequence,
-                crate::FontOptions::from_font_ref(crate::FontRef::Loaded(&font))
-                    .with_font_size(32.0),
-            );
-            let legacy = font.font().text2command(sequence);
+                .text2command("🥺")
+                .expect("render from padded woff2 buffer");
+            assert!(!commands.is_empty());
+            assert!(commands.iter().any(|glyph| glyph.bitmap.is_some()));
+            assert!(bytes.len() > original_len);
+        }
 
-            println!("font: {}", path.display());
-            println!("  glyph_ids: {:?}", glyph_ids);
-            println!(
-                "  ccmp_glyph_ids: {:?}",
-                ccmp_applied
+        #[test]
+        #[ignore]
+        fn investigate_police_officer_female_emoji_ligature() {
+            let sequence = "👮🏻‍♀️";
+
+            for path in emoji_ligature_font_candidates() {
+                if !path.exists() {
+                    continue;
+                }
+                let font = crate::load_font_from_file(&path).expect("load candidate font");
+                let glyph_ids = font
+                    .font()
+                    .debug_shape_glyph_ids(sequence, None)
+                    .expect("debug shape glyph ids");
+                let ccmp_applied = glyph_ids
                     .iter()
-                    .map(|(glyph_id, _)| *glyph_id)
-                    .collect::<Vec<_>>()
-            );
-            println!("  liga_lookup: {:?}", liga);
-            println!("  rlig_lookup: {:?}", rlig);
-            println!(
-                "  glyph_run: {}",
-                match &run {
-                    Ok(run) => format!(
-                        "ok glyphs={} layers0={}",
-                        run.glyphs.len(),
-                        run.glyphs
-                            .first()
-                            .map(|glyph| glyph.glyph.layers.len())
-                            .unwrap_or(0)
-                    ),
-                    Err(err) => format!("err {err}"),
-                }
-            );
-            println!(
-                "  legacy: {}",
-                match &legacy {
-                    Ok(commands) => format!(
-                        "ok glyphs={} first_bitmap={} first_cmds={}",
-                        commands.len(),
-                        commands
-                            .first()
-                            .and_then(|glyph| glyph.bitmap.as_ref())
-                            .is_some(),
-                        commands
-                            .first()
-                            .map(|glyph| glyph.commands.len())
-                            .unwrap_or(0)
-                    ),
-                    Err(err) => format!("err {err}"),
-                }
-            );
+                    .copied()
+                    .enumerate()
+                    .map(|(index, glyph_id)| (glyph_id, index))
+                    .collect::<Vec<_>>();
+                #[cfg(feature = "layout")]
+                let mut ccmp_applied = ccmp_applied;
+                #[cfg(feature = "layout")]
+                let liga = font.font().gsub.as_ref().and_then(|gsub| {
+                    gsub.apply_ccmp_sequence(&mut ccmp_applied);
+                    gsub.lookup_liga_sequence(
+                        &ccmp_applied
+                            .iter()
+                            .map(|(glyph_id, _)| *glyph_id)
+                            .collect::<Vec<_>>(),
+                    )
+                });
+                #[cfg(feature = "layout")]
+                let rlig = font.font().gsub.as_ref().and_then(|gsub| {
+                    gsub.lookup_rlig_sequence(
+                        &ccmp_applied
+                            .iter()
+                            .map(|(glyph_id, _)| *glyph_id)
+                            .collect::<Vec<_>>(),
+                        None,
+                    )
+                });
+                #[cfg(not(feature = "layout"))]
+                let liga: Option<usize> = None;
+                #[cfg(not(feature = "layout"))]
+                let rlig: Option<usize> = None;
+                let run = font.text2glyph_run(
+                    sequence,
+                    crate::FontOptions::from_font_ref(crate::FontRef::Loaded(&font))
+                        .with_font_size(32.0),
+                );
+                let legacy = font.font().text2command(sequence);
 
-            let regular =
-                crate::load_font_from_file(fira_sans_regular_path()).expect("load regular fira");
-            let mut family = crate::FontFamily::new("Fira Sans");
-            family.add_loaded_font(regular);
-            family.add_loaded_font(font);
-            let family_run = crate::text2commands(
-                &format!("A{}B", sequence),
-                crate::FontOptions::from_family(&family)
-                    .with_font_family("Fira Sans")
-                    .with_font_size(32.0),
+                println!("font: {}", path.display());
+                println!("  glyph_ids: {:?}", glyph_ids);
+                println!(
+                    "  ccmp_glyph_ids: {:?}",
+                    ccmp_applied
+                        .iter()
+                        .map(|(glyph_id, _)| *glyph_id)
+                        .collect::<Vec<_>>()
+                );
+                println!("  liga_lookup: {:?}", liga);
+                println!("  rlig_lookup: {:?}", rlig);
+                println!(
+                    "  glyph_run: {}",
+                    match &run {
+                        Ok(run) => format!(
+                            "ok glyphs={} layers0={}",
+                            run.glyphs.len(),
+                            run.glyphs
+                                .first()
+                                .map(|glyph| glyph.glyph.layers.len())
+                                .unwrap_or(0)
+                        ),
+                        Err(err) => format!("err {err}"),
+                    }
+                );
+                println!(
+                    "  legacy: {}",
+                    match &legacy {
+                        Ok(commands) => format!(
+                            "ok glyphs={} first_bitmap={} first_cmds={}",
+                            commands.len(),
+                            commands
+                                .first()
+                                .and_then(|glyph| glyph.bitmap.as_ref())
+                                .is_some(),
+                            commands
+                                .first()
+                                .map(|glyph| glyph.commands.len())
+                                .unwrap_or(0)
+                        ),
+                        Err(err) => format!("err {err}"),
+                    }
+                );
+
+                let regular = crate::load_font_from_file(fira_sans_regular_path())
+                    .expect("load regular fira");
+                let mut family = crate::FontFamily::new("Fira Sans");
+                family.add_loaded_font(regular);
+                family.add_loaded_font(font);
+                let family_run = crate::text2commands(
+                    &format!("A{}B", sequence),
+                    crate::FontOptions::from_family(&family)
+                        .with_font_family("Fira Sans")
+                        .with_font_size(32.0),
+                );
+                println!(
+                    "  family glyph_run: {}",
+                    match family_run {
+                        Ok(run) => format!("ok glyphs={}", run.glyphs.len()),
+                        Err(err) => format!("err {err}"),
+                    }
+                );
+            }
+        }
+
+        #[test]
+        fn sniff_encoded_image_dimensions_supports_png_and_jpeg_headers() {
+            let png = vec![
+                0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, b'I', b'H', b'D',
+                b'R', 0, 0, 0, 16, 0, 0, 0, 32,
+            ];
+            let jpeg = vec![
+                0xff, 0xd8, 0xff, 0xc0, 0x00, 0x11, 0x08, 0x00, 0x20, 0x00, 0x10, 0x03, 0x01, 0x11,
+                0x00, 0x02, 0x11, 0x00, 0x03, 0x11, 0x00, 0xff, 0xd9,
+            ];
+
+            assert_eq!(
+                crate::util::sniff_encoded_image_dimensions(&png),
+                Some(("image/png", 16, 32))
             );
-            println!(
-                "  family glyph_run: {}",
-                match family_run {
-                    Ok(run) => format!("ok glyphs={}", run.glyphs.len()),
-                    Err(err) => format!("err {err}"),
-                }
+            assert_eq!(
+                crate::util::sniff_encoded_image_dimensions(&jpeg),
+                Some(("image/jpeg", 16, 32))
             );
         }
-    }
 
-    #[test]
-    fn sniff_encoded_image_dimensions_supports_png_and_jpeg_headers() {
-        let png = vec![
-            0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, b'I', b'H', b'D', b'R', 0,
-            0, 0, 16, 0, 0, 0, 32,
-        ];
-        let jpeg = vec![
-            0xff, 0xd8, 0xff, 0xc0, 0x00, 0x11, 0x08, 0x00, 0x20, 0x00, 0x10, 0x03, 0x01, 0x11,
-            0x00, 0x02, 0x11, 0x00, 0x03, 0x11, 0x00, 0xff, 0xd9,
-        ];
+        #[test]
+        fn glyph_run_from_truetype_outline_works() {
+            let path = sample_font_path();
+            let font = crate::load_font_from_file(&path).expect("load font");
+            let run =
+                crate::text2commands("A", crate::FontOptions::new(&font).with_font_size(24.0))
+                    .expect("glyph run");
 
-        assert_eq!(
-            crate::util::sniff_encoded_image_dimensions(&png),
-            Some(("image/png", 16, 32))
-        );
-        assert_eq!(
-            crate::util::sniff_encoded_image_dimensions(&jpeg),
-            Some(("image/jpeg", 16, 32))
-        );
-    }
+            assert_eq!(run.glyphs.len(), 1);
+            assert!(run.glyphs[0].glyph.metrics.advance_x > 0.0);
+            assert!(matches!(
+                run.glyphs[0].glyph.layers.first(),
+                Some(crate::GlyphLayer::Path(_))
+            ));
+        }
 
-    #[test]
-    fn glyph_run_from_truetype_outline_works() {
-        let path = sample_font_path();
-        let font = crate::load_font_from_file(&path).expect("load font");
-        let run = crate::text2commands("A", crate::FontOptions::new(&font).with_font_size(24.0))
+        #[test]
+        #[cfg(feature = "cff")]
+        fn glyph_run_from_cff_outline_works() {
+            let font = crate::load_font_from_file(cff_font_path()).expect("load cff font");
+            let run =
+                crate::text2commands("漢", crate::FontOptions::new(&font).with_font_size(24.0))
+                    .expect("glyph run");
+
+            assert_eq!(run.glyphs.len(), 1);
+            assert!(matches!(
+                run.glyphs[0].glyph.layers.first(),
+                Some(crate::GlyphLayer::Path(_))
+            ));
+        }
+
+        #[test]
+        fn glyph_run_respects_line_height() {
+            let path = sample_font_path();
+            let font = crate::load_font_from_file(&path).expect("load font");
+            let run = crate::text2commands(
+                "A\nB",
+                crate::FontOptions::new(&font)
+                    .with_font_size(24.0)
+                    .with_line_height(40.0),
+            )
             .expect("glyph run");
 
-        assert_eq!(run.glyphs.len(), 1);
-        assert!(run.glyphs[0].glyph.metrics.advance_x > 0.0);
-        assert!(matches!(
-            run.glyphs[0].glyph.layers.first(),
-            Some(crate::GlyphLayer::Path(_))
-        ));
-    }
+            assert_eq!(run.glyphs.len(), 2);
+            assert_eq!(run.glyphs[0].y, 0.0);
+            assert_eq!(run.glyphs[1].y, 40.0);
+        }
 
-    #[test]
-    #[cfg(feature = "cff")]
-    fn glyph_run_from_cff_outline_works() {
-        let font = crate::load_font_from_file(cff_font_path()).expect("load cff font");
-        let run = crate::text2commands("漢", crate::FontOptions::new(&font).with_font_size(24.0))
-            .expect("glyph run");
+        #[test]
+        #[cfg(not(feature = "svg-fonts"))]
+        fn glyph_run_rejects_svg_glyphs_without_svg_fonts_feature() {
+            let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join(".test_fonts")
+                .join("EmojiOneColor.otf");
+            let bytes = std::fs::read(path).expect("read svg font");
+            let font = crate::load_font_from_buffer(&bytes).expect("load svg font");
+            let err =
+                crate::text2commands("😀", crate::FontOptions::new(&font).with_font_size(32.0))
+                    .expect_err("svg glyphs should be rejected for now");
 
-        assert_eq!(run.glyphs.len(), 1);
-        assert!(matches!(
-            run.glyphs[0].glyph.layers.first(),
-            Some(crate::GlyphLayer::Path(_))
-        ));
-    }
+            assert_eq!(err.kind(), std::io::ErrorKind::Unsupported);
+        }
 
-    #[test]
-    fn glyph_run_respects_line_height() {
-        let path = sample_font_path();
-        let font = crate::load_font_from_file(&path).expect("load font");
-        let run = crate::text2commands(
-            "A\nB",
-            crate::FontOptions::new(&font)
-                .with_font_size(24.0)
-                .with_line_height(40.0),
-        )
-        .expect("glyph run");
-
-        assert_eq!(run.glyphs.len(), 2);
-        assert_eq!(run.glyphs[0].y, 0.0);
-        assert_eq!(run.glyphs[1].y, 40.0);
-    }
-
-    #[test]
-    #[cfg(not(feature = "svg-fonts"))]
-    fn glyph_run_rejects_svg_glyphs_without_svg_fonts_feature() {
-        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join(".test_fonts")
-            .join("EmojiOneColor.otf");
-        let bytes = std::fs::read(path).expect("read svg font");
-        let font = crate::load_font_from_buffer(&bytes).expect("load svg font");
-        let err = crate::text2commands("😀", crate::FontOptions::new(&font).with_font_size(32.0))
-            .expect_err("svg glyphs should be rejected for now");
-
-        assert_eq!(err.kind(), std::io::ErrorKind::Unsupported);
-    }
-
-    #[test]
-    #[cfg(feature = "svg-fonts")]
-    fn glyph_run_supports_svg_glyphs_with_svg_fonts_feature() {
-        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join(".test_fonts")
-            .join("EmojiOneColor.otf");
-        let bytes = std::fs::read(path).expect("read svg font");
-        let font = crate::load_font_from_buffer(&bytes).expect("load svg font");
-        let run = crate::text2commands("😀", crate::FontOptions::new(&font).with_font_size(32.0))
-            .expect("svg glyph run");
-
-        assert_eq!(run.glyphs.len(), 1);
-        assert!(
-            run.glyphs[0].glyph.layers.iter().any(|layer| {
-                matches!(layer, crate::GlyphLayer::Path(path) if !path.commands.is_empty())
-                    || matches!(layer, crate::GlyphLayer::Svg(layer)
-                        if !layer.document.is_empty()
-                            && layer.view_box_width > 0.0
-                            && layer.view_box_height > 0.0)
-            }),
-            "expected svg glyph to expose a usable layer"
-        );
-
-        let svg = font.text2svg("😀", 32.0, "px").expect("svg font render");
-        assert!(svg.contains("<svg"));
-    }
-
-    #[test]
-    #[cfg(feature = "svg-fonts")]
-    fn glyph_run_supports_noto_color_emoji_svg_with_svg_fonts_feature() {
-        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join(".test_fonts")
-            .join("NotoColorEmoji-Regular.ttf");
-        let bytes = std::fs::read(path).expect("read noto color emoji");
-        let font = crate::load_font_from_buffer(&bytes).expect("load noto color emoji");
-        let run = crate::text2commands("😀", crate::FontOptions::new(&font).with_font_size(32.0))
-            .expect("noto color emoji glyph run");
-
-        assert_eq!(run.glyphs.len(), 1);
-        assert!(
-            run.glyphs[0].glyph.layers.iter().any(|layer| {
-                matches!(layer, crate::GlyphLayer::Path(path) if !path.commands.is_empty())
-                    || matches!(layer, crate::GlyphLayer::Svg(layer)
-                        if !layer.document.is_empty()
-                            && layer.view_box_width > 0.0
-                            && layer.view_box_height > 0.0)
-            }),
-            "expected svg glyph to expose a usable layer"
-        );
-
-        let svg = font
-            .text2svg("😀", 32.0, "px")
-            .expect("noto color emoji svg");
-        assert!(svg.contains("<svg"));
-    }
-
-    #[test]
-    #[cfg(feature = "svg-fonts")]
-    fn svg_font_plain_digit_no_longer_errors_when_svg_table_is_present() {
-        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join(".test_fonts")
-            .join("NotoColorEmoji-Regular.ttf");
-        let bytes = std::fs::read(path).expect("read noto color emoji");
-        let font = crate::load_font_from_buffer(&bytes).expect("load noto color emoji");
-        let run = crate::text2commands("1", crate::FontOptions::new(&font).with_font_size(32.0))
-            .expect("plain digit glyph run");
-
-        assert_eq!(run.glyphs.len(), 1);
-    }
-
-    #[test]
-    #[cfg(feature = "svg-fonts")]
-    fn svg_font_zero_does_not_return_legacy_unsupported_error() {
-        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join(".test_fonts")
-            .join("NotoColorEmoji-Regular.ttf");
-        let bytes = std::fs::read(path).expect("read noto color emoji");
-        let face = crate::load_font_from_buffer(&bytes).expect("load noto color emoji");
-
-        let run = face
-            .engine()
-            .with_font_size(32.0)
-            .shape("0")
-            .expect("shape zero");
-        assert_eq!(run.glyphs.len(), 1);
-    }
-
-    #[test]
-    #[cfg(feature = "svg-fonts")]
-    fn emojione_color_supports_some_zwj_svg_sequence() {
-        assert_svg_font_supports_any_sequence(
-            "EmojiOneColor.otf",
-            &["👩‍💻", "👨‍👩‍👧‍👦", "🏳️‍🌈", "👩🏽‍💻"],
-            "ZWJ",
-        );
-    }
-
-    #[test]
-    #[cfg(feature = "svg-fonts")]
-    fn emojione_color_supports_some_variation_svg_sequence() {
-        assert_svg_font_supports_any_sequence("EmojiOneColor.otf", &["❤️", "1️⃣"], "variation");
-    }
-
-    #[test]
-    #[cfg(feature = "svg-fonts")]
-    fn noto_color_emoji_supports_some_zwj_svg_sequence() {
-        assert_svg_font_supports_any_sequence(
-            "NotoColorEmoji-Regular.ttf",
-            &["👩‍💻", "👨‍👩‍👧‍👦", "🏳️‍🌈", "👩🏽‍💻"],
-            "ZWJ",
-        );
-    }
-
-    #[test]
-    #[cfg(feature = "svg-fonts")]
-    fn noto_color_emoji_supports_some_variation_svg_sequence() {
-        assert_svg_font_supports_any_sequence(
-            "NotoColorEmoji-Regular.ttf",
-            &["❤️", "1️⃣"],
-            "variation",
-        );
-    }
-
-    #[test]
-    #[cfg(feature = "svg-fonts")]
-    fn emojione_color_family_fallback_keeps_some_zwj_svg_sequence() {
-        assert_svg_font_family_fallback_supports_any_sequence(
-            "EmojiOneColor.otf",
-            &["👩‍💻", "👨‍👩‍👧‍👦", "🏳️‍🌈", "👩🏽‍💻"],
-            "ZWJ",
-        );
-    }
-
-    #[test]
-    #[cfg(feature = "svg-fonts")]
-    fn emojione_color_family_fallback_keeps_some_variation_svg_sequence() {
-        assert_svg_font_family_fallback_supports_any_sequence(
-            "EmojiOneColor.otf",
-            &["❤️", "1️⃣"],
-            "variation",
-        );
-    }
-
-    #[test]
-    #[cfg(feature = "svg-fonts")]
-    fn noto_color_emoji_family_fallback_keeps_some_zwj_svg_sequence() {
-        assert_svg_font_family_fallback_supports_any_sequence(
-            "NotoColorEmoji-Regular.ttf",
-            &["👩‍💻", "👨‍👩‍👧‍👦", "🏳️‍🌈", "👩🏽‍💻"],
-            "ZWJ",
-        );
-    }
-
-    #[test]
-    #[cfg(feature = "svg-fonts")]
-    fn noto_color_emoji_family_fallback_keeps_some_variation_svg_sequence() {
-        assert_svg_font_family_fallback_supports_any_sequence(
-            "NotoColorEmoji-Regular.ttf",
-            &["❤️", "1️⃣"],
-            "variation",
-        );
-    }
-
-    #[test]
-    #[cfg(feature = "svg-fonts")]
-    fn svg_glyph_run_exposes_some_path_layers_when_svg_payload_is_simple_enough() {
-        for font_name in ["EmojiOneColor.otf", "NotoColorEmoji-Regular.ttf"] {
-            let path = direct_svg_emoji_font_path(font_name);
-            let bytes = std::fs::read(&path)
-                .unwrap_or_else(|err| panic!("read {font_name} for svg path layers: {err}"));
-            let font = crate::load_font_from_buffer(&bytes)
-                .unwrap_or_else(|err| panic!("load {font_name} for svg path layers: {err}"));
+        #[test]
+        #[cfg(feature = "svg-fonts")]
+        fn glyph_run_supports_svg_glyphs_with_svg_fonts_feature() {
+            let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join(".test_fonts")
+                .join("EmojiOneColor.otf");
+            let bytes = std::fs::read(path).expect("read svg font");
+            let font = crate::load_font_from_buffer(&bytes).expect("load svg font");
             let run =
                 crate::text2commands("😀", crate::FontOptions::new(&font).with_font_size(32.0))
-                    .unwrap_or_else(|err| panic!("shape {font_name} for svg path layers: {err}"));
+                    .expect("svg glyph run");
 
-            if run.glyphs[0].glyph.layers.iter().any(
+            assert_eq!(run.glyphs.len(), 1);
+            assert!(
+                run.glyphs[0].glyph.layers.iter().any(|layer| {
+                    matches!(layer, crate::GlyphLayer::Path(path) if !path.commands.is_empty())
+                        || matches!(layer, crate::GlyphLayer::Svg(layer)
+                        if !layer.document.is_empty()
+                            && layer.view_box_width > 0.0
+                            && layer.view_box_height > 0.0)
+                }),
+                "expected svg glyph to expose a usable layer"
+            );
+
+            let svg = font.text2svg("😀", 32.0, "px").expect("svg font render");
+            assert!(svg.contains("<svg"));
+        }
+
+        #[test]
+        #[cfg(feature = "svg-fonts")]
+        fn glyph_run_supports_noto_color_emoji_svg_with_svg_fonts_feature() {
+            let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join(".test_fonts")
+                .join("NotoColorEmoji-Regular.ttf");
+            let bytes = std::fs::read(path).expect("read noto color emoji");
+            let font = crate::load_font_from_buffer(&bytes).expect("load noto color emoji");
+            let run =
+                crate::text2commands("😀", crate::FontOptions::new(&font).with_font_size(32.0))
+                    .expect("noto color emoji glyph run");
+
+            assert_eq!(run.glyphs.len(), 1);
+            assert!(
+                run.glyphs[0].glyph.layers.iter().any(|layer| {
+                    matches!(layer, crate::GlyphLayer::Path(path) if !path.commands.is_empty())
+                        || matches!(layer, crate::GlyphLayer::Svg(layer)
+                        if !layer.document.is_empty()
+                            && layer.view_box_width > 0.0
+                            && layer.view_box_height > 0.0)
+                }),
+                "expected svg glyph to expose a usable layer"
+            );
+
+            let svg = font
+                .text2svg("😀", 32.0, "px")
+                .expect("noto color emoji svg");
+            assert!(svg.contains("<svg"));
+        }
+
+        #[test]
+        #[cfg(feature = "svg-fonts")]
+        fn svg_font_plain_digit_no_longer_errors_when_svg_table_is_present() {
+            let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join(".test_fonts")
+                .join("NotoColorEmoji-Regular.ttf");
+            let bytes = std::fs::read(path).expect("read noto color emoji");
+            let font = crate::load_font_from_buffer(&bytes).expect("load noto color emoji");
+            let run =
+                crate::text2commands("1", crate::FontOptions::new(&font).with_font_size(32.0))
+                    .expect("plain digit glyph run");
+
+            assert_eq!(run.glyphs.len(), 1);
+        }
+
+        #[test]
+        #[cfg(feature = "svg-fonts")]
+        fn svg_font_zero_does_not_return_legacy_unsupported_error() {
+            let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join(".test_fonts")
+                .join("NotoColorEmoji-Regular.ttf");
+            let bytes = std::fs::read(path).expect("read noto color emoji");
+            let face = crate::load_font_from_buffer(&bytes).expect("load noto color emoji");
+
+            let run = face
+                .engine()
+                .with_font_size(32.0)
+                .shape("0")
+                .expect("shape zero");
+            assert_eq!(run.glyphs.len(), 1);
+        }
+
+        #[test]
+        #[cfg(feature = "svg-fonts")]
+        fn emojione_color_supports_some_zwj_svg_sequence() {
+            assert_svg_font_supports_any_sequence(
+                "EmojiOneColor.otf",
+                &["👩‍💻", "👨‍👩‍👧‍👦", "🏳️‍🌈", "👩🏽‍💻"],
+                "ZWJ",
+            );
+        }
+
+        #[test]
+        #[cfg(feature = "svg-fonts")]
+        fn emojione_color_supports_some_variation_svg_sequence() {
+            assert_svg_font_supports_any_sequence("EmojiOneColor.otf", &["❤️", "1️⃣"], "variation");
+        }
+
+        #[test]
+        #[cfg(feature = "svg-fonts")]
+        fn noto_color_emoji_supports_some_zwj_svg_sequence() {
+            assert_svg_font_supports_any_sequence(
+                "NotoColorEmoji-Regular.ttf",
+                &["👩‍💻", "👨‍👩‍👧‍👦", "🏳️‍🌈", "👩🏽‍💻"],
+                "ZWJ",
+            );
+        }
+
+        #[test]
+        #[cfg(feature = "svg-fonts")]
+        fn noto_color_emoji_supports_some_variation_svg_sequence() {
+            assert_svg_font_supports_any_sequence(
+                "NotoColorEmoji-Regular.ttf",
+                &["❤️", "1️⃣"],
+                "variation",
+            );
+        }
+
+        #[test]
+        #[cfg(feature = "svg-fonts")]
+        fn emojione_color_family_fallback_keeps_some_zwj_svg_sequence() {
+            assert_svg_font_family_fallback_supports_any_sequence(
+                "EmojiOneColor.otf",
+                &["👩‍💻", "👨‍👩‍👧‍👦", "🏳️‍🌈", "👩🏽‍💻"],
+                "ZWJ",
+            );
+        }
+
+        #[test]
+        #[cfg(feature = "svg-fonts")]
+        fn emojione_color_family_fallback_keeps_some_variation_svg_sequence() {
+            assert_svg_font_family_fallback_supports_any_sequence(
+                "EmojiOneColor.otf",
+                &["❤️", "1️⃣"],
+                "variation",
+            );
+        }
+
+        #[test]
+        #[cfg(feature = "svg-fonts")]
+        fn noto_color_emoji_family_fallback_keeps_some_zwj_svg_sequence() {
+            assert_svg_font_family_fallback_supports_any_sequence(
+                "NotoColorEmoji-Regular.ttf",
+                &["👩‍💻", "👨‍👩‍👧‍👦", "🏳️‍🌈", "👩🏽‍💻"],
+                "ZWJ",
+            );
+        }
+
+        #[test]
+        #[cfg(feature = "svg-fonts")]
+        fn noto_color_emoji_family_fallback_keeps_some_variation_svg_sequence() {
+            assert_svg_font_family_fallback_supports_any_sequence(
+                "NotoColorEmoji-Regular.ttf",
+                &["❤️", "1️⃣"],
+                "variation",
+            );
+        }
+
+        #[test]
+        #[cfg(feature = "svg-fonts")]
+        fn svg_glyph_run_exposes_some_path_layers_when_svg_payload_is_simple_enough() {
+            for font_name in ["EmojiOneColor.otf", "NotoColorEmoji-Regular.ttf"] {
+                let path = direct_svg_emoji_font_path(font_name);
+                let bytes = std::fs::read(&path)
+                    .unwrap_or_else(|err| panic!("read {font_name} for svg path layers: {err}"));
+                let font = crate::load_font_from_buffer(&bytes)
+                    .unwrap_or_else(|err| panic!("load {font_name} for svg path layers: {err}"));
+                let run =
+                    crate::text2commands("😀", crate::FontOptions::new(&font).with_font_size(32.0))
+                        .unwrap_or_else(|err| {
+                            panic!("shape {font_name} for svg path layers: {err}")
+                        });
+
+                if run.glyphs[0].glyph.layers.iter().any(
                 |layer| matches!(layer, crate::GlyphLayer::Path(path) if !path.commands.is_empty()),
             ) {
                 return;
             }
+            }
+
+            panic!("expected at least one SVG emoji font to expose path layers");
         }
 
-        panic!("expected at least one SVG emoji font to expose path layers");
-    }
-
-    #[test]
-    #[cfg(feature = "svg-fonts")]
-    fn emojione_and_noto_color_emoji_expose_real_gradient_payloads() {
-        for font_name in ["EmojiOneColor.otf", "NotoColorEmoji-Regular.ttf"] {
-            let Some((sequence, payload)) = first_svg_gradient_payload(font_name) else {
-                continue;
-            };
-            assert!(
-                payload.contains("Gradient") || payload.contains("gradient"),
-                "expected gradient payload in {font_name} for {sequence:?}"
-            );
-            return;
-        }
-        panic!("expected at least one real svg emoji font to expose a gradient payload");
-    }
-
-    #[test]
-    #[cfg(feature = "svg-fonts")]
-    fn emojione_or_noto_color_emoji_shapes_real_gradient_paint_layers() {
-        for font_name in ["EmojiOneColor.otf", "NotoColorEmoji-Regular.ttf"] {
-            let Some((sequence, _)) = first_svg_gradient_payload(font_name) else {
-                continue;
-            };
-            let path = direct_svg_emoji_font_path(font_name);
-            let font = crate::load_font_from_file(&path)
-                .unwrap_or_else(|err| panic!("load {font_name} for gradient paint: {err}"));
-            let run = crate::text2commands(&sequence, crate::FontOptions::new(&font).with_font_size(32.0))
-                .unwrap_or_else(|err| panic!("shape {font_name} {sequence:?}: {err}"));
-            assert_eq!(run.glyphs.len(), 1);
-            if run.glyphs[0].glyph.layers.iter().any(|layer| {
-                matches!(
-                    layer,
-                    crate::GlyphLayer::Path(path)
-                        if matches!(
-                            &path.paint,
-                            crate::GlyphPaint::LinearGradient(_)
-                                | crate::GlyphPaint::RadialGradient(_)
-                        )
-                )
-            }) {
+        #[test]
+        #[cfg(feature = "svg-fonts")]
+        fn emojione_and_noto_color_emoji_expose_real_gradient_payloads() {
+            for font_name in ["EmojiOneColor.otf", "NotoColorEmoji-Regular.ttf"] {
+                let Some((sequence, payload)) = first_svg_gradient_payload(font_name) else {
+                    continue;
+                };
+                assert!(
+                    payload.contains("Gradient") || payload.contains("gradient"),
+                    "expected gradient payload in {font_name} for {sequence:?}"
+                );
                 return;
             }
+            panic!("expected at least one real svg emoji font to expose a gradient payload");
         }
-        panic!("expected at least one real svg emoji font to produce gradient paint layers");
-    }
 
-    #[test]
-    #[cfg(feature = "svg-fonts")]
-    fn emojione_or_noto_color_emoji_exposes_inherited_gradient_payloads_when_present() {
-        for font_name in ["EmojiOneColor.otf", "NotoColorEmoji-Regular.ttf"] {
-            let Some((sequence, payload)) = first_svg_inherited_gradient_payload(font_name) else {
-                continue;
-            };
-            assert!(
-                payload.contains("href=\"#") || payload.contains("xlink:href=\"#"),
-                "expected inherited gradient reference in {font_name} for {sequence:?}"
-            );
-            return;
-        }
-    }
-
-    #[test]
-    #[cfg(feature = "svg-fonts")]
-    fn emojione_or_noto_color_emoji_shapes_inherited_gradient_paint_layers_when_present() {
-        for font_name in ["EmojiOneColor.otf", "NotoColorEmoji-Regular.ttf"] {
-            let Some((sequence, _)) = first_svg_inherited_gradient_payload(font_name) else {
-                continue;
-            };
-            let path = direct_svg_emoji_font_path(font_name);
-            let font = crate::load_font_from_file(&path)
-                .unwrap_or_else(|err| panic!("load {font_name} for inherited gradient paint: {err}"));
-            let run = crate::text2commands(&sequence, crate::FontOptions::new(&font).with_font_size(32.0))
+        #[test]
+        #[cfg(feature = "svg-fonts")]
+        fn emojione_or_noto_color_emoji_shapes_real_gradient_paint_layers() {
+            for font_name in ["EmojiOneColor.otf", "NotoColorEmoji-Regular.ttf"] {
+                let Some((sequence, _)) = first_svg_gradient_payload(font_name) else {
+                    continue;
+                };
+                let path = direct_svg_emoji_font_path(font_name);
+                let font = crate::load_font_from_file(&path)
+                    .unwrap_or_else(|err| panic!("load {font_name} for gradient paint: {err}"));
+                let run = crate::text2commands(
+                    &sequence,
+                    crate::FontOptions::new(&font).with_font_size(32.0),
+                )
                 .unwrap_or_else(|err| panic!("shape {font_name} {sequence:?}: {err}"));
-            assert_eq!(run.glyphs.len(), 1);
-            assert!(
-                run.glyphs[0].glyph.layers.iter().any(|layer| {
+                assert_eq!(run.glyphs.len(), 1);
+                if run.glyphs[0].glyph.layers.iter().any(|layer| {
                     matches!(
                         layer,
                         crate::GlyphLayer::Path(path)
@@ -6143,38 +6129,94 @@ mod tests {
                                     | crate::GlyphPaint::RadialGradient(_)
                             )
                     )
-                }),
-                "expected inherited gradient paint layer for {font_name} {sequence:?}"
-            );
-            return;
+                }) {
+                    return;
+                }
+            }
+            panic!("expected at least one real svg emoji font to produce gradient paint layers");
         }
-    }
 
-    #[test]
-    #[cfg(feature = "svg-fonts")]
-    fn noto_color_emoji_exposes_arc_path_payload() {
-        let Some((sequence, payload)) = first_svg_arc_payload("NotoColorEmoji-Regular.ttf") else {
-            return;
-        };
-        assert!(
-            payload_has_arc_path_command(&payload),
-            "expected arc path payload in NotoColorEmoji-Regular.ttf for {sequence:?}"
-        );
-    }
+        #[test]
+        #[cfg(feature = "svg-fonts")]
+        fn emojione_or_noto_color_emoji_exposes_inherited_gradient_payloads_when_present() {
+            for font_name in ["EmojiOneColor.otf", "NotoColorEmoji-Regular.ttf"] {
+                let Some((sequence, payload)) = first_svg_inherited_gradient_payload(font_name)
+                else {
+                    continue;
+                };
+                assert!(
+                    payload.contains("href=\"#") || payload.contains("xlink:href=\"#"),
+                    "expected inherited gradient reference in {font_name} for {sequence:?}"
+                );
+                return;
+            }
+        }
 
-    #[test]
-    #[cfg(feature = "svg-fonts")]
-    fn noto_color_emoji_arc_payload_shapes_path_layers() {
-        let Some((sequence, _)) = first_svg_arc_payload("NotoColorEmoji-Regular.ttf") else {
-            return;
-        };
-        let path = direct_svg_emoji_font_path("NotoColorEmoji-Regular.ttf");
-        let font = crate::load_font_from_file(&path)
-            .unwrap_or_else(|err| panic!("load NotoColorEmoji-Regular.ttf for arc payload: {err}"));
-        let run = crate::text2commands(&sequence, crate::FontOptions::new(&font).with_font_size(32.0))
+        #[test]
+        #[cfg(feature = "svg-fonts")]
+        fn emojione_or_noto_color_emoji_shapes_inherited_gradient_paint_layers_when_present() {
+            for font_name in ["EmojiOneColor.otf", "NotoColorEmoji-Regular.ttf"] {
+                let Some((sequence, _)) = first_svg_inherited_gradient_payload(font_name) else {
+                    continue;
+                };
+                let path = direct_svg_emoji_font_path(font_name);
+                let font = crate::load_font_from_file(&path).unwrap_or_else(|err| {
+                    panic!("load {font_name} for inherited gradient paint: {err}")
+                });
+                let run = crate::text2commands(
+                    &sequence,
+                    crate::FontOptions::new(&font).with_font_size(32.0),
+                )
+                .unwrap_or_else(|err| panic!("shape {font_name} {sequence:?}: {err}"));
+                assert_eq!(run.glyphs.len(), 1);
+                assert!(
+                    run.glyphs[0].glyph.layers.iter().any(|layer| {
+                        matches!(
+                            layer,
+                            crate::GlyphLayer::Path(path)
+                                if matches!(
+                                    &path.paint,
+                                    crate::GlyphPaint::LinearGradient(_)
+                                        | crate::GlyphPaint::RadialGradient(_)
+                                )
+                        )
+                    }),
+                    "expected inherited gradient paint layer for {font_name} {sequence:?}"
+                );
+                return;
+            }
+        }
+
+        #[test]
+        #[cfg(feature = "svg-fonts")]
+        fn noto_color_emoji_exposes_arc_path_payload() {
+            let Some((sequence, payload)) = first_svg_arc_payload("NotoColorEmoji-Regular.ttf")
+            else {
+                return;
+            };
+            assert!(
+                payload_has_arc_path_command(&payload),
+                "expected arc path payload in NotoColorEmoji-Regular.ttf for {sequence:?}"
+            );
+        }
+
+        #[test]
+        #[cfg(feature = "svg-fonts")]
+        fn noto_color_emoji_arc_payload_shapes_path_layers() {
+            let Some((sequence, _)) = first_svg_arc_payload("NotoColorEmoji-Regular.ttf") else {
+                return;
+            };
+            let path = direct_svg_emoji_font_path("NotoColorEmoji-Regular.ttf");
+            let font = crate::load_font_from_file(&path).unwrap_or_else(|err| {
+                panic!("load NotoColorEmoji-Regular.ttf for arc payload: {err}")
+            });
+            let run = crate::text2commands(
+                &sequence,
+                crate::FontOptions::new(&font).with_font_size(32.0),
+            )
             .unwrap_or_else(|err| panic!("shape NotoColorEmoji-Regular.ttf {sequence:?}: {err}"));
-        assert_eq!(run.glyphs.len(), 1);
-        assert!(
+            assert_eq!(run.glyphs.len(), 1);
+            assert!(
             run.glyphs[0].glyph.layers.iter().any(|layer| {
                 matches!(
                     layer,
@@ -6184,33 +6226,40 @@ mod tests {
             }),
             "expected NotoColorEmoji arc payload {sequence:?} to shape into cubic path layers"
         );
-    }
+        }
 
-    #[test]
-    #[cfg(feature = "svg-fonts")]
-    fn noto_color_emoji_exposes_transform_payload() {
-        let Some((sequence, payload)) = first_svg_transform_payload("NotoColorEmoji-Regular.ttf") else {
-            return;
-        };
-        assert!(
-            payload_has_transform(&payload),
-            "expected transform payload in NotoColorEmoji-Regular.ttf for {sequence:?}"
-        );
-    }
+        #[test]
+        #[cfg(feature = "svg-fonts")]
+        fn noto_color_emoji_exposes_transform_payload() {
+            let Some((sequence, payload)) =
+                first_svg_transform_payload("NotoColorEmoji-Regular.ttf")
+            else {
+                return;
+            };
+            assert!(
+                payload_has_transform(&payload),
+                "expected transform payload in NotoColorEmoji-Regular.ttf for {sequence:?}"
+            );
+        }
 
-    #[test]
-    #[cfg(feature = "svg-fonts")]
-    fn noto_color_emoji_transform_payload_shapes_path_layers() {
-        let Some((sequence, _)) = first_svg_transform_payload("NotoColorEmoji-Regular.ttf") else {
-            return;
-        };
-        let path = direct_svg_emoji_font_path("NotoColorEmoji-Regular.ttf");
-        let font = crate::load_font_from_file(&path)
-            .unwrap_or_else(|err| panic!("load NotoColorEmoji-Regular.ttf for transform payload: {err}"));
-        let run = crate::text2commands(&sequence, crate::FontOptions::new(&font).with_font_size(32.0))
+        #[test]
+        #[cfg(feature = "svg-fonts")]
+        fn noto_color_emoji_transform_payload_shapes_path_layers() {
+            let Some((sequence, _)) = first_svg_transform_payload("NotoColorEmoji-Regular.ttf")
+            else {
+                return;
+            };
+            let path = direct_svg_emoji_font_path("NotoColorEmoji-Regular.ttf");
+            let font = crate::load_font_from_file(&path).unwrap_or_else(|err| {
+                panic!("load NotoColorEmoji-Regular.ttf for transform payload: {err}")
+            });
+            let run = crate::text2commands(
+                &sequence,
+                crate::FontOptions::new(&font).with_font_size(32.0),
+            )
             .unwrap_or_else(|err| panic!("shape NotoColorEmoji-Regular.ttf {sequence:?}: {err}"));
-        assert_eq!(run.glyphs.len(), 1);
-        assert!(
+            assert_eq!(run.glyphs.len(), 1);
+            assert!(
             run.glyphs[0]
                 .glyph
                 .layers
@@ -6218,91 +6267,92 @@ mod tests {
                 .any(|layer| matches!(layer, crate::GlyphLayer::Path(path) if !path.commands.is_empty())),
             "expected NotoColorEmoji transform payload {sequence:?} to shape into path layers"
         );
-    }
+        }
 
-    #[test]
-    #[cfg(feature = "svg-fonts")]
-    fn noto_color_emoji_exposes_payload_requiring_svg_fallback_when_present() {
-        let Some((sequence, payload)) =
-            first_svg_payload_requiring_fallback("NotoColorEmoji-Regular.ttf")
-        else {
-            return;
-        };
-        assert!(
+        #[test]
+        #[cfg(feature = "svg-fonts")]
+        fn noto_color_emoji_exposes_payload_requiring_svg_fallback_when_present() {
+            let Some((sequence, payload)) =
+                first_svg_payload_requiring_fallback("NotoColorEmoji-Regular.ttf")
+            else {
+                return;
+            };
+            assert!(
             payload_has_unsupported_svg_constructs(&payload),
             "expected unsupported SVG constructs in NotoColorEmoji-Regular.ttf for {sequence:?}"
         );
-    }
+        }
 
-    #[test]
-    #[cfg(feature = "svg-fonts")]
-    fn noto_color_emoji_keeps_svg_layer_for_payload_requiring_fallback_when_present() {
-        let Some((sequence, _)) =
-            first_svg_payload_requiring_fallback("NotoColorEmoji-Regular.ttf")
-        else {
-            return;
-        };
-        let path = direct_svg_emoji_font_path("NotoColorEmoji-Regular.ttf");
-        let font = crate::load_font_from_file(&path).unwrap_or_else(|err| {
-            panic!("load NotoColorEmoji-Regular.ttf for fallback payload: {err}")
-        });
-        let run = crate::text2commands(&sequence, crate::FontOptions::new(&font).with_font_size(32.0))
+        #[test]
+        #[cfg(feature = "svg-fonts")]
+        fn noto_color_emoji_keeps_svg_layer_for_payload_requiring_fallback_when_present() {
+            let Some((sequence, _)) =
+                first_svg_payload_requiring_fallback("NotoColorEmoji-Regular.ttf")
+            else {
+                return;
+            };
+            let path = direct_svg_emoji_font_path("NotoColorEmoji-Regular.ttf");
+            let font = crate::load_font_from_file(&path).unwrap_or_else(|err| {
+                panic!("load NotoColorEmoji-Regular.ttf for fallback payload: {err}")
+            });
+            let run = crate::text2commands(
+                &sequence,
+                crate::FontOptions::new(&font).with_font_size(32.0),
+            )
             .unwrap_or_else(|err| panic!("shape NotoColorEmoji-Regular.ttf {sequence:?}: {err}"));
-        assert_eq!(run.glyphs.len(), 1);
-        assert!(
-            run.glyphs[0]
-                .glyph
-                .layers
-                .iter()
-                .any(|layer| matches!(layer, crate::GlyphLayer::Svg(svg) if !svg.document.is_empty())),
-            "expected NotoColorEmoji payload {sequence:?} to keep raw Svg fallback layer"
-        );
-    }
+            assert_eq!(run.glyphs.len(), 1);
+            assert!(
+                run.glyphs[0].glyph.layers.iter().any(
+                    |layer| matches!(layer, crate::GlyphLayer::Svg(svg) if !svg.document.is_empty())
+                ),
+                "expected NotoColorEmoji payload {sequence:?} to keep raw Svg fallback layer"
+            );
+        }
 
-    #[test]
-    #[cfg(feature = "svg-fonts")]
-    #[ignore = "diagnostic: scans all NotoColorEmoji SVG glyph ids for unsupported payloads"]
-    fn noto_color_emoji_glyph_id_requiring_fallback_when_present() {
-        let Some((glyph_id, payload)) =
-            first_svg_gid_requiring_fallback("NotoColorEmoji-Regular.ttf")
-        else {
-            return;
-        };
-        assert!(
-            payload_has_unsupported_svg_constructs(&payload),
-            "expected unsupported SVG constructs for glyph {glyph_id}"
-        );
-    }
+        #[test]
+        #[cfg(feature = "svg-fonts")]
+        #[ignore = "diagnostic: scans all NotoColorEmoji SVG glyph ids for unsupported payloads"]
+        fn noto_color_emoji_glyph_id_requiring_fallback_when_present() {
+            let Some((glyph_id, payload)) =
+                first_svg_gid_requiring_fallback("NotoColorEmoji-Regular.ttf")
+            else {
+                return;
+            };
+            assert!(
+                payload_has_unsupported_svg_constructs(&payload),
+                "expected unsupported SVG constructs for glyph {glyph_id}"
+            );
+        }
 
-    #[test]
-    #[cfg(feature = "svg-fonts")]
-    #[ignore = "diagnostic: scans all NotoColorEmoji SVG glyph ids for unsupported payloads"]
-    fn noto_color_emoji_glyph_id_keeps_svg_fallback_when_present() {
-        let Some((glyph_id, payload)) =
-            first_svg_gid_requiring_fallback("NotoColorEmoji-Regular.ttf")
-        else {
-            return;
-        };
-        let document = crate::opentype::color::svg::SvgGlyphDocument {
-            payload,
-            view_box_min_x: 0.0,
-            view_box_min_y: 0.0,
-            view_box_width: 32.0,
-            view_box_height: 32.0,
-        };
-        let layers = crate::fontreader::svg_document_to_glyph_layers(&document, 1.0, 1.0);
-        assert!(
-            layers
-                .iter()
-                .any(|layer| matches!(layer, crate::GlyphLayer::Svg(svg) if !svg.document.is_empty())),
-            "expected fallback payload for glyph {glyph_id} to keep raw Svg layer"
-        );
-    }
+        #[test]
+        #[cfg(feature = "svg-fonts")]
+        #[ignore = "diagnostic: scans all NotoColorEmoji SVG glyph ids for unsupported payloads"]
+        fn noto_color_emoji_glyph_id_keeps_svg_fallback_when_present() {
+            let Some((glyph_id, payload)) =
+                first_svg_gid_requiring_fallback("NotoColorEmoji-Regular.ttf")
+            else {
+                return;
+            };
+            let document = crate::opentype::color::svg::SvgGlyphDocument {
+                payload,
+                view_box_min_x: 0.0,
+                view_box_min_y: 0.0,
+                view_box_width: 32.0,
+                view_box_height: 32.0,
+            };
+            let layers = crate::fontreader::svg_document_to_glyph_layers(&document, 1.0, 1.0);
+            assert!(
+                layers.iter().any(
+                    |layer| matches!(layer, crate::GlyphLayer::Svg(svg) if !svg.document.is_empty())
+                ),
+                "expected fallback payload for glyph {glyph_id} to keep raw Svg layer"
+            );
+        }
 
-    #[test]
-    #[cfg(feature = "svg-fonts")]
-    fn svg_document_to_glyph_layers_keeps_svg_fallback_for_pattern_payload() {
-        let document = crate::opentype::color::svg::SvgGlyphDocument {
+        #[test]
+        #[cfg(feature = "svg-fonts")]
+        fn svg_document_to_glyph_layers_keeps_svg_fallback_for_pattern_payload() {
+            let document = crate::opentype::color::svg::SvgGlyphDocument {
             payload: concat!(
                 "<svg>",
                 "<defs><pattern id=\"p\"><rect x=\"0\" y=\"0\" width=\"2\" height=\"2\"/></pattern></defs>",
@@ -6316,1259 +6366,1287 @@ mod tests {
             view_box_width: 10.0,
             view_box_height: 10.0,
         };
-        let layers = crate::fontreader::svg_document_to_glyph_layers(&document, 1.0, 1.0);
-        assert!(
+            let layers = crate::fontreader::svg_document_to_glyph_layers(&document, 1.0, 1.0);
+            assert!(
             layers
                 .iter()
                 .any(|layer| matches!(layer, crate::GlyphLayer::Path(path) if !path.commands.is_empty())),
             "expected supported shapes to keep path layers"
         );
-        assert!(
-            layers
-                .iter()
-                .any(|layer| matches!(layer, crate::GlyphLayer::Svg(svg) if !svg.document.is_empty())),
-            "expected unsupported pattern payload to keep raw Svg fallback"
-        );
-    }
+            assert!(
+                layers.iter().any(
+                    |layer| matches!(layer, crate::GlyphLayer::Svg(svg) if !svg.document.is_empty())
+                ),
+                "expected unsupported pattern payload to keep raw Svg fallback"
+            );
+        }
 
-    #[test]
-    #[cfg(feature = "svg-fonts")]
-    fn svg_document_to_glyph_layers_uses_svg_only_when_no_path_layers_can_be_built() {
-        let document = crate::opentype::color::svg::SvgGlyphDocument {
+        #[test]
+        #[cfg(feature = "svg-fonts")]
+        fn svg_document_to_glyph_layers_uses_svg_only_when_no_path_layers_can_be_built() {
+            let document = crate::opentype::color::svg::SvgGlyphDocument {
             payload: "<svg><defs><pattern id=\"p\"><rect x=\"0\" y=\"0\" width=\"2\" height=\"2\"/></pattern></defs><rect x=\"0\" y=\"0\" width=\"10\" height=\"10\" fill=\"url(#p)\"/></svg>".to_string(),
             view_box_min_x: 0.0,
             view_box_min_y: 0.0,
             view_box_width: 10.0,
             view_box_height: 10.0,
         };
-        let layers = crate::fontreader::svg_document_to_glyph_layers(&document, 1.0, 1.0);
-        assert_eq!(layers.len(), 1);
-        assert!(matches!(layers[0], crate::GlyphLayer::Svg(_)));
-    }
+            let layers = crate::fontreader::svg_document_to_glyph_layers(&document, 1.0, 1.0);
+            assert_eq!(layers.len(), 1);
+            assert!(matches!(layers[0], crate::GlyphLayer::Svg(_)));
+        }
 
-    #[test]
-    fn fira_sans_black_i_and_j_have_outline_commands() {
-        let font = crate::load_font_from_file(fira_sans_black_path()).expect("load fira sans");
+        #[test]
+        fn fira_sans_black_i_and_j_have_outline_commands() {
+            let font = crate::load_font_from_file(fira_sans_black_path()).expect("load fira sans");
 
-        for ch in ['i', 'j'] {
+            for ch in ['i', 'j'] {
+                let commands = font
+                    .font()
+                    .text2command(&ch.to_string())
+                    .expect("text2command");
+                assert_eq!(commands.len(), 1, "expected one glyph for {ch}");
+                assert!(
+                    !commands[0].commands.is_empty(),
+                    "expected outline commands for {ch}"
+                );
+            }
+        }
+
+        #[test]
+        fn glyph_run_fira_sans_black_keeps_outline_layers() {
+            let font = crate::load_font_from_file(fira_sans_black_path()).expect("load fira sans");
+            let run =
+                crate::text2commands("ij", crate::FontOptions::new(&font).with_font_size(32.0))
+                    .expect("glyph run");
+
+            assert_eq!(run.glyphs.len(), 2);
+            for (index, glyph) in run.glyphs.iter().enumerate() {
+                assert!(
+                    glyph.glyph.metrics.bounds.is_some(),
+                    "expected bounds for glyph {index}"
+                );
+                match glyph.glyph.layers.first() {
+                    Some(crate::GlyphLayer::Path(path)) => {
+                        assert!(
+                            !path.commands.is_empty(),
+                            "expected path commands for glyph {index}"
+                        );
+                    }
+                    Some(crate::GlyphLayer::Raster(_)) => {
+                        panic!("expected outline layer for Fira Sans glyph {index}");
+                    }
+                    #[cfg(feature = "svg-fonts")]
+                    Some(crate::GlyphLayer::Svg(_)) => {
+                        panic!("expected outline layer for Fira Sans glyph {index}");
+                    }
+                    None => panic!("expected at least one layer for glyph {index}"),
+                }
+            }
+        }
+
+        #[test]
+        fn glyph_run_colr_layers_keep_cpal_argb32_paint() {
+            let font =
+                crate::load_font_from_file(segoe_emoji_font_path()).expect("load segoe emoji");
+            let inner = font.font();
+            let glyph_id = inner
+                .cmap
+                .as_ref()
+                .expect("cmap")
+                .get_glyph_position('🥺' as u32) as usize;
+            let expected_layers = inner
+                .colr
+                .as_ref()
+                .expect("colr")
+                .get_layer_record(glyph_id as u16);
+            let cpal = inner.cpal.as_ref().expect("cpal");
+            let run =
+                crate::text2commands("🥺", crate::FontOptions::new(&font).with_font_size(32.0))
+                    .expect("glyph run");
+
+            assert_eq!(run.glyphs.len(), 1);
+            assert_eq!(run.glyphs[0].glyph.layers.len(), expected_layers.len());
+
+            for (actual, expected) in run.glyphs[0]
+                .glyph
+                .layers
+                .iter()
+                .zip(expected_layers.iter())
+            {
+                match actual {
+                    crate::GlyphLayer::Path(path) => match &path.paint {
+                        crate::GlyphPaint::Solid(argb) => {
+                            let color = cpal
+                                .get_palette_color(0, expected.palette_index)
+                                .expect("valid CPAL palette entry");
+                            let expected_argb = ((color.alpha as u32) << 24)
+                                | ((color.red as u32) << 16)
+                                | ((color.green as u32) << 8)
+                                | color.blue as u32;
+                            assert_eq!(*argb, expected_argb)
+                        }
+                        crate::GlyphPaint::CurrentColor => {
+                            assert_eq!(expected.palette_index, 0xffff);
+                        }
+                        crate::GlyphPaint::LinearGradient(_)
+                        | crate::GlyphPaint::RadialGradient(_) => {
+                            panic!("expected COLR glyph layer to keep solid CPAL color")
+                        }
+                    },
+                    crate::GlyphLayer::Raster(_) => {
+                        panic!("expected COLR glyph to use only path layers")
+                    }
+                    #[cfg(feature = "svg-fonts")]
+                    crate::GlyphLayer::Svg(_) => {
+                        panic!("expected COLR glyph to use only path layers")
+                    }
+                }
+            }
+        }
+
+        #[test]
+        fn glyph_run_colr_layers_keep_non_empty_commands() {
+            let font =
+                crate::load_font_from_file(segoe_emoji_font_path()).expect("load segoe emoji");
+            let run =
+                crate::text2commands("🥺", crate::FontOptions::new(&font).with_font_size(32.0))
+                    .expect("glyph run");
+
+            assert_eq!(run.glyphs.len(), 1);
+            assert!(
+                !run.glyphs[0].glyph.layers.is_empty(),
+                "expected at least one COLR layer"
+            );
+
+            for (index, layer) in run.glyphs[0].glyph.layers.iter().enumerate() {
+                match layer {
+                    crate::GlyphLayer::Path(path) => {
+                        assert!(
+                            !path.commands.is_empty(),
+                            "expected non-empty path commands for COLR layer {index}"
+                        );
+                    }
+                    crate::GlyphLayer::Raster(_) => {
+                        panic!("expected COLR glyph to use only path layers");
+                    }
+                    #[cfg(feature = "svg-fonts")]
+                    crate::GlyphLayer::Svg(_) => {
+                        panic!("expected COLR glyph to use only path layers");
+                    }
+                }
+            }
+        }
+
+        #[test]
+        fn vertical_html_path_is_enabled() {
+            let path = sample_font_path();
+            let font = crate::fontload_file(&path).expect("load font");
+            let html = font
+                .font()
+                .get_html_vert("A", 24.0, "px")
+                .expect("html vert");
+            assert!(html.contains("writing-mode: vertical-rl"));
+            assert!(html.contains("<svg"));
+        }
+
+        #[test]
+        fn variation_selector_real_font_uses_format14() {
+            let font = crate::fontload_file(japanese_font_path()).expect("load uvs font");
+            let cmap = font.font().cmap.as_ref().expect("cmap");
+            let format14 = cmap
+                .cmap_encodings
+                .iter()
+                .find_map(|encoding| match encoding.cmap_subtable.as_ref() {
+                    CmapSubtable::Format14(format14) => Some(format14),
+                    _ => None,
+                })
+                .expect("expected format 14 cmap");
+            let var_selector_record = format14
+                .var_selector_records
+                .first()
+                .expect("expected at least one var selector record");
+            let mapping = var_selector_record
+                .non_default_uvs
+                .unicode_value_ranges
+                .first()
+                .expect("expected at least one UVS mapping");
+            let var_selector = var_selector_record.var_selector;
+            let unicode_value = mapping.unicode_value;
+            let glyph_id = mapping.glyph_id;
+            let base = cmap.get_glyph_position(unicode_value);
+            let uvs = cmap.get_glyph_position_from_uvs(unicode_value, var_selector);
+            assert_eq!(uvs, glyph_id);
+            assert!(base > 0);
+        }
+
+        #[test]
+        #[cfg(feature = "cff")]
+        fn glyph_run_uses_real_variation_selector_as_single_cluster() {
+            let font = crate::load_font_from_file(japanese_font_path()).expect("load uvs font");
+            let (text, _) = real_variation_sequence(&font);
+
+            let run =
+                crate::text2commands(&text, crate::FontOptions::new(&font).with_font_size(32.0))
+                    .expect("glyph run");
+
+            assert_eq!(run.glyphs.len(), 1);
+            assert!(matches!(
+                run.glyphs[0].glyph.layers.first(),
+                Some(crate::GlyphLayer::Path(_))
+            ));
+        }
+
+        #[test]
+        #[cfg(feature = "cff")]
+        fn measure_uses_real_variation_selector_glyph() {
+            let font = crate::load_font_from_file(japanese_font_path()).expect("load uvs font");
+            let (text, expected_glyph_id) = real_variation_sequence(&font);
+
+            let glyph_ids = font
+                .font()
+                .debug_shape_glyph_ids(&text, None)
+                .expect("shape glyph ids with uvs");
+            assert_eq!(glyph_ids, vec![expected_glyph_id]);
+
+            let width = font.measure(&text).expect("measure with uvs");
+            assert!(width > 0.0);
+        }
+
+        #[test]
+        #[cfg(feature = "cff")]
+        fn html_uses_single_svg_for_variation_selector_cluster_and_ignores_stray_selector() {
+            let font = crate::load_font_from_file(japanese_font_path()).expect("load uvs font");
+            let (text, _) = real_variation_sequence(&font);
+
+            let html = font
+                .font()
+                .get_html(&text, 32.0, "px")
+                .expect("html with uvs");
+            assert_eq!(html.matches("<svg").count(), 1);
+
+            let html_with_stray = font
+                .font()
+                .get_html(&format!("\u{FE0F}{text}"), 32.0, "px")
+                .expect("html with stray selector");
+            assert_eq!(html_with_stray.matches("<svg").count(), 1);
+        }
+
+        #[test]
+        #[cfg(feature = "cff")]
+        fn font_family_text2commands_keeps_real_variation_selector_cluster() {
+            let font = crate::load_font_from_file(japanese_font_path()).expect("load uvs font");
+            let (text, expected_glyph_id) = real_variation_sequence(&font);
+
+            let mut family = crate::FontFamily::new("Noto Sans JP");
+            family.add_loaded_font(font);
+            let run = family
+                .text2commands(&text, family.options().with_font_size(32.0))
+                .expect("family glyph run with uvs");
+
+            assert_eq!(run.glyphs.len(), 1);
+            let glyph_ids = family
+                .resolve_loaded_font(
+                    Some("Noto Sans JP"),
+                    None,
+                    crate::FontWeight::default(),
+                    crate::FontStyle::default(),
+                    crate::FontStretch::default(),
+                )
+                .expect("resolved family font")
+                .font()
+                .debug_shape_glyph_ids(&text, None)
+                .expect("shape glyph ids");
+            assert_eq!(glyph_ids, vec![expected_glyph_id]);
+        }
+
+        #[test]
+        fn legacy_text2command_keeps_real_variation_selector_cluster_for_truetype() {
+            let Some(path) = first_truetype_variation_selector_font_path() else {
+                return;
+            };
+            let font = crate::load_font_from_file(path).expect("load truetype uvs font");
+            let (text, expected_glyph_id) = real_variation_sequence(&font);
+
             let commands = font
                 .font()
-                .text2command(&ch.to_string())
-                .expect("text2command");
-            assert_eq!(commands.len(), 1, "expected one glyph for {ch}");
-            assert!(
-                !commands[0].commands.is_empty(),
-                "expected outline commands for {ch}"
-            );
+                .text2command(&text)
+                .expect("legacy text2command with uvs");
+
+            assert_eq!(commands.len(), 1);
+            assert_eq!(commands[0].glyph_id, expected_glyph_id);
+            assert!(!commands[0].commands.is_empty() || commands[0].bitmap.is_some());
         }
-    }
 
-    #[test]
-    fn glyph_run_fira_sans_black_keeps_outline_layers() {
-        let font = crate::load_font_from_file(fira_sans_black_path()).expect("load fira sans");
-        let run = crate::text2commands("ij", crate::FontOptions::new(&font).with_font_size(32.0))
-            .expect("glyph run");
+        #[test]
+        #[cfg(feature = "layout")]
+        fn lookup_locale_uses_real_japanese_locl_data() {
+            let path = japanese_font_path();
+            let font = crate::fontload_file(&path).expect("load japanese font");
+            let gsub = font.font().gsub.as_ref().expect("gsub");
+            let max_glyphs = font.font().maxp.as_ref().expect("maxp").num_glyphs as usize;
+            let locale = "ja-JP";
 
-        assert_eq!(run.glyphs.len(), 2);
-        for (index, glyph) in run.glyphs.iter().enumerate() {
-            assert!(
-                glyph.glyph.metrics.bounds.is_some(),
-                "expected bounds for glyph {index}"
-            );
-            match glyph.glyph.layers.first() {
-                Some(crate::GlyphLayer::Path(path)) => {
-                    assert!(
-                        !path.commands.is_empty(),
-                        "expected path commands for glyph {index}"
-                    );
-                }
-                Some(crate::GlyphLayer::Raster(_)) => {
-                    panic!("expected outline layer for Fira Sans glyph {index}");
-                }
-                #[cfg(feature = "svg-fonts")]
-                Some(crate::GlyphLayer::Svg(_)) => {
-                    panic!("expected outline layer for Fira Sans glyph {index}");
-                }
-                None => panic!("expected at least one layer for glyph {index}"),
-            }
-        }
-    }
-
-    #[test]
-    fn glyph_run_colr_layers_keep_cpal_argb32_paint() {
-        let font = crate::load_font_from_file(segoe_emoji_font_path()).expect("load segoe emoji");
-        let inner = font.font();
-        let glyph_id = inner
-            .cmap
-            .as_ref()
-            .expect("cmap")
-            .get_glyph_position('🥺' as u32) as usize;
-        let expected_layers = inner
-            .colr
-            .as_ref()
-            .expect("colr")
-            .get_layer_record(glyph_id as u16);
-        let cpal = inner.cpal.as_ref().expect("cpal");
-        let run = crate::text2commands("🥺", crate::FontOptions::new(&font).with_font_size(32.0))
-            .expect("glyph run");
-
-        assert_eq!(run.glyphs.len(), 1);
-        assert_eq!(run.glyphs[0].glyph.layers.len(), expected_layers.len());
-
-        for (actual, expected) in run.glyphs[0]
-            .glyph
-            .layers
-            .iter()
-            .zip(expected_layers.iter())
-        {
-            match actual {
-                crate::GlyphLayer::Path(path) => match &path.paint {
-                    crate::GlyphPaint::Solid(argb) => {
-                        let color = cpal
-                            .get_palette_color(0, expected.palette_index)
-                            .expect("valid CPAL palette entry");
-                        let expected_argb = ((color.alpha as u32) << 24)
-                            | ((color.red as u32) << 16)
-                            | ((color.green as u32) << 8)
-                            | color.blue as u32;
-                        assert_eq!(*argb, expected_argb)
-                    }
-                    crate::GlyphPaint::CurrentColor => {
-                        assert_eq!(expected.palette_index, 0xffff);
-                    }
-                    crate::GlyphPaint::LinearGradient(_) | crate::GlyphPaint::RadialGradient(_) => {
-                        panic!("expected COLR glyph layer to keep solid CPAL color")
-                    }
-                },
-                crate::GlyphLayer::Raster(_) => {
-                    panic!("expected COLR glyph to use only path layers")
-                }
-                #[cfg(feature = "svg-fonts")]
-                crate::GlyphLayer::Svg(_) => {
-                    panic!("expected COLR glyph to use only path layers")
+            let mut found = None;
+            for glyph_id in 1..=max_glyphs {
+                let localized = gsub.lookup_locale(glyph_id, locale);
+                if localized != glyph_id {
+                    found = Some((glyph_id, localized));
+                    break;
                 }
             }
+
+            let (glyph_id, localized) = found.expect("expected at least one locl substitution");
+            assert_ne!(glyph_id, localized);
         }
-    }
 
-    #[test]
-    fn glyph_run_colr_layers_keep_non_empty_commands() {
-        let font = crate::load_font_from_file(segoe_emoji_font_path()).expect("load segoe emoji");
-        let run = crate::text2commands("🥺", crate::FontOptions::new(&font).with_font_size(32.0))
-            .expect("glyph run");
+        #[test]
+        #[cfg(feature = "layout")]
+        fn text_api_uses_real_japanese_locl_substitution_when_requested() {
+            let font =
+                crate::load_font_from_file(japanese_font_path()).expect("load japanese font");
+            let cmap = font.font().cmap.as_ref().expect("cmap");
+            let gsub = font.font().gsub.as_ref().expect("gsub");
+            let locale = "ja-JP";
 
-        assert_eq!(run.glyphs.len(), 1);
-        assert!(
-            !run.glyphs[0].glyph.layers.is_empty(),
-            "expected at least one COLR layer"
-        );
-
-        for (index, layer) in run.glyphs[0].glyph.layers.iter().enumerate() {
-            match layer {
-                crate::GlyphLayer::Path(path) => {
-                    assert!(
-                        !path.commands.is_empty(),
-                        "expected non-empty path commands for COLR layer {index}"
-                    );
+            let mut found = None;
+            for codepoint in 0x20u32..=0xFFFF {
+                let Some(ch) = char::from_u32(codepoint) else {
+                    continue;
+                };
+                if ch.is_control() {
+                    continue;
                 }
-                crate::GlyphLayer::Raster(_) => {
-                    panic!("expected COLR glyph to use only path layers");
+                let glyph_id = cmap.get_glyph_position(codepoint) as usize;
+                if glyph_id == 0 {
+                    continue;
                 }
-                #[cfg(feature = "svg-fonts")]
-                crate::GlyphLayer::Svg(_) => {
-                    panic!("expected COLR glyph to use only path layers");
+
+                let localized = gsub.lookup_locale(glyph_id, locale);
+                if localized != glyph_id {
+                    found = Some((ch, glyph_id, localized));
+                    break;
                 }
             }
-        }
-    }
 
-    #[test]
-    fn vertical_html_path_is_enabled() {
-        let path = sample_font_path();
-        let font = crate::fontload_file(&path).expect("load font");
-        let html = font
-            .font()
-            .get_html_vert("A", 24.0, "px")
-            .expect("html vert");
-        assert!(html.contains("writing-mode: vertical-rl"));
-        assert!(html.contains("<svg"));
-    }
+            let (ch, glyph_id, localized) = found.expect("expected locl-mapped character");
+            let glyph_ids = font
+                .font()
+                .debug_shape_glyph_ids(&ch.to_string(), Some(locale))
+                .expect("shape glyph ids");
 
-    #[test]
-    fn variation_selector_real_font_uses_format14() {
-        let font = crate::fontload_file(japanese_font_path()).expect("load uvs font");
-        let cmap = font.font().cmap.as_ref().expect("cmap");
-        let format14 = cmap
-            .cmap_encodings
-            .iter()
-            .find_map(|encoding| match encoding.cmap_subtable.as_ref() {
-                CmapSubtable::Format14(format14) => Some(format14),
-                _ => None,
-            })
-            .expect("expected format 14 cmap");
-        let var_selector_record = format14
-            .var_selector_records
-            .first()
-            .expect("expected at least one var selector record");
-        let mapping = var_selector_record
-            .non_default_uvs
-            .unicode_value_ranges
-            .first()
-            .expect("expected at least one UVS mapping");
-        let var_selector = var_selector_record.var_selector;
-        let unicode_value = mapping.unicode_value;
-        let glyph_id = mapping.glyph_id;
-        let base = cmap.get_glyph_position(unicode_value);
-        let uvs = cmap.get_glyph_position_from_uvs(unicode_value, var_selector);
-        assert_eq!(uvs, glyph_id);
-        assert!(base > 0);
-    }
+            assert_eq!(glyph_ids, vec![localized]);
+            assert_ne!(glyph_id, localized);
 
-    #[test]
-    #[cfg(feature = "cff")]
-    fn glyph_run_uses_real_variation_selector_as_single_cluster() {
-        let font = crate::load_font_from_file(japanese_font_path()).expect("load uvs font");
-        let (text, _) = real_variation_sequence(&font);
-
-        let run = crate::text2commands(&text, crate::FontOptions::new(&font).with_font_size(32.0))
-            .expect("glyph run");
-
-        assert_eq!(run.glyphs.len(), 1);
-        assert!(matches!(
-            run.glyphs[0].glyph.layers.first(),
-            Some(crate::GlyphLayer::Path(_))
-        ));
-    }
-
-    #[test]
-    #[cfg(feature = "cff")]
-    fn measure_uses_real_variation_selector_glyph() {
-        let font = crate::load_font_from_file(japanese_font_path()).expect("load uvs font");
-        let (text, expected_glyph_id) = real_variation_sequence(&font);
-
-        let glyph_ids = font
-            .font()
-            .debug_shape_glyph_ids(&text, None)
-            .expect("shape glyph ids with uvs");
-        assert_eq!(glyph_ids, vec![expected_glyph_id]);
-
-        let width = font.measure(&text).expect("measure with uvs");
-        assert!(width > 0.0);
-    }
-
-    #[test]
-    #[cfg(feature = "cff")]
-    fn html_uses_single_svg_for_variation_selector_cluster_and_ignores_stray_selector() {
-        let font = crate::load_font_from_file(japanese_font_path()).expect("load uvs font");
-        let (text, _) = real_variation_sequence(&font);
-
-        let html = font
-            .font()
-            .get_html(&text, 32.0, "px")
-            .expect("html with uvs");
-        assert_eq!(html.matches("<svg").count(), 1);
-
-        let html_with_stray = font
-            .font()
-            .get_html(&format!("\u{FE0F}{text}"), 32.0, "px")
-            .expect("html with stray selector");
-        assert_eq!(html_with_stray.matches("<svg").count(), 1);
-    }
-
-    #[test]
-    #[cfg(feature = "cff")]
-    fn font_family_text2commands_keeps_real_variation_selector_cluster() {
-        let font = crate::load_font_from_file(japanese_font_path()).expect("load uvs font");
-        let (text, expected_glyph_id) = real_variation_sequence(&font);
-
-        let mut family = crate::FontFamily::new("Noto Sans JP");
-        family.add_loaded_font(font);
-        let run = family
-            .text2commands(&text, family.options().with_font_size(32.0))
-            .expect("family glyph run with uvs");
-
-        assert_eq!(run.glyphs.len(), 1);
-        let glyph_ids = family
-            .resolve_loaded_font(
-                Some("Noto Sans JP"),
-                None,
-                crate::FontWeight::default(),
-                crate::FontStyle::default(),
-                crate::FontStretch::default(),
+            let run = crate::text2commands(
+                &ch.to_string(),
+                crate::FontOptions::new(&font)
+                    .with_font_size(32.0)
+                    .with_locale(locale),
             )
-            .expect("resolved family font")
-            .font()
-            .debug_shape_glyph_ids(&text, None)
-            .expect("shape glyph ids");
-        assert_eq!(glyph_ids, vec![expected_glyph_id]);
-    }
-
-    #[test]
-    fn legacy_text2command_keeps_real_variation_selector_cluster_for_truetype() {
-        let Some(path) = first_truetype_variation_selector_font_path() else {
-            return;
-        };
-        let font = crate::load_font_from_file(path).expect("load truetype uvs font");
-        let (text, expected_glyph_id) = real_variation_sequence(&font);
-
-        let commands = font
-            .font()
-            .text2command(&text)
-            .expect("legacy text2command with uvs");
-
-        assert_eq!(commands.len(), 1);
-        assert_eq!(commands[0].glyph_id, expected_glyph_id);
-        assert!(!commands[0].commands.is_empty() || commands[0].bitmap.is_some());
-    }
-
-    #[test]
-    #[cfg(feature = "layout")]
-    fn lookup_locale_uses_real_japanese_locl_data() {
-        let path = japanese_font_path();
-        let font = crate::fontload_file(&path).expect("load japanese font");
-        let gsub = font.font().gsub.as_ref().expect("gsub");
-        let max_glyphs = font.font().maxp.as_ref().expect("maxp").num_glyphs as usize;
-        let locale = "ja-JP";
-
-        let mut found = None;
-        for glyph_id in 1..=max_glyphs {
-            let localized = gsub.lookup_locale(glyph_id, locale);
-            if localized != glyph_id {
-                found = Some((glyph_id, localized));
-                break;
-            }
+            .expect("glyph run");
+            assert_eq!(run.glyphs.len(), 1);
         }
 
-        let (glyph_id, localized) = found.expect("expected at least one locl substitution");
-        assert_ne!(glyph_id, localized);
-    }
-
-    #[test]
-    #[cfg(feature = "layout")]
-    fn text_api_uses_real_japanese_locl_substitution_when_requested() {
-        let font = crate::load_font_from_file(japanese_font_path()).expect("load japanese font");
-        let cmap = font.font().cmap.as_ref().expect("cmap");
-        let gsub = font.font().gsub.as_ref().expect("gsub");
-        let locale = "ja-JP";
-
-        let mut found = None;
-        for codepoint in 0x20u32..=0xFFFF {
-            let Some(ch) = char::from_u32(codepoint) else {
-                continue;
+        #[test]
+        #[cfg(feature = "layout")]
+        fn text_api_uses_real_jp78_variant_when_requested() {
+            let Some((path, ch, glyph_id, variant_glyph_id)) =
+                first_real_variant_substitution(crate::FontVariant::Jis78)
+            else {
+                return;
             };
-            if ch.is_control() {
-                continue;
-            }
-            let glyph_id = cmap.get_glyph_position(codepoint) as usize;
-            if glyph_id == 0 {
-                continue;
-            }
+            let font = crate::load_font_from_file(&path).expect("load japanese variant font");
 
-            let localized = gsub.lookup_locale(glyph_id, locale);
-            if localized != glyph_id {
-                found = Some((ch, glyph_id, localized));
-                break;
-            }
-        }
+            let default_ids = font
+                .font()
+                .debug_shape_glyph_ids_with_variant(
+                    &ch.to_string(),
+                    Some("ja-JP"),
+                    crate::FontVariant::Normal,
+                )
+                .expect("default glyph ids");
+            assert_eq!(default_ids, vec![glyph_id]);
 
-        let (ch, glyph_id, localized) = found.expect("expected locl-mapped character");
-        let glyph_ids = font
-            .font()
-            .debug_shape_glyph_ids(&ch.to_string(), Some(locale))
-            .expect("shape glyph ids");
+            let variant_ids = font
+                .font()
+                .debug_shape_glyph_ids_with_variant(
+                    &ch.to_string(),
+                    Some("ja-JP"),
+                    crate::FontVariant::Jis78,
+                )
+                .expect("jp78 glyph ids");
+            assert_eq!(variant_ids, vec![variant_glyph_id]);
+            assert_ne!(glyph_id, variant_glyph_id);
 
-        assert_eq!(glyph_ids, vec![localized]);
-        assert_ne!(glyph_id, localized);
-
-        let run = crate::text2commands(
-            &ch.to_string(),
-            crate::FontOptions::new(&font)
-                .with_font_size(32.0)
-                .with_locale(locale),
-        )
-        .expect("glyph run");
-        assert_eq!(run.glyphs.len(), 1);
-    }
-
-    #[test]
-    #[cfg(feature = "layout")]
-    fn text_api_uses_real_jp78_variant_when_requested() {
-        let Some((path, ch, glyph_id, variant_glyph_id)) =
-            first_real_variant_substitution(crate::FontVariant::Jis78)
-        else {
-            return;
-        };
-        let font = crate::load_font_from_file(&path).expect("load japanese variant font");
-
-        let default_ids = font
-            .font()
-            .debug_shape_glyph_ids_with_variant(
+            let run = crate::text2commands(
                 &ch.to_string(),
-                Some("ja-JP"),
-                crate::FontVariant::Normal,
-            )
-            .expect("default glyph ids");
-        assert_eq!(default_ids, vec![glyph_id]);
-
-        let variant_ids = font
-            .font()
-            .debug_shape_glyph_ids_with_variant(
-                &ch.to_string(),
-                Some("ja-JP"),
-                crate::FontVariant::Jis78,
-            )
-            .expect("jp78 glyph ids");
-        assert_eq!(variant_ids, vec![variant_glyph_id]);
-        assert_ne!(glyph_id, variant_glyph_id);
-
-        let run = crate::text2commands(
-            &ch.to_string(),
-            crate::FontOptions::new(&font)
-                .with_font_size(32.0)
-                .with_locale("ja-JP")
-                .with_font_variant(crate::FontVariant::Jis78),
-        )
-        .expect("jp78 glyph run");
-        assert_eq!(run.glyphs.len(), 1);
-    }
-
-    #[test]
-    #[cfg(feature = "layout")]
-    fn font_engine_public_api_supports_font_variant_selection() {
-        let Some((path, ch, glyph_id, variant_glyph_id)) =
-            first_real_variant_substitution(crate::FontVariant::Jis78)
-        else {
-            return;
-        };
-        let face = crate::FontFile::from_file(&path)
-            .expect("load font file")
-            .current_face()
-            .expect("current face");
-        let engine = face
-            .engine()
-            .with_font_size(32.0)
-            .with_locale("ja-JP")
-            .with_jis78();
-
-        assert_eq!(engine.font_variant(), crate::FontVariant::Jis78);
-
-        let run = engine.shape(&ch.to_string()).expect("shape variant glyph");
-        assert_eq!(run.glyphs.len(), 1);
-        assert_ne!(glyph_id, variant_glyph_id);
-    }
-
-    #[test]
-    #[cfg(feature = "layout")]
-    fn font_family_text2commands_uses_real_jp78_variant_when_requested() {
-        let Some((path, ch, _, _variant_glyph_id)) =
-            first_real_variant_substitution(crate::FontVariant::Jis78)
-        else {
-            return;
-        };
-        let font = crate::load_font_from_file(&path).expect("load japanese variant font");
-        let mut family = crate::FontFamily::new("JIS Variant");
-        family.add_loaded_font(font);
-
-        let run = family
-            .text2commands(
-                &ch.to_string(),
-                family
-                    .options()
+                crate::FontOptions::new(&font)
                     .with_font_size(32.0)
                     .with_locale("ja-JP")
                     .with_font_variant(crate::FontVariant::Jis78),
             )
-            .expect("family jp78 glyph run");
-        assert_eq!(run.glyphs.len(), 1);
-        assert!(run.glyphs[0].glyph.metrics.advance_x > 0.0);
-    }
+            .expect("jp78 glyph run");
+            assert_eq!(run.glyphs.len(), 1);
+        }
 
-    #[test]
-    #[cfg(feature = "layout")]
-    fn measure_uses_real_gpos_kern_pair_when_layout_enabled() {
-        let font = crate::load_font_from_file(fira_sans_regular_path()).expect("load fira sans");
-        let (left, right, total_adjustment) =
-            first_real_kern_pair(&font).expect("expected real kern pair in Fira Sans");
+        #[test]
+        #[cfg(feature = "layout")]
+        fn font_engine_public_api_supports_font_variant_selection() {
+            let Some((path, ch, glyph_id, variant_glyph_id)) =
+                first_real_variant_substitution(crate::FontVariant::Jis78)
+            else {
+                return;
+            };
+            let face = crate::FontFile::from_file(&path)
+                .expect("load font file")
+                .current_face()
+                .expect("current face");
+            let engine = face
+                .engine()
+                .with_font_size(32.0)
+                .with_locale("ja-JP")
+                .with_jis78();
 
-        let pair = format!("{left}{right}");
-        let left_width = font.measure(&left.to_string()).expect("measure left");
-        let right_width = font.measure(&right.to_string()).expect("measure right");
-        let pair_width = font.measure(&pair).expect("measure kern pair");
-        let observed_delta = pair_width - (left_width + right_width);
-        let left_run = font
-            .text2glyph_run(&left.to_string(), crate::FontOptions::new(&font))
-            .expect("shape left");
-        let right_run = font
-            .text2glyph_run(&right.to_string(), crate::FontOptions::new(&font))
-            .expect("shape right");
-        let pair_run = font
-            .text2glyph_run(&pair, crate::FontOptions::new(&font))
-            .expect("shape pair");
-        let expected_delta: f32 = pair_run
-            .glyphs
-            .iter()
-            .map(|glyph| glyph.glyph.metrics.advance_x)
-            .sum::<f32>()
-            - left_run
+            assert_eq!(engine.font_variant(), crate::FontVariant::Jis78);
+
+            let run = engine.shape(&ch.to_string()).expect("shape variant glyph");
+            assert_eq!(run.glyphs.len(), 1);
+            assert_ne!(glyph_id, variant_glyph_id);
+        }
+
+        #[test]
+        #[cfg(feature = "layout")]
+        fn font_family_text2commands_uses_real_jp78_variant_when_requested() {
+            let Some((path, ch, _, _variant_glyph_id)) =
+                first_real_variant_substitution(crate::FontVariant::Jis78)
+            else {
+                return;
+            };
+            let font = crate::load_font_from_file(&path).expect("load japanese variant font");
+            let mut family = crate::FontFamily::new("JIS Variant");
+            family.add_loaded_font(font);
+
+            let run = family
+                .text2commands(
+                    &ch.to_string(),
+                    family
+                        .options()
+                        .with_font_size(32.0)
+                        .with_locale("ja-JP")
+                        .with_font_variant(crate::FontVariant::Jis78),
+                )
+                .expect("family jp78 glyph run");
+            assert_eq!(run.glyphs.len(), 1);
+            assert!(run.glyphs[0].glyph.metrics.advance_x > 0.0);
+        }
+
+        #[test]
+        #[cfg(feature = "layout")]
+        fn measure_uses_real_gpos_kern_pair_when_layout_enabled() {
+            let font =
+                crate::load_font_from_file(fira_sans_regular_path()).expect("load fira sans");
+            let (left, right, total_adjustment) =
+                first_real_kern_pair(&font).expect("expected real kern pair in Fira Sans");
+
+            let pair = format!("{left}{right}");
+            let left_width = font.measure(&left.to_string()).expect("measure left");
+            let right_width = font.measure(&right.to_string()).expect("measure right");
+            let pair_width = font.measure(&pair).expect("measure kern pair");
+            let observed_delta = pair_width - (left_width + right_width);
+            let left_run = font
+                .text2glyph_run(&left.to_string(), crate::FontOptions::new(&font))
+                .expect("shape left");
+            let right_run = font
+                .text2glyph_run(&right.to_string(), crate::FontOptions::new(&font))
+                .expect("shape right");
+            let pair_run = font
+                .text2glyph_run(&pair, crate::FontOptions::new(&font))
+                .expect("shape pair");
+            let expected_delta: f32 = pair_run
                 .glyphs
                 .iter()
                 .map(|glyph| glyph.glyph.metrics.advance_x)
                 .sum::<f32>()
-            - right_run
+                - left_run
+                    .glyphs
+                    .iter()
+                    .map(|glyph| glyph.glyph.metrics.advance_x)
+                    .sum::<f32>()
+                - right_run
+                    .glyphs
+                    .iter()
+                    .map(|glyph| glyph.glyph.metrics.advance_x)
+                    .sum::<f32>();
+
+            assert!(
+                (observed_delta - expected_delta as f64).abs() <= 0.001,
+                "expected delta {expected_delta}, got {observed_delta} for {pair:?}",
+            );
+            assert_ne!(total_adjustment, 0);
+        }
+
+        #[test]
+        #[cfg(feature = "layout")]
+        fn glyph_run_uses_real_gpos_kern_pair_when_layout_enabled() {
+            let font =
+                crate::load_font_from_file(fira_sans_regular_path()).expect("load fira sans");
+            let (left, right, total_adjustment) =
+                first_real_kern_pair(&font).expect("expected real kern pair in Fira Sans");
+            let options = crate::FontOptions::new(&font).with_font_size(32.0);
+            let pair = format!("{left}{right}");
+
+            let left_run =
+                crate::text2commands(&left.to_string(), options.clone()).expect("left glyph run");
+            let right_run =
+                crate::text2commands(&right.to_string(), options.clone()).expect("right glyph run");
+            let pair_run = crate::text2commands(&pair, options.clone()).expect("pair glyph run");
+
+            assert_eq!(pair_run.glyphs.len(), 2);
+            let sum_single = left_run.glyphs[0].glyph.metrics.advance_x
+                + right_run.glyphs[0].glyph.metrics.advance_x;
+            let sum_pair = pair_run
                 .glyphs
                 .iter()
                 .map(|glyph| glyph.glyph.metrics.advance_x)
                 .sum::<f32>();
+            let hhea = font.font().hhea.as_ref().expect("hhea");
+            let default_line_height =
+                (hhea.get_accender() - hhea.get_descender() + hhea.get_line_gap()) as f32;
+            let scale_x = options.font_size / default_line_height.max(1.0);
+            let expected_delta = total_adjustment as f32 * scale_x;
+            let observed_delta = sum_pair - sum_single;
 
-        assert!(
-            (observed_delta - expected_delta as f64).abs() <= 0.001,
-            "expected delta {expected_delta}, got {observed_delta} for {pair:?}",
-        );
-        assert_ne!(total_adjustment, 0);
-    }
-
-    #[test]
-    #[cfg(feature = "layout")]
-    fn glyph_run_uses_real_gpos_kern_pair_when_layout_enabled() {
-        let font = crate::load_font_from_file(fira_sans_regular_path()).expect("load fira sans");
-        let (left, right, total_adjustment) =
-            first_real_kern_pair(&font).expect("expected real kern pair in Fira Sans");
-        let options = crate::FontOptions::new(&font).with_font_size(32.0);
-        let pair = format!("{left}{right}");
-
-        let left_run =
-            crate::text2commands(&left.to_string(), options.clone()).expect("left glyph run");
-        let right_run =
-            crate::text2commands(&right.to_string(), options.clone()).expect("right glyph run");
-        let pair_run = crate::text2commands(&pair, options.clone()).expect("pair glyph run");
-
-        assert_eq!(pair_run.glyphs.len(), 2);
-        let sum_single = left_run.glyphs[0].glyph.metrics.advance_x
-            + right_run.glyphs[0].glyph.metrics.advance_x;
-        let sum_pair = pair_run
-            .glyphs
-            .iter()
-            .map(|glyph| glyph.glyph.metrics.advance_x)
-            .sum::<f32>();
-        let hhea = font.font().hhea.as_ref().expect("hhea");
-        let default_line_height =
-            (hhea.get_accender() - hhea.get_descender() + hhea.get_line_gap()) as f32;
-        let scale_x = options.font_size / default_line_height.max(1.0);
-        let expected_delta = total_adjustment as f32 * scale_x;
-        let observed_delta = sum_pair - sum_single;
-
-        assert!(
-            (observed_delta - expected_delta).abs() <= 0.25,
-            "expected scaled delta {expected_delta}, got {observed_delta} for {pair:?}",
-        );
-        if expected_delta < 0.0 {
-            assert!(sum_pair < sum_single);
-        } else {
-            assert!(sum_pair > sum_single);
+            assert!(
+                (observed_delta - expected_delta).abs() <= 0.25,
+                "expected scaled delta {expected_delta}, got {observed_delta} for {pair:?}",
+            );
+            if expected_delta < 0.0 {
+                assert!(sum_pair < sum_single);
+            } else {
+                assert!(sum_pair > sum_single);
+            }
         }
-    }
 
-    #[test]
-    #[cfg(feature = "layout")]
-    fn lookup_liga_sequence_uses_real_font_data() {
-        let path = japanese_font_path();
-        let font = crate::fontload_file(&path).expect("load japanese font");
-        let gsub = font.font().gsub.as_ref().expect("gsub");
-        let cmap = font.font().cmap.as_ref().expect("cmap");
-        let candidates = [
-            vec!['f', 'i'],
-            vec!['f', 'l'],
-            vec!['f', 'f'],
-            vec!['T', 'o'],
-        ];
+        #[test]
+        #[cfg(feature = "layout")]
+        fn lookup_liga_sequence_uses_real_font_data() {
+            let path = japanese_font_path();
+            let font = crate::fontload_file(&path).expect("load japanese font");
+            let gsub = font.font().gsub.as_ref().expect("gsub");
+            let cmap = font.font().cmap.as_ref().expect("cmap");
+            let candidates = [
+                vec!['f', 'i'],
+                vec!['f', 'l'],
+                vec!['f', 'f'],
+                vec!['T', 'o'],
+            ];
 
-        for candidate in candidates.iter() {
-            let glyph_ids: Vec<usize> = candidate
-                .iter()
-                .map(|ch| cmap.get_glyph_position(*ch as u32) as usize)
-                .collect();
-            if glyph_ids.iter().any(|glyph_id| *glyph_id == 0) {
-                continue;
+            for candidate in candidates.iter() {
+                let glyph_ids: Vec<usize> = candidate
+                    .iter()
+                    .map(|ch| cmap.get_glyph_position(*ch as u32) as usize)
+                    .collect();
+                if glyph_ids.iter().any(|glyph_id| *glyph_id == 0) {
+                    continue;
+                }
+
+                if let Some(ligature_glyph) = gsub.lookup_liga_sequence(&glyph_ids) {
+                    assert_ne!(ligature_glyph, glyph_ids[0]);
+                    return;
+                }
             }
 
-            if let Some(ligature_glyph) = gsub.lookup_liga_sequence(&glyph_ids) {
-                assert_ne!(ligature_glyph, glyph_ids[0]);
+            panic!("expected at least one ligature sequence in real font data");
+        }
+
+        #[test]
+        #[cfg(feature = "layout")]
+        fn text2command_uses_real_ligature_glyph_when_layout_enabled() {
+            let font =
+                crate::load_font_from_file(fira_sans_regular_path()).expect("load fira sans");
+            let cmap = font.font().cmap.as_ref().expect("cmap");
+            let gsub = font.font().gsub.as_ref().expect("gsub");
+            let glyph_ids = [
+                cmap.get_glyph_position('f' as u32) as usize,
+                cmap.get_glyph_position('i' as u32) as usize,
+            ];
+            let ligature_glyph = gsub
+                .lookup_liga_sequence(&glyph_ids)
+                .expect("expected fi ligature in Fira Sans");
+
+            let commands = font.font().text2command("fi").expect("text2command");
+
+            assert_eq!(commands.len(), 1);
+            assert_eq!(commands[0].glyph_id, ligature_glyph);
+            assert!(!commands[0].commands.is_empty());
+        }
+
+        #[test]
+        #[cfg(feature = "layout")]
+        fn glyph_run_uses_real_ligature_glyph_when_layout_enabled() {
+            let font =
+                crate::load_font_from_file(fira_sans_regular_path()).expect("load fira sans");
+            let run =
+                crate::text2commands("fi", crate::FontOptions::new(&font).with_font_size(32.0))
+                    .expect("glyph run");
+
+            assert_eq!(run.glyphs.len(), 1);
+            assert!(run.glyphs[0].glyph.metrics.advance_x > 0.0);
+            match run.glyphs[0].glyph.layers.first() {
+                Some(crate::GlyphLayer::Path(path)) => assert!(!path.commands.is_empty()),
+                Some(crate::GlyphLayer::Raster(_)) => panic!("expected outline ligature glyph"),
+                #[cfg(feature = "svg-fonts")]
+                Some(crate::GlyphLayer::Svg(_)) => panic!("expected outline ligature glyph"),
+                None => panic!("expected ligature layer"),
+            }
+        }
+
+        #[test]
+        #[cfg(feature = "layout")]
+        fn vertical_lookup_uses_real_font_data() {
+            let font = crate::fontload_file(japanese_font_path()).expect("load japanese font");
+            let (ch, horizontal, vertical) = first_real_vertical_substitution(&font)
+                .expect("expected at least one vertical substitution");
+            assert_ne!(horizontal, vertical, "vertical form should differ for {ch}");
+        }
+
+        #[test]
+        #[cfg(feature = "layout")]
+        fn glyph_run_uses_vertical_flow_and_positions_glyphs_vertically() {
+            let font =
+                crate::load_font_from_file(japanese_font_path()).expect("load japanese font");
+            let (ch, horizontal, vertical) =
+                first_real_vertical_substitution(&font).expect("expected vertical substitution");
+            let text = format!("{ch}{ch}");
+            let options = crate::FontOptions::new(&font)
+                .with_font_size(32.0)
+                .with_vertical_flow();
+            let run = crate::text2commands(&text, options).expect("vertical glyph run");
+
+            assert_eq!(run.glyphs.len(), 2);
+            let first_font = run.glyphs[0].glyph.font.expect("font metrics");
+            assert_eq!(first_font.flow, crate::GlyphFlow::Vertical);
+            assert!(run.glyphs[0].glyph.metrics.advance_y > 0.0);
+            assert_ne!(horizontal, vertical);
+            assert!(run.glyphs[1].y > run.glyphs[0].y);
+        }
+
+        #[test]
+        #[cfg(feature = "layout")]
+        fn font_engine_public_api_supports_vertical_svg_output() {
+            let face = crate::FontFile::from_file(japanese_font_path())
+                .expect("load font file")
+                .current_face()
+                .expect("current face");
+            let (ch, _, _) =
+                first_real_vertical_substitution(&face).expect("expected vertical substitution");
+            let text = format!("{ch}{ch}");
+            let engine = face.engine().with_font_size(32.0).with_vertical_flow();
+
+            assert_eq!(engine.shaping_policy(), crate::ShapingPolicy::TopToBottom);
+            let run = engine.shape(&text).expect("vertical shape");
+            assert_eq!(run.glyphs.len(), 2);
+            assert!(run.glyphs[1].y > run.glyphs[0].y);
+
+            let svg = engine
+                .render_svg_vertical(&text)
+                .expect("render vertical svg via public api");
+            assert!(svg.contains("<svg"));
+        }
+
+        #[test]
+        #[cfg(feature = "layout")]
+        fn measure_with_vertical_flow_reports_positive_inline_extent() {
+            let font =
+                crate::load_font_from_file(japanese_font_path()).expect("load japanese font");
+            let (ch, _, _) =
+                first_real_vertical_substitution(&font).expect("expected vertical substitution");
+            let text = format!("{ch}{ch}");
+            let options = crate::FontOptions::new(&font)
+                .with_font_size(32.0)
+                .with_vertical_flow();
+            let run = crate::text2commands(&text, options.clone()).expect("vertical glyph run");
+            let measure = font
+                .measure_with_options(&text, options.clone())
+                .expect("measure vertical flow");
+
+            assert!(measure > 0.0);
+            let expected_min =
+                run.glyphs[1].y as f64 + run.glyphs[1].glyph.metrics.advance_y as f64;
+            assert!(measure >= expected_min - 1.0);
+        }
+
+        #[test]
+        fn glyph_run_positions_hebrew_text_right_to_left() {
+            let font = crate::load_font_from_file(rtl_font_path()).expect("load rtl font");
+            let text = "אבג";
+            let cmap = font.font().cmap.as_ref().expect("cmap");
+            for ch in text.chars() {
+                assert_ne!(
+                    cmap.get_glyph_position(ch as u32),
+                    0,
+                    "missing glyph for {ch}"
+                );
+            }
+
+            let ltr_options = crate::FontOptions::new(&font).with_font_size(32.0);
+            let rtl_options = crate::FontOptions::new(&font)
+                .with_font_size(32.0)
+                .with_right_to_left();
+            let ltr_run = crate::text2commands(text, ltr_options.clone()).expect("ltr glyph run");
+            let rtl_run = crate::text2commands(text, rtl_options.clone()).expect("rtl glyph run");
+
+            assert_eq!(rtl_run.glyphs.len(), 3);
+            assert_eq!(
+                rtl_run.glyphs[0].glyph.font.expect("font metrics").flow,
+                crate::GlyphFlow::Horizontal
+            );
+            assert!(rtl_run.glyphs[0].x > rtl_run.glyphs[1].x);
+            assert!(rtl_run.glyphs[1].x > rtl_run.glyphs[2].x);
+
+            let ltr_measure = font
+                .measure_with_options(text, ltr_options.clone())
+                .expect("measure ltr");
+            let rtl_measure = font
+                .measure_with_options(text, rtl_options.clone())
+                .expect("measure rtl");
+            assert!(rtl_measure > 0.0);
+            assert!((ltr_measure - rtl_measure).abs() <= 1.0);
+            assert!(ltr_run.glyphs[0].x < ltr_run.glyphs[1].x);
+        }
+
+        #[test]
+        #[cfg(feature = "layout")]
+        fn rtl_shaping_uses_real_arabic_joining_forms() {
+            let font = crate::load_font_from_file(rtl_font_path()).expect("load rtl font");
+            let (text, expected_glyph_ids) =
+                first_real_arabic_joining_pair(&font).expect("expected arabic joining pair");
+
+            let glyph_ids = font
+                .font()
+                .debug_shape_glyph_ids_with_direction(&text, Some("ar"), true)
+                .expect("shape rtl glyph ids");
+            assert_eq!(glyph_ids, expected_glyph_ids);
+
+            let run = crate::text2commands(
+                &text,
+                crate::FontOptions::new(&font)
+                    .with_font_size(32.0)
+                    .with_locale("ar")
+                    .with_right_to_left(),
+            )
+            .expect("rtl arabic glyph run");
+            assert_eq!(run.glyphs.len(), expected_glyph_ids.len());
+            assert!(run.glyphs[0].x > run.glyphs[1].x);
+        }
+
+        #[test]
+        #[cfg(feature = "layout")]
+        fn font_family_text2commands_uses_real_arabic_joining_forms() {
+            let font = crate::load_font_from_file(rtl_font_path()).expect("load rtl font");
+            let (text, expected_glyph_ids) =
+                first_real_arabic_joining_pair(&font).expect("expected arabic joining pair");
+            let mut family = crate::FontFamily::new("Arial");
+            family.add_loaded_font(font);
+
+            let run = family
+                .text2commands(
+                    &text,
+                    family
+                        .options()
+                        .with_font_size(32.0)
+                        .with_locale("ar")
+                        .with_right_to_left(),
+                )
+                .expect("family rtl arabic glyph run");
+            assert_eq!(run.glyphs.len(), expected_glyph_ids.len());
+            assert!(run.glyphs[0].x > run.glyphs[1].x);
+        }
+
+        #[test]
+        #[cfg(feature = "layout")]
+        fn rtl_shaping_uses_real_arabic_required_ligature() {
+            let font = crate::load_font_from_file(rtl_font_path()).expect("load rtl font");
+            let (text, expected_ligature) =
+                first_real_arabic_rlig_sequence(&font).expect("expected arabic required ligature");
+
+            let glyph_ids = font
+                .font()
+                .debug_shape_glyph_ids_with_direction(&text, Some("ar"), true)
+                .expect("shape rtl glyph ids");
+            assert_eq!(glyph_ids, vec![expected_ligature]);
+
+            let run = crate::text2commands(
+                &text,
+                crate::FontOptions::new(&font)
+                    .with_font_size(32.0)
+                    .with_locale("ar")
+                    .with_right_to_left(),
+            )
+            .expect("rtl arabic ligature glyph run");
+            assert_eq!(run.glyphs.len(), 1);
+        }
+
+        #[test]
+        #[cfg(feature = "layout")]
+        fn font_family_text2commands_uses_real_arabic_required_ligature() {
+            let font = crate::load_font_from_file(rtl_font_path()).expect("load rtl font");
+            let (text, expected_ligature) =
+                first_real_arabic_rlig_sequence(&font).expect("expected arabic required ligature");
+            let mut family = crate::FontFamily::new("Arial");
+            family.add_loaded_font(font);
+
+            let run = family
+                .text2commands(
+                    &text,
+                    family
+                        .options()
+                        .with_font_size(32.0)
+                        .with_locale("ar")
+                        .with_right_to_left(),
+                )
+                .expect("family rtl arabic ligature glyph run");
+            assert_eq!(run.glyphs.len(), 1);
+
+            let glyph_ids = family
+                .resolve_loaded_font(
+                    Some("Arial"),
+                    None,
+                    crate::FontWeight::default(),
+                    crate::FontStyle::default(),
+                    crate::FontStretch::default(),
+                )
+                .expect("resolved family font")
+                .font()
+                .debug_shape_glyph_ids_with_direction(&text, Some("ar"), true)
+                .expect("shape rtl glyph ids");
+            assert_eq!(glyph_ids, vec![expected_ligature]);
+        }
+
+        #[test]
+        #[cfg(feature = "layout")]
+        fn rtl_shaping_uses_real_arabic_contextual_sequence() {
+            let Some((path, text, expected_glyph_ids)) = first_real_arabic_contextual_sequence()
+            else {
                 return;
-            }
+            };
+            let font = crate::load_font_from_file(&path).expect("load rtl contextual font");
+
+            let glyph_ids = font
+                .font()
+                .debug_shape_glyph_ids_with_direction(&text, Some("ar"), true)
+                .expect("shape rtl contextual glyph ids");
+            assert_eq!(glyph_ids, expected_glyph_ids);
+
+            let run = crate::text2commands(
+                &text,
+                crate::FontOptions::new(&font)
+                    .with_font_size(32.0)
+                    .with_locale("ar")
+                    .with_right_to_left(),
+            )
+            .expect("rtl arabic contextual glyph run");
+            assert_eq!(run.glyphs.len(), expected_glyph_ids.len());
         }
 
-        panic!("expected at least one ligature sequence in real font data");
-    }
+        #[test]
+        #[cfg(feature = "layout")]
+        fn font_family_text2commands_uses_real_arabic_contextual_sequence() {
+            let Some((path, text, expected_glyph_ids)) = first_real_arabic_contextual_sequence()
+            else {
+                return;
+            };
+            let font = crate::load_font_from_file(&path).expect("load rtl contextual font");
+            let mut family = crate::FontFamily::new("RTL Contextual");
+            family.add_loaded_font(font);
 
-    #[test]
-    #[cfg(feature = "layout")]
-    fn text2command_uses_real_ligature_glyph_when_layout_enabled() {
-        let font = crate::load_font_from_file(fira_sans_regular_path()).expect("load fira sans");
-        let cmap = font.font().cmap.as_ref().expect("cmap");
-        let gsub = font.font().gsub.as_ref().expect("gsub");
-        let glyph_ids = [
-            cmap.get_glyph_position('f' as u32) as usize,
-            cmap.get_glyph_position('i' as u32) as usize,
-        ];
-        let ligature_glyph = gsub
-            .lookup_liga_sequence(&glyph_ids)
-            .expect("expected fi ligature in Fira Sans");
+            let run = family
+                .text2commands(
+                    &text,
+                    family
+                        .options()
+                        .with_font_size(32.0)
+                        .with_locale("ar")
+                        .with_right_to_left(),
+                )
+                .expect("family rtl arabic contextual glyph run");
+            assert_eq!(run.glyphs.len(), expected_glyph_ids.len());
 
-        let commands = font.font().text2command("fi").expect("text2command");
-
-        assert_eq!(commands.len(), 1);
-        assert_eq!(commands[0].glyph_id, ligature_glyph);
-        assert!(!commands[0].commands.is_empty());
-    }
-
-    #[test]
-    #[cfg(feature = "layout")]
-    fn glyph_run_uses_real_ligature_glyph_when_layout_enabled() {
-        let font = crate::load_font_from_file(fira_sans_regular_path()).expect("load fira sans");
-        let run = crate::text2commands("fi", crate::FontOptions::new(&font).with_font_size(32.0))
-            .expect("glyph run");
-
-        assert_eq!(run.glyphs.len(), 1);
-        assert!(run.glyphs[0].glyph.metrics.advance_x > 0.0);
-        match run.glyphs[0].glyph.layers.first() {
-            Some(crate::GlyphLayer::Path(path)) => assert!(!path.commands.is_empty()),
-            Some(crate::GlyphLayer::Raster(_)) => panic!("expected outline ligature glyph"),
-            #[cfg(feature = "svg-fonts")]
-            Some(crate::GlyphLayer::Svg(_)) => panic!("expected outline ligature glyph"),
-            None => panic!("expected ligature layer"),
+            let glyph_ids = family
+                .resolve_loaded_font(
+                    Some("RTL Contextual"),
+                    None,
+                    crate::FontWeight::default(),
+                    crate::FontStyle::default(),
+                    crate::FontStretch::default(),
+                )
+                .expect("resolved family font")
+                .font()
+                .debug_shape_glyph_ids_with_direction(&text, Some("ar"), true)
+                .expect("shape rtl contextual glyph ids");
+            assert_eq!(glyph_ids, expected_glyph_ids);
         }
-    }
 
-    #[test]
-    #[cfg(feature = "layout")]
-    fn vertical_lookup_uses_real_font_data() {
-        let font = crate::fontload_file(japanese_font_path()).expect("load japanese font");
-        let (ch, horizontal, vertical) = first_real_vertical_substitution(&font)
-            .expect("expected at least one vertical substitution");
-        assert_ne!(horizontal, vertical, "vertical form should differ for {ch}");
-    }
+        #[test]
+        #[cfg(feature = "layout")]
+        fn font_family_fallback_keeps_real_arabic_contextual_run_on_secondary_face() {
+            let Some((path, text, _)) = first_real_arabic_contextual_sequence() else {
+                return;
+            };
+            let regular = crate::load_font_from_file(fira_sans_regular_path())
+                .expect("load regular fira sans");
+            let arabic = crate::load_font_from_file(&path).expect("load arabic contextual font");
 
-    #[test]
-    #[cfg(feature = "layout")]
-    fn glyph_run_uses_vertical_flow_and_positions_glyphs_vertically() {
-        let font = crate::load_font_from_file(japanese_font_path()).expect("load japanese font");
-        let (ch, horizontal, vertical) =
-            first_real_vertical_substitution(&font).expect("expected vertical substitution");
-        let text = format!("{ch}{ch}");
-        let options = crate::FontOptions::new(&font)
-            .with_font_size(32.0)
-            .with_vertical_flow();
-        let run = crate::text2commands(&text, options).expect("vertical glyph run");
+            let mut family = crate::FontFamily::new("Fira Sans");
+            family.add_loaded_font(regular);
+            family.add_loaded_font(arabic);
 
-        assert_eq!(run.glyphs.len(), 2);
-        let first_font = run.glyphs[0].glyph.font.expect("font metrics");
-        assert_eq!(first_font.flow, crate::GlyphFlow::Vertical);
-        assert!(run.glyphs[0].glyph.metrics.advance_y > 0.0);
-        assert_ne!(horizontal, vertical);
-        assert!(run.glyphs[1].y > run.glyphs[0].y);
-    }
+            let text = format!("A{text}B");
+            let face_indices = family
+                .debug_face_indices_for_text(
+                    &text,
+                    family
+                        .options()
+                        .with_font_size(32.0)
+                        .with_locale("ar")
+                        .with_right_to_left(),
+                )
+                .expect("resolve fallback face indices");
 
-    #[test]
-    #[cfg(feature = "layout")]
-    fn font_engine_public_api_supports_vertical_svg_output() {
-        let face = crate::FontFile::from_file(japanese_font_path())
-            .expect("load font file")
-            .current_face()
-            .expect("current face");
-        let (ch, _, _) =
-            first_real_vertical_substitution(&face).expect("expected vertical substitution");
-        let text = format!("{ch}{ch}");
-        let engine = face.engine().with_font_size(32.0).with_vertical_flow();
+            assert_eq!(face_indices.first(), Some(&0));
+            assert_eq!(face_indices.last(), Some(&0));
+            assert!(face_indices[1..face_indices.len() - 1]
+                .iter()
+                .all(|face_index| *face_index == 1));
+        }
 
-        assert_eq!(engine.shaping_policy(), crate::ShapingPolicy::TopToBottom);
-        let run = engine.shape(&text).expect("vertical shape");
-        assert_eq!(run.glyphs.len(), 2);
-        assert!(run.glyphs[1].y > run.glyphs[0].y);
+        #[test]
+        #[cfg(feature = "layout")]
+        fn font_family_fallback_keeps_real_arabic_mark_cluster_on_secondary_face() {
+            let regular = crate::load_font_from_file(fira_sans_regular_path())
+                .expect("load regular fira sans");
+            let arabic = crate::load_font_from_file(rtl_font_path()).expect("load arabic font");
+            let cluster = first_real_mark_cluster(&arabic, 0x0621..=0x064A, 0x0610..=0x065F)
+                .expect("expected arabic mark cluster");
 
-        let svg = engine
-            .render_svg_vertical(&text)
-            .expect("render vertical svg via public api");
-        assert!(svg.contains("<svg"));
-    }
+            let mut family = crate::FontFamily::new("Fira Sans");
+            family.add_loaded_font(regular);
+            family.add_loaded_font(arabic);
 
-    #[test]
-    #[cfg(feature = "layout")]
-    fn measure_with_vertical_flow_reports_positive_inline_extent() {
-        let font = crate::load_font_from_file(japanese_font_path()).expect("load japanese font");
-        let (ch, _, _) =
-            first_real_vertical_substitution(&font).expect("expected vertical substitution");
-        let text = format!("{ch}{ch}");
-        let options = crate::FontOptions::new(&font)
-            .with_font_size(32.0)
-            .with_vertical_flow();
-        let run = crate::text2commands(&text, options.clone()).expect("vertical glyph run");
-        let measure = font
-            .measure_with_options(&text, options.clone())
-            .expect("measure vertical flow");
+            let text = format!("A{cluster}B");
+            let face_indices = family
+                .debug_face_indices_for_text(
+                    &text,
+                    family
+                        .options()
+                        .with_font_size(32.0)
+                        .with_locale("ar")
+                        .with_right_to_left(),
+                )
+                .expect("resolve arabic mark fallback face indices");
 
-        assert!(measure > 0.0);
-        let expected_min = run.glyphs[1].y as f64 + run.glyphs[1].glyph.metrics.advance_y as f64;
-        assert!(measure >= expected_min - 1.0);
-    }
+            assert_eq!(face_indices, vec![0, 1, 0]);
+        }
 
-    #[test]
-    fn glyph_run_positions_hebrew_text_right_to_left() {
-        let font = crate::load_font_from_file(rtl_font_path()).expect("load rtl font");
-        let text = "אבג";
-        let cmap = font.font().cmap.as_ref().expect("cmap");
-        for ch in text.chars() {
-            assert_ne!(
-                cmap.get_glyph_position(ch as u32),
-                0,
-                "missing glyph for {ch}"
+        #[test]
+        #[cfg(feature = "layout")]
+        fn font_family_fallback_keeps_real_syriac_mark_cluster_on_secondary_face() {
+            let regular = crate::load_font_from_file(fira_sans_regular_path())
+                .expect("load regular fira sans");
+            let syriac = crate::load_font_from_file(syriac_font_path()).expect("load syriac font");
+            let cluster =
+                first_real_mark_attachment_cluster(&syriac, 0x0710..=0x072C, 0x0730..=0x074A)
+                    .expect("expected syriac mark attachment cluster");
+
+            let mut family = crate::FontFamily::new("Fira Sans");
+            family.add_loaded_font(regular);
+            family.add_loaded_font(syriac);
+
+            let text = format!("A{cluster}B");
+            let face_indices = family
+                .debug_face_indices_for_text(
+                    &text,
+                    family
+                        .options()
+                        .with_font_size(32.0)
+                        .with_locale("syr-Syrc")
+                        .with_right_to_left(),
+                )
+                .expect("resolve syriac mark fallback face indices");
+
+            assert_eq!(face_indices, vec![0, 1, 0]);
+        }
+
+        #[test]
+        #[cfg(feature = "layout")]
+        fn rtl_shaping_applies_real_gpos_mark_to_base_attachment() {
+            let font = crate::load_font_from_file(syriac_font_path()).expect("load syriac font");
+            let Some((text, attachment)) = first_real_gpos_mark_to_base_cluster(
+                &font,
+                "syr-Syrc",
+                0x0710..=0x072C,
+                0x0730..=0x074A,
+            ) else {
+                return;
+            };
+
+            let options = crate::FontOptions::new(&font)
+                .with_font_size(32.0)
+                .with_locale("syr-Syrc")
+                .with_right_to_left();
+            let run = crate::text2commands(&text, options.clone()).expect("syriac mark glyph run");
+            assert_eq!(run.glyphs.len(), 2);
+
+            let base_char = text.chars().next().expect("base char");
+            let base_glyph_id = font
+                .font()
+                .cmap
+                .as_ref()
+                .expect("cmap")
+                .get_glyph_position(base_char as u32) as usize;
+            let base_layout = font
+                .font()
+                .get_layout_with_options(base_glyph_id, false, &options);
+            let scale = match base_layout {
+                crate::fontreader::FontLayout::Horizontal(ref layout)
+                    if layout.advance_width != 0 =>
+                {
+                    run.glyphs[0].glyph.metrics.advance_x / layout.advance_width as f32
+                }
+                _ => 1.0,
+            };
+            let expected_dx = attachment.x_placement as f32 * scale;
+            let expected_dy = -(attachment.y_placement as f32) * scale;
+
+            let actual_dx = run.glyphs[1].x - run.glyphs[0].x;
+            let actual_dy = run.glyphs[1].y - run.glyphs[0].y;
+            assert!((actual_dx - expected_dx).abs() <= 1.0);
+            assert!((actual_dy - expected_dy).abs() <= 1.0);
+            assert_eq!(run.glyphs[1].glyph.metrics.advance_x, 0.0);
+            assert_eq!(run.glyphs[1].glyph.metrics.advance_y, 0.0);
+        }
+
+        #[test]
+        #[cfg(feature = "layout")]
+        fn rtl_shaping_applies_real_gpos_mark_to_mark_attachment() {
+            let font = crate::load_font_from_file(syriac_font_path()).expect("load syriac font");
+            let Some((text, base_attachment, mark_attachment)) = first_real_gpos_mark_stack_cluster(
+                &font,
+                "syr-Syrc",
+                0x0710..=0x072C,
+                0x0730..=0x074A,
+            ) else {
+                return;
+            };
+
+            let options = crate::FontOptions::new(&font)
+                .with_font_size(32.0)
+                .with_locale("syr-Syrc")
+                .with_right_to_left();
+            let run = crate::text2commands(&text, options.clone()).expect("syriac stacked marks");
+            assert_eq!(run.glyphs.len(), 3);
+
+            let base_char = text.chars().next().expect("base char");
+            let base_glyph_id = font
+                .font()
+                .cmap
+                .as_ref()
+                .expect("cmap")
+                .get_glyph_position(base_char as u32) as usize;
+            let base_layout = font
+                .font()
+                .get_layout_with_options(base_glyph_id, false, &options);
+            let scale = match base_layout {
+                crate::fontreader::FontLayout::Horizontal(ref layout)
+                    if layout.advance_width != 0 =>
+                {
+                    run.glyphs[0].glyph.metrics.advance_x / layout.advance_width as f32
+                }
+                _ => 1.0,
+            };
+
+            let first_mark_dx = run.glyphs[1].x - run.glyphs[0].x;
+            let first_mark_dy = run.glyphs[1].y - run.glyphs[0].y;
+            assert!((first_mark_dx - base_attachment.x_placement as f32 * scale).abs() <= 1.0);
+            assert!((first_mark_dy + base_attachment.y_placement as f32 * scale).abs() <= 1.0);
+
+            let second_mark_dx = run.glyphs[2].x - run.glyphs[1].x;
+            let second_mark_dy = run.glyphs[2].y - run.glyphs[1].y;
+            assert!((second_mark_dx - mark_attachment.x_placement as f32 * scale).abs() <= 1.0);
+            assert!((second_mark_dy + mark_attachment.y_placement as f32 * scale).abs() <= 1.0);
+            assert_eq!(run.glyphs[1].glyph.metrics.advance_x, 0.0);
+            assert_eq!(run.glyphs[2].glyph.metrics.advance_x, 0.0);
+        }
+
+        #[test]
+        #[cfg(feature = "layout")]
+        fn font_family_fallback_checks_arabic_mark_boundaries_across_real_fonts() {
+            let successes = count_mark_boundary_successes(
+                &arabic_boundary_font_paths(),
+                "ar",
+                true,
+                detect_arabic_mark_cluster,
+            );
+            assert!(
+                successes >= 1,
+                "expected at least one Arabic mark font to pass boundary checks"
             );
         }
 
-        let ltr_options = crate::FontOptions::new(&font).with_font_size(32.0);
-        let rtl_options = crate::FontOptions::new(&font)
-            .with_font_size(32.0)
-            .with_right_to_left();
-        let ltr_run = crate::text2commands(text, ltr_options.clone()).expect("ltr glyph run");
-        let rtl_run = crate::text2commands(text, rtl_options.clone()).expect("rtl glyph run");
-
-        assert_eq!(rtl_run.glyphs.len(), 3);
-        assert_eq!(
-            rtl_run.glyphs[0].glyph.font.expect("font metrics").flow,
-            crate::GlyphFlow::Horizontal
-        );
-        assert!(rtl_run.glyphs[0].x > rtl_run.glyphs[1].x);
-        assert!(rtl_run.glyphs[1].x > rtl_run.glyphs[2].x);
-
-        let ltr_measure = font
-            .measure_with_options(text, ltr_options.clone())
-            .expect("measure ltr");
-        let rtl_measure = font
-            .measure_with_options(text, rtl_options.clone())
-            .expect("measure rtl");
-        assert!(rtl_measure > 0.0);
-        assert!((ltr_measure - rtl_measure).abs() <= 1.0);
-        assert!(ltr_run.glyphs[0].x < ltr_run.glyphs[1].x);
-    }
-
-    #[test]
-    #[cfg(feature = "layout")]
-    fn rtl_shaping_uses_real_arabic_joining_forms() {
-        let font = crate::load_font_from_file(rtl_font_path()).expect("load rtl font");
-        let (text, expected_glyph_ids) =
-            first_real_arabic_joining_pair(&font).expect("expected arabic joining pair");
-
-        let glyph_ids = font
-            .font()
-            .debug_shape_glyph_ids_with_direction(&text, Some("ar"), true)
-            .expect("shape rtl glyph ids");
-        assert_eq!(glyph_ids, expected_glyph_ids);
-
-        let run = crate::text2commands(
-            &text,
-            crate::FontOptions::new(&font)
-                .with_font_size(32.0)
-                .with_locale("ar")
-                .with_right_to_left(),
-        )
-        .expect("rtl arabic glyph run");
-        assert_eq!(run.glyphs.len(), expected_glyph_ids.len());
-        assert!(run.glyphs[0].x > run.glyphs[1].x);
-    }
-
-    #[test]
-    #[cfg(feature = "layout")]
-    fn font_family_text2commands_uses_real_arabic_joining_forms() {
-        let font = crate::load_font_from_file(rtl_font_path()).expect("load rtl font");
-        let (text, expected_glyph_ids) =
-            first_real_arabic_joining_pair(&font).expect("expected arabic joining pair");
-        let mut family = crate::FontFamily::new("Arial");
-        family.add_loaded_font(font);
-
-        let run = family
-            .text2commands(
-                &text,
-                family
-                    .options()
-                    .with_font_size(32.0)
-                    .with_locale("ar")
-                    .with_right_to_left(),
-            )
-            .expect("family rtl arabic glyph run");
-        assert_eq!(run.glyphs.len(), expected_glyph_ids.len());
-        assert!(run.glyphs[0].x > run.glyphs[1].x);
-    }
-
-    #[test]
-    #[cfg(feature = "layout")]
-    fn rtl_shaping_uses_real_arabic_required_ligature() {
-        let font = crate::load_font_from_file(rtl_font_path()).expect("load rtl font");
-        let (text, expected_ligature) =
-            first_real_arabic_rlig_sequence(&font).expect("expected arabic required ligature");
-
-        let glyph_ids = font
-            .font()
-            .debug_shape_glyph_ids_with_direction(&text, Some("ar"), true)
-            .expect("shape rtl glyph ids");
-        assert_eq!(glyph_ids, vec![expected_ligature]);
-
-        let run = crate::text2commands(
-            &text,
-            crate::FontOptions::new(&font)
-                .with_font_size(32.0)
-                .with_locale("ar")
-                .with_right_to_left(),
-        )
-        .expect("rtl arabic ligature glyph run");
-        assert_eq!(run.glyphs.len(), 1);
-    }
-
-    #[test]
-    #[cfg(feature = "layout")]
-    fn font_family_text2commands_uses_real_arabic_required_ligature() {
-        let font = crate::load_font_from_file(rtl_font_path()).expect("load rtl font");
-        let (text, expected_ligature) =
-            first_real_arabic_rlig_sequence(&font).expect("expected arabic required ligature");
-        let mut family = crate::FontFamily::new("Arial");
-        family.add_loaded_font(font);
-
-        let run = family
-            .text2commands(
-                &text,
-                family
-                    .options()
-                    .with_font_size(32.0)
-                    .with_locale("ar")
-                    .with_right_to_left(),
-            )
-            .expect("family rtl arabic ligature glyph run");
-        assert_eq!(run.glyphs.len(), 1);
-
-        let glyph_ids = family
-            .resolve_loaded_font(
-                Some("Arial"),
-                None,
-                crate::FontWeight::default(),
-                crate::FontStyle::default(),
-                crate::FontStretch::default(),
-            )
-            .expect("resolved family font")
-            .font()
-            .debug_shape_glyph_ids_with_direction(&text, Some("ar"), true)
-            .expect("shape rtl glyph ids");
-        assert_eq!(glyph_ids, vec![expected_ligature]);
-    }
-
-    #[test]
-    #[cfg(feature = "layout")]
-    fn rtl_shaping_uses_real_arabic_contextual_sequence() {
-        let Some((path, text, expected_glyph_ids)) = first_real_arabic_contextual_sequence() else {
-            return;
-        };
-        let font = crate::load_font_from_file(&path).expect("load rtl contextual font");
-
-        let glyph_ids = font
-            .font()
-            .debug_shape_glyph_ids_with_direction(&text, Some("ar"), true)
-            .expect("shape rtl contextual glyph ids");
-        assert_eq!(glyph_ids, expected_glyph_ids);
-
-        let run = crate::text2commands(
-            &text,
-            crate::FontOptions::new(&font)
-                .with_font_size(32.0)
-                .with_locale("ar")
-                .with_right_to_left(),
-        )
-        .expect("rtl arabic contextual glyph run");
-        assert_eq!(run.glyphs.len(), expected_glyph_ids.len());
-    }
-
-    #[test]
-    #[cfg(feature = "layout")]
-    fn font_family_text2commands_uses_real_arabic_contextual_sequence() {
-        let Some((path, text, expected_glyph_ids)) = first_real_arabic_contextual_sequence() else {
-            return;
-        };
-        let font = crate::load_font_from_file(&path).expect("load rtl contextual font");
-        let mut family = crate::FontFamily::new("RTL Contextual");
-        family.add_loaded_font(font);
-
-        let run = family
-            .text2commands(
-                &text,
-                family
-                    .options()
-                    .with_font_size(32.0)
-                    .with_locale("ar")
-                    .with_right_to_left(),
-            )
-            .expect("family rtl arabic contextual glyph run");
-        assert_eq!(run.glyphs.len(), expected_glyph_ids.len());
-
-        let glyph_ids = family
-            .resolve_loaded_font(
-                Some("RTL Contextual"),
-                None,
-                crate::FontWeight::default(),
-                crate::FontStyle::default(),
-                crate::FontStretch::default(),
-            )
-            .expect("resolved family font")
-            .font()
-            .debug_shape_glyph_ids_with_direction(&text, Some("ar"), true)
-            .expect("shape rtl contextual glyph ids");
-        assert_eq!(glyph_ids, expected_glyph_ids);
-    }
-
-    #[test]
-    #[cfg(feature = "layout")]
-    fn font_family_fallback_keeps_real_arabic_contextual_run_on_secondary_face() {
-        let Some((path, text, _)) = first_real_arabic_contextual_sequence() else {
-            return;
-        };
-        let regular =
-            crate::load_font_from_file(fira_sans_regular_path()).expect("load regular fira sans");
-        let arabic = crate::load_font_from_file(&path).expect("load arabic contextual font");
-
-        let mut family = crate::FontFamily::new("Fira Sans");
-        family.add_loaded_font(regular);
-        family.add_loaded_font(arabic);
-
-        let text = format!("A{text}B");
-        let face_indices = family
-            .debug_face_indices_for_text(
-                &text,
-                family
-                    .options()
-                    .with_font_size(32.0)
-                    .with_locale("ar")
-                    .with_right_to_left(),
-            )
-            .expect("resolve fallback face indices");
-
-        assert_eq!(face_indices.first(), Some(&0));
-        assert_eq!(face_indices.last(), Some(&0));
-        assert!(face_indices[1..face_indices.len() - 1]
-            .iter()
-            .all(|face_index| *face_index == 1));
-    }
-
-    #[test]
-    #[cfg(feature = "layout")]
-    fn font_family_fallback_keeps_real_arabic_mark_cluster_on_secondary_face() {
-        let regular =
-            crate::load_font_from_file(fira_sans_regular_path()).expect("load regular fira sans");
-        let arabic = crate::load_font_from_file(rtl_font_path()).expect("load arabic font");
-        let cluster = first_real_mark_cluster(&arabic, 0x0621..=0x064A, 0x0610..=0x065F)
-            .expect("expected arabic mark cluster");
-
-        let mut family = crate::FontFamily::new("Fira Sans");
-        family.add_loaded_font(regular);
-        family.add_loaded_font(arabic);
-
-        let text = format!("A{cluster}B");
-        let face_indices = family
-            .debug_face_indices_for_text(
-                &text,
-                family
-                    .options()
-                    .with_font_size(32.0)
-                    .with_locale("ar")
-                    .with_right_to_left(),
-            )
-            .expect("resolve arabic mark fallback face indices");
-
-        assert_eq!(face_indices, vec![0, 1, 0]);
-    }
-
-    #[test]
-    #[cfg(feature = "layout")]
-    fn font_family_fallback_keeps_real_syriac_mark_cluster_on_secondary_face() {
-        let regular =
-            crate::load_font_from_file(fira_sans_regular_path()).expect("load regular fira sans");
-        let syriac = crate::load_font_from_file(syriac_font_path()).expect("load syriac font");
-        let cluster = first_real_mark_attachment_cluster(&syriac, 0x0710..=0x072C, 0x0730..=0x074A)
-            .expect("expected syriac mark attachment cluster");
-
-        let mut family = crate::FontFamily::new("Fira Sans");
-        family.add_loaded_font(regular);
-        family.add_loaded_font(syriac);
-
-        let text = format!("A{cluster}B");
-        let face_indices = family
-            .debug_face_indices_for_text(
-                &text,
-                family
-                    .options()
-                    .with_font_size(32.0)
-                    .with_locale("syr-Syrc")
-                    .with_right_to_left(),
-            )
-            .expect("resolve syriac mark fallback face indices");
-
-        assert_eq!(face_indices, vec![0, 1, 0]);
-    }
-
-    #[test]
-    #[cfg(feature = "layout")]
-    fn rtl_shaping_applies_real_gpos_mark_to_base_attachment() {
-        let font = crate::load_font_from_file(syriac_font_path()).expect("load syriac font");
-        let Some((text, attachment)) = first_real_gpos_mark_to_base_cluster(
-            &font,
-            "syr-Syrc",
-            0x0710..=0x072C,
-            0x0730..=0x074A,
-        ) else {
-            return;
-        };
-
-        let options = crate::FontOptions::new(&font)
-            .with_font_size(32.0)
-            .with_locale("syr-Syrc")
-            .with_right_to_left();
-        let run = crate::text2commands(&text, options.clone()).expect("syriac mark glyph run");
-        assert_eq!(run.glyphs.len(), 2);
-
-        let base_char = text.chars().next().expect("base char");
-        let base_glyph_id = font
-            .font()
-            .cmap
-            .as_ref()
-            .expect("cmap")
-            .get_glyph_position(base_char as u32) as usize;
-        let base_layout = font
-            .font()
-            .get_layout_with_options(base_glyph_id, false, &options);
-        let scale = match base_layout {
-            crate::fontreader::FontLayout::Horizontal(ref layout) if layout.advance_width != 0 => {
-                run.glyphs[0].glyph.metrics.advance_x / layout.advance_width as f32
-            }
-            _ => 1.0,
-        };
-        let expected_dx = attachment.x_placement as f32 * scale;
-        let expected_dy = -(attachment.y_placement as f32) * scale;
-
-        let actual_dx = run.glyphs[1].x - run.glyphs[0].x;
-        let actual_dy = run.glyphs[1].y - run.glyphs[0].y;
-        assert!((actual_dx - expected_dx).abs() <= 1.0);
-        assert!((actual_dy - expected_dy).abs() <= 1.0);
-        assert_eq!(run.glyphs[1].glyph.metrics.advance_x, 0.0);
-        assert_eq!(run.glyphs[1].glyph.metrics.advance_y, 0.0);
-    }
-
-    #[test]
-    #[cfg(feature = "layout")]
-    fn rtl_shaping_applies_real_gpos_mark_to_mark_attachment() {
-        let font = crate::load_font_from_file(syriac_font_path()).expect("load syriac font");
-        let Some((text, base_attachment, mark_attachment)) =
-            first_real_gpos_mark_stack_cluster(&font, "syr-Syrc", 0x0710..=0x072C, 0x0730..=0x074A)
-        else {
-            return;
-        };
-
-        let options = crate::FontOptions::new(&font)
-            .with_font_size(32.0)
-            .with_locale("syr-Syrc")
-            .with_right_to_left();
-        let run = crate::text2commands(&text, options.clone()).expect("syriac stacked marks");
-        assert_eq!(run.glyphs.len(), 3);
-
-        let base_char = text.chars().next().expect("base char");
-        let base_glyph_id = font
-            .font()
-            .cmap
-            .as_ref()
-            .expect("cmap")
-            .get_glyph_position(base_char as u32) as usize;
-        let base_layout = font
-            .font()
-            .get_layout_with_options(base_glyph_id, false, &options);
-        let scale = match base_layout {
-            crate::fontreader::FontLayout::Horizontal(ref layout) if layout.advance_width != 0 => {
-                run.glyphs[0].glyph.metrics.advance_x / layout.advance_width as f32
-            }
-            _ => 1.0,
-        };
-
-        let first_mark_dx = run.glyphs[1].x - run.glyphs[0].x;
-        let first_mark_dy = run.glyphs[1].y - run.glyphs[0].y;
-        assert!((first_mark_dx - base_attachment.x_placement as f32 * scale).abs() <= 1.0);
-        assert!((first_mark_dy + base_attachment.y_placement as f32 * scale).abs() <= 1.0);
-
-        let second_mark_dx = run.glyphs[2].x - run.glyphs[1].x;
-        let second_mark_dy = run.glyphs[2].y - run.glyphs[1].y;
-        assert!((second_mark_dx - mark_attachment.x_placement as f32 * scale).abs() <= 1.0);
-        assert!((second_mark_dy + mark_attachment.y_placement as f32 * scale).abs() <= 1.0);
-        assert_eq!(run.glyphs[1].glyph.metrics.advance_x, 0.0);
-        assert_eq!(run.glyphs[2].glyph.metrics.advance_x, 0.0);
-    }
-
-    #[test]
-    #[cfg(feature = "layout")]
-    fn font_family_fallback_checks_arabic_mark_boundaries_across_real_fonts() {
-        let successes = count_mark_boundary_successes(
-            &arabic_boundary_font_paths(),
-            "ar",
-            true,
-            detect_arabic_mark_cluster,
-        );
-        assert!(
-            successes >= 1,
-            "expected at least one Arabic mark font to pass boundary checks"
-        );
-    }
-
-    #[test]
-    #[cfg(feature = "layout")]
-    fn font_family_fallback_checks_arabic_mark_stack_boundaries_across_real_fonts() {
-        let successes = count_mark_boundary_successes(
-            &arabic_boundary_font_paths(),
-            "ar",
-            true,
-            detect_arabic_mark_stack_cluster,
-        );
-        assert!(
-            successes >= 1,
-            "expected at least one Arabic stacked-mark font to pass boundary checks"
-        );
-    }
-
-    #[test]
-    #[cfg(feature = "layout")]
-    fn font_family_fallback_checks_syriac_mark_boundaries_across_real_fonts() {
-        let successes = count_mark_boundary_successes(
-            &syriac_boundary_font_paths(),
-            "syr-Syrc",
-            true,
-            detect_syriac_mark_attachment_cluster,
-        );
-        assert!(
-            successes >= 1,
-            "expected at least one Syriac mark font to pass boundary checks"
-        );
-    }
-
-    #[test]
-    #[cfg(feature = "layout")]
-    fn font_family_fallback_checks_syriac_mark_stack_boundaries_across_real_fonts() {
-        let successes = count_mark_boundary_successes(
-            &syriac_boundary_font_paths(),
-            "syr-Syrc",
-            true,
-            detect_syriac_mark_stack_cluster,
-        );
-        assert!(
-            successes >= 1,
-            "expected at least one Syriac stacked-mark font to pass boundary checks"
-        );
-    }
-
-    #[test]
-    #[cfg(feature = "layout")]
-    fn font_family_fallback_checks_hebrew_mark_boundaries_across_real_fonts() {
-        let successes = count_mark_boundary_successes(
-            &hebrew_boundary_font_paths(),
-            "he-Hebr",
-            true,
-            detect_hebrew_mark_cluster,
-        );
-        assert!(
-            successes >= 1,
-            "expected at least one Hebrew mark font to pass boundary checks"
-        );
-    }
-
-    #[test]
-    #[cfg(feature = "layout")]
-    fn font_family_fallback_checks_tibetan_mark_boundaries_across_real_fonts() {
-        let regular = crate::load_font_from_file(rtl_font_path()).expect("load latin base font");
-        let mut successes = 0usize;
-        let mut diagnostics = Vec::new();
-
-        for path in tibetan_boundary_font_paths() {
-            let font = crate::load_font_from_file(&path)
-                .unwrap_or_else(|err| panic!("load tibetan font {}: {err}", path.display()));
-            let Some(cluster) = detect_tibetan_mark_cluster(&font) else {
-                diagnostics.push(format!("{}: no cluster", path.display()));
-                continue;
-            };
-
-            let mut family = crate::FontFamily::new("Fira Sans");
-            family.add_loaded_font(regular.clone());
-            family.add_loaded_font(font);
-
-            let text = format!("A{cluster}B");
-            match family.debug_face_indices_for_text(
-                &text,
-                family.options().with_font_size(32.0).with_locale("bo-Tibt"),
-            ) {
-                Ok(face_indices) if face_indices == vec![0, 1, 0] => successes += 1,
-                Ok(face_indices) => diagnostics.push(format!(
-                    "{}: cluster={cluster:?} face_indices={face_indices:?}",
-                    path.display()
-                )),
-                Err(err) => diagnostics.push(format!(
-                    "{}: cluster={cluster:?} error={err}",
-                    path.display()
-                )),
-            }
+        #[test]
+        #[cfg(feature = "layout")]
+        fn font_family_fallback_checks_arabic_mark_stack_boundaries_across_real_fonts() {
+            let successes = count_mark_boundary_successes(
+                &arabic_boundary_font_paths(),
+                "ar",
+                true,
+                detect_arabic_mark_stack_cluster,
+            );
+            assert!(
+                successes >= 1,
+                "expected at least one Arabic stacked-mark font to pass boundary checks"
+            );
         }
 
-        assert!(
-            successes >= 1,
-            "expected at least one Tibetan mark font to pass boundary checks: {}",
-            diagnostics.join(" | ")
-        );
-    }
+        #[test]
+        #[cfg(feature = "layout")]
+        fn font_family_fallback_checks_syriac_mark_boundaries_across_real_fonts() {
+            let successes = count_mark_boundary_successes(
+                &syriac_boundary_font_paths(),
+                "syr-Syrc",
+                true,
+                detect_syriac_mark_attachment_cluster,
+            );
+            assert!(
+                successes >= 1,
+                "expected at least one Syriac mark font to pass boundary checks"
+            );
+        }
 
-    #[test]
-    #[cfg(feature = "layout")]
-    fn font_family_text2commands_supports_vertical_flow() {
-        let font = crate::load_font_from_file(japanese_font_path()).expect("load japanese font");
-        let (ch, _, _) =
-            first_real_vertical_substitution(&font).expect("expected vertical substitution");
-        let mut family = crate::FontFamily::new("Noto Sans JP");
-        family.add_loaded_font(font);
+        #[test]
+        #[cfg(feature = "layout")]
+        fn font_family_fallback_checks_syriac_mark_stack_boundaries_across_real_fonts() {
+            let successes = count_mark_boundary_successes(
+                &syriac_boundary_font_paths(),
+                "syr-Syrc",
+                true,
+                detect_syriac_mark_stack_cluster,
+            );
+            assert!(
+                successes >= 1,
+                "expected at least one Syriac stacked-mark font to pass boundary checks"
+            );
+        }
 
-        let run = family
-            .text2commands(
-                &format!("{ch}{ch}"),
-                family.options().with_font_size(32.0).with_vertical_flow(),
-            )
-            .expect("family vertical glyph run");
+        #[test]
+        #[cfg(feature = "layout")]
+        fn font_family_fallback_checks_hebrew_mark_boundaries_across_real_fonts() {
+            let successes = count_mark_boundary_successes(
+                &hebrew_boundary_font_paths(),
+                "he-Hebr",
+                true,
+                detect_hebrew_mark_cluster,
+            );
+            assert!(
+                successes >= 1,
+                "expected at least one Hebrew mark font to pass boundary checks"
+            );
+        }
 
-        assert_eq!(run.glyphs.len(), 2);
-        assert_eq!(
-            run.glyphs[0].glyph.font.expect("font metrics").flow,
-            crate::GlyphFlow::Vertical
-        );
-        assert!(run.glyphs[1].y > run.glyphs[0].y);
-    }
+        #[test]
+        #[cfg(feature = "layout")]
+        fn font_family_fallback_checks_tibetan_mark_boundaries_across_real_fonts() {
+            let regular =
+                crate::load_font_from_file(rtl_font_path()).expect("load latin base font");
+            let mut successes = 0usize;
+            let mut diagnostics = Vec::new();
 
-    #[test]
-    fn font_family_text2commands_supports_right_to_left() {
-        let font = crate::load_font_from_file(rtl_font_path()).expect("load rtl font");
-        let mut family = crate::FontFamily::new("Arial");
-        family.add_loaded_font(font);
+            for path in tibetan_boundary_font_paths() {
+                let font = crate::load_font_from_file(&path)
+                    .unwrap_or_else(|err| panic!("load tibetan font {}: {err}", path.display()));
+                let Some(cluster) = detect_tibetan_mark_cluster(&font) else {
+                    diagnostics.push(format!("{}: no cluster", path.display()));
+                    continue;
+                };
 
-        let run = family
-            .text2commands(
-                "אבג",
-                family.options().with_font_size(32.0).with_right_to_left(),
-            )
-            .expect("family rtl glyph run");
+                let mut family = crate::FontFamily::new("Fira Sans");
+                family.add_loaded_font(regular.clone());
+                family.add_loaded_font(font);
 
-        assert_eq!(run.glyphs.len(), 3);
-        assert!(run.glyphs[0].x > run.glyphs[1].x);
-        assert!(run.glyphs[1].x > run.glyphs[2].x);
+                let text = format!("A{cluster}B");
+                match family.debug_face_indices_for_text(
+                    &text,
+                    family.options().with_font_size(32.0).with_locale("bo-Tibt"),
+                ) {
+                    Ok(face_indices) if face_indices == vec![0, 1, 0] => successes += 1,
+                    Ok(face_indices) => diagnostics.push(format!(
+                        "{}: cluster={cluster:?} face_indices={face_indices:?}",
+                        path.display()
+                    )),
+                    Err(err) => diagnostics.push(format!(
+                        "{}: cluster={cluster:?} error={err}",
+                        path.display()
+                    )),
+                }
+            }
 
-        let measure = family
-            .measure_with_options(
-                "אבג",
-                family.options().with_font_size(32.0).with_right_to_left(),
-            )
-            .expect("family rtl measure");
-        assert!(measure > 0.0);
-    }
+            assert!(
+                successes >= 1,
+                "expected at least one Tibetan mark font to pass boundary checks: {}",
+                diagnostics.join(" | ")
+            );
+        }
+
+        #[test]
+        #[cfg(feature = "layout")]
+        fn font_family_text2commands_supports_vertical_flow() {
+            let font =
+                crate::load_font_from_file(japanese_font_path()).expect("load japanese font");
+            let (ch, _, _) =
+                first_real_vertical_substitution(&font).expect("expected vertical substitution");
+            let mut family = crate::FontFamily::new("Noto Sans JP");
+            family.add_loaded_font(font);
+
+            let run = family
+                .text2commands(
+                    &format!("{ch}{ch}"),
+                    family.options().with_font_size(32.0).with_vertical_flow(),
+                )
+                .expect("family vertical glyph run");
+
+            assert_eq!(run.glyphs.len(), 2);
+            assert_eq!(
+                run.glyphs[0].glyph.font.expect("font metrics").flow,
+                crate::GlyphFlow::Vertical
+            );
+            assert!(run.glyphs[1].y > run.glyphs[0].y);
+        }
+
+        #[test]
+        fn font_family_text2commands_supports_right_to_left() {
+            let font = crate::load_font_from_file(rtl_font_path()).expect("load rtl font");
+            let mut family = crate::FontFamily::new("Arial");
+            family.add_loaded_font(font);
+
+            let run = family
+                .text2commands(
+                    "אבג",
+                    family.options().with_font_size(32.0).with_right_to_left(),
+                )
+                .expect("family rtl glyph run");
+
+            assert_eq!(run.glyphs.len(), 3);
+            assert!(run.glyphs[0].x > run.glyphs[1].x);
+            assert!(run.glyphs[1].x > run.glyphs[2].x);
+
+            let measure = family
+                .measure_with_options(
+                    "אבג",
+                    family.options().with_font_size(32.0).with_right_to_left(),
+                )
+                .expect("family rtl measure");
+            assert!(measure > 0.0);
+        }
     }
 }

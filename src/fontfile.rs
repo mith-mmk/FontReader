@@ -50,10 +50,7 @@ impl FontFile {
     }
 
     /// Opens a font from bytes with explicit resource limits.
-    pub fn from_buffer_with_limits(
-        buffer: &[u8],
-        limits: DecodeLimits,
-    ) -> Result<Self, Error> {
+    pub fn from_buffer_with_limits(buffer: &[u8], limits: DecodeLimits) -> Result<Self, Error> {
         let font = fontreader::Font::get_font_from_buffer_with_limits(buffer, &limits)?;
         Ok(Self { font })
     }
