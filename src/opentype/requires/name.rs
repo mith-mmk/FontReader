@@ -467,11 +467,19 @@ fn get_names<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> Result
     }
 
     let mut lang_tag_string = Vec::new();
-    for record in &mut lang_tag_record {
-        let string_offset = record.offset + current_position as u16;
-        file.seek(SeekFrom::Start(string_offset as u64))?;
-        let string = file.read_utf16be_string(record.length as usize)?;
-        record.offset = string_offset;
+    for record in &lang_tag_record {
+        if !record.length.is_multiple_of(2) {
+            return Err(Error::new(
+                std::io::ErrorKind::InvalidData,
+                "language-tag byte length must be even",
+            ));
+        }
+        // Language-tag offsets, like name-string offsets, are relative to the
+        // string storage area. Keep the original on-disk record unchanged.
+        let string_offset = current_position + u64::from(record.offset);
+        file.seek(SeekFrom::Start(string_offset))?;
+        // bin-rs 0.0.9 expects UTF-16 code units; the table stores byte lengths.
+        let string = file.read_utf16be_string(record.length as usize / 2)?;
         lang_tag_string.push(string);
     }
 
@@ -484,4 +492,55 @@ fn get_names<R: BinaryReader>(file: &mut R, offest: u32, _length: u32) -> Result
         lang_tag_records: lang_tag_record,
         lang_tag_string,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bin_rs::reader::BytesReader;
+
+    fn language_tag_table(offset: usize, tag: &[u8]) -> Vec<u8> {
+        let mut data = vec![0; offset];
+        // Version 1, no name records, storage at byte 12, one language tag.
+        for word in [1u16, 0, 12, 1, tag.len() as u16, 2] {
+            data.extend_from_slice(&word.to_be_bytes());
+        }
+        data.extend_from_slice(&[0, 0]);
+        data.extend_from_slice(tag);
+        data
+    }
+
+    #[test]
+    fn language_tags_use_full_storage_offset_and_preserve_records() {
+        let offset = 70_000;
+        let tag = [0, b'e', 0, b'n', 0, b'-', 0, b'U', 0, b'S'];
+        let data = language_tag_table(offset, &tag);
+        let name = Name::new(&mut BytesReader::new(&data), offset as u32, 24).unwrap();
+        assert_eq!(name.lang_tag_string, ["en-US"]);
+        assert_eq!(name.lang_tag_records[0].offset, 2);
+        assert_eq!(name.lang_tag_records[0].length, 10);
+        let expected = "name\nVersion 1\nCount 0\nLang Count 1\nen-US\n";
+        assert_eq!(name.to_string(), expected);
+        assert_eq!(format!("{name}"), expected);
+    }
+
+    #[test]
+    fn language_tags_reject_odd_byte_lengths() {
+        for tag in [&[0, b'e', 0][..], &[0, b'e'][..]] {
+            let mut data = language_tag_table(0, tag);
+            // Declare three bytes, with or without the trailing byte present.
+            data[8..10].copy_from_slice(&3u16.to_be_bytes());
+            let error = Name::new(&mut BytesReader::new(&data), 0, data.len() as u32).unwrap_err();
+            assert_eq!(error.kind(), std::io::ErrorKind::InvalidData);
+        }
+    }
+
+    #[test]
+    fn language_tags_propagate_truncation_and_invalid_utf16_errors() {
+        let mut data = language_tag_table(0, &[0, b'e']);
+        data.pop();
+        assert!(Name::new(&mut BytesReader::new(&data), 0, data.len() as u32).is_err());
+        let data = language_tag_table(0, &[0xD8, 0]);
+        assert!(Name::new(&mut BytesReader::new(&data), 0, data.len() as u32).is_err());
+    }
 }
