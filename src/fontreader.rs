@@ -1656,7 +1656,7 @@ impl Font {
         font_variant: crate::commands::FontVariant,
     ) -> Result<Vec<ResolvedTextUnit>, Error> {
         #[cfg(not(feature = "layout"))]
-        let _ = (locale, is_right_to_left, font_variant);
+        let _ = (is_vert, locale, is_right_to_left, font_variant);
 
         let mut output = Vec::new();
         let mut pending_glyphs = Vec::new();
@@ -1686,8 +1686,10 @@ impl Font {
                 ParsedTextUnit::Glyph { text, .. } => {
                     let prefer_color = Self::text_prefers_color_glyph(&text);
                     for (ch, variation_selector) in Self::cluster_glyph_scalars(&text) {
+                        // Text shaping applies vertical alternates after all other GSUB
+                        // stages. Raw glyph APIs retain the helper's direct alternate path.
                         let glyph_id =
-                            self.resolve_glyph_id_with_uvs(ch, variation_selector, is_vert)?;
+                            self.resolve_glyph_id_with_uvs(ch, variation_selector, false)?;
                         #[cfg(feature = "layout")]
                         let glyph_id = if let Some(locale) = locale {
                             if let Some(gsub) = self.current_gsub() {
@@ -1716,6 +1718,20 @@ impl Font {
             is_right_to_left,
             font_variant,
         );
+        #[cfg(feature = "layout")]
+        if is_vert {
+            if let Some(gsub) = self.current_gsub() {
+                // The selected vertical feature is the final GSUB stage, including
+                // for ligatures. Metrics, outline origins, and GPOS consume these IDs.
+                for unit in &mut output {
+                    if let ResolvedTextUnit::Glyph(glyph) = unit {
+                        if let Some(glyph_id) = gsub.lookup_vertical(glyph.glyph_id as u16) {
+                            glyph.glyph_id = glyph_id as usize;
+                        }
+                    }
+                }
+            }
+        }
         Ok(output)
     }
 

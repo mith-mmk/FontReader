@@ -216,8 +216,14 @@ for pre-rotated alternates and mutual exclusivity of these features.
 This preserves the current global scope: all scripts, their default and named
 LangSys records, and required features participate, including non-DFLT-only
 fonts. It does not implement script-run selection or Unicode mixed orientation.
-The existing position of vertical substitution before other GSUB stages is
-unchanged; moving `vrt2` to the final GSUB stage is separate work.
+High-level text shaping resolves cmap/UVS first and applies the selected vertical
+feature after ordinary GSUB stages (composition, locale/variant, RTL forms, and
+ligatures). Metrics, outline origins, and GPOS use those final glyph IDs. Raw
+`get_glyph_with_uvs_axis()` keeps its direct vertical alternate behavior without
+running the text shaping stages. This does not change
+the existing single-feature lookup chaining or source-cluster representation.
 Horizontal flow and builds without `layout` remain unchanged. MIT synthetic
 fixtures verify selection, final glyph bounds/advance, measure, and SVG output;
 see `tests/fixtures/manifest.toml` for provenance and hash.
+`vertical-gsub-order.ttc` covers composition, variants, locale, ligatures, UVS,
+final mark anchors and origins, selected-face fallback, and raw glyph compatibility.

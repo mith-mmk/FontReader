@@ -189,8 +189,14 @@ MITの再現可能なfixtureは`colr-vertical-origin.ttc`です。生成script�
 既存の探索範囲は維持する。全 Script の既定・名前付き LangSys と必須
 フィーチャーを含み、DFLT 以外だけを持つフォントも対象となる。
 Script run ごとの選択や Unicode の混在方向は未対応。
-他の GSUB 段階より前に縦書き置換する既存の順序は変更していない。
-`vrt2` を GSUB の最終段階に移す対応は別途行う。
+高水準のテキスト整形では cmap/UVS を先に解決し、通常の GSUB 段階
+（合成、locale/variant、RTL 字形、合字）の後に選択した縦書きフィーチャーを
+適用する。メトリクス、輪郭の原点、GPOS は最終的なグリフ ID を使う。
+raw の `get_glyph_with_uvs_axis()` はテキスト整形を
+行わず、従来どおり直接縦書き字形へ置換する。既存の単一フィーチャー内の
+Lookup 連鎖処理やソースクラスタ表現は変更しない。
 横書きと `layout` 無効時は変更なし。MIT の合成フォントで選択結果、
 最終字形の bounds・送り量、measure、SVG を検証する。
 出典とハッシュは `tests/fixtures/manifest.toml` を参照。
+`vertical-gsub-order.ttc` は合成、variant、locale、合字、UVS、最終字形の
+マークアンカーと原点、選択 face の fallback、raw グリフ互換性を検証する。
