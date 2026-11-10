@@ -18,7 +18,7 @@ vheaだけがある場合も同じフォールバックです。
 `layout` featureなしではsfnt loaderが縦表を読まないため、同じフォールバックを使います。
 
 合成fixtureで縦メトリクスの有無とコレクション内のface選択を検証し、外部フォントを必要としません。
-このfallbackとは別に下記のTrueType縦原点補正を行います。Unicode縦方向、約物の回転、CFFのVORGは別対応です。
+このfallbackとは別に下記のTrueType縦原点補正を行います。Unicode縦方向、約物の回転は別対応です。静的CFFの原点は下記を参照してください。
 
 ### TrueTypeの縦原点
 
@@ -30,7 +30,7 @@ layer offsetに倍率を一度だけ適用し、論理的な列位置とadvance�
 boundsとSVGも同じlayerを使い、GPOS/GDEFで付くmarkはbaseの原点移動量を継承します。
 
 合成fixtureで約物、負のbearing、合成glyph、gvarの輪郭/phantom移動、TTC face選択、sfnt/WOFFを検証します。
-CFF/CFF2のVORG、VVAR原点map、BASE、Unicode縦方向、COLR/sbix/SVGの色layer原点は別対応です。
+CFF2のVORG、VVAR原点map、BASE、Unicode縦方向、COLR/sbix/SVGの色layer原点は別対応です。
 色layerのoffsetと旧raw glyph/SVG APIは変更しません。TrueTypeのVORGは仕様どおり無視します。
 
 ### GSUB
@@ -111,3 +111,18 @@ CFF/CFF2のVORG、VVAR原点map、BASE、Unicode縦方向、COLR/sbix/SVGの色l
 - `paintcore` 側でも clip / gradient renderer を使える前提で bridge が追随した
 - WOFF2 は完全な byte stream がそろってから decode する前提
 - CFF2 の事前調査メモは `cff2-investigation.ja.md` に配置
+
+### 静的CFFの縦原点
+
+高水準のshape・計測・SVG出力では、単色の静的CFFにVORGの既定値または
+glyph別の符号付きY原点を適用します。X方向は横advanceの半分だけ移動し、
+置換後のglyph IDを使います。結合markはbaseの移動を継承します。
+advanceは従来どおりvhea/vmtxから求め、VORGでは変更しません。
+
+VORGがない場合は、三次曲線の正確なyMaxとvmtxのtop side bearingを使います。
+縦metricsもない場合はTrueTypeと同じ合成セル中央へ配置します。空輪郭の極値は0です。
+公開ink boundsは従来の保守的な制御点込みの範囲のままです。
+sfnt・選択したTTC face・WOFFに対応します。不正な任意VORGは無視してfallbackし、
+TrueTypeではVORGを使いません。`cff`が必要で、sfntの縦metricsには従来どおり`layout`も必要です。
+CFF2/VVARの原点変動、色layer原点、BASE、Unicode縦方向、横書き・旧raw APIは今回の対象外です。
+MIT合成fixtureとSHA-256は`tests/fixtures/manifest.toml`を参照してください。

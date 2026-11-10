@@ -189,6 +189,7 @@ pub struct Font {
     pub(crate) vhea: Option<vhea::VHEA>,
     pub(crate) vvar: Option<vvar::VVAR>,
     pub(crate) vmtx: Option<vmtx::VMTX>,
+    vorg: Option<vorg::Vorg>,
     hmtx_pos: Option<Pointer>,
     vmtx_pos: Option<Pointer>,
     loca_pos: Option<Pointer>, // OpenType font, CFF/CFF2 none
@@ -287,6 +288,7 @@ impl Font {
             vhea: None,
             vvar: None,
             vmtx: None,
+            vorg: None,
             hmtx_pos: None,
             vmtx_pos: None,
             loca_pos: None,
@@ -2516,7 +2518,7 @@ impl Font {
                         attach_glyph_index
                             .and_then(|index| layer_origins.get(index).copied())
                             .or_else(|| {
-                                self.truetype_vertical_origin_offset(
+                                self.monochrome_vertical_origin_offset(
                                     glyph_id,
                                     open_type_glyph,
                                     scale_x,
@@ -2552,7 +2554,7 @@ impl Font {
         Ok(GlyphRun::new(glyphs))
     }
 
-    fn truetype_vertical_origin_offset(
+    fn monochrome_vertical_origin_offset(
         &self,
         glyph_id: usize,
         glyph: &OpenTypeGlyph,
@@ -2571,11 +2573,27 @@ impl Font {
                 (y(4), y(8))
             }
             FontData::ParsedGlyph(parsed) => (parsed.y_min as f32, parsed.y_max as f32),
+            #[cfg(feature = "cff")]
+            FontData::CFF(_) if self.current_outline_format() == GlyphFormat::CFF => {
+                let commands = self.current_cff()?.to_path_commands(glyph_id, 1.0).ok()?;
+                cff_y_bounds(&commands)
+            }
             _ => return None,
         };
         let horizontal = self.get_horizontal_layout_with_coords(glyph_id, &glyph.variation_coords);
-        let origin_y = match &glyph.layout {
-            FontLayout::Vertical(layout) => y_max + layout.tsb as f32,
+        // VORG is defined only for CFF. CFF2 variation origins remain out of scope.
+        let vorg = if self.current_outline_format() == GlyphFormat::CFF {
+            if self.current_font == 0 {
+                self.vorg.as_ref()
+            } else {
+                self.more_fonts[self.current_font - 1].vorg.as_ref()
+            }
+        } else {
+            None
+        };
+        let origin_y = match (vorg, &glyph.layout) {
+            (Some(vorg), _) => vorg.origin(glyph_id as u16) as f32,
+            (_, FontLayout::Vertical(layout)) => y_max + layout.tsb as f32,
             _ => {
                 let height = horizontal.accender - horizontal.descender;
                 let height = if height > 0 {
@@ -4185,6 +4203,10 @@ fn font_load<R: BinaryReader>(file: &mut R, limits: &DecodeLimits) -> Result<Fon
                         let vhea = vhea::VHEA::new(&mut reader, 0, table.data.len() as u32)?;
                         font.vhea = Some(vhea);
                     }
+                    b"VORG" => {
+                        let mut reader = BytesReader::new(&table.data);
+                        font.vorg = vorg::Vorg::new(&mut reader, 0, table.data.len() as u32).ok();
+                    }
                     b"vmtx" => {
                         vmtx_table = Some(table);
                     }
@@ -4453,6 +4475,9 @@ fn from_opentype<R: BinaryReader>(
                 };
                 font.vmtx_pos = Some(vmtx_pos);
             }
+            b"VORG" => {
+                font.vorg = vorg::Vorg::new(file, record.offset, record.length).ok();
+            }
             b"VVAR" => {
                 let vvar = vvar::VVAR::new(file, record.offset, record.length)?;
                 font.vvar = Some(vvar);
@@ -4573,4 +4598,123 @@ fn from_opentype<R: BinaryReader>(
     }
 
     Ok(font)
+}
+
+/// Exact CFF outline Y extrema in font coordinates. CFF commands are Y-down.
+/// Keep this separate from the public conservative ink bounds.
+#[cfg(feature = "cff")]
+fn cff_y_bounds(commands: &[DrawCommand]) -> (f32, f32) {
+    let mut bounds: Option<(f64, f64)> = None;
+    let mut include = |y: f64| {
+        bounds = Some(match bounds {
+            Some((lo, hi)) => (lo.min(y), hi.max(y)),
+            None => (y, y),
+        });
+    };
+    let mut current = 0.0_f64;
+    let mut start = 0.0_f64;
+    for command in commands {
+        match command {
+            DrawCommand::MoveTo(_, y) => {
+                current = -(*y as f64);
+                start = current;
+                include(current);
+            }
+            DrawCommand::Line(_, y) => {
+                current = -(*y as f64);
+                include(current);
+            }
+            DrawCommand::CubicBezier((_, a), (_, b), (_, end)) => {
+                let (p0, p1, p2, p3) = (current, -(*a as f64), -(*b as f64), -(*end as f64));
+                // Derivative / 3 = a*t*t + b*t + c.
+                let a = -p0 + 3.0 * p1 - 3.0 * p2 + p3;
+                let b = 2.0 * (p0 - 2.0 * p1 + p2);
+                let c = p1 - p0;
+                let mut roots = [f64::NAN; 2];
+                if a == 0.0 {
+                    if b != 0.0 {
+                        roots[0] = -c / b;
+                    }
+                } else {
+                    let discriminant = b * b - 4.0 * a * c;
+                    if discriminant >= 0.0 {
+                        let root = discriminant.sqrt();
+                        roots = [(-b + root) / (2.0 * a), (-b - root) / (2.0 * a)];
+                    }
+                }
+                for t in roots {
+                    if t > 0.0 && t < 1.0 {
+                        let u = 1.0 - t;
+                        include(
+                            u * u * u * p0
+                                + 3.0 * u * u * t * p1
+                                + 3.0 * u * t * t * p2
+                                + t * t * t * p3,
+                        );
+                    }
+                }
+                include(p3);
+                current = p3;
+            }
+            DrawCommand::Close => {
+                current = start;
+            }
+            // Static CFF emits only cubic curves.
+            DrawCommand::Bezier(_, _) => {}
+        }
+    }
+    bounds
+        .map(|(lo, hi)| (lo as f32, hi as f32))
+        .unwrap_or((0.0, 0.0))
+}
+
+#[cfg(all(test, feature = "cff"))]
+mod cff_origin_bounds_tests {
+    use super::*;
+    #[test]
+    fn cubic_extrema_cover_two_roots_monotonic_lines_and_empty_paths() {
+        let two_roots = [
+            DrawCommand::MoveTo(0.0, 0.0),
+            DrawCommand::CubicBezier((0.0, -100.0), (0.0, 100.0), (0.0, 0.0)),
+        ];
+        let (lo, hi) = cff_y_bounds(&two_roots);
+        assert!((lo + 28.867514).abs() < 0.0001);
+        assert!((hi - 28.867514).abs() < 0.0001);
+        assert_eq!(cff_y_bounds(&[]), (0.0, 0.0));
+        // Negative derivative discriminant: monotonic despite a nonzero quadratic term.
+        assert_eq!(
+            cff_y_bounds(&[
+                DrawCommand::MoveTo(0.0, 0.0),
+                DrawCommand::CubicBezier((0.0, -100.0), (0.0, -200.0), (0.0, -400.0))
+            ]),
+            (0.0, 400.0)
+        );
+        assert_eq!(
+            cff_y_bounds(&[
+                DrawCommand::MoveTo(0.0, -50.0),
+                DrawCommand::CubicBezier((0.0, -50.0), (0.0, -50.0), (0.0, -50.0)),
+                DrawCommand::Close,
+                DrawCommand::MoveTo(0.0, 20.0),
+                DrawCommand::Line(0.0, 10.0),
+                DrawCommand::Close
+            ]),
+            (-20.0, 50.0)
+        );
+
+        assert_eq!(
+            cff_y_bounds(&[
+                DrawCommand::MoveTo(0.0, 50.0),
+                DrawCommand::Line(0.0, -100.0),
+                DrawCommand::Close
+            ]),
+            (-50.0, 100.0)
+        );
+        assert_eq!(
+            cff_y_bounds(&[
+                DrawCommand::MoveTo(0.0, 0.0),
+                DrawCommand::CubicBezier((0.0, -100.0), (0.0, -200.0), (0.0, -300.0))
+            ]),
+            (0.0, 300.0)
+        );
+    }
 }

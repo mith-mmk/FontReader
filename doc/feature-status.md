@@ -23,7 +23,7 @@ uses the same fallback.
 The committed synthetic fixtures exercise fonts with and without vertical
 metrics and mixed collection faces without requiring an installed font. This
 fallback is distinct from the TrueType origin correction below. Unicode
-orientation, punctuation rotation, and CFF VORG origins remain separate work.
+orientation and punctuation rotation remain separate work. Static CFF origins are covered below.
 
 ### TrueType vertical origins
 
@@ -37,7 +37,7 @@ attached by GPOS/GDEF inherit the base glyph's origin translation.
 
 Synthetic regressions cover punctuation, negative bearings, composites, gvar
 outline/phantom movement, collection face selection, and sfnt/WOFF parity.
-CFF/CFF2 VORG, VVAR origin maps, BASE alignment, Unicode orientation, and color
+CFF2 VORG, VVAR origin maps, BASE alignment, Unicode orientation, and color
 origins (COLR, sbix, SVG) remain separate work. Color layer offsets and the legacy
 raw glyph/SVG APIs are unchanged. TrueType ignores VORG as required by OpenType.
 
@@ -119,3 +119,25 @@ raw glyph/SVG APIs are unchanged. TrueType ignores VORG as required by OpenType.
 - The `paintcore` bridge now preserves clip/gradient-capable layer data from the public 0.0.13 `fontcore` line
 - WOFF2 still requires the complete byte stream before decoding
 - CFF2 planning notes live in `cff2-investigation.md`
+
+### Static CFF vertical origins
+
+High-level shape, measurement and SVG export translate monochrome static CFF
+outlines by half the horizontal advance width and the VORG default/per-glyph
+signed Y origin. Origins are selected after substitution, shared by attached
+marks (including mark-to-mark), and scaled once. Vertical advances still come
+from vhea/vmtx; VORG does not supply advances.
+
+Without VORG, the origin is the exact cubic outline yMax plus vmtx top side
+bearing. Without usable vertical metrics, the outline is centered in the same
+synthesized cell used for TrueType. Empty outlines use zero extrema. Public ink
+bounds remain conservative (include control points); only origin calculation
+uses exact curve extrema. sfnt, selected TTC faces and WOFF use this policy.
+Invalid optional VORG (unsupported version, short data, unsorted or duplicate
+records) is ignored and uses the same fallback. TrueType ignores VORG entirely.
+
+This correction requires `cff`; sfnt vertical metrics require `layout` as before.
+CFF2/VVAR origin variation, color COLR/sbix/SVG origins, BASE alignment and Unicode
+orientation remain outside this scope. Horizontal and legacy raw APIs are unchanged.
+Tests use committed MIT synthetic fixtures in `cff-vertical-origin.ttc` and
+`cff-vertical-origin.woff`; provenance and SHA-256 are in `tests/fixtures/manifest.toml`.

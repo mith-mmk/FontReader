@@ -15,4 +15,5 @@ pub(crate) mod post;
 pub(crate) mod var_store;
 pub(crate) mod vhea;
 pub(crate) mod vmtx;
+pub(crate) mod vorg;
 pub(crate) mod vvar;
