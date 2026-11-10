@@ -1,8 +1,12 @@
-# Unicode Vertical_Orientation data
+# Unicode data and versions
 
 fontcore's `vertical_orientation(char)` query is pinned to Unicode **18.0.0**.
 It exposes the scalar property only. This data does not implement grapheme
 segmentation, font substitution, or automatic mixed-orientation layout.
+
+The internal shaping/fallback text boundaries use Unicode **17.0.0** extended
+grapheme clusters, separately pinned as described below. Neither version states
+that fontcore implements complete Unicode shaping, BiDi, or CSS mixed layout.
 
 ## Provenance and license
 
@@ -18,7 +22,7 @@ segmentation, font substitution, or automatic mixed-orientation layout.
   from <https://www.unicode.org/license.txt> on 2026-11-09
 - License SHA-256: `e7a93b009565cfce55919a381437ac4db883e9da2126fa28b91d12732bc53d96`
 
-The Unicode data and derived Rust property table are copyright (c) 2026
+The Vertical_Orientation data and derived Rust property table are copyright (c) 2026
 Unicode, Inc., and covered by the accompanying Unicode license, not the project's
 MIT license alone. The remaining project code is MIT-licensed. Cargo declares
 the combined package as `MIT AND Unicode-3.0`. Both licenses, this provenance
@@ -74,3 +78,57 @@ property data or infer this property's version from a segmentation library.
 行いません。未割当文字・私用文字を含む全 1,112,064 スカラー値と各境界を、
 独立した Rust の原本パーサーで照合します。サロゲートは `char` にできないため
 スカラー値の件数から除きます。ビルドに Python やネットワークは不要です。
+
+## Extended grapheme clusters: Unicode 17.0.0
+
+The internal boundary iterator uses `unicode-segmentation = "=1.13.3"`, whose
+`UNICODE_VERSION` is `(17, 0, 0)`. The exact Cargo.toml pin protects downstream
+library users even when they do not use this repository's Cargo.lock. The crate
+is MIT OR Apache-2.0, has no runtime dependencies, and declares Rust 1.85.0 as
+its minimum version. fontcore has no declared overall MSRV; this dependency
+floor is not a claim that the complete crate builds with Rust 1.85.0.
+
+- Dependency: <https://crates.io/crates/unicode-segmentation/1.13.3>
+- Implementation: <https://github.com/unicode-rs/unicode-segmentation>
+- Rules: [UAX #29 revision 47 (Unicode 17)](https://www.unicode.org/reports/tr29/tr29-47.html)
+- Official test source: <https://www.unicode.org/Public/17.0.0/ucd/auxiliary/GraphemeBreakTest.txt>
+- Local original: [`17.0.0/GraphemeBreakTest.txt`](17.0.0/GraphemeBreakTest.txt)
+- Source header date: 2025-03-24, 14:45:55 GMT
+- Retrieved: 2026-11-09
+- Size: 126,570 bytes; all 766 official test cases
+- Source SHA-256: `e2d134d2c52919bace503ebb6a551c1855fe1a1faec18478c78fff254a1793ec`
+
+The unchanged test data is copyright (c) 2025 Unicode, Inc., under the bundled
+[Unicode-3.0 license](LICENSE.txt), whose source and checksum are above. The
+fixture, license, test parser, and verification script are included in the crate
+package. `.gitattributes` preserves original downloaded bytes on every platform.
+No Unicode 18 grapheme segmentation or Unicode 18 mixed-layout conformance is
+claimed. Updating this dependency or its Unicode version requires an explicit
+review independently of the vertical-orientation property data.
+
+```console
+python tools/check_grapheme_data.py
+cargo test --offline --no-default-features --lib unicode::graphemes
+cargo test --offline --no-default-features --lib fontreader::text_control_tests
+cargo test --offline --no-default-features --test unicode_grapheme_fallback
+```
+
+The Rust conformance test parses every official boundary marker independently
+and compares forward and reverse extended grapheme iteration before any layout
+or orphan-selector policy is applied. Adapter and public fallback tests run
+separately. All verification is offline; Python and fontTools are not needed to
+build or test the crate. Regenerating the synthetic MIT fallback font requires
+fontTools 4.65.0 via `python tests/fixtures/generate_unicode_grapheme_fallback.py`.
+
+### 拡張書記素クラスタのバージョン
+
+内部のシェーピング／フォールバック境界には、`unicode-segmentation = "=1.13.3"`
+による **Unicode 17.0.0** の拡張書記素クラスタを使用します。公開の
+`vertical_orientation(char)` は別に **Unicode 18.0.0** へ固定されています。
+Unicode 18 の書記素分割や、完全なシェーピング・BiDi・CSS 混植レイアウトへの
+適合を示すものではありません。依存 crate の最低 Rust バージョンは 1.85.0
+ですが、fontcore 全体の MSRV を宣言するものではありません。
+
+公式の全 766 テストを省略せず同梱し、分割処理とレイアウト用の調整を別々に
+検証します。上記のスクリプトで原本とライセンスの SHA-256 をオフライン確認
+できます。Unicode の原本には同梱の Unicode-3.0 ライセンスが適用されます。

@@ -28,6 +28,11 @@ English: [README.md](README.md)
 [使用例](doc/api-recipes.ja.md#unicode-の縦書きプロパティを調べる)と
 [Unicode データ・ライセンス](data/unicode/README.md)を参照してください。
 
+シェーピングとファミリーフォールバックの境界には、`unicode-segmentation = "=1.13.3"`
+による **Unicode 17.0.0** の拡張書記素クラスタを使用します。Unicode 18.0.0 の
+スカラー単位の縦書きプロパティとは別で、自動の混植縦書きや完全なシェーピング・
+BiDi を追加するものではありません。[境界の動作](doc/feature-status.ja.md#拡張書記素クラスタの境界)を参照してください。
+
 ## 対応フォーマット
 
 - TrueType

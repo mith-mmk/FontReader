@@ -28,6 +28,11 @@ no feature flags and does not choose automatic mixed vertical layout. See the
 [recipe](doc/api-recipes.md#query-unicode-vertical-orientation) and
 [Unicode data and license](data/unicode/README.md).
 
+Shaping and family fallback share Unicode **17.0.0** extended grapheme boundaries
+(`unicode-segmentation = "=1.13.3"`). This is distinct from the Unicode 18.0.0
+scalar orientation query and does not add automatic mixed vertical layout,
+complete font shaping, or BiDi. See [text boundary behavior](doc/feature-status.md#extended-grapheme-boundaries).
+
 ## Supported Formats
 
 - TrueType

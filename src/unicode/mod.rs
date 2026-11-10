@@ -2,6 +2,7 @@
 //!
 //! フォントやシェーピングに依存しない Unicode 文字プロパティです。
 
+pub(crate) mod graphemes;
 mod vertical_orientation_data;
 
 /// Unicode version used by [`vertical_orientation`], currently `"18.0.0"`.
