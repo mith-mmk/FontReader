@@ -28,9 +28,9 @@ checksum = "9d297deb1925b89f2ccc13d7635fa0714f12c87adce1c75356b39ca9b7178567"
 
 [[package]]
 name = "bin-rs"
-version = "0.0.11"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b28062885c4e7689b7fbf601cc5ed5519efd9e07ae5c33266c41f9e87755e007"
+checksum = "76470098509d8c31d514e231dfd885a2477a8f6a0e500ec30e0b54f125d0ea49"
 
 [[package]]
 name = "brotli"
@@ -65,7 +65,7 @@ checksum = "74c57ab96715773d9cb9789b38eb7cbf04b3c6f5624a9d98f51761603376767c"
 
 [[package]]
 name = "fontcore"
-version = "0.0.15"
+version = "0.0.16"
 dependencies = [
  "base64",
  "bin-rs",
