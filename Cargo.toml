@@ -1,6 +1,6 @@
 [package]
 name = "fontcore"
-version = "0.0.15"
+version = "0.0.16"
 edition = "2021"
 rust-version = "1.91"
 authors = ["Mith@mmk"]
@@ -34,7 +34,7 @@ svg-fonts = []
 
 [dependencies]
 # MUST
-bin-rs = "0.0.11"
+bin-rs = "0.1.0"
 num-traits = "0.2"
 num-derive = "0.4"
 # for Woff

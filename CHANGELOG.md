@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.0.16 - 2026-11-11
+
+### Compatibility
+
+- Update the published `bin-rs` dependency to 0.1.0. Callers passing `bin-rs` readers to low-level APIs must also use `bin-rs` 0.1.0; reader types from `bin-rs` 0.0.11, used by fontcore 0.0.15, are not interchangeable.
+- Preserve the high-level APIs, legacy raw API names, default and optional features, and Rust 1.91 minimum. This release changes dependency metadata only; font parsing and shaping code is unchanged.
+
 ## 0.0.15 - 2026-11-10
 
 ### Compatibility and fixes
