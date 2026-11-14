@@ -38,6 +38,27 @@ fallback is distinct from the TrueType origin correction below. Unicode
 orientation is not inferred by this legacy flow; opt-in mixed layout is described
 [below](#opt-in-mixed-vertical-ltr-outlines). Static CFF origins are covered below.
 
+### TrueType variable horizontal metrics
+
+Horizontal phantom points start from the selected face's default `hmtx`.
+`HVAR` and `gvar` are alternative metric sources: available HVAR advance/LSB
+entries take precedence without adding both deltas. A missing optional LSB map
+keeps the gvar-derived bearing; a mapped zero remains authoritative. HVAR still
+applies when no gvar tuple matches. This works without the `layout` feature.
+
+The [HVAR specification](https://learn.microsoft.com/en-us/typography/opentype/spec/hvar)
+describes defaults and optional mappings. Conflicting-table fixtures test our
+source-selection policy, not conforming font authoring or a required conflict
+resolution rule. MIT fixtures cover implicit/explicit maps, TTC faces, sparse
+phantom tuples, signed/fractional deltas, scale/stretch, measure/SVG bounds and
+saturation diagnostics. Saturation cases test robustness outside valid metrics.
+
+Remaining limitation: composite-glyph gvar tuples use component indices, but
+current metric interpolation consumes flattened outline point indices. A
+composite's gvar-only phantom advance/bearing changes may therefore be lost,
+even while its component outlines vary correctly. HVAR can provide those metrics.
+Nested composites and `USE_MY_METRICS` are not validated by this correction.
+
 ### TrueType variable vertical metrics
 
 Vertical phantom points start from default `vmtx` metrics. `gvar` deltas and
@@ -53,8 +74,7 @@ Conflicting tables are tested as a deterministic source-selection policy, not
 as conforming font authoring or a spec-mandated conflict-resolution rule.
 Committed MIT fixtures cover default/middle/maximum axis values, optional
 mappings, selected collection faces, shaping, measurement, and ink origins.
-This correction is vertical-only; horizontal `HVAR`/`gvar` interaction is not
-changed or validated by these fixtures.
+These vertical fixtures are separate from the horizontal coverage above.
 
 ### TrueType vertical origins
 
