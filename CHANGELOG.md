@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.0.17 - 2026-11-14
+
+### Added
+
+- Explicit LTR tate-chu-yoko cell APIs: `shape_tate_chu_yoko_ltr`, `measure_tate_chu_yoko_ltr`, `measure_layout_tate_chu_yoko_ltr`, and `render_svg_tate_chu_yoko_ltr`. They fit a single horizontal run into one upright, scaled-em cell without enlarging it or changing the engine's shaping policy.
+- Run all-feature library, integration, and documentation tests in CI on stable Rust and the Rust 1.91 minimum, including feature-gated CFF2, SVG-font, and raw API regressions.
+
+### Fixed
+
+- Apply GPOS PairPos formats 1/2 and Extension lookups with per-lookup GDEF filtering and neighbor selection. Preserve first-match zero records and class-0 matches, accumulate both ValueRecords across distinct lookups without intermediate i16 saturation, and advance the scan cursor according to ValueFormat2 presence. Existing SinglePos and attached-mark advance adjustments are retained.
+- Apply horizontal HVAR and gvar metric deltas once, using HVAR advance/LSB entries when available, retaining gvar bearings for a missing optional LSB map, and respecting authoritative mapped-zero values. Cover implicit and explicit advance mappings, including nonidentity maps.
+- Apply composite-glyph gvar tuples to component indices and phantom points rather than flattened outline points. Preserve sparse component semantics, selected-face metrics, child-only variations, per-field HVAR/VVAR precedence, and fractional nested XY offsets until the final integer outline conversion. Do not treat `ROUND_XY_TO_GRID` as design-unit rounding in the unhinted path.
+
+### Compatibility
+
+- Preserve existing public signatures, public structs/enums, feature flags, dependencies, licensing, and the Rust 1.91 minimum; the four tate-chu-yoko methods are additive. Corrected positioning, outlines, advances, and bearings can change rendered output, measurement, and SVG bounds.
+- This is a version boundary before multi-font composition APIs. Composite glyphs within one face are not composite fonts or multi-face fallback.
+- Update dependency requirements explicitly: Cargo's `fontcore = "0.0.16"` requirement does not select 0.0.17.
+
+### Verification and limits
+
+- Add self-contained MIT synthetic fixtures and integration regressions for tate-chu-yoko, PairPos filtering/cursor/ValueRecord semantics, HVAR/gvar metric selection, and composite gvar. The committed composite-gvar oracle was generated independently with fontTools 4.68.0. Normal tests need neither fontTools nor installed fonts; verification instructions and fixture checksums are in `doc/testing.md` and `tests/fixtures/manifest.toml`.
+- Tate-chu-yoko is explicit, single-face, single-line, and LTR only. It supports current-color, clip-free filled paths and fits advance width without clipping overhanging ink. Automatic digit grouping, BiDi, multi-font fallback, and multiline composition are not implemented.
+- Point-attached composites retain the legacy unvaried-outline fallback; correct point matching is not implemented. `USE_MY_METRICS` inherited phantom positions/hinting are absent: its own phantom deltas are ignored while supported XY outlines vary, with `hmtx`/HVAR and `vmtx`/VVAR metric fallback. Simple-glyph rounding and the public integer outline representation are unchanged; arbitrary rotated/sheared composites are not validated.
+- GPOS mark attachment keeps its existing separate filtering behavior. Device/VariationIndex adjustments and broad real-font/HarfBuzz parity remain unimplemented or unverified, respectively. See `doc/feature-status.md` for the detailed support boundaries.
+
 ## 0.0.16 - 2026-11-11
 
 ### Compatibility
