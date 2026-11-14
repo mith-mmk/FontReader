@@ -241,6 +241,54 @@ impl Gvar {
         })
     }
 
+    /// Composite tuples address component offsets followed by four phantoms.
+    /// Missing component deltas are zero; contour IUP must never be applied.
+    pub(crate) fn composite_deltas(
+        &self,
+        glyph_id: usize,
+        coordinates: &[f32],
+        component_count: usize,
+    ) -> Option<Vec<(f32, f32)>> {
+        if coordinates.is_empty() || coordinates.len() != self.axis_count as usize {
+            return None;
+        }
+        let total_points = u16::try_from(component_count.checked_add(4)?).ok()?;
+        let mut deltas = vec![(0.0, 0.0); usize::from(total_points)];
+        if let Some(data) = self.glyph_variation_data(glyph_id) {
+            for tuple in self.parse_glyph_variation_data(data, coordinates, total_points)? {
+                apply_tuple_to_points(&mut deltas, &[], &[], 0, &tuple);
+            }
+        }
+        // Even without a parent tuple, varied children can change its bearings.
+        Some(deltas)
+    }
+
+    pub(crate) fn composite_metrics(
+        base: &ParsedGlyph,
+        parsed: ParsedGlyph,
+        deltas: &[(f32, f32)],
+        horizontal_metric: Option<LongHorMetric>,
+        vertical_metric: Option<VerticalMetric>,
+    ) -> Option<GlyphVariationResult> {
+        let phantom_start = deltas.len().checked_sub(4)?;
+        // The original glyf bounds locate the default phantoms. Using the
+        // already-varied component bounds here would cancel bearing changes.
+        let mut phantoms = build_phantom_points(base, horizontal_metric, vertical_metric.as_ref());
+        for (point, delta) in phantoms.iter_mut().zip(&deltas[phantom_start..]) {
+            point.0 += delta.0;
+            point.1 += delta.1;
+        }
+        let horizontal_metric = horizontal_metric
+            .map(|metric| apply_horizontal_phantom_metrics(metric, &parsed, &phantoms, 0));
+        let vertical_metric = vertical_metric
+            .map(|metric| apply_vertical_phantom_metrics(metric, &parsed, &phantoms, 0));
+        Some(GlyphVariationResult {
+            parsed,
+            horizontal_metric,
+            vertical_metric,
+        })
+    }
+
     fn glyph_variation_data(&self, glyph_id: usize) -> Option<&[u8]> {
         let (start, end) = match &self.offsets {
             GlyphVariationDataOffsets::Short(offsets) => {

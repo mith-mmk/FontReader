@@ -53,11 +53,32 @@ resolution rule. MIT fixtures cover implicit/explicit maps, TTC faces, sparse
 phantom tuples, signed/fractional deltas, scale/stretch, measure/SVG bounds and
 saturation diagnostics. Saturation cases test robustness outside valid metrics.
 
-Remaining limitation: composite-glyph gvar tuples use component indices, but
-current metric interpolation consumes flattened outline point indices. A
-composite's gvar-only phantom advance/bearing changes may therefore be lost,
-even while its component outlines vary correctly. HVAR can provide those metrics.
-Nested composites and `USE_MY_METRICS` are not validated by this correction.
+Composite-glyph tuples use component indices followed by four phantom points,
+not flattened outline indices. Component XY deltas are applied before offset
+scaling; omitted component deltas remain zero rather than using contour IUP.
+Default phantoms use the original composite bounds and the selected face's
+`hmtx`/`vmtx`; varied outline bounds determine bearings, including when only a
+child has an applicable tuple. HVAR/VVAR precedence remains per field. Nested component offsets retain
+fractional precision until the outer outline is converted to `ParsedGlyph`;
+`ROUND_XY_TO_GRID` is not applied as design-unit rounding in this unhinted path.
+The public integer outline representation and simple-glyph rounding are
+unchanged, so this is not a general sub-font-unit precision guarantee.
+
+The dedicated MIT fixture and independent fontTools 4.68.0 instancing oracle
+cover translated and nested XY components, uniformly scaled component offsets,
+sparse tuples, signed/fractional phantom deltas, child-only variations, selected
+TTC faces, raw getters, shaping, scale/stretch, measurement and SVG bounds.
+Nonzero-left-phantom and conflicting-table cases are diagnostic, not conforming
+variable-font authoring examples. These are composite glyphs within a face,
+distinct from multi-font fallback.
+See [composite gvar processing](https://learn.microsoft.com/en-us/typography/opentype/spec/gvar#point-numbers-and-processing-for-composite-glyphs).
+
+Limits: point-attached composites still use the legacy unvaried outline path;
+correct point matching is not implemented. `USE_MY_METRICS` inherited phantom
+positions/hinting are not implemented: its own phantom deltas are ignored and
+metrics retain the `hmtx`/HVAR and `vmtx`/VVAR fallback while supported XY outlines
+vary. Fallback tests verify these boundaries, not conformance. Arbitrary rotated
+or sheared composites are not covered by this regression suite.
 
 ### TrueType variable vertical metrics
 
@@ -152,7 +173,7 @@ raw glyph/SVG APIs are unchanged. TrueType ignores VORG as required by OpenType.
 - Family fallback chains and Last Resort handling are still not implemented
 - Variable-font metadata and axis-driven metrics are available through `fvar` / `avar` / `HVAR` / `VVAR` / `MVAR`
 - Public API axis entry points are `FontFace::variation_axes()` and `FontEngine::with_variation()`
-- `gvar` outline deltas now cover both simple glyphs and composite glyphs, including recursive component variation for Source Serif variable-font fixtures
+- `gvar` outline deltas cover simple glyphs and XY-positioned composite glyphs, including recursive component variation; point attachment and inherited metrics remain limited as described above
 - `gvar` phantom-point deltas now feed horizontal and vertical glyph metrics in both layout getters and shaping output
 - Phantom-point behavior is covered by synthetic unit tests and Source Serif real-font regressions
 - Parser hardening is in progress: malformed optional GSUB/GPOS feature-variation data is now skipped instead of panicking
