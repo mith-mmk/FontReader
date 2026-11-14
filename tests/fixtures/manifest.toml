@@ -177,3 +177,10 @@ source = "generate_gpos_single.py (fontTools 4.65.0; no external font)"
 license = "MIT (project test code)"
 sha256 = "e96e6c7902bc6942a27698f1adab5f8293b0327cb184f52d87e593a2cbd192f1"
 features = ["layout", "gpos-single"]
+
+[[fixture]]
+id = "tate-chu-yoko.ttc"
+source = "tests/fixtures/generate_tate_chu_yoko.py (fontTools 4.65.0)"
+license = "MIT (project test code)"
+sha256 = "349d048ebddbb110d99b2209c74653a24c515b281e632260ffd97b85e51e14ba"
+features = ["tate-chu-yoko", "horizontal-composition", "kerning", "ligatures", "marks", "vertical-feature-exclusion", "negative-advance", "line-gap"]

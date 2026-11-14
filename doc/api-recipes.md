@@ -254,3 +254,33 @@ let svg = engine.render_svg_vertical_mixed_ltr("漢字AV「かな」")?;
 # Ok(())
 # }
 ```
+
+## Compose an explicit tate-chu-yoko cell
+
+Select the complete substring explicitly. This does not automatically find
+numbers or insert cells into an existing mixed-vertical run. The returned run
+contains one upright composite glyph anchored at the cell's top center.
+
+```rust,no_run
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+use fontcore::FontFile;
+let file = FontFile::from_file("example.ttf")?;
+let face = file.current_face()?;
+let engine = face.engine().with_font_size(32.0);
+let mut run = engine.shape_tate_chu_yoko_ltr("12")?;
+let metrics = engine.measure_layout_tate_chu_yoko_ltr("12")?;
+assert_eq!(metrics.inline_advance, 32.0);
+// Place the cell at a caller-managed column cursor.
+for glyph in &mut run.glyphs {
+    glyph.x += 200.0;
+    glyph.y += 64.0;
+}
+let svg = engine.render_svg_tate_chu_yoko_ltr("12")?;
+# let _ = (run, svg);
+# Ok(())
+# }
+```
+
+The cell side is font_size. Only wider advances are compressed; ink overhangs
+are retained. Logical bounds are square, while SVG is ink-sized (zero for
+space-only input). See [scope and limitations](feature-status.md#explicit-tate-chu-yoko-ltr-cells).
