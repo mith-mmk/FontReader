@@ -119,8 +119,8 @@ fn cff2_marks_inherit_varied_base_origin_and_advance() {
             .with_variation("wght", weight)
             .shape("A\u{301}\u{301}B")
             .unwrap();
-        for index in 0..3 {
-            let GlyphLayer::Path(path) = &run.glyphs[index].glyph.layers[0] else {
+        for glyph in &run.glyphs[..3] {
+            let GlyphLayer::Path(path) = &glyph.glyph.layers[0] else {
                 panic!()
             };
             assert_eq!(

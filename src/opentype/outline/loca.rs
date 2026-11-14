@@ -31,11 +31,11 @@ impl Loca {
         } else {
             max_length
         };
-        for i in 0..length {
+        for (i, value) in self.offsets.iter().take(length).enumerate() {
             if i % 16 == 0 {
                 string += "\n";
             }
-            let offset = format!("{:3} Offset {:08x}\n", i, self.offsets[i]);
+            let offset = format!("{:3} Offset {:08x}\n", i, value);
             string += &offset;
         }
         string

@@ -118,14 +118,10 @@ impl Cpal {
         } else {
             self.color_records.len()
         };
-        for i in 0..len {
+        for (i, record) in self.color_records[..len].iter().enumerate() {
             string.push_str(&format!(
                 "color_record[{}]: {} {} {} {}\n",
-                i,
-                self.color_records[i].red,
-                self.color_records[i].green,
-                self.color_records[i].blue,
-                self.color_records[i].alpha
+                i, record.red, record.green, record.blue, record.alpha
             ));
         }
 
@@ -134,11 +130,8 @@ impl Cpal {
         } else {
             self.color_record_indices.len()
         };
-        for i in 0..len {
-            string.push_str(&format!(
-                "color_record_indices[{}]: {}\n",
-                i, self.color_record_indices[i]
-            ));
+        for (i, index) in self.color_record_indices.iter().take(len).enumerate() {
+            string.push_str(&format!("color_record_indices[{}]: {}\n", i, index));
         }
         string
     }
@@ -187,6 +180,47 @@ impl std::fmt::Display for Cpal {
 mod tests {
     use super::*;
     use bin_rs::reader::BytesReader;
+
+    fn display_palette(num_palette_entries: u16, num_color_records: u16) -> Cpal {
+        Cpal {
+            version: 0,
+            num_palette_entries,
+            num_palettes: 1,
+            num_color_records,
+            color_records: vec![
+                ColorRecord {
+                    red: 1,
+                    green: 2,
+                    blue: 3,
+                    alpha: 4,
+                };
+                num_color_records as usize
+            ],
+            color_record_indices: vec![0],
+        }
+    }
+
+    #[test]
+    fn display_preserves_palette_entry_dependent_record_limit() {
+        for (num_palette_entries, displayed_records) in [(10, 12), (11, 10)] {
+            let cpal = display_palette(num_palette_entries, 12);
+            let mut expected = format!(
+                "CPAL Table\nversion: 0\nnum_palette_entries: {}\nnum_palettes: 1\nnum_color_records: 12\n",
+                num_palette_entries
+            );
+            for i in 0..displayed_records {
+                expected.push_str(&format!("color_record[{}]: 1 2 3 4\n", i));
+            }
+            expected.push_str("color_record_indices[0]: 0\n");
+            assert_eq!(cpal.to_string(), expected);
+        }
+    }
+
+    #[test]
+    #[should_panic]
+    fn display_preserves_panic_when_record_limit_exceeds_available_records() {
+        let _ = display_palette(11, 9).to_string();
+    }
 
     #[test]
     fn palette_indices_are_read_once_and_resolved_relative_to_palette() {

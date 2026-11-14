@@ -472,3 +472,58 @@ difference `A + U+1D127`. Existing fixtures cover selected TT/CFF/CFF2 faces,
 missing vertical metrics, supported variations and rejected color layers.
 Regenerate with `python tests/fixtures/generate_mixed_vertical_ltr.py`
 (fontTools 4.65.0); tests need only committed bytes, not Python or installed fonts.
+
+## Explicit tate-chu-yoko LTR cells
+
+`shape_tate_chu_yoko_ltr`, `measure_tate_chu_yoko_ltr`,
+`measure_layout_tate_chu_yoko_ltr`, and `render_svg_tate_chu_yoko_ltr` compose an
+explicitly selected single-face, single-line string horizontally into one
+upright synthetic glyph. They override direction for that call without changing
+the engine. Ordinary horizontal GSUB/GPOS, style, locale, variants and supported
+variation coordinates are retained; `vert`, `vrt2` and `vrtr` are not selected.
+Existing horizontal and mixed-vertical APIs are unchanged.
+
+The cell is one scaled em: `units_per_em * horizontal_outline_scale`, using
+exactly the same instance-dependent scale as horizontal shaping. This matters
+when units-per-em differs from the horizontal ascender/descender/line-gap sum:
+`font_size` itself is a line-height input in the existing API, not one em.
+Supported MVAR changes affect this scale once. Stretch and explicit line height
+do not change the cell. Its origin is the top center, advance is `(0, cell_size)`,
+and logical bounds are `[-cell_size/2, 0, cell_size/2, cell_size]`. Source glyphs become separate path
+layers of one composite glyph; original glyph boundaries are not retained.
+Its synthetic font metrics are half-cell ascent/descent, zero gap and vertical
+flow, with zero bearings. The cell is a low-level composition primitive, not
+an automatic insertion into `shape_vertical_mixed_ltr`.
+
+Let `size` denote the scaled em, `W` the sum of the horizontal run's x advances,
+and `S = min(1, size/W)`
+(`S = 1` when W is zero). Final outline x is `S * (glyph.x + layer.x + x - W/2)`.
+The horizontal baseline is placed at `size/2 + (ascent-descent)/2`, using the
+already-scaled horizontal font metrics and positive descent. Glyph y placement,
+path y and layer y are preserved relative to that baseline. This is metric-based
+centering, not ink centering. Line height does not change it. Horizontal stretch
+and font size apply before fitting; no enlargement is performed. Kerning affects
+the fitting width; internal cross-axis advances affect positioned source ink
+but not the final cell advance.
+
+Only advance width is fitted. Overhanging ink/marks can exceed the square and
+are not clipped. Leading/trailing spaces affect centering; all spaces are
+preserved. Spaces and zero-advance marks occupy a cell when shaping emits a
+glyph; empty input and ignored orphan selectors with no glyphs occupy none.
+Measurement keeps conservative transformed ink bounds separate from the square.
+SVG uses the exact final run and normal ink padding, so ink-free cells produce
+zero-sized empty SVG despite their nonzero logical advance.
+
+As with the explicit sideways API, only current-color, clip-free filled paths
+are accepted. Other colors/gradients, strokes, clips, raster and raw SVG layers
+return `Unsupported`. Tabs and line-break controls, invalid options, negative
+total horizontal advance or non-finite composed geometry return `InvalidInput`.
+No partial output is returned. Path layer ordering and fill rules are preserved.
+
+The [CSS Writing Modes horizontal-in-vertical section](https://www.w3.org/TR/css-writing-modes-4/#text-combine-upright)
+is background for the composition concept, not a conformance claim. Automatic
+digit ranges, width variants (`hwid`/`twid`/`qwid`), full-width normalization,
+BiDi, fallback, BASE alignment, multiline flow and line-breaking rules are not
+implemented here. Existing horizontal shaping limitations still apply.
+MIT fixtures, generator and SHA-256 are in `tests/fixtures/manifest.toml`;
+`tests/tate_chu_yoko.rs` covers the public APIs without installed fonts.

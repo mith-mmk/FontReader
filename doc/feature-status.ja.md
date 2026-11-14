@@ -415,3 +415,43 @@ Unicode17/18 の `A + U+1D127` の境界差を検証します。既存 fixture �
 縦メトリクス欠落、対応済み可変フォント、カラー拒否も検証します。再生成は
 `python tests/fixtures/generate_mixed_vertical_ltr.py`（fontTools 4.65.0）。
 通常テストに Python やインストール済みフォントは不要です。
+
+## 明示指定の縦中横 LTR セル
+
+`shape_tate_chu_yoko_ltr`、`measure_tate_chu_yoko_ltr`、
+`measure_layout_tate_chu_yoko_ltr`、`render_svg_tate_chu_yoko_ltr` は、
+呼び出し側が選んだ単一face・単一行の文字列を横組みし、縦送り1セルにまとめる。
+既存の横組みGSUB/GPOS・style・locale・variant・対応済みvariationを維持し、
+`vert`・`vrt2`・`vrtr`は選ばない。エンジンの方向や既存APIの挙動は変更しない。
+
+セルの一辺は `units_per_em × 横組みoutlineのスケール` で求めた1em。
+現行APIのfont_sizeは横組みの行高入力であり、フォントのemとは必ずしも一致しない。
+MVAR対応メトリクスを含め横組みと同じスケールを一度だけ使い、stretchと明示的な
+line_heightはセルサイズに影響しない。上中央を原点として送りは `(0, cell_size)`、
+論理boundsは `[-cell_size/2, 0, cell_size/2, cell_size]`。各glyphのpath layerを順序・fill ruleを
+保ったまま1つの合成glyphへまとめ、元のglyph境界は保持しない。合成font metricsは
+ascent/descentが各半セル、line gapが0、flowがVertical、bearingが0となる。
+混在縦書きAPIへの自動挿入ではなく、明示的に配置するための基本操作である。
+
+以下のsizeはスケール済みem寸法を指す。横advance合計Wがセル幅を超える場合だけx方向に縮小し、狭い文字列は拡大しない。
+x方向はadvanceを中心に配置し、baselineは `size/2 + (ascent-descent)/2` とする。
+ascent/descentは横組み後の値で、descentは正。GPOS配置、layer offset、曲線の全点を
+一度だけ変換する。line_heightはセルサイズや中央配置に影響しない。文字サイズと
+stretchは横組み時に反映済みで、kerningは圧縮幅に反映する。内部のy送りは元の
+glyph位置に反映するが、セル全体の送りは変えない。
+
+幅を合わせる対象はadvanceであり、はみ出すinkやmarkは切り取らない。前後の空白も
+幅と配置に含める。glyphを出力する空白や幅0のmarkは1セル、空文字や無視される
+孤立selectorだけでglyphがない場合は0セル。ink boundsは保守的な曲線boundsを
+変換し、論理セルと分離する。SVGは最終runのinkと通常の余白を使うため、inkがない
+空白セルは、論理送りがあってもサイズ0の空SVGとなる。
+
+対応layerはCurrentColor・clipなし・fill pathのみ。色、gradient、stroke、clip、
+raster、raw SVGはUnsupported。TAB・改行control、不正option、負の横advance合計、
+非有限の形状はInvalidInputで、部分出力は返さない。
+
+[CSS Writing Modesの縦中横](https://www.w3.org/TR/css-writing-modes-4/#text-combine-upright)
+は概念上の参考で、CSS準拠を表明するものではない。数字の自動選択、hwid/twid/qwid、
+全角正規化、BiDi、fallback、BASE、複数行、禁則・折返しは対象外。
+MIT合成fixture・再生成方法・SHA-256は `tests/fixtures/manifest.toml` に記載。
+公開APIの回帰テストは `tests/tate_chu_yoko.rs` にあり、インストール済みfontは不要。

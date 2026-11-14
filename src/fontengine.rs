@@ -12,6 +12,8 @@ use base64::{engine::general_purpose, Engine as _};
 use std::fmt::Write as _;
 use std::io::{Error, ErrorKind};
 
+mod tate_chu_yoko;
+
 /// Public shaping direction used by [`FontEngine`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ShapingPolicy {

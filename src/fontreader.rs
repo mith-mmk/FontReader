@@ -1836,6 +1836,23 @@ impl Font {
         self.default_line_height_with_options(&crate::commands::FontOptions::from_parsed(self))
     }
 
+    pub(crate) fn em_size_with_options(
+        &self,
+        options: &crate::commands::FontOptions<'_>,
+    ) -> Result<f32, Error> {
+        // Match text2glyph_run_impl: font_size is a line height, not always an em.
+        let scale =
+            options.font_size / (self.default_line_height_with_options(options)? as f32).max(1.0);
+        let em = self.current_head()?.units_per_em as f32 * scale;
+        if !em.is_finite() || em <= 0.0 {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "scaled em must be positive and finite",
+            ));
+        }
+        Ok(em)
+    }
+
     fn default_line_height_with_options(
         &self,
         options: &crate::commands::FontOptions<'_>,
