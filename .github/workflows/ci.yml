@@ -28,7 +28,7 @@ jobs:
           - name: test-layout-and-cff
             command: cargo test --features "layout,cff"
           - name: test-all-features
-            command: cargo test --all-features --lib
+            command: cargo test --all-features
           - name: check-all-features
             command: cargo check --all-features
           - name: check-examples-all-features
@@ -70,8 +70,8 @@ jobs:
       - name: Test default features
         run: cargo test --locked
 
-      - name: Test all library features
-        run: cargo test --locked --all-features --lib
+      - name: Test all features including integration tests
+        run: cargo test --locked --all-features
 
       - name: Check WebAssembly
         run: cargo check --locked --target wasm32-unknown-unknown --all-features
