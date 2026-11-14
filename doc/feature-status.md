@@ -111,7 +111,7 @@ raw glyph/SVG APIs are unchanged. TrueType ignores VORG as required by OpenType.
 - Type 1 SinglePos Formats 1/2 and Type 9 wrapping SinglePos are parsed and executed.
 - Default execution covers `kern` / `dist` horizontally and `vkrn` / `dist` vertically, with the existing locale/script selection. Arbitrary feature selection and contextual GPOS are not added.
 - All four static ValueRecord fields reach shaping and measurement, including explicit advances on attached marks. Distinct lookups accumulate in i32, and the first matching subtable (including a zero record) wins within one lookup.
-- SinglePos observes GDEF glyph classes, IgnoreBaseGlyphs / IgnoreLigatures / IgnoreMarks, MarkAttachmentType, and MarkFilteringSet. This does not add shared filtering to the existing pair/mark paths.
+- SinglePos observes GDEF glyph classes, IgnoreBaseGlyphs / IgnoreLigatures / IgnoreMarks, MarkAttachmentType, and MarkFilteringSet. PairPos now shares this filtering; mark attachment retains its existing separate behavior.
 - Device / VariationIndex offsets are consumed but their deltas are not evaluated. Cursive positioning and Unicode Arabic joining remain separate work.
 - Regressions use the committed MIT synthetic font (`tests/fixtures/gpos-single.ttf`) and byte fixtures for truncation, invalid coverage/counts, lookup accumulation, locale, scaling, vertical flow, and mark attachment. Broad real-font / HarfBuzz comparison is not yet covered.
 - Reference: [OpenType GPOS Single Adjustment](https://learn.microsoft.com/en-us/typography/opentype/spec/gpos#lookup-type-1-single-adjustment-positioning-subtable).
@@ -527,3 +527,33 @@ BiDi, fallback, BASE alignment, multiline flow and line-breaking rules are not
 implemented here. Existing horizontal shaping limitations still apply.
 MIT fixtures, generator and SHA-256 are in `tests/fixtures/manifest.toml`;
 `tests/tate_chu_yoko.rs` covers the public APIs without installed fonts.
+
+### Lookup-aware PairPos filtering
+
+PairPos formats 1/2 and their Type 9 Extension wrappers now select neighbors
+inside each lookup, using GDEF IgnoreBaseGlyphs, IgnoreLigatures, IgnoreMarks,
+MarkAttachmentType, and MarkFilteringSet. A zero flag no longer skips every
+mark. IgnoreMarks takes precedence over mark sets, which take precedence over
+attachment classes. With no GDEF, glyph classes are not inferred. Tabs and
+newlines terminate pair matching. Existing locale/script selection and kern /
+vkrn feature selection are unchanged; this does not add full GPOS shaping.
+
+The first matching subtable wins even for an all-zero record or class-0 matrix
+entry. Distinct lookups accumulate both ValueRecords in i32, with no intermediate
+i16 saturation. ValueFormat2 presence controls the next scan position: an empty
+second record permits overlapping pairs, while a present record consumes the
+second glyph even when all its values are zero. SinglePos still accumulates with
+pairs, and explicitly positioned attached marks keep their advance adjustments.
+The pre-existing GDEF/GPOS mark attachment path is unchanged and is not newly
+lookup-filter-aware. Device/VariationIndex adjustments remain unevaluated.
+
+The reproducible MIT `pair-filtering.ttc` and byte tests cover filtering flags
+and their precedence, absent GDEF, both formats and extensions, first-match zero
+records, distinct lookups with different neighbors, wide accumulation, cursor
+advancement, locale, boundaries, both ValueRecords, LTR/RTL/vertical placement,
+non-unit size/stretch, measurement, and an exact SVG viewBox with attachment.
+Existing pair-coordinate tests are unchanged except for their internal helper
+call. Broad real-font/HarfBuzz parity remains unverified.
+
+References: [GPOS pair adjustment](https://learn.microsoft.com/en-us/typography/opentype/spec/gpos#lookup-type-2-pair-adjustment-positioning-subtable)
+and [lookup flags](https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#lookupFlags).
