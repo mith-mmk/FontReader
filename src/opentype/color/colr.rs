@@ -71,22 +71,16 @@ impl Colr {
         } else {
             self.base_glyph_records.len()
         };
-        for i in 0..len {
-            string.push_str(&format!(
-                "base_glyph_record[{}]: {:?}\n",
-                i, self.base_glyph_records[i]
-            ));
+        for (i, record) in self.base_glyph_records.iter().take(len).enumerate() {
+            string.push_str(&format!("base_glyph_record[{}]: {:?}\n", i, record));
         }
         let len = if max_length < self.layer_records.len() {
             max_length
         } else {
             self.layer_records.len()
         };
-        for i in 0..len {
-            string.push_str(&format!(
-                "layer_record[{}]: {:?}\n",
-                i, self.layer_records[i]
-            ));
+        for (i, record) in self.layer_records.iter().take(len).enumerate() {
+            string.push_str(&format!("layer_record[{}]: {:?}\n", i, record));
         }
         string
     }
