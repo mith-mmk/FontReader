@@ -184,3 +184,10 @@ source = "tests/fixtures/generate_tate_chu_yoko.py (fontTools 4.65.0)"
 license = "MIT (project test code)"
 sha256 = "e980b72e455a5f8df6b0430420a6c3905862711168b4cd2392d5a03b2165b957"
 features = ["tate-chu-yoko", "horizontal-composition", "kerning", "ligatures", "marks", "vertical-feature-exclusion", "negative-advance", "line-gap"]
+
+[[fixture]]
+id = "pair-filtering.ttc"
+source = "tests/fixtures/generate_pair_filtering.py (fontTools 4.65.0; no external font)"
+license = "MIT (project test code)"
+sha256 = "07299d1a4be5b23f170a813668377e5371de5d42a7e1cb694eb9b9a3eaa8f2a2"
+features = ["GPOS", "PairPos-format1", "PairPos-format2", "Extension", "GDEF", "lookup-filtering", "cursor-advancement", "locale", "SinglePos", "mark-attachment"]
