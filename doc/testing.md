@@ -12,12 +12,18 @@ Run the CI checks with the current stable Rust toolchain:
 cargo test --no-default-features
 cargo test
 cargo test --features "layout,cff"
-cargo test --all-features --lib
+cargo test --all-features
 cargo check --all-features
 cargo check --examples --all-features
 cargo fmt --all -- --check
 cargo clippy --all-targets --all-features -- -D warnings
 ```
+
+The all-feature test job runs library, integration and documentation tests on
+both stable Rust and the minimum supported version. Do not restrict this job to
+`--lib`: integration tests gated by `cff2`, `svg-fonts` or `raw` are not enabled
+by the default-feature jobs. Compiling them with Clippy or `cargo check` does
+not execute their assertions.
 
 ## External font corpus
 
