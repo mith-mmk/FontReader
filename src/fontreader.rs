@@ -1208,7 +1208,20 @@ impl Font {
         let gvar = self.current_gvar()?;
         let component_varied = self.current_gvar_component_varied_parsed(glyph_id, coordinates)?;
 
-        let horizontal_metric = Some(self.get_h_metrix_with_coords(glyph_id, coordinates));
+        // HVAR and gvar encode alternative adjustments to default hmtx,
+        // just as VVAR and gvar do for vertical metrics.
+        let (hmtx, hvar) = if self.current_font == 0 {
+            (self.hmtx.as_ref(), self.hvar.as_ref())
+        } else {
+            let font = &self.more_fonts[self.current_font - 1];
+            (font.hmtx.as_ref(), font.hvar.as_ref())
+        };
+        let horizontal_metric = Some(hmtx.map(|hmtx| hmtx.get_metrix(glyph_id)).unwrap_or(
+            LongHorMetric {
+                advance_width: 0,
+                left_side_bearing: 0,
+            },
+        ));
         // Phantom points start at default vmtx metrics. VVAR and gvar encode
         // alternative adjustments to those defaults, not cumulative deltas.
         let vertical_metric = self.current_vhea().map(|_| {
@@ -1227,6 +1240,20 @@ impl Font {
             horizontal_metric,
             vertical_metric.clone(),
         )?;
+        if let (Some(base), Some(metric), Some(hvar)) = (
+            horizontal_metric,
+            variation.horizontal_metric.as_mut(),
+            hvar,
+        ) {
+            // Present HVAR entries override gvar, including mapped zero.
+            // Missing optional LSB mappings retain the gvar-derived bearing.
+            if let Some(delta) = hvar.advance_offset(glyph_id, coordinates) {
+                metric.advance_width = apply_u16_delta(base.advance_width, delta);
+            }
+            if let Some(delta) = hvar.left_side_bearing_offset(glyph_id, coordinates) {
+                metric.left_side_bearing = apply_i16_delta(base.left_side_bearing, delta);
+            }
+        }
         let vvar = if self.current_font == 0 {
             self.vvar.as_ref()
         } else {

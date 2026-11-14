@@ -191,3 +191,17 @@ source = "tests/fixtures/generate_pair_filtering.py (fontTools 4.65.0; no extern
 license = "MIT (project test code)"
 sha256 = "07299d1a4be5b23f170a813668377e5371de5d42a7e1cb694eb9b9a3eaa8f2a2"
 features = ["GPOS", "PairPos-format1", "PairPos-format2", "Extension", "GDEF", "lookup-filtering", "cursor-advancement", "locale", "SinglePos", "mark-attachment"]
+
+[[fixture]]
+id = "horizontal-variations.ttc"
+source = "tests/fixtures/generate_horizontal_variations.py (fontTools 4.65.0; no external font)"
+license = "MIT (project test code)"
+sha256 = "73bdbf8227634e1981b9b9d8ea18e69bd415b1455065c471eed3063f5ff01ba4"
+features = ["HVAR", "gvar", "horizontal-metrics", "implicit-map", "explicit-map", "optional-lsb", "mapped-zero", "phantom-only", "composites", "negative-deltas", "clamping", "TTC"]
+
+[[fixture]]
+id = "horizontal-variations.ttf"
+source = "tests/fixtures/generate_horizontal_variations.py (fontTools 4.65.0; no external font)"
+license = "MIT (project test code)"
+sha256 = "19b6fa52d6e1f7be47e91cf247b3da70c979211504874adc04e8b66bf086238b"
+features = ["HVAR", "gvar", "horizontal-metrics", "first-face"]

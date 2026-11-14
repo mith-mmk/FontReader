@@ -31,6 +31,23 @@ vheaだけがある場合も同じフォールバックです。
 合成fixtureで縦メトリクスの有無とコレクション内のface選択を検証し、外部フォントを必要としません。
 このfallbackとは別に下記のTrueType縦原点補正を行います。この従来フローは向きを判定しません。混在縦書きは下記の明示 API を使用します。静的CFFの原点は下記を参照してください。
 
+### TrueTypeの可変横メトリクス
+
+横phantom pointは選択faceの既定`hmtx`から構築します。`HVAR`と`gvar`は代替の
+メトリクス情報であり、有効なHVARのadvance/LSBを項目ごとに優先して二重加算を防ぎます。
+任意LSB mapの省略時はgvar由来のbearingを保持し、明示されたゼロは有効な値として扱います。
+gvar tupleが適用されない場合もHVARを利用します。`layout` featureなしでも動作します。
+
+[OpenType HVAR仕様](https://learn.microsoft.com/en-us/typography/opentype/spec/hvar)を参照してください。
+不一致tableのfixtureは実装の選択方針を検証するもので、準拠フォントや仕様上の競合解決規則ではありません。
+MIT fixtureで暗黙・明示map、TTC face、phantomのみのtuple、符号付き・小数delta、
+拡大縮小・横stretch、measure/SVG boundsを検証します。範囲外の飽和テストは堅牢性の診断です。
+
+残る制限：複合グリフのgvar tupleはcomponent番号を使いますが、現在のメトリクス補間は
+展開後の輪郭点番号を使うため、component輪郭が正しく変化しても、複合グリフ自身の
+gvar phantom由来のadvance/bearing変化が失われる場合があります。HVARがあれば
+そのメトリクスを利用できます。入れ子の複合グリフと`USE_MY_METRICS`は今回の検証範囲外です。
+
 ### TrueTypeの可変縦メトリクス
 
 縦phantom pointは既定の`vmtx`から作り、`gvar`と`VVAR`の同じ変化を二重適用しません。
@@ -42,7 +59,7 @@ TrueTypeでは`VVAR`の縦原点mapを使いません。
 不一致データの優先順位は実装の決定的な選択方針であり、適合するフォント作成例や
 仕様が定めた競合解決規則という意味ではありません。MITの合成fixtureで軸の既定値・中間値・
 最大値、任意map、TTC face、shape・measure・描画boundsを検証します。
-この修正は縦方向のみです。横方向の`HVAR`/`gvar`の相互作用は変更・検証していません。
+縦方向のfixtureは上記の横方向の検証とは別です。
 
 ### TrueTypeの縦原点
 
