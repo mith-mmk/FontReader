@@ -43,10 +43,24 @@ gvar tupleが適用されない場合もHVARを利用します。`layout` featur
 MIT fixtureで暗黙・明示map、TTC face、phantomのみのtuple、符号付き・小数delta、
 拡大縮小・横stretch、measure/SVG boundsを検証します。範囲外の飽和テストは堅牢性の診断です。
 
-残る制限：複合グリフのgvar tupleはcomponent番号を使いますが、現在のメトリクス補間は
-展開後の輪郭点番号を使うため、component輪郭が正しく変化しても、複合グリフ自身の
-gvar phantom由来のadvance/bearing変化が失われる場合があります。HVARがあれば
-そのメトリクスを利用できます。入れ子の複合グリフと`USE_MY_METRICS`は今回の検証範囲外です。
+複合グリフのtupleは、展開後の輪郭点ではなくcomponent番号とその後の4つのphantom pointを使います。
+componentのXY deltaはoffsetの拡大縮小より前に適用し、省略deltaはゼロとします。輪郭用IUPは行いません。
+既定phantomは元の複合グリフboundsと選択faceの`hmtx`/`vmtx`から作り、変化後のboundsでbearingを計算します。
+親にtupleがなく子だけが変化する場合も対象です。項目ごとのHVAR/VVAR優先順位は維持します。
+入れ子componentの小数offsetは最外側の`ParsedGlyph`変換まで保持します。この未hint輪郭経路では
+`ROUND_XY_TO_GRID`をdesign unit単位の丸めとして適用しません。公開された整数輪郭表現と
+simple glyphの丸めは変更していないため、font unit未満の精度全般を保証する修正ではありません。
+
+専用MIT fixtureとfontTools 4.68.0の独立したinstance生成結果で、XY移動、入れ子、均等拡大縮小されたoffset、
+疎なtuple、符号付き・小数phantom delta、子のみの変化、TTC face選択、raw getter、shape、
+拡大縮小・横stretch、measure/SVG boundsを検証します。左phantomがゼロでないケースと不一致tableは診断用で、
+準拠する可変フォントの作成例ではありません。これは1つのface内の複合グリフで、複数フォントのfallbackとは別です。
+[複合グリフのgvar仕様](https://learn.microsoft.com/en-us/typography/opentype/spec/gvar#point-numbers-and-processing-for-composite-glyphs)を参照してください。
+
+制限：点同士で接続する複合グリフは従来の未変形輪郭経路を使い、正しい点の対応付けは未実装です。
+`USE_MY_METRICS`のphantom継承・hintingも未実装のため、親自身のphantom deltaは無視し、
+`hmtx`/HVARと`vmtx`/VVARのfallbackを保持します。対応するXY輪郭は変形します。
+fallbackテストはこの境界を検証するもので、仕様準拠を示しません。任意の回転・斜行を含む複合グリフは今回の検証範囲外です。
 
 ### TrueTypeの可変縦メトリクス
 
@@ -133,7 +147,7 @@ BASE と下記の静的COLR v0以外の色layer原点は別対応です。向き
 - family fallback chain と Last Resort は未実装
 - variable font の metadata と axis 依存 metrics は `fvar` / `avar` / `HVAR` / `VVAR` / `MVAR` まで対応
 - 公開API では `FontFace::variation_axes()` と `FontEngine::with_variation()` から使える
-- `gvar` は simple glyph に加えて composite glyph の outline delta まで実装済みで、Source Serif variable-font fixture を含めて回帰確認している
+- `gvar` は simple glyph とXY配置のcomposite glyphの輪郭delta・再帰的component変形に対応。点接続とメトリクス継承には上記の制限がある
 - `gvar` phantom point delta は horizontal / vertical の glyph metrics に反映するようにした
 - phantom point の挙動は synthetic unit test と Source Serif の real-font regression で確認している
 - parser hardening を進めており、GSUB/GPOS の壊れた optional feature variation は panic せず読み飛ばすようにした

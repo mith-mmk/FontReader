@@ -206,3 +206,25 @@ fn standalone_first_face_applies_each_delta_once() {
         );
     }
 }
+
+#[test]
+fn composite_gvar_only_uses_component_phantom_indices() {
+    check(0, "BB", 700.0, 200.0);
+    let file = FontFile::from_buffer(COLLECTION).unwrap();
+    // First and selected faces, including HVAR with no optional LSB map.
+    for index in 0..4 {
+        for (weight, scalar) in [(400.0, 0.0), (650.0, 0.5), (900.0, 1.0)] {
+            let run = file
+                .face(index)
+                .unwrap()
+                .engine()
+                .with_font_size(1000.0)
+                .with_variation("wght", weight)
+                .shape("B")
+                .unwrap();
+            let metric = &run.glyphs[0].glyph.metrics;
+            assert_eq!(metric.bearing_x, 150.0 + 40.0 * scalar, "face {index}");
+            assert_eq!(metric.bounds.unwrap().min_x, 150.0 + 40.0 * scalar);
+        }
+    }
+}

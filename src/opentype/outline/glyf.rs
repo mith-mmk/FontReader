@@ -28,6 +28,7 @@ const MORE_COMPONENTS: u16 = 0x0020;
 const WE_HAVE_AN_X_AND_Y_SCALE: u16 = 0x0040;
 const WE_HAVE_A_TWO_BY_TWO: u16 = 0x0080;
 const WE_HAVE_INSTRUCTIONS: u16 = 0x0100;
+const USE_MY_METRICS: u16 = 0x0200;
 const SCALED_COMPONENT_OFFSET: u16 = 0x0800;
 
 #[derive(Debug, Clone, Copy)]
@@ -38,6 +39,46 @@ struct CompositeTransform {
     yy: f64,
     dx: f64,
     dy: f64,
+}
+
+// Preserve fractional offsets through nested components. Only the outer
+// unhinted outline is converted to the public integer ParsedGlyph format.
+struct CompositeOutline {
+    offset: u32,
+    length: u32,
+    instructions: Vec<u8>,
+    points: Vec<(f64, f64, bool)>,
+    end_pts_of_contours: Vec<usize>,
+}
+
+impl CompositeOutline {
+    fn from_parsed(parsed: ParsedGlyph) -> Self {
+        let points = Glyph::build_contours(&parsed)
+            .into_iter()
+            .flatten()
+            .map(|(x, y, on_curve)| (f64::from(x), f64::from(y), on_curve))
+            .collect();
+        Self {
+            offset: parsed.offset,
+            length: parsed.length,
+            instructions: parsed.instructions,
+            points,
+            end_pts_of_contours: parsed.end_pts_of_contours,
+        }
+    }
+
+    fn into_parsed(self) -> ParsedGlyph {
+        parsed_glyph_from_points(
+            self.offset,
+            self.length,
+            self.instructions,
+            self.points
+                .into_iter()
+                .map(|(x, y, on_curve)| (round_f64_to_i16(x), round_f64_to_i16(y), on_curve))
+                .collect(),
+            self.end_pts_of_contours,
+        )
+    }
 }
 
 impl Default for CompositeTransform {
@@ -109,6 +150,46 @@ impl Glyph {
             xs: Vec::new(),
             ys: Vec::new(),
             on_curves: Vec::new(),
+        }
+    }
+
+    /// Count component-domain gvar points without flattening the outline.
+    /// The flag reports inherited phantom metrics, which this unhinted path
+    /// does not implement. Reject truncated component records before parsing.
+    pub(crate) fn composite_variation_info(&self) -> Option<(usize, bool)> {
+        let bytes = &self.glyphs;
+        if bytes.len() < 10 || i16::from_be_bytes([bytes[0], bytes[1]]) >= 0 {
+            return None;
+        }
+        let mut offset = 10usize;
+        let mut count = 0usize;
+        let mut inherits_metrics = false;
+        loop {
+            bytes.get(offset..offset.checked_add(4)?)?;
+            let flags = read_u16(bytes, &mut offset);
+            let _ = read_u16(bytes, &mut offset);
+            let argument_bytes = if flags & ARG_1_AND_2_ARE_WORDS != 0 {
+                4
+            } else {
+                2
+            };
+            let transform_bytes = if flags & WE_HAVE_A_SCALE != 0 {
+                2
+            } else if flags & WE_HAVE_AN_X_AND_Y_SCALE != 0 {
+                4
+            } else if flags & WE_HAVE_A_TWO_BY_TWO != 0 {
+                8
+            } else {
+                0
+            };
+            let end = offset.checked_add(argument_bytes + transform_bytes)?;
+            bytes.get(offset..end)?;
+            offset = end;
+            count += 1;
+            inherits_metrics |= flags & USE_MY_METRICS != 0;
+            if flags & MORE_COMPONENTS == 0 {
+                return Some((count, inherits_metrics));
+            }
         }
     }
 
@@ -635,15 +716,18 @@ impl Glyf {
         self.parse_glyph_recursive(index, 0)
     }
 
-    pub(crate) fn parse_glyph_with_variation<F>(
+    pub(crate) fn parse_glyph_with_variation<F, C>(
         &self,
         index: usize,
         vary: &F,
+        component_deltas: &C,
     ) -> Option<ParsedGlyph>
     where
         F: Fn(usize, &ParsedGlyph) -> Option<ParsedGlyph>,
+        C: Fn(usize, usize) -> Option<Vec<(f32, f32)>>,
     {
-        self.parse_glyph_recursive_with_variation(index, 0, vary)
+        self.parse_glyph_recursive_with_variation(index, 0, vary, component_deltas)
+            .map(CompositeOutline::into_parsed)
     }
 
     pub fn to_path_commands(
@@ -730,17 +814,20 @@ impl Glyf {
 
     #[allow(dead_code)]
     fn parse_glyph_recursive(&self, index: usize, depth: usize) -> Option<ParsedGlyph> {
-        self.parse_glyph_recursive_with_variation(index, depth, &|_, _| None)
+        self.parse_glyph_recursive_with_variation(index, depth, &|_, _| None, &|_, _| None)
+            .map(CompositeOutline::into_parsed)
     }
 
-    fn parse_glyph_recursive_with_variation<F>(
+    fn parse_glyph_recursive_with_variation<F, C>(
         &self,
         index: usize,
         depth: usize,
         vary: &F,
-    ) -> Option<ParsedGlyph>
+        component_deltas: &C,
+    ) -> Option<CompositeOutline>
     where
         F: Fn(usize, &ParsedGlyph) -> Option<ParsedGlyph>,
+        C: Fn(usize, usize) -> Option<Vec<(f32, f32)>>,
     {
         if depth > 16 {
             return None;
@@ -748,26 +835,38 @@ impl Glyf {
 
         let glyph = self.get_glyph(index)?;
         let parsed = glyph.parse();
-        let parsed = if parsed.number_of_contours >= 0 {
-            parsed
+        if parsed.number_of_contours >= 0 {
+            Some(CompositeOutline::from_parsed(
+                vary(index, &parsed).unwrap_or(parsed),
+            ))
         } else {
-            self.parse_composite_glyph_with_variation(glyph, depth, vary)?
-        };
-
-        Some(vary(index, &parsed).unwrap_or(parsed))
+            let (count, _) = glyph.composite_variation_info()?;
+            let deltas = component_deltas(index, count);
+            self.parse_composite_glyph_with_variation(
+                glyph,
+                depth,
+                vary,
+                component_deltas,
+                deltas.as_deref().unwrap_or(&[]),
+            )
+        }
     }
 
-    fn parse_composite_glyph_with_variation<F>(
+    fn parse_composite_glyph_with_variation<F, C>(
         &self,
         glyph: &Glyph,
         depth: usize,
         vary: &F,
-    ) -> Option<ParsedGlyph>
+        component_deltas: &C,
+        deltas: &[(f32, f32)],
+    ) -> Option<CompositeOutline>
     where
         F: Fn(usize, &ParsedGlyph) -> Option<ParsedGlyph>,
+        C: Fn(usize, usize) -> Option<Vec<(f32, f32)>>,
     {
         let mut offset = 10usize;
-        let mut points = Vec::<(i16, i16, bool)>::new();
+        let mut component_number = 0usize;
+        let mut points = Vec::<(f64, f64, bool)>::new();
         let mut end_pts_of_contours = Vec::new();
         let mut instructions = Vec::new();
 
@@ -797,11 +896,15 @@ impl Glyf {
 
             let mut transform = CompositeTransform::default();
             if args_are_xy_values {
-                transform.dx = arg1;
-                transform.dy = arg2;
+                let (dx, dy) = deltas.get(component_number).copied().unwrap_or((0.0, 0.0));
+                // gvar adjusts raw offsets before optional offset scaling.
+                transform.dx = arg1 + f64::from(dx);
+                transform.dy = arg2 + f64::from(dy);
             } else {
+                // Point attachment needs point matching, not XY translation.
                 return None;
             }
+            component_number += 1;
 
             if flags & WE_HAVE_A_SCALE != 0 {
                 let scale = read_f2dot14(&glyph.glyphs, &mut offset);
@@ -823,24 +926,26 @@ impl Glyf {
                 transform.dx = dx;
                 transform.dy = dy;
             }
-            if flags & ROUND_XY_TO_GRID != 0 {
-                transform.dx = transform.dx.round();
-                transform.dy = transform.dy.round();
-            }
+            // ROUND_XY_TO_GRID is pixel-grid fitting, not design-unit
+            // rounding. This unhinted path retains fractional offsets.
 
-            let component =
-                self.parse_glyph_recursive_with_variation(component_index, depth + 1, vary)?;
-            for contour in Glyph::build_contours(&component) {
-                if contour.is_empty() {
-                    continue;
-                }
-
-                for (x, y, on_curve) in contour {
-                    let (x, y) = transform_outline_point(x as f64, y as f64, transform);
-                    points.push((round_f64_to_i16(x), round_f64_to_i16(y), on_curve));
-                }
-                end_pts_of_contours.push(points.len() - 1);
+            let component = self.parse_glyph_recursive_with_variation(
+                component_index,
+                depth + 1,
+                vary,
+                component_deltas,
+            )?;
+            let point_base = points.len();
+            for (x, y, on_curve) in component.points {
+                let (x, y) = transform_outline_point(x, y, transform);
+                points.push((x, y, on_curve));
             }
+            end_pts_of_contours.extend(
+                component
+                    .end_pts_of_contours
+                    .into_iter()
+                    .map(|end| point_base + end),
+            );
 
             if flags & MORE_COMPONENTS == 0 {
                 if flags & WE_HAVE_INSTRUCTIONS != 0 && offset + 2 <= glyph.glyphs.len() {
@@ -854,13 +959,13 @@ impl Glyf {
             }
         }
 
-        Some(parsed_glyph_from_points(
-            glyph.offset,
-            glyph.length,
+        Some(CompositeOutline {
+            offset: glyph.offset,
+            length: glyph.length,
             instructions,
             points,
             end_pts_of_contours,
-        ))
+        })
     }
 
     fn composite_to_path_commands(
@@ -1147,6 +1252,29 @@ fn get_glyph<R: BinaryReader>(file: &mut R, offset: u32, length: u32) -> Glyph {
 #[cfg(test)]
 mod display_tests {
     use super::*;
+
+    #[test]
+    fn composite_variation_info_checks_full_component_records() {
+        let bytes = vec![255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 2, 10, 0, 1, 100, 0, 32, 0];
+        let glyph = Glyph {
+            glyphs: Box::new(bytes.clone()),
+            offset: 0,
+            length: bytes.len() as u32,
+        };
+        assert_eq!(glyph.composite_variation_info(), Some((1, true)));
+        for length in 0..bytes.len() {
+            let truncated = Glyph {
+                glyphs: Box::new(bytes[..length].to_vec()),
+                offset: 0,
+                length: length as u32,
+            };
+            assert_eq!(
+                truncated.composite_variation_info(),
+                None,
+                "length {length}"
+            );
+        }
+    }
 
     #[test]
     fn glyph_display_preserves_empty_glyph() {

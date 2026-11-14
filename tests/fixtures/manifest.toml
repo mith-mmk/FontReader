@@ -205,3 +205,17 @@ source = "tests/fixtures/generate_horizontal_variations.py (fontTools 4.65.0; no
 license = "MIT (project test code)"
 sha256 = "19b6fa52d6e1f7be47e91cf247b3da70c979211504874adc04e8b66bf086238b"
 features = ["HVAR", "gvar", "horizontal-metrics", "first-face"]
+
+[[fixture]]
+id = "composite-gvar.ttc"
+source = "tests/fixtures/generate_composite_gvar.py (fontTools 4.68.0; no external font)"
+license = "MIT (project test code)"
+sha256 = "57be41fc815ba4d6b29407d1621b69f2b8bba45eb08d91366fd96fe05cb0e36a"
+features = ["gvar", "component-indices", "horizontal-and-vertical-phantoms", "nested-XY", "scaled-offsets", "sparse-tuples", "child-only-variation", "signed-fractional-deltas", "HVAR-VVAR-precedence", "TTC", "documented-fallbacks"]
+
+[[fixture]]
+id = "composite-gvar-oracle.rs"
+source = "tests/fixtures/generate_composite_gvar.py (fontTools 4.68.0; no external font)"
+license = "MIT (project test code)"
+sha256 = "0cddbba5fccde7c59d9a852a302aed222730b8bfea462785005b666a91dc7e16"
+features = ["gvar", "component-indices", "horizontal-and-vertical-phantoms", "nested-XY", "scaled-offsets", "sparse-tuples", "child-only-variation", "signed-fractional-deltas", "HVAR-VVAR-precedence", "TTC", "documented-fallbacks"]

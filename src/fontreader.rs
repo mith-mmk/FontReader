@@ -1206,6 +1206,8 @@ impl Font {
         coordinates: &[f32],
     ) -> Option<gvar::GlyphVariationResult> {
         let gvar = self.current_gvar()?;
+        let glyph = self.current_glyf()?.get_glyph(glyph_id)?;
+        let raw_parsed = glyph.parse();
         let component_varied = self.current_gvar_component_varied_parsed(glyph_id, coordinates)?;
 
         // HVAR and gvar encode alternative adjustments to default hmtx,
@@ -1233,13 +1235,36 @@ impl Font {
                 })
         });
 
-        let mut variation = gvar.apply_to_parsed_glyph_with_metrics(
-            glyph_id,
-            coordinates,
-            &component_varied,
-            horizontal_metric,
-            vertical_metric.clone(),
-        )?;
+        let mut variation = if raw_parsed.number_of_contours < 0 {
+            let (count, inherits_metrics) = glyph.composite_variation_info()?;
+            let deltas = gvar.composite_deltas(glyph_id, coordinates, count)?;
+            // USE_MY_METRICS needs inherited component phantom positions.
+            // Until supported, retain hmtx/HVAR and vmtx/VVAR metrics rather
+            // than treating the composite's own phantoms as authoritative.
+            gvar::Gvar::composite_metrics(
+                &raw_parsed,
+                component_varied,
+                &deltas,
+                if inherits_metrics {
+                    None
+                } else {
+                    horizontal_metric
+                },
+                if inherits_metrics {
+                    None
+                } else {
+                    vertical_metric.clone()
+                },
+            )?
+        } else {
+            gvar.apply_to_parsed_glyph_with_metrics(
+                glyph_id,
+                coordinates,
+                &component_varied,
+                horizontal_metric,
+                vertical_metric.clone(),
+            )?
+        };
         if let (Some(base), Some(metric), Some(hvar)) = (
             horizontal_metric,
             variation.horizontal_metric.as_mut(),
@@ -1284,14 +1309,15 @@ impl Font {
         let glyph = glyf.get_glyph(glyph_id)?;
         let raw_parsed = glyph.parse();
         if raw_parsed.number_of_contours < 0 {
-            glyf.parse_glyph_with_variation(glyph_id, &|component_glyph_id, parsed| {
-                if component_glyph_id == glyph_id {
-                    None
-                } else {
+            glyf.parse_glyph_with_variation(
+                glyph_id,
+                &|component_glyph_id, parsed| {
                     gvar.apply_to_parsed_glyph(component_glyph_id, coordinates, parsed)
-                }
-            })
-            .or(Some(raw_parsed))
+                },
+                &|component_glyph_id, count| {
+                    gvar.composite_deltas(component_glyph_id, coordinates, count)
+                },
+            )
         } else {
             Some(raw_parsed)
         }
