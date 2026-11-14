@@ -483,16 +483,20 @@ the engine. Ordinary horizontal GSUB/GPOS, style, locale, variants and supported
 variation coordinates are retained; `vert`, `vrt2` and `vrtr` are not selected.
 Existing horizontal and mixed-vertical APIs are unchanged.
 
-The cell is a square of side `font_size`, following this library's current
-size convention rather than claiming a CSS em mapping. Its origin is the top
-center; the advance is `(0, font_size)`. Logical bounds are
-`[-font_size/2, 0, font_size/2, font_size]`. Source glyphs become separate path
+The cell is one scaled em: `units_per_em * horizontal_outline_scale`, using
+exactly the same instance-dependent scale as horizontal shaping. This matters
+when units-per-em differs from the horizontal ascender/descender/line-gap sum:
+`font_size` itself is a line-height input in the existing API, not one em.
+Supported MVAR changes affect this scale once. Stretch and explicit line height
+do not change the cell. Its origin is the top center, advance is `(0, cell_size)`,
+and logical bounds are `[-cell_size/2, 0, cell_size/2, cell_size]`. Source glyphs become separate path
 layers of one composite glyph; original glyph boundaries are not retained.
 Its synthetic font metrics are half-cell ascent/descent, zero gap and vertical
 flow, with zero bearings. The cell is a low-level composition primitive, not
 an automatic insertion into `shape_vertical_mixed_ltr`.
 
-Let `W` be the sum of the horizontal run's x advances and `S = min(1, size/W)`
+Let `size` denote the scaled em, `W` the sum of the horizontal run's x advances,
+and `S = min(1, size/W)`
 (`S = 1` when W is zero). Final outline x is `S * (glyph.x + layer.x + x - W/2)`.
 The horizontal baseline is placed at `size/2 + (ascent-descent)/2`, using the
 already-scaled horizontal font metrics and positive descent. Glyph y placement,

@@ -424,14 +424,16 @@ Unicode17/18 の `A + U+1D127` の境界差を検証します。既存 fixture �
 既存の横組みGSUB/GPOS・style・locale・variant・対応済みvariationを維持し、
 `vert`・`vrt2`・`vrtr`は選ばない。エンジンの方向や既存APIの挙動は変更しない。
 
-セルの一辺は `font_size`。これは現行ライブラリのサイズ規約であり、CSSのemとの
-一致を保証しない。上中央を原点として送りは `(0, font_size)`、論理boundsは
-`[-font_size/2, 0, font_size/2, font_size]`。各glyphのpath layerを順序・fill ruleを
+セルの一辺は `units_per_em × 横組みoutlineのスケール` で求めた1em。
+現行APIのfont_sizeは横組みの行高入力であり、フォントのemとは必ずしも一致しない。
+MVAR対応メトリクスを含め横組みと同じスケールを一度だけ使い、stretchと明示的な
+line_heightはセルサイズに影響しない。上中央を原点として送りは `(0, cell_size)`、
+論理boundsは `[-cell_size/2, 0, cell_size/2, cell_size]`。各glyphのpath layerを順序・fill ruleを
 保ったまま1つの合成glyphへまとめ、元のglyph境界は保持しない。合成font metricsは
 ascent/descentが各半セル、line gapが0、flowがVertical、bearingが0となる。
 混在縦書きAPIへの自動挿入ではなく、明示的に配置するための基本操作である。
 
-横advance合計Wがセル幅を超える場合だけx方向に縮小し、狭い文字列は拡大しない。
+以下のsizeはスケール済みem寸法を指す。横advance合計Wがセル幅を超える場合だけx方向に縮小し、狭い文字列は拡大しない。
 x方向はadvanceを中心に配置し、baselineは `size/2 + (ascent-descent)/2` とする。
 ascent/descentは横組み後の値で、descentは正。GPOS配置、layer offset、曲線の全点を
 一度だけ変換する。line_heightはセルサイズや中央配置に影響しない。文字サイズと

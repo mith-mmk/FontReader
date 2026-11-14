@@ -21,6 +21,10 @@ fn point(command: &Command) -> Vec<(f32, f32)> {
 }
 
 fn check_composition(e: &FontEngine<'_>, text: &str) -> GlyphRun {
+    check_composition_with_cell(e, text, e.options().font_size)
+}
+
+fn check_composition_with_cell(e: &FontEngine<'_>, text: &str, size: f32) -> GlyphRun {
     let horizontal = e.clone().with_left_to_right().shape(text).unwrap();
     let actual = e.shape_tate_chu_yoko_ltr(text).unwrap();
     if horizontal.glyphs.is_empty() {
@@ -30,7 +34,6 @@ fn check_composition(e: &FontEngine<'_>, text: &str) -> GlyphRun {
     assert_eq!(actual.glyphs.len(), 1);
     let cell = &actual.glyphs[0];
     assert_eq!((cell.x, cell.y), (0.0, 0.0));
-    let size = e.options().font_size;
     assert_eq!(cell.glyph.metrics.advance_x, 0.0);
     assert_eq!(cell.glyph.metrics.advance_y, size);
     let fm = cell.glyph.font.unwrap();
@@ -176,7 +179,15 @@ fn selected_face_size_stretch_gap_and_policy_do_not_change_cell_contract() {
                         )
                         .with_shaping_policy(policy);
                     let before = format!("{:?}", e.shape("12").unwrap());
-                    check_composition(&e, "12");
+                    check_composition_with_cell(
+                        &e,
+                        "12",
+                        if index == 2 {
+                            size / 1200.0 * 1000.0
+                        } else {
+                            size
+                        },
+                    );
                     assert_eq!(before, format!("{:?}", e.shape("12").unwrap()));
                     assert_eq!(e.shaping_policy(), policy);
                 }
@@ -363,4 +374,37 @@ fn raw_svg_is_rejected_and_pathified_foreground_svg_is_supported() {
     assert_errors(&raw.engine(), "A\u{fe0f}", ErrorKind::Unsupported);
     let path = file.face(10).unwrap();
     check_composition(&path.engine().with_font_size(100.0), "A\u{fe0f}");
+}
+
+#[test]
+fn scaled_em_matches_fullwidth_neighbors_when_hhea_exceeds_units_per_em() {
+    let file = FontFile::from_buffer(FONT).unwrap();
+    let face = file.face(3).unwrap();
+    for size in [32.0, 128.0] {
+        let e = face.engine().with_font_size(size);
+        let cell = size / 1500.0 * 1000.0;
+        check_composition_with_cell(&e, "12", cell);
+        close(
+            e.measure_tate_chu_yoko_ltr("12").unwrap() as f32,
+            size * 2.0 / 3.0,
+        );
+        #[cfg(feature = "layout")]
+        {
+            let upright = e.clone().with_vertical_flow().shape("\u{300c}").unwrap();
+            close(upright.glyphs[0].glyph.metrics.advance_y, cell);
+        }
+    }
+}
+
+#[test]
+fn scaled_em_uses_supported_mvar_line_metrics_once() {
+    let file = FontFile::from_buffer(include_bytes!("fixtures/mixed-vertical-ltr.ttc")).unwrap();
+    let face = file.face(13).unwrap();
+    for (weight, height) in [(400.0, 1000.0), (650.0, 1150.0), (900.0, 1300.0)] {
+        let e = face
+            .engine()
+            .with_font_size(100.0)
+            .with_variation("wght", weight);
+        check_composition_with_cell(&e, "AB", 100.0 / height * 1000.0);
+    }
 }

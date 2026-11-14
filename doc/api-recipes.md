@@ -269,7 +269,8 @@ let face = file.current_face()?;
 let engine = face.engine().with_font_size(32.0);
 let mut run = engine.shape_tate_chu_yoko_ltr("12")?;
 let metrics = engine.measure_layout_tate_chu_yoko_ltr("12")?;
-assert_eq!(metrics.inline_advance, 32.0);
+let cell_advance = metrics.inline_advance;
+assert!(cell_advance > 0.0);
 // Place the cell at a caller-managed column cursor.
 for glyph in &mut run.glyphs {
     glyph.x += 200.0;
@@ -281,6 +282,8 @@ let svg = engine.render_svg_tate_chu_yoko_ltr("12")?;
 # }
 ```
 
-The cell side is font_size. Only wider advances are compressed; ink overhangs
+The cell side is one em scaled exactly like the outlines, which may differ
+from font_size. Use the returned advance for the next cursor position. Only
+wider advances are compressed; ink overhangs
 are retained. Logical bounds are square, while SVG is ink-sized (zero for
 space-only input). See [scope and limitations](feature-status.md#explicit-tate-chu-yoko-ltr-cells).

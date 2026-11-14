@@ -182,5 +182,5 @@ features = ["layout", "gpos-single"]
 id = "tate-chu-yoko.ttc"
 source = "tests/fixtures/generate_tate_chu_yoko.py (fontTools 4.65.0)"
 license = "MIT (project test code)"
-sha256 = "349d048ebddbb110d99b2209c74653a24c515b281e632260ffd97b85e51e14ba"
+sha256 = "e980b72e455a5f8df6b0430420a6c3905862711168b4cd2392d5a03b2165b957"
 features = ["tate-chu-yoko", "horizontal-composition", "kerning", "ligatures", "marks", "vertical-feature-exclusion", "negative-advance", "line-gap"]

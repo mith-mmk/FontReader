@@ -265,7 +265,8 @@ let face = file.current_face()?;
 let engine = face.engine().with_font_size(32.0);
 let mut run = engine.shape_tate_chu_yoko_ltr("12")?;
 let metrics = engine.measure_layout_tate_chu_yoko_ltr("12")?;
-assert_eq!(metrics.inline_advance, 32.0);
+let cell_advance = metrics.inline_advance;
+assert!(cell_advance > 0.0);
 // Place the cell at a caller-managed column cursor.
 for glyph in &mut run.glyphs {
     glyph.x += 200.0;
@@ -277,6 +278,7 @@ let svg = engine.render_svg_tate_chu_yoko_ltr("12")?;
 # }
 ```
 
-1セルの辺長はfont_size。幅が超過する場合だけ横に圧縮し、inkのはみ出しは保持する。
+1セルの辺長はoutlineと同じスケールで求めた1emで、font_sizeと異なる場合がある。
+次の配置位置には返されたadvanceを使う。幅超過時だけ横に圧縮し、inkのはみ出しは保持する。
 論理boundsは正方形、SVGはink基準なので空白だけのSVGはサイズ0になる。
 詳細と未対応範囲は[対応状況](feature-status.ja.md#明示指定の縦中横-ltr-セル)を参照。

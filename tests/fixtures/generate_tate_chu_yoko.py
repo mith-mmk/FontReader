@@ -2,7 +2,8 @@
 
 Reuses the committed synthetic vertical-metrics.ttf; no external fonts.
 Faces: horizontal kerning/ligatures and vertical-feature sentinels, negative
-total advance, and nonzero horizontal line gap. Source timestamps are retained.
+total advance, nonzero horizontal line gap, and an em/line-height ratio of 2/3.
+Source timestamps are retained.
 """
 from pathlib import Path
 from fontTools.ttLib import TTFont, TTCollection
@@ -32,5 +33,8 @@ def build(kern=-100, gap=0):
 
 
 collection = TTCollection()
-collection.fonts = [build(), build(-2000), build(gap=200)]
+meiryo_ratio = build()
+meiryo_ratio["hhea"].ascent = 1100
+meiryo_ratio["hhea"].descent = -400
+collection.fonts = [build(), build(-2000), build(gap=200), meiryo_ratio]
 collection.save(ROOT / "tate-chu-yoko.ttc")

@@ -14,11 +14,11 @@ impl FontEngine<'_> {
     /// Ordinary horizontal shaping runs first, retaining supported GSUB/GPOS,
     /// style, locale, variants, variations, size and stretch. No vertical or
     /// rotation feature is selected. The advance width is centered at x=0 and
-    /// compressed horizontally only if wider than `font_size`. The baseline is
-    /// `font_size / 2 + (ascent - descent) / 2`, using the scaled horizontal
+    /// compressed horizontally only if wider than one scaled em. The baseline is
+    /// `cell_size / 2 + (ascent - descent) / 2`, using the scaled horizontal
     /// metrics and positive descent. Ink may overhang the cell; it is not clipped.
     ///
-    /// The result is one composite glyph at (0, 0), with advance (0, font_size).
+    /// The result is one composite glyph at (0, 0), with advance (0, cell_size).
     /// Its font metrics describe the synthetic square cell (half-size ascent
     /// and descent, zero gap, vertical flow); its bearings are zero. Source
     /// glyph boundaries are not retained. An empty shaped input yields no cell.
@@ -26,8 +26,10 @@ impl FontEngine<'_> {
     /// Leading/trailing spaces participate in width and centering. `line_height`
     /// does not change the cell. Bounds retain conservative outline extrema.
     ///
-    /// `font_size` follows this library's sizing convention, not a guarantee of
-    /// CSS em sizing. Only current-color, clip-free fill paths are supported.
+    /// Cell size is units-per-em times the horizontal outline scale, including
+    /// supported MVAR metrics. It is independent of stretch and line_height;
+    /// this library's `font_size` is not necessarily one em. Only current-color,
+    /// clip-free fill paths are supported.
     /// Tabs/line-break controls, invalid options, negative total advance and
     /// non-finite geometry are errors. Direction is overridden for this call
     /// only. This does not add automatic digit selection, width-feature
@@ -35,10 +37,13 @@ impl FontEngine<'_> {
     pub fn shape_tate_chu_yoko_ltr(&self, text: &str) -> Result<GlyphRun, Error> {
         validate_single_line(text, "tate-chu-yoko LTR")?;
         let run = self.clone().with_left_to_right().shape(text)?;
-        compose(run, self.options().font_size)
+        if run.glyphs.is_empty() {
+            return Ok(run);
+        }
+        compose(run, self.face.font().em_size_with_options(&self.options())?)
     }
 
-    /// Returns one `font_size` advance, or zero for an empty shaped input.
+    /// Returns one scaled-em advance, or zero for an empty shaped input.
     pub fn measure_tate_chu_yoko_ltr(&self, text: &str) -> Result<f64, Error> {
         Ok(self.measure_layout_tate_chu_yoko_ltr(text)?.inline_advance)
     }
