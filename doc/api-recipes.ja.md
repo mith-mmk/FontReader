@@ -251,3 +251,34 @@ let svg = engine.render_svg_vertical_mixed_ltr("漢字AV「かな」")?;
 # Ok(())
 # }
 ```
+
+## 縦中横を1セルとして配置する
+
+対象文字列を明示して呼び出す。数字の自動検出や既存の混在縦書きへの挿入は行わない。
+返されるrunは上中央を原点に、横向きの文字列を1つの縦送りglyphにまとめる。
+
+```rust,no_run
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+use fontcore::FontFile;
+let file = FontFile::from_file("example.ttf")?;
+let face = file.current_face()?;
+let engine = face.engine().with_font_size(32.0);
+let mut run = engine.shape_tate_chu_yoko_ltr("12")?;
+let metrics = engine.measure_layout_tate_chu_yoko_ltr("12")?;
+let cell_advance = metrics.inline_advance;
+assert!(cell_advance > 0.0);
+// Place the cell at a caller-managed column cursor.
+for glyph in &mut run.glyphs {
+    glyph.x += 200.0;
+    glyph.y += 64.0;
+}
+let svg = engine.render_svg_tate_chu_yoko_ltr("12")?;
+# let _ = (run, svg);
+# Ok(())
+# }
+```
+
+1セルの辺長はoutlineと同じスケールで求めた1emで、font_sizeと異なる場合がある。
+次の配置位置には返されたadvanceを使う。幅超過時だけ横に圧縮し、inkのはみ出しは保持する。
+論理boundsは正方形、SVGはink基準なので空白だけのSVGはサイズ0になる。
+詳細と未対応範囲は[対応状況](feature-status.ja.md#明示指定の縦中横-ltr-セル)を参照。

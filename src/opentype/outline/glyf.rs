@@ -586,11 +586,8 @@ impl Glyph {
         string += "\n";
 
         let mut pos = 0;
-        for i in 0..parsed.end_pts_of_contours.len() {
-            string += &format!(
-                "{} end_pts_of_contours {}\n",
-                i, parsed.end_pts_of_contours[i]
-            );
+        for (i, end_point) in parsed.end_pts_of_contours.iter().enumerate() {
+            string += &format!("{} end_pts_of_contours {}\n", i, end_point);
         }
         let mut x = 0;
         let mut y = 0;

@@ -339,8 +339,7 @@ impl CmapEncodings {
             }
 
             CmapSubtable::Format13(format13) => {
-                for i in 0..format13.groups.len() {
-                    let group = &format13.groups[i];
+                for group in &format13.groups {
                     if group.start_char_code <= code_number && code_number <= group.end_char_code {
                         position = group.glyph_id;
                         break;
@@ -406,11 +405,11 @@ impl CmapSubtable {
                 string += &format!("length: {}\n", format0.length);
                 string += &format!("language: {}\n", format0.language);
                 string += "glyph_id_array:";
-                for i in 0..length {
+                for (i, glyph_id) in format0.glyph_id_array.iter().take(length).enumerate() {
                     if i % 16 == 0 {
-                        string += &format!("\n{:002} ", format0.glyph_id_array[i]);
+                        string += &format!("\n{:002} ", glyph_id);
                     }
-                    string += &format!("  {:02X} ", format0.glyph_id_array[i]);
+                    string += &format!("  {:02X} ", glyph_id);
                 }
                 string += "\n";
                 string
@@ -426,11 +425,11 @@ impl CmapSubtable {
                 string += &format!("length: {}\n", format2.length);
                 string += &format!("language: {}\n", format2.language);
                 string += "sub_header_keys:";
-                for i in 0..length {
+                for (i, key) in format2.sub_header_keys.iter().take(length).enumerate() {
                     if i % 16 == 0 {
-                        string += &format!("\n{:002} ", format2.sub_header_keys[i]);
+                        string += &format!("\n{:002} ", key);
                     }
-                    string += &format!("  {:02X} ", format2.sub_header_keys[i]);
+                    string += &format!("  {:02X} ", key);
                 }
                 string += "\n";
                 string
@@ -475,11 +474,11 @@ impl CmapSubtable {
                 string += &format!("first_code: {}\n", format6.first_code);
                 string += &format!("entry_count: {}\n", format6.entry_count);
                 string += "glyph_id_array:";
-                for i in 0..length {
+                for (i, glyph_id) in format6.glyph_id_array.iter().take(length).enumerate() {
                     if i % 16 == 0 {
-                        string += &format!("\n{:002} ", format6.glyph_id_array[i]);
+                        string += &format!("\n{:002} ", glyph_id);
                     }
-                    string += &format!("  {:02X} ", format6.glyph_id_array[i]);
+                    string += &format!("  {:02X} ", glyph_id);
                 }
                 string += "\n";
                 string
@@ -497,11 +496,11 @@ impl CmapSubtable {
                 string += &format!("length: {}\n", format8.length);
                 string += &format!("language: {}\n", format8.language);
                 string += "is32:";
-                for i in 0..length {
+                for (i, value) in format8.is32.iter().take(length).enumerate() {
                     if i % 16 == 0 {
-                        string += &format!("\n{:002} ", format8.is32[i]);
+                        string += &format!("\n{:002} ", value);
                     }
-                    string += &format!("  {:02X} ", format8.is32[i]);
+                    string += &format!("  {:02X} ", value);
                 }
                 string += "\n";
 
@@ -512,8 +511,8 @@ impl CmapSubtable {
                     length
                 };
                 string += "groups:\n";
-                for i in 0..lenghth {
-                    string += &format!("\n{} ", format8.groups[i]);
+                for group in format8.groups.iter().take(lenghth) {
+                    string += &format!("\n{} ", group);
                 }
                 string += "\n";
                 string
@@ -532,11 +531,11 @@ impl CmapSubtable {
                 string += &format!("start_char_code: {}\n", format10.start_char_code);
                 string += &format!("num_chars: {}\n", format10.num_chars);
                 string += "glyph_id_array:";
-                for i in 0..length {
+                for (i, glyph_id) in format10.glyph_id_array.iter().take(length).enumerate() {
                     if i % 16 == 0 {
-                        string += &format!("\n{:002} ", format10.glyph_id_array[i]);
+                        string += &format!("\n{:002} ", glyph_id);
                     }
-                    string += &format!("  {:02X} ", format10.glyph_id_array[i]);
+                    string += &format!("  {:02X} ", glyph_id);
                 }
                 string += "\n";
                 string
@@ -554,8 +553,8 @@ impl CmapSubtable {
                 string += &format!("language: {}\n", format12.language);
                 string += &format!("num_groups: {}\n", format12.num_groups);
                 string += "groups:\n";
-                for i in 0..length {
-                    let seg = &format12.groups[i].to_string();
+                for (i, group) in format12.groups.iter().take(length).enumerate() {
+                    let seg = &group.to_string();
                     string += &format!("{:3} {}\n", i, seg);
                 }
                 string += "\n";
@@ -574,8 +573,8 @@ impl CmapSubtable {
                 string += &format!("language: {}\n", format13.language);
                 string += &format!("num_groups: {}\n", format13.num_groups);
                 string += "groups:\n";
-                for i in 0..length {
-                    string += &format!("{:3} {}\n", i, format13.groups[i]);
+                for (i, group) in format13.groups.iter().take(length).enumerate() {
+                    string += &format!("{:3} {}\n", i, group);
                 }
                 string += "\n";
                 string
@@ -595,12 +594,13 @@ impl CmapSubtable {
                     format14.num_var_selector_records
                 );
                 string += "var_selector_records:\n";
-                for i in 0..length {
-                    string += &format!(
-                        "{:04x} {:002}\n",
-                        i,
-                        format14.var_selector_records[i].to_stirng()
-                    );
+                for (i, record) in format14
+                    .var_selector_records
+                    .iter()
+                    .take(length)
+                    .enumerate()
+                {
+                    string += &format!("{:04x} {:002}\n", i, record.to_stirng());
                 }
                 string += "\n";
                 string
@@ -787,13 +787,13 @@ impl DefaultUVS {
         } else {
             self.unicode_value_ranges.len()
         };
-        for i in 0..length {
+        for (i, range) in self.unicode_value_ranges.iter().take(length).enumerate() {
             string += &format!(
                 "{} {:06x} {} {}\n",
                 i,
-                self.unicode_value_ranges[i].start_unicode_value,
-                char::from_u32(self.unicode_value_ranges[i].start_unicode_value).unwrap_or(' '),
-                self.unicode_value_ranges[i].additional_count
+                range.start_unicode_value,
+                char::from_u32(range.start_unicode_value).unwrap_or(' '),
+                range.additional_count
             );
         }
         string
@@ -823,8 +823,8 @@ impl NonDefautUVS {
         } else {
             self.unicode_value_ranges.len()
         };
-        for i in 0..length {
-            string += &format!("{}\n", self.unicode_value_ranges[i]);
+        for mapping in self.unicode_value_ranges.iter().take(length) {
+            string += &format!("{}\n", mapping);
         }
         string
     }
