@@ -40,8 +40,12 @@ f['gvar'].variations['B'] = [TupleVariation(region, [(0, 0), (0, 0), (200, 0), (
 def hvar(source, advance=200, lsb=40, mapped=True, explicit=False):
     result = deepcopy(source)
     t = otTables.HVAR(); t.Version = 0x10000
-    t.VarStore = buildVarStore(buildVarRegionList([region], ['wght']), [buildVarData([0], [[0], [advance], [advance], [lsb], [advance-lsb]], optimize=False)])
-    t.AdvWidthMap = buildDeltaSetIndexMap([0, 1, 2]) if explicit else None
+    # Explicit maps deliberately bypass distinct glyph-index sentinel entries.
+    # Ignoring the map must not accidentally produce the correct A/B advances.
+    items = ([[0], [advance + 77], [advance + 99], [lsb], [advance-lsb], [advance]]
+             if explicit else [[0], [advance], [advance], [lsb], [advance-lsb]])
+    t.VarStore = buildVarStore(buildVarRegionList([region], ['wght']), [buildVarData([0], items, optimize=False)])
+    t.AdvWidthMap = buildDeltaSetIndexMap([0, 5, 5]) if explicit else None
     t.LsbMap = buildDeltaSetIndexMap([0, 3, 3]) if mapped else None
     t.RsbMap = buildDeltaSetIndexMap([0, 4, 4]) if mapped else None
     result['HVAR'] = newTable('HVAR'); result['HVAR'].table = t

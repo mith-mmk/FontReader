@@ -32,7 +32,9 @@ fn missing_lsb_mapping() {
 }
 #[test]
 fn explicit_advance_mapping() {
+    // A/B map to a shared nonidentity entry; implicit glyph slots are sentinels.
     check(3, "AA", 600.0, 200.0);
+    check(3, "BB", 700.0, 200.0);
 }
 // Conflicting tables test a deterministic precedence policy, not conforming fonts.
 #[test]

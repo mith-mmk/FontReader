@@ -196,7 +196,7 @@ features = ["GPOS", "PairPos-format1", "PairPos-format2", "Extension", "GDEF", "
 id = "horizontal-variations.ttc"
 source = "tests/fixtures/generate_horizontal_variations.py (fontTools 4.65.0; no external font)"
 license = "MIT (project test code)"
-sha256 = "73bdbf8227634e1981b9b9d8ea18e69bd415b1455065c471eed3063f5ff01ba4"
+sha256 = "a7bbf81bc75c2eba13fceb9896eb2242fce86cee31cf49fec1f711c05e060538"
 features = ["HVAR", "gvar", "horizontal-metrics", "implicit-map", "explicit-map", "optional-lsb", "mapped-zero", "phantom-only", "composites", "negative-deltas", "clamping", "TTC"]
 
 [[fixture]]
