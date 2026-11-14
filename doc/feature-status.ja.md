@@ -95,7 +95,7 @@ BASE と下記の静的COLR v0以外の色layer原点は別対応です。向き
 - Type 1 SinglePos Format 1/2 と、それを包む Type 9 をパースし、実行する。
 - 既定の実行対象は横組み `kern` / `dist`、縦組み `vkrn` / `dist`。既存の locale / script 選択を利用し、任意 feature 選択や contextual GPOS は追加しない。
 - 静的 ValueRecord の4値を shaping と測定へ反映する。付着する mark の明示 advance も保持し、lookup 間は i32 で加算する。同一 lookup ではゼロ値を含む最初の一致 subtable だけを適用する。
-- SinglePos は GDEF の glyph class、IgnoreBaseGlyphs / IgnoreLigatures / IgnoreMarks、MarkAttachmentType、MarkFilteringSet を尊重する。既存 pair / mark 経路への共通 filtering 統合は含めない。
+- SinglePos は GDEF の glyph class、IgnoreBaseGlyphs / IgnoreLigatures / IgnoreMarks、MarkAttachmentType、MarkFilteringSet を尊重する。PairPos もこの filtering を共有する。mark attachment は従来の別経路を維持する。
 - Device / VariationIndex offset は読み進めるが delta は未評価。筆記体接続と Unicode Arabic joining は別の残件。
 - MIT の合成フォント `tests/fixtures/gpos-single.ttf` と byte fixture により、切断入力、不正 coverage / count、lookup 加算、locale、拡縮、縦組み、mark 付着を検証する。広範な実フォント / HarfBuzz 比較は未実施。
 - 仕様: [OpenType GPOS Single Adjustment](https://learn.microsoft.com/en-us/typography/opentype/spec/gpos#lookup-type-1-single-adjustment-positioning-subtable)。
@@ -455,3 +455,31 @@ raster、raw SVGはUnsupported。TAB・改行control、不正option、負の横a
 全角正規化、BiDi、fallback、BASE、複数行、禁則・折返しは対象外。
 MIT合成fixture・再生成方法・SHA-256は `tests/fixtures/manifest.toml` に記載。
 公開APIの回帰テストは `tests/tate_chu_yoko.rs` にあり、インストール済みfontは不要。
+
+### Lookup ごとの PairPos filtering
+
+PairPos Format 1/2 と、それらを包む Type 9 Extension は、各 Lookup 内で
+隣接グリフを選択する。GDEF の IgnoreBaseGlyphs、IgnoreLigatures、IgnoreMarks、
+MarkAttachmentType、MarkFilteringSet を反映し、フラグがゼロの場合はマークを
+一律に飛ばさない。IgnoreMarks が mark set より優先し、mark set は attachment
+class より優先する。GDEF がない場合に glyph class を推定しない。タブ・改行を
+越えるペアは作らない。locale / script と kern / vkrn の選択は従来どおりであり、
+完全な GPOS shaping の実装ではない。
+
+ゼロ値や class 0 の行列要素も最初に一致したサブテーブルとして扱う。
+異なる Lookup の両 ValueRecord は i32 で加算し、途中で i16 に飽和させない。
+ValueFormat2 がゼロなら第 2 グリフから次のペアを検索する。第 2 レコードが
+存在する場合は値が全てゼロでも第 2 グリフを消費する。SinglePos との加算と、
+接続されたマークへの明示的な advance は維持する。既存の GDEF / GPOS mark
+attachment 経路は変更せず、Lookup ごとの filtering も今回追加しない。
+Device / VariationIndex の補正値は引き続き未評価。
+
+再生成可能な MIT 合成フォント `pair-filtering.ttc` とバイト単体テストで、
+各フラグと優先順位、GDEF なし、両形式と Extension、ゼロ値の最初の一致、
+Lookup ごとに異なる隣接グリフ、広い範囲の加算、走査位置、locale、境界、
+両 ValueRecord、横 LTR / RTL / 縦書き、サイズ・横倍率、計測、マーク接続を
+含む正確な SVG viewBox を検証する。既存の pair-coordinate テストは内部
+ヘルパー呼び出し以外変更しない。広範な実フォント / HarfBuzz 比較は未検証。
+
+参照: [GPOS Pair Adjustment](https://learn.microsoft.com/en-us/typography/opentype/spec/gpos#lookup-type-2-pair-adjustment-positioning-subtable)、
+[Lookup Flags](https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#lookupFlags)。

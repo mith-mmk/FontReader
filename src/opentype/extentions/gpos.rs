@@ -116,6 +116,7 @@ struct PairSet {
 
 #[derive(Debug, Clone)]
 struct PairPosFormat1 {
+    second_is_present: bool,
     coverage: Coverage,
     pair_sets: Vec<PairSet>,
 }
@@ -128,6 +129,7 @@ struct Class2Record {
 
 #[derive(Debug, Clone)]
 struct PairPosFormat2 {
+    second_is_present: bool,
     coverage: Coverage,
     class_def1: ClassDef,
     class_def2: ClassDef,
@@ -240,6 +242,16 @@ impl PositioningSubtable {
             }
             Self::Extension(extension) => extension.lookup_single_adjustment(glyph),
             _ => None,
+        }
+    }
+
+    // The presence of ValueRecord2, not its values, controls cursor movement.
+    fn pair_consumes_second(&self) -> bool {
+        match self {
+            Self::PairFormat1(pair) => pair.second_is_present,
+            Self::PairFormat2(pair) => pair.second_is_present,
+            Self::Extension(inner) => inner.pair_consumes_second(),
+            _ => false,
         }
     }
 
@@ -400,9 +412,8 @@ struct PositioningLookup {
 }
 
 impl PositioningLookup {
-    // Kept local to the new SinglePos execution path. Pair/mark filtering remains
-    // outside this change until the shared lookup-filter work is integrated.
-    fn includes_single_glyph(&self, glyph: u16, gdef: Option<&Gdef>) -> bool {
+    // SinglePos and PairPos share GDEF filtering; mark attachment is separate.
+    fn includes_glyph(&self, glyph: u16, gdef: Option<&Gdef>) -> bool {
         let Some(gdef) = gdef else { return true };
         match gdef.glyph_class(glyph) {
             Some(GlyphClass::Base) => self.lookup_flag & 0x0002 == 0,
@@ -659,6 +670,7 @@ impl Gpos {
                 }
 
                 Ok(PositioningSubtable::PairFormat1(PairPosFormat1 {
+                    second_is_present: value_format2 != 0,
                     coverage: Coverage::new(reader, offset + coverage_offset as u64)?,
                     pair_sets,
                 }))
@@ -682,6 +694,7 @@ impl Gpos {
                 }
 
                 Ok(PositioningSubtable::PairFormat2(PairPosFormat2 {
+                    second_is_present: value_format2 != 0,
                     coverage: Coverage::new(reader, offset + coverage_offset as u64)?,
                     class_def1: ClassDef::new(reader, offset + class_def1_offset as u64)?,
                     class_def2: ClassDef::new(reader, offset + class_def2_offset as u64)?,
@@ -1328,7 +1341,7 @@ impl Gpos {
         let mut matched = false;
         for lookup in self.collect_lookups(locale, &feature_tags) {
             if (lookup.lookup_type != 1 && lookup.lookup_type != 9)
-                || !lookup.includes_single_glyph(glyph, gdef)
+                || !lookup.includes_glyph(glyph, gdef)
             {
                 continue;
             }
@@ -1344,6 +1357,59 @@ impl Gpos {
         matched.then_some(result)
     }
 
+    /// Apply each selected PairPos lookup to the logical glyph sequence.
+    /// None entries are boundaries (tabs/newlines), never skippable glyphs.
+    /// Accumulate in i32 just like SinglePos, without intermediate i16 clipping.
+    pub(crate) fn pair_adjustments(
+        &self,
+        glyphs: &[Option<u16>],
+        is_vertical: bool,
+        locale: Option<&str>,
+        gdef: Option<&Gdef>,
+    ) -> Vec<SingleAdjustment> {
+        let tags = if is_vertical { [*b"vkrn"] } else { [*b"kern"] };
+        let mut result = vec![SingleAdjustment::default(); glyphs.len()];
+        for lookup in self.collect_lookups(locale, &tags) {
+            if lookup.lookup_type != 2 && lookup.lookup_type != 9 {
+                continue;
+            }
+            let mut first = 0;
+            while first < glyphs.len() {
+                let Some(left) = glyphs[first].filter(|id| lookup.includes_glyph(*id, gdef)) else {
+                    first += 1;
+                    continue;
+                };
+                let mut second = first + 1;
+                while second < glyphs.len()
+                    && glyphs[second].is_some_and(|id| !lookup.includes_glyph(id, gdef))
+                {
+                    second += 1;
+                }
+                let Some(right) = glyphs.get(second).copied().flatten() else {
+                    first = second + 1;
+                    continue;
+                };
+                let matched = lookup.subtables.iter().find_map(|subtable| {
+                    subtable
+                        .lookup_pair_adjustment(left, right)
+                        .map(|pair| (pair, subtable.pair_consumes_second()))
+                });
+                if let Some((pair, consumes_second)) = matched {
+                    result[first].add_assign(pair.first);
+                    result[second].add_assign(pair.second);
+                    // A zero record is still a match. ValueFormat2 == 0 lets
+                    // the second glyph start the next pair in this lookup.
+                    first = second + usize::from(consumes_second);
+                } else {
+                    first = second;
+                }
+            }
+        }
+        result
+    }
+
+    // Legacy two-glyph parser assertions; production uses the sequence executor.
+    #[cfg(test)]
     pub(crate) fn lookup_pair_adjustment(
         &self,
         left: u16,
@@ -1498,6 +1564,201 @@ mod tests {
             subtables,
         };
         gpos
+    }
+
+    fn pair_bytes(format: u16, first: u16, second: u16, value: i16) -> Vec<u8> {
+        let mut words = if format == 1 {
+            // One pair set with an empty second ValueRecord.
+            vec![1, 18, 4, 0, 1, 12, 1, second, value as u16]
+        } else {
+            // Class 0 is a valid pair match, including a zero matrix entry.
+            vec![2, 18, 4, 0, 24, 30, 1, 1, value as u16]
+        };
+        words.extend([1, 1, first]);
+        if format == 2 {
+            words.extend([1, 0, 0, 1, 0, 0]);
+        }
+        words.iter().flat_map(|word| word.to_be_bytes()).collect()
+    }
+
+    fn pair_gpos(subtables: Vec<PositioningSubtable>, flag: u16) -> Gpos {
+        let mut gpos = single_gpos(subtables, flag);
+        for lookup in &mut gpos.lookups {
+            lookup.lookup_type = 2;
+        }
+        gpos
+    }
+
+    #[test]
+    fn pair_zero_first_match_blocks_fallback_in_both_formats_and_extensions() {
+        for format in [1, 2] {
+            for extension in [false, true] {
+                let parse = |value| {
+                    let bytes = pair_bytes(format, 10, 20, value);
+                    let sub = Gpos::parse_subtable(&mut BytesReader::new(&bytes), 2, 0).unwrap();
+                    if extension {
+                        PositioningSubtable::Extension(Box::new(sub))
+                    } else {
+                        sub
+                    }
+                };
+                let gpos = pair_gpos(vec![parse(0), parse(-50)], 0);
+                assert_eq!(
+                    gpos.pair_adjustments(&[Some(10), Some(20)], false, None, None),
+                    vec![SingleAdjustment::default(); 2]
+                );
+                // A missed first coverage falls through to the next subtable.
+                let missed = Gpos::parse_subtable(
+                    &mut BytesReader::new(&pair_bytes(format, 11, 20, 0)),
+                    2,
+                    0,
+                )
+                .unwrap();
+                let gpos = pair_gpos(vec![missed, parse(-50)], 0);
+                assert_eq!(
+                    gpos.pair_adjustments(&[Some(10), Some(20)], false, None, None)[0].x_advance,
+                    -50
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn pair_distinct_lookups_accumulate_without_i16_clipping_or_duplicate_references() {
+        let mut gpos = pair_gpos(vec![], 0);
+        let mut indices = Vec::new();
+        for value in [20000, 20000, -20000] {
+            let bytes = pair_bytes(1, 10, 20, value);
+            indices.push(gpos.lookups.len() as u16);
+            gpos.lookups.push(PositioningLookup {
+                lookup_type: 2,
+                lookup_flag: 0,
+                mark_filtering_set: None,
+                subtables: vec![Gpos::parse_subtable(&mut BytesReader::new(&bytes), 2, 0).unwrap()],
+            });
+        }
+        let kern = gpos
+            .features
+            .features
+            .iter_mut()
+            .find(|feature| feature.feature_tag == u32::from_be_bytes(*b"kern"))
+            .unwrap();
+        kern.lookup_list_indices = indices.clone();
+        kern.lookup_list_indices.extend(indices);
+        assert_eq!(
+            gpos.pair_adjustments(&[Some(10), Some(20)], false, None, None)[0].x_advance,
+            20000
+        );
+        gpos.lookups.last_mut().unwrap().subtables.clear();
+        assert_eq!(
+            gpos.pair_adjustments(&[Some(10), Some(20)], false, None, None)[0].x_advance,
+            40000
+        );
+    }
+
+    #[test]
+    fn pair_filters_first_glyph_and_missing_gdef_does_not_invent_classes() {
+        let font = crate::load_font_from_buffer(include_bytes!(
+            "../../../tests/fixtures/pair-filtering.ttc"
+        ))
+        .unwrap();
+        let gdef = font.font().gdef.as_ref().unwrap();
+        for (flag, first) in [(2, 1), (4, 4), (8, 5)] {
+            let bytes = pair_bytes(1, first, 2, -50);
+            let gpos = pair_gpos(
+                vec![Gpos::parse_subtable(&mut BytesReader::new(&bytes), 2, 0).unwrap()],
+                flag,
+            );
+            let glyphs = [Some(first), Some(2)];
+            assert_eq!(
+                gpos.pair_adjustments(&glyphs, false, None, Some(gdef))[0].x_advance,
+                0
+            );
+            assert_eq!(
+                gpos.pair_adjustments(&glyphs, false, None, None)[0].x_advance,
+                -50
+            );
+        }
+    }
+
+    #[test]
+    fn pair_cursor_skips_consumed_second_and_restarts_after_boundaries() {
+        let font = crate::load_font_from_buffer(include_bytes!(
+            "../../../tests/fixtures/pair-filtering.ttc"
+        ))
+        .unwrap();
+        let gdef = font.font().gdef.as_ref().unwrap();
+        for format in [1, 2] {
+            for present in [false, true] {
+                for extension in [false, true] {
+                    let mut bytes = if present {
+                        let mut words: Vec<u16> = if format == 1 {
+                            vec![1, 20, 4, 4, 1, 12, 1, 10, 50, 0]
+                        } else {
+                            vec![2, 20, 4, 4, 26, 32, 1, 1, 50, 0]
+                        };
+                        words.extend([1, 1, 10]);
+                        if format == 2 {
+                            words.extend([1, 0, 0, 1, 0, 0]);
+                        }
+                        words.iter().flat_map(|word| word.to_be_bytes()).collect()
+                    } else {
+                        pair_bytes(format, 10, 10, 50)
+                    };
+                    if extension {
+                        let mut header = vec![0, 1, 0, 2, 0, 0, 0, 8];
+                        header.append(&mut bytes);
+                        bytes = header;
+                    }
+                    let sub = Gpos::parse_subtable(
+                        &mut BytesReader::new(&bytes),
+                        if extension { 9 } else { 2 },
+                        0,
+                    )
+                    .unwrap();
+                    let gpos = pair_gpos(vec![sub], 8);
+                    let glyphs = [
+                        Some(10),
+                        Some(5),
+                        Some(10),
+                        Some(5),
+                        Some(10),
+                        Some(5),
+                        Some(10),
+                        None,
+                        Some(10),
+                        Some(10),
+                    ];
+                    let actual: Vec<_> = gpos
+                        .pair_adjustments(&glyphs, false, None, Some(gdef))
+                        .iter()
+                        .map(|value| value.x_advance)
+                        .collect();
+                    let expected = if present {
+                        vec![50, 0, 0, 0, 50, 0, 0, 0, 50, 0]
+                    } else {
+                        vec![50, 0, 50, 0, 50, 0, 0, 0, 50, 0]
+                    };
+                    assert_eq!(
+                        actual, expected,
+                        "format {format}, present {present}, extension {extension}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn pair_rejects_truncated_records_in_both_formats() {
+        for format in [1, 2] {
+            let bytes = pair_bytes(format, 10, 20, -50);
+            for length in 0..bytes.len() {
+                assert!(
+                    Gpos::parse_subtable(&mut BytesReader::new(&bytes[..length]), 2, 0).is_err(),
+                    "format {format}, length {length}"
+                );
+            }
+        }
     }
 
     #[test]

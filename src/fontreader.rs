@@ -1915,79 +1915,37 @@ impl Font {
         Some(svg_document_to_glyph_layers(&document, scale_x, scale_y))
     }
 
-    fn position_adjustment_for_index(
+    fn position_adjustments(
         &self,
         units: &[ResolvedTextUnit],
-        index: usize,
         locale: Option<&str>,
         is_vertical: bool,
         scale_x: f32,
         scale_y: f32,
-    ) -> GlyphPositionAdjustment {
+    ) -> Vec<GlyphPositionAdjustment> {
+        let mut adjustments = vec![GlyphPositionAdjustment::default(); units.len()];
         #[cfg(not(feature = "layout"))]
-        {
-            let _ = (units, index, locale, is_vertical, scale_x, scale_y);
-            GlyphPositionAdjustment::default()
-        }
-
+        let _ = (locale, is_vertical, scale_x, scale_y, &mut adjustments);
         #[cfg(feature = "layout")]
-        {
-            let Some(gpos) = self.current_gpos() else {
-                return GlyphPositionAdjustment::default();
-            };
-            let Some(current) = Self::glyph_unit_at(units, index) else {
-                return GlyphPositionAdjustment::default();
-            };
-
-            let mut adjustment = GlyphPositionAdjustment::default();
-            if let Some(single) = gpos.lookup_single_adjustment(
-                current.glyph_id as u16,
-                is_vertical,
-                locale,
-                self.current_gdef(),
-            ) {
-                adjustment.placement_x += single.x_placement as f32 * scale_x;
-                adjustment.placement_y += single.y_placement as f32 * scale_y;
-                adjustment.advance_x += single.x_advance as f32 * scale_x;
-                adjustment.advance_y += single.y_advance as f32 * scale_y;
+        if let Some(gpos) = self.current_gpos() {
+            let glyphs: Vec<_> = (0..units.len())
+                .map(|index| Self::glyph_unit_at(units, index).map(|unit| unit.glyph_id as u16))
+                .collect();
+            let pairs = gpos.pair_adjustments(&glyphs, is_vertical, locale, self.current_gdef());
+            for (index, pair) in pairs.into_iter().enumerate() {
+                let Some(glyph) = glyphs[index] else { continue };
+                let single = gpos
+                    .lookup_single_adjustment(glyph, is_vertical, locale, self.current_gdef())
+                    .unwrap_or_default();
+                adjustments[index] = GlyphPositionAdjustment {
+                    placement_x: (pair.x_placement + single.x_placement) as f32 * scale_x,
+                    placement_y: (pair.y_placement + single.y_placement) as f32 * scale_y,
+                    advance_x: (pair.x_advance + single.x_advance) as f32 * scale_x,
+                    advance_y: (pair.y_advance + single.y_advance) as f32 * scale_y,
+                };
             }
-            let previous_index = self.find_previous_spacing_glyph_index(units, index);
-            let next_index = self.find_next_spacing_glyph_index(units, index);
-
-            if let Some(previous_index) = previous_index {
-                if let Some(previous) = Self::glyph_unit_at(units, previous_index) {
-                    if let Some(pair) = gpos.lookup_pair_adjustment(
-                        previous.glyph_id as u16,
-                        current.glyph_id as u16,
-                        is_vertical,
-                        locale,
-                    ) {
-                        adjustment.placement_x += pair.second.x_placement as f32 * scale_x;
-                        adjustment.placement_y += pair.second.y_placement as f32 * scale_y;
-                        adjustment.advance_x += pair.second.x_advance as f32 * scale_x;
-                        adjustment.advance_y += pair.second.y_advance as f32 * scale_y;
-                    }
-                }
-            }
-
-            if let Some(next_index) = next_index {
-                if let Some(next) = Self::glyph_unit_at(units, next_index) {
-                    if let Some(pair) = gpos.lookup_pair_adjustment(
-                        current.glyph_id as u16,
-                        next.glyph_id as u16,
-                        is_vertical,
-                        locale,
-                    ) {
-                        adjustment.placement_x += pair.first.x_placement as f32 * scale_x;
-                        adjustment.placement_y += pair.first.y_placement as f32 * scale_y;
-                        adjustment.advance_x += pair.first.x_advance as f32 * scale_x;
-                        adjustment.advance_y += pair.first.y_advance as f32 * scale_y;
-                    }
-                }
-            }
-
-            adjustment
         }
+        adjustments
     }
 
     #[cfg(feature = "layout")]
@@ -2098,9 +2056,7 @@ impl Font {
         let mut cursor = index.checked_sub(1)?;
         loop {
             match Self::glyph_unit_at(units, cursor) {
-                Some(glyph)
-                    if !self.gdef_is_ignored_for_pair_positioning(glyph.glyph_id as u16) =>
-                {
+                Some(glyph) if !self.gdef_is_mark_for_attachment(glyph.glyph_id as u16) => {
                     return Some(cursor);
                 }
                 Some(_) => {
@@ -2122,37 +2078,14 @@ impl Font {
     }
 
     #[cfg(feature = "layout")]
-    fn find_next_spacing_glyph_index(
-        &self,
-        units: &[ResolvedTextUnit],
-        index: usize,
-    ) -> Option<usize> {
-        let mut cursor = index + 1;
-        while cursor < units.len() {
-            match Self::glyph_unit_at(units, cursor) {
-                Some(glyph)
-                    if !self.gdef_is_ignored_for_pair_positioning(glyph.glyph_id as u16) =>
-                {
-                    return Some(cursor);
-                }
-                Some(_) => {
-                    cursor += 1;
-                }
-                None => return None,
-            }
-        }
-        None
-    }
-
-    #[cfg(feature = "layout")]
-    fn gdef_is_ignored_for_pair_positioning(&self, glyph_id: u16) -> bool {
+    fn gdef_is_mark_for_attachment(&self, glyph_id: u16) -> bool {
         self.current_gdef()
             .map(|gdef| gdef.is_mark_glyph(glyph_id))
             .unwrap_or(false)
     }
 
     #[cfg(not(feature = "layout"))]
-    fn gdef_is_ignored_for_pair_positioning(&self, glyph_id: u16) -> bool {
+    fn gdef_is_mark_for_attachment(&self, glyph_id: u16) -> bool {
         let _ = glyph_id;
         false
     }
@@ -2272,6 +2205,8 @@ impl Font {
                 }
             }
         }
+        let adjustments =
+            self.position_adjustments(&shaped_units, options.locale, is_vertical, scale_x, scale_y);
         let mut unit_glyph_indices = vec![None; shaped_units.len()];
 
         for (index, unit) in shaped_units.iter().enumerate() {
@@ -2438,14 +2373,7 @@ impl Font {
                             };
                         }
                     }
-                    let mut adjustment = self.position_adjustment_for_index(
-                        &shaped_units,
-                        index,
-                        options.locale,
-                        is_vertical,
-                        scale_x,
-                        scale_y,
-                    );
+                    let mut adjustment = adjustments[index];
                     // GPOS placement is Cartesian (Y-up); this run is Y-down.
                     // Advances are directional: positive YAdvance increases the
                     // TTB advance height, so it must not be negated here.
@@ -2804,6 +2732,8 @@ impl Font {
             crate::commands::FontVariant::Normal,
         )?;
 
+        let adjustments = self.position_adjustments(&shaped_units, None, false, 1.0, 1.0);
+
         for (index, unit) in shaped_units.iter().enumerate() {
             match *unit {
                 ResolvedTextUnit::Newline => {
@@ -2823,14 +2753,7 @@ impl Font {
                         .open_type_glyf
                         .as_ref()
                         .ok_or_else(|| Error::other("glyph is none"))?;
-                    let adjustment = self.position_adjustment_for_index(
-                        &shaped_units,
-                        index,
-                        None,
-                        false,
-                        1.0,
-                        1.0,
-                    );
+                    let adjustment = adjustments[index];
                     let origin_y =
                         -(line_index as f64 * line_height) + adjustment.placement_y as f64;
                     let advance_width = match &open_type_glyph.layout {
@@ -4732,9 +4655,8 @@ mod pair_coordinate_tests {
                             ),
                             expected
                         );
-                        let scaled = font.position_adjustment_for_index(
-                            &units, index, None, vertical, 0.5, 0.25,
-                        );
+                        let scaled =
+                            font.position_adjustments(&units, None, vertical, 0.5, 0.25)[index];
                         assert_eq!(scaled.placement_x, expected.0 as f32 * 0.5);
                         assert_eq!(scaled.placement_y, expected.1 as f32 * 0.25);
                         assert_eq!(scaled.advance_x, expected.2 as f32 * 0.5);
