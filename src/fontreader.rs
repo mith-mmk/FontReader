@@ -4545,6 +4545,36 @@ fn validate_variation_axis_counts(font: &Font) -> Result<(), Error> {
     Ok(())
 }
 
+// Isolate nested layout offsets from other tables and trailing container bytes.
+// Check both the limit and physical range before read_bytes_as_vec allocates,
+// even when called independently of the public SFNT directory validation.
+#[cfg(feature = "layout")]
+fn bounded_layout_reader<R: BinaryReader>(
+    file: &mut R,
+    offset: u32,
+    length: u32,
+    limits: &DecodeLimits,
+) -> Result<BytesReader, Error> {
+    if length as usize > limits.max_table_bytes {
+        return Err(crate::limits::resource_limit(
+            "OpenType table",
+            length as usize,
+            limits.max_table_bytes,
+        ));
+    }
+    let end = u64::from(offset)
+        .checked_add(u64::from(length))
+        .ok_or_else(|| Error::new(ErrorKind::InvalidData, "OpenType table range overflow"))?;
+    if end > file.seek(SeekFrom::End(0))? {
+        return Err(Error::new(
+            ErrorKind::UnexpectedEof,
+            "OpenType table exceeds input buffer",
+        ));
+    }
+    file.seek(SeekFrom::Start(u64::from(offset)))?;
+    Ok(BytesReader::from(file.read_bytes_as_vec(length as usize)?))
+}
+
 fn from_opentype<R: BinaryReader>(
     file: &mut R,
     header: &OTFHeader,
@@ -4671,12 +4701,14 @@ fn from_opentype<R: BinaryReader>(
             }
             #[cfg(feature = "layout")]
             b"GPOS" => {
-                let gpos = gpos::Gpos::new(file, record.offset, record.length)?;
+                let mut reader = bounded_layout_reader(file, record.offset, record.length, limits)?;
+                let gpos = gpos::Gpos::new(&mut reader, 0, record.length)?;
                 font.gpos = Some(gpos);
             }
             #[cfg(feature = "layout")]
             b"GSUB" => {
-                let gsub = gsub::Gsub::new(file, record.offset, record.length)?;
+                let mut reader = bounded_layout_reader(file, record.offset, record.length, limits)?;
+                let gsub = gsub::Gsub::new(&mut reader, 0, record.length)?;
                 font.gsub = Some(gsub);
                 #[cfg(debug_assertions)]
                 {
@@ -5207,5 +5239,40 @@ mod text_control_tests {
             let text = format!("A\u{200d}{ch}");
             assert_eq!(unit_texts(&text), ["A\u{200d}".to_owned(), ch.to_string()]);
         }
+    }
+}
+
+#[cfg(all(test, feature = "layout"))]
+mod layout_reader_bounds_tests {
+    use super::*;
+
+    #[test]
+    fn validates_physical_range_and_limit_before_allocating() {
+        let mut source = BytesReader::from(vec![0, 1, 2, 3]);
+        let limits = DecodeLimits::default();
+        assert_eq!(
+            bounded_layout_reader(&mut source, 0, u32::MAX, &limits)
+                .err()
+                .unwrap()
+                .kind(),
+            ErrorKind::InvalidData
+        );
+        let unlimited_table = DecodeLimits {
+            max_table_bytes: usize::MAX,
+            ..limits
+        };
+        for (offset, length) in [(0, u32::MAX), (u32::MAX, 2), (3, 2)] {
+            assert_eq!(
+                bounded_layout_reader(&mut source, offset, length, &unlimited_table)
+                    .err()
+                    .unwrap()
+                    .kind(),
+                ErrorKind::UnexpectedEof
+            );
+        }
+        let mut bounded = bounded_layout_reader(&mut source, 2, 2, &limits).unwrap();
+        assert_eq!(bounded.read_u16_be().unwrap(), 0x0203);
+        assert!(bounded.read_u8().is_err());
+        assert!(bounded_layout_reader(&mut source, 4, 0, &limits).is_ok());
     }
 }
