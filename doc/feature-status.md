@@ -341,7 +341,7 @@ raw glyph/SVG APIs are unchanged. TrueType ignores VORG as required by OpenType.
 - Type 1 SinglePos Formats 1/2 and Type 9 wrapping SinglePos are parsed and executed.
 - Default execution covers `kern` / `dist` horizontally and `vkrn` / `dist` / `vert` vertically, with the existing locale/script selection. Arbitrary feature selection and contextual GPOS are not added.
 - All four static ValueRecord fields reach shaping and measurement, including explicit advances on attached marks. Distinct lookups accumulate in i32, and the first matching subtable (including a zero record) wins within one lookup.
-- SinglePos observes GDEF glyph classes, IgnoreBaseGlyphs / IgnoreLigatures / IgnoreMarks, MarkAttachmentType, and MarkFilteringSet. PairPos now shares this filtering; mark attachment retains its existing separate behavior.
+- SinglePos observes GDEF glyph classes, IgnoreBaseGlyphs / IgnoreLigatures / IgnoreMarks, MarkAttachmentType, and MarkFilteringSet. PairPos shares this filtering. Ordinary mark attachment now filters the current lookup input only; target search and historical GDEF-origin fallback remain separate. See [bounded mark filtering](mark-input-filtering.md).
 - Device / VariationIndex offsets are consumed but their deltas are not evaluated. Cursive positioning and complete Arabic shaping remain separate work.
 - Regressions use the committed MIT synthetic font (`tests/fixtures/gpos-single.ttf`) and byte fixtures for truncation, invalid coverage/counts, lookup accumulation, locale, scaling, vertical flow, and mark attachment. Broad real-font / HarfBuzz comparison is not yet covered.
 - Vertical `vert` selection also covers font-authored SinglePos for unclassified kana marks (including Extension lookups). It does not add `vert` PairPos, generic mark fallback, or anchor inference. Horizontal and sideways runs remain unchanged. Synthetic tests cover shared lookup deduplication, zero-subtable precedence, GDEF filtering, signed values, scaling, locale/required features and public shape/measure/render/family routes. Noto Sans CJK JP 2.004 provides a targeted real-font example; this is not general Japanese/HarfBuzz parity.
@@ -918,3 +918,9 @@ claim of all-font or all-position equivalence. The real comparison font binaries
 
 References: [Unicode data](https://www.unicode.org/Public/17.0.0/ucd/extracted/DerivedJoiningType.txt),
 [OpenType Arabic shaping](https://learn.microsoft.com/en-us/typography/script-development/arabic).
+
+## Bounded mark input filtering
+
+GPOS types 4/5/6 and ExtensionPos now apply GDEF filtering to the current input,
+with explicit target-search, missing-class and synthetic-fallback limits.
+See [scope](mark-input-filtering.md) and [regression commands](testing.md#bounded-mark-input-filtering).

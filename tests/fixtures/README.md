@@ -54,3 +54,13 @@ with unclassified mark, 3 authored SinglePos cancellation, 4 zero SinglePos,
 16 canonical-composition rollback, 17 missing base, 18 PairPos first-record
 cancellation, 19 first-only zero pair, 20 identity locl, 21 deleted base.
 Both nominal advances are 1000.
+
+## Mark lookup input filtering
+
+`mark-input-filter.ttc` is original MIT data derived only from the existing
+original `mark-coordinates.ttf`. Reproduce with
+`python tests/fixtures/generate_mark_input_filter.py` using FontTools4.68.0.
+The 17 ordinary faces and 17 ExtensionPos counterparts exercise current-input
+GDEF filtering without changing target-search rules; see
+`doc/mark-input-filtering.md` for the deliberately retained synthetic GDEF
+fallback and missing-class policy. No installed-font bytes are included.

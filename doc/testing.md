@@ -335,3 +335,17 @@ tests check legacy raw export. `cargo test --all-features`, default,
 The generator and SHA256 are in the fixture README/manifest. Licensed real-font
 checks stay local. See [policy limits](kana-residual-marks.md); shrinking advance
 does not guarantee good attachment or prevent following-glyph ink overlap.
+
+## Bounded mark input filtering
+
+- `cargo test --lib mark_input_filter`
+- `cargo test --test mark_input_filter`
+- `cargo test --no-default-features --test mark_input_filter`
+
+The original 34-face MIT fixture covers types4/5/6 and ExtensionPos, input flags,
+mark-filter precedence, missing GDEF/classes/sets, zero anchors, later eligible
+lookups, locale controls and vertical/no-layout regressions. Regenerate with
+`python tests/fixtures/generate_mark_input_filter.py` using FontTools4.68.0;
+the fixture manifest pins its SHA256. See [scope and real-font controls](mark-input-filtering.md).
+The explicit synthetic GDEF-origin fallback case is a remaining limitation,
+not a full HarfBuzz output equality assertion.

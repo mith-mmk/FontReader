@@ -10,6 +10,8 @@
 
 ### Fixed
 
+- Filter the current input of ordinary GPOS mark attachment lookups using GDEF, including ExtensionPos. Preserve attachment-target search and the existing synthetic GDEF origin fallback; this is bounded HarfBuzz-compatible filtering, not general mark-layout parity. See [scope and tests](doc/mark-input-filtering.md).
+
 - Keep SVG path clips and gradients in the same translated coordinate system as their positioned glyph, including composite baseline shifts and preceding-span advances. Plain paths retain their existing export format.
 - Bound residual kana mark advance suppression to untouched exact-pair EGCs in GPOS faces without GDEF glyph classes. Preserve effective SinglePos/PairPos ownership, nominal positions, raw text exports and no-layout controls. This removes an extra cell, not mark attachment or ink overlap; see [scope](doc/kana-residual-marks.md).
 
