@@ -59,6 +59,7 @@ default feature には `layout` と `cff` が含まれます。
   - GSUB / GPOS を使った shaping
   - 縦書き、RTL、locale、variant 指定
   - 未リリース：[範囲を限定したチベット文字の置換 run](doc/feature-status.ja.md#範囲を限定したチベット文字の置換-run)。フォントの成分 coverage を確認する限定的な canonical 正規化に対応します。上母音付き積み重ね、別文字体系・空白を含む run、一般的な mark skipping は対象外です。
+  - 未リリース：[範囲を限定した現代ハングル合成](doc/feature-status.ja.md#範囲を限定した現代ハングル合成)。合成先を持つ face で現代 LV/LVT/LV+T 書記素を合成します。古ハングル、声調、韓国語全般の shaping は対象外です。
 - `cff`
   - OpenType / CFF outline
 - `raw`
