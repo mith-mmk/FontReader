@@ -23,6 +23,7 @@ const MAX_GSUB_LOOKUP_APPLICATIONS: usize = 4096;
 const MAX_GSUB_NESTING: usize = 32;
 
 mod filtered_context;
+mod hangul;
 
 /// Metadata carried through every sequence substitution, before GPOS.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
