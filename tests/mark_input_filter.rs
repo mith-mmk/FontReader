@@ -58,6 +58,7 @@ fn mark_lookup_filters_only_current_input() {
                         .with_vertical_flow()
                         .shape("A\u{301}\u{301}")
                         .unwrap();
+                    assert_eq!(actual.glyphs.len(), expected.glyphs.len());
                     for (a, b) in actual.glyphs.iter().zip(expected.glyphs.iter()) {
                         assert_eq!((a.x, a.y), (b.x, b.y));
                     }
@@ -76,6 +77,7 @@ fn mark_lookup_filters_only_current_input() {
                         .with_vertical_flow()
                         .shape("A\u{301}\u{301}")
                         .unwrap();
+                    assert_eq!(actual.glyphs.len(), expected.glyphs.len());
                     for (a, b) in actual.glyphs.iter().zip(expected.glyphs.iter()) {
                         assert_eq!((a.x, a.y), (b.x, b.y));
                     }
