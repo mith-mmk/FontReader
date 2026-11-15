@@ -223,6 +223,43 @@ impl CmapEncodings {
         }
     }
 
+    // Coverage and rendering fallback are distinct: Some(0) is an explicit
+    // font mapping and must survive until contextual GSUB has had its chance.
+    pub(crate) fn get_exact_uvs_glyph(&self, code_number: u32, vs: u32) -> Option<u32> {
+        let format14 = self.cmap_encodings.iter().find_map(|encoding| {
+            match encoding.cmap_subtable.as_ref() {
+                CmapSubtable::Format14(format14) => Some(format14),
+                _ => None,
+            }
+        })?;
+        let record = format14
+            .var_selector_records
+            .iter()
+            .find(|record| record.var_selector == vs)?;
+
+        if let Some(mapping) = record
+            .non_default_uvs
+            .unicode_value_ranges
+            .iter()
+            .find(|mapping| mapping.unicode_value == code_number)
+        {
+            return Some(mapping.glyph_id);
+        }
+
+        let is_default = record.default_uvs.unicode_value_ranges.iter().any(|range| {
+            range.start_unicode_value <= code_number
+                && code_number
+                    <= range
+                        .start_unicode_value
+                        .saturating_add(range.additional_count as u32)
+        });
+        if is_default {
+            Some(self.get_glyph_position(code_number))
+        } else {
+            None
+        }
+    }
+
     pub(crate) fn get_glyph_position(&self, code_number: u32) -> u32 {
         let cmap_encodings = &self.cmap_encodings;
         let cmap_encoding = if let Some(encoding) = cmap_encodings

@@ -283,3 +283,27 @@ NFC と等価になり、アイヌ630件と layout 無効6,570件は不変でし
 100/200%表示し代表例を目視確認しました。これは Chrome 自体の組版ではありません。
 未合字の縦書き記号、一部の縦約物、未対応ハングルを含む Hiragino の混植 run
 による保守的復元は残る制限であり、全面的な shaping 一致は主張しません。
+
+## Variation-selector regressions
+
+`cargo test --test unsupported_ivs --all-features` runs 12 synthetic regressions;
+`--no-default-features` runs the six layout-independent controls. Adding `raw` to the no-default run
+adds a seventh control for the public raw UVS glyph/SVG wrappers. The original
+MIT fixtures and generator are recorded in `tests/fixtures/manifest.toml` and
+regenerate byte-for-byte with fontTools 4.68.0. Coverage includes absent format
+14/selector/pair, exact default/nondefault mappings, supplementary selectors and
+bases, missing bases, repeated/orphan selectors, multi-pair EGCs, horizontal/
+vertical/mixed rendering, exact versus nominal family choice, continuity,
+explicit glyph-zero contextual repair, invalid nominal/post-GSUB mark IDs, and
+CFF/CFF2 invalid CharStrings with color metadata. The cmap unit test also checks
+inclusive default ranges and preserves historical low-level return behavior.
+
+Raw UVS glyph/SVG rendering now retains unsupported bases; public signatures
+are unchanged. These tests do not claim original scalar source indices, a
+registered-sequence filter, full CSS fallback, or universal Chrome parity.
+Font-authored unregistered mappings can differ from Chrome policy. Separate
+local real-font/Chrome checks are diagnostic, not required for the offline suite.
+
+The inherited `--no-default-features --features raw` combination still fails
+`raw_layout_getters_match_shaped_composite_metrics` in `tests/composite_gvar.rs`;
+this unrelated baseline limitation is not fixed by the selector change.

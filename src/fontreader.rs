@@ -1375,9 +1375,10 @@ impl Font {
     }
 
     fn resolve_glyph_id_with_uvs(&self, ch: char, vs: char, is_vert: bool) -> Result<usize, Error> {
-        let glyph_id = self
-            .current_cmap()?
-            .get_glyph_position_from_uvs(ch as u32, vs as u32) as usize;
+        let cmap = self.current_cmap()?;
+        let glyph_id = cmap
+            .get_exact_uvs_glyph(ch as u32, vs as u32)
+            .unwrap_or_else(|| cmap.get_glyph_position(ch as u32)) as usize;
 
         #[cfg(feature = "layout")]
         {
@@ -1789,6 +1790,20 @@ impl Font {
         Ok(output)
     }
 
+    /// Whether every attached selector has an exact cmap14 mapping. This is
+    /// a family preference, not proof of renderability (including glyph zero).
+    pub(crate) fn has_exact_variations(&self, unit: &ParsedTextUnit) -> bool {
+        let ParsedTextUnit::Glyph { text, .. } = unit else {
+            return true;
+        };
+        let Ok(cmap) = self.current_cmap() else {
+            return false;
+        };
+        Self::cluster_glyph_scalars(text)
+            .into_iter()
+            .all(|(ch, vs)| vs == '\0' || cmap.get_exact_uvs_glyph(ch as u32, vs as u32).is_some())
+    }
+
     pub(crate) fn supports_text_unit(
         &self,
         unit: &ParsedTextUnit,
@@ -1870,16 +1885,12 @@ impl Font {
                         continue;
                     };
                     let current = self.resolved_glyph_support(glyph.glyph_id);
-                    if !current.has_glyph {
+                    if !current.is_supported() {
                         return TextUnitSupport::default();
                     }
                     support.has_glyph = true;
                     support.has_outline |= current.has_outline;
                     support.has_color |= current.has_color;
-
-                    if !support.has_outline && !support.has_color {
-                        return TextUnitSupport::default();
-                    }
                 }
 
                 support
@@ -1896,7 +1907,12 @@ impl Font {
             ..TextUnitSupport::default()
         };
         #[cfg(feature = "cff")]
-        if self.current_cff().is_some() {
+        if let Some(cff) = self.current_cff() {
+            // CFF outlines are decoded before color layers during rendering.
+            // Color metadata cannot make an out-of-range CharString safe.
+            if glyph_id >= cff.char_string.data.data.len() {
+                return TextUnitSupport::default();
+            }
             support.has_outline = true;
         }
         support.has_outline |= self

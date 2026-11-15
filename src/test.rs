@@ -3001,6 +3001,40 @@ mod tests {
         assert_eq!(cmap.get_glyph_position_from_uvs(0x2764, 0xFE0E), 20);
     }
 
+    #[test]
+    fn exact_uvs_coverage_distinguishes_missing_pairs_and_explicit_zero() {
+        let cmap = cmap_encodings(vec![
+            (3, 10, format12_table(&[(0x3042, 0x3042, 20)])),
+            (0, 5, format14_table(0x3044, 0xE0100, 0)),
+        ]);
+        assert_eq!(cmap.get_exact_uvs_glyph(0x3044, 0xE0100), Some(0));
+        assert_eq!(cmap.get_exact_uvs_glyph(0x3042, 0xE0100), None);
+        assert_eq!(cmap.get_exact_uvs_glyph(0x3042, 0xE01EF), None);
+        // Preserve the historical low-level cmap result, separate from render fallback.
+        assert_eq!(cmap.get_glyph_position_from_uvs(0x3042, 0xE0100), 0);
+        assert_eq!(cmap.get_glyph_position_from_uvs(0x3042, 0xE01EF), 20);
+        let mut default_uvs = Vec::new();
+        push_u16(&mut default_uvs, 14);
+        push_u32(&mut default_uvs, 29);
+        push_u32(&mut default_uvs, 1);
+        push_u24(&mut default_uvs, 0xE0100);
+        push_u32(&mut default_uvs, 21);
+        push_u32(&mut default_uvs, 0);
+        push_u32(&mut default_uvs, 1);
+        push_u24(&mut default_uvs, 0x3042);
+        default_uvs.push(1);
+        let defaults = cmap_encodings(vec![
+            (3, 10, format12_table(&[(0x3042, 0x3042, 20)])),
+            (0, 5, default_uvs),
+        ]);
+        assert_eq!(defaults.get_exact_uvs_glyph(0x3042, 0xE0100), Some(20));
+        assert_eq!(defaults.get_exact_uvs_glyph(0x3043, 0xE0100), Some(0));
+        assert_eq!(defaults.get_exact_uvs_glyph(0x3044, 0xE0100), None);
+        let nominal = cmap_encodings(vec![(3, 10, format12_table(&[(0x3042, 0x3042, 20)]))]);
+        assert_eq!(nominal.get_exact_uvs_glyph(0x3042, 0xE0100), None);
+        assert_eq!(nominal.get_glyph_position_from_uvs(0x3042, 0xE0100), 20);
+    }
+
     fn test_fonts_dir() -> std::path::PathBuf {
         if let Ok(path) = std::env::var("FONTCORE_TEST_FONTS") {
             return std::path::PathBuf::from(path);
