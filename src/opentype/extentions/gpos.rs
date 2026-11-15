@@ -1471,6 +1471,43 @@ impl Gpos {
         None
     }
 
+    // This is a bounded fallback, not a global complex-script feature plan.
+    pub(crate) fn lookup_tibetan_vowel_adjustment(
+        &self,
+        base: u16,
+        mark: u16,
+        locale: Option<&str>,
+        gdef: Option<&Gdef>,
+    ) -> Option<MarkAttachmentAdjustment> {
+        let scripts = self
+            .scripts
+            .scripts
+            .iter()
+            .filter(|script| script.script_tag == u32::from_be_bytes(*b"tibt"))
+            .collect();
+        for lookup in self.collect_lookups_from_scripts(scripts, locale, &[*b"abvm", *b"blwm"]) {
+            if lookup.lookup_type != 4 && lookup.lookup_type != 9 {
+                continue;
+            }
+            // Do not guess participant classes when filtering is requested.
+            let has_filter_classes = gdef.is_some_and(|gdef| {
+                gdef.glyph_class(base).is_some() && gdef.glyph_class(mark).is_some()
+            });
+            if (!has_filter_classes && lookup.lookup_flag & 0xff1e != 0)
+                || !lookup.includes_glyph(base, gdef)
+                || !lookup.includes_glyph(mark, gdef)
+            {
+                continue;
+            }
+            for subtable in &lookup.subtables {
+                if let Some(found) = subtable.lookup_mark_to_base_adjustment(base, mark) {
+                    return Some(found);
+                }
+            }
+        }
+        None
+    }
+
     pub(crate) fn lookup_mark_to_ligature_adjustment(
         &self,
         ligature: u16,

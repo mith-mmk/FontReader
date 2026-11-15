@@ -73,3 +73,28 @@ Unit regressions also cover format 1 records, nested lookup bounds, no-op rules,
 reverse Extension traversal, deletion, output cursor movement, ligature counts,
 and conservative GDEF filtering. This suite is not a claim of general script
 shaping, mark-skipping, or full real-font/HarfBuzz equivalence.
+
+### Basic Tibetan vowel positioning (unreleased)
+
+`tests/tibetan_vowel_positioning.rs` uses an original MIT collection generated
+by `python tests/fixtures/generate_tibetan_vowel_positioning.py` with
+fontTools 4.68.0. Ordinary tests require neither Python nor an installed font.
+The paired control faces omit GPOS while retaining all other tables; they check unchanged out-of-scope and layout-disabled output.
+Run `cargo test --test tibetan_vowel_positioning` and repeat with
+`--no-default-features` and `--all-features`.
+
+A separate local diagnostic used official Noto Serif Tibetan 2.103, weight 400
+(SHA-256 `060ec022b04c306de3f58d051fb0e1cf81a5b610c5910fbfc43bba154c057cda`).
+At fontcore size 2815 (unit font scale for this face), U+0F40 U+0F72 now places
+the vowel at (90, 0), rather than (0, 0), matching HarfBuzz 15 full shaping.
+U+0F40 U+0F74 places the separate vowel at (60, 525), matching only the
+HarfBuzz diagnostic with `blws=0`; full HarfBuzz substitutes a single glyph.
+Do not interpret that diagnostic comparison as full Tibetan shaping parity.
+A local Chrome comparison at 100%/200% confirmed the above-vowel placements
+for ka+i/e/o/reversed-i and the below-vowel GPOS-only movement for ka+u.
+Ka+aa remains a separate, incorrect glyph with a visible dotted-circle form in
+this font; including a vowel in the fallback whitelist does not guarantee a
+usable anchor or replace missing `blws` substitutions. Stacks, subjoined
+letters, multiple marks and orphan vowels remain outside the repair.
+Screen Y coordinates are the negation of HarfBuzz Y-up positions. The external
+font, license and raw diagnostic output are not part of the repository.

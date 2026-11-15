@@ -240,3 +240,10 @@ source = "tests/fixtures/generate_arabic_joining.py (fontTools 4.68.0)"
 license = "MIT (project test code)"
 sha256 = "de6890b11416aac16b0dab636d269fcf47c321b1d3588984e1f97088863be729"
 features = ["arabic-joining", "ccmp", "source-mapping"]
+
+[[fixture]]
+id = "tibetan-vowel-positioning.ttc"
+source = "tests/fixtures/generate_tibetan_vowel_positioning.py (fontTools 4.68.0; no external font)"
+license = "MIT (project test code)"
+sha256 = "5dddb90dc08a3afbeb49b316285b9752fc9387c5a1e92a4a15f2d062f05a5168"
+features = ["GPOS", "Tibetan", "abvm", "blwm", "mark", "mkmk", "script-selection", "LangSys", "lookup-flags", "GDEF", "mark-filtering-set", "Extension", "cmap-aliases", "ligature-exclusion", "no-layout-controls", "TTC"]

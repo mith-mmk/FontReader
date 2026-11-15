@@ -2050,14 +2050,35 @@ impl Font {
                     current.glyph_id as u16,
                     locale,
                 )
-            })?
+            })
         } else {
             gpos.lookup_mark_to_base_adjustment(
                 base.glyph_id as u16,
                 current.glyph_id as u16,
                 locale,
-            )?
-        };
+            )
+        }
+        .or_else(|| {
+            // Deliberately limited to an adjacent consonant and simple vowel.
+            // Tibetan stacks and decomposable vowels need a full shaping plan.
+            let simple_pair = base_index + 1 == index
+                && base.ligature_components == 1
+                && current.ligature_components == 1
+                && matches!(base.ch, '\u{0f40}'..='\u{0f47}' | '\u{0f49}'..='\u{0f6c}')
+                && matches!(
+                    current.ch,
+                    '\u{0f71}' | '\u{0f72}' | '\u{0f74}' | '\u{0f7a}'..='\u{0f7d}' | '\u{0f80}'
+                );
+            if !simple_pair {
+                return None;
+            }
+            gpos.lookup_tibetan_vowel_adjustment(
+                base.glyph_id as u16,
+                current.glyph_id as u16,
+                locale,
+                self.current_gdef(),
+            )
+        })?;
 
         Some(GlyphAttachmentPlacement {
             glyph_index,
