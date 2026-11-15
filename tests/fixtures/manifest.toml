@@ -219,3 +219,10 @@ source = "tests/fixtures/generate_composite_gvar.py (fontTools 4.68.0; no extern
 license = "MIT (project test code)"
 sha256 = "0cddbba5fccde7c59d9a852a302aed222730b8bfea462785005b666a91dc7e16"
 features = ["gvar", "component-indices", "horizontal-and-vertical-phantoms", "nested-XY", "scaled-offsets", "sparse-tuples", "child-only-variation", "signed-fractional-deltas", "HVAR-VVAR-precedence", "TTC", "documented-fallbacks"]
+
+[[fixture]]
+id = "contextual-gsub.ttc"
+source = "tests/fixtures/generate_contextual_gsub.py (fontTools 4.68.0; no external font)"
+license = "MIT (project test code)"
+sha256 = "ed52278aa4055cd2da5b5de32e8fd249d34a93a008c0999703329f24e2792c5a"
+features = ["GSUB", "rclt", "calt", "clig", "rlig", "ccmp", "IVS", "vert", "vrt2", "vrtr", "contextual-multiple", "shared-lookup", "ligature-mark", "GDEF-flags"]

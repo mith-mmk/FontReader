@@ -19,10 +19,10 @@ mod tests {
             AlternateSet, AlternateSubstitutionFormat1, ChainSubRule, ChainSubRuleSet,
             ChainingContextSubstitutionFormat1, ChainingContextSubstitutionFormat2,
             ChainingContextSubstitutionFormat3, ContextSubstitutionFormat1, LigatureSet,
-            LigatureSubstitutionFormat1, LigatureTable, Lookup, LookupList, LookupResult,
-            LookupSubstitution, LookupType, MultipleSubstitutionFormat1, SequenceLookupRecords,
-            SequenceRule, SequenceRuleSet, SequenceTable, SingleSubstitutionFormat1,
-            SingleSubstitutionFormat2,
+            LigatureSubstitutionFormat1, LigatureTable, Lookup, LookupList, LookupRecord,
+            LookupResult, LookupSubstitution, LookupType, MultipleSubstitutionFormat1,
+            SequenceLookupRecords, SequenceRule, SequenceRuleSet, SequenceTable,
+            SingleSubstitutionFormat1, SingleSubstitutionFormat2,
         },
     };
     #[cfg(fontcore_external_corpus)]
@@ -321,7 +321,12 @@ mod tests {
                     glyph_count: 2,
                     input_sequence: vec![71],
                     lookup_count: 1,
-                    lookup_indexes: vec![9],
+                    seq_lookup_records: SequenceLookupRecords {
+                        lookup_records: vec![LookupRecord {
+                            sequence_index: 0,
+                            lookup_list_index: 9,
+                        }],
+                    },
                 }],
             }],
         });
@@ -329,7 +334,10 @@ mod tests {
             LookupResult::Context(rules) => {
                 assert_eq!(rules.len(), 1);
                 assert_eq!(rules[0].input_sequence, vec![71]);
-                assert_eq!(rules[0].lookup_indexes, vec![9]);
+                assert_eq!(
+                    rules[0].seq_lookup_records.lookup_records[0].lookup_list_index,
+                    9
+                );
             }
             _ => panic!("unexpected lookup result"),
         }
@@ -353,7 +361,12 @@ mod tests {
                         lookahead_glyph_count: 1,
                         lookahead_glyph_ids: vec![82],
                         lookup_count: 1,
-                        lookup_indexes: vec![7],
+                        seq_lookup_records: SequenceLookupRecords {
+                            lookup_records: vec![LookupRecord {
+                                sequence_index: 0,
+                                lookup_list_index: 7,
+                            }],
+                        },
                     }],
                 }],
             });
@@ -361,7 +374,10 @@ mod tests {
             LookupResult::Chaining(rules) => {
                 assert_eq!(rules.len(), 1);
                 assert_eq!(rules[0].backtrack_glyph_ids, vec![79]);
-                assert_eq!(rules[0].lookup_indexes, vec![7]);
+                assert_eq!(
+                    rules[0].seq_lookup_records.lookup_records[0].lookup_list_index,
+                    7
+                );
             }
             _ => panic!("unexpected lookup result"),
         }
@@ -1015,16 +1031,17 @@ mod tests {
     fn lookup_context_format1_record(
         coverage_glyph_id: u16,
         input_sequence: &[u16],
-        lookup_indexes: &[u16],
+        lookup_records: &[(u16, u16)],
     ) -> Vec<u8> {
         let coverage = coverage_table(&[coverage_glyph_id]);
         let mut rule = Vec::new();
         push_u16(&mut rule, (input_sequence.len() + 1) as u16);
-        push_u16(&mut rule, lookup_indexes.len() as u16);
+        push_u16(&mut rule, lookup_records.len() as u16);
         for glyph_id in input_sequence {
             push_u16(&mut rule, *glyph_id);
         }
-        for lookup_index in lookup_indexes {
+        for (sequence_index, lookup_index) in lookup_records {
+            push_u16(&mut rule, *sequence_index);
             push_u16(&mut rule, *lookup_index);
         }
 
@@ -1173,7 +1190,7 @@ mod tests {
         backtrack_glyph_ids: &[u16],
         input_glyph_ids: &[u16],
         lookahead_glyph_ids: &[u16],
-        lookup_indexes: &[u16],
+        lookup_records: &[(u16, u16)],
     ) -> Vec<u8> {
         let coverage = coverage_table(&[coverage_glyph_id]);
         let mut rule = Vec::new();
@@ -1181,7 +1198,7 @@ mod tests {
         for glyph_id in backtrack_glyph_ids {
             push_u16(&mut rule, *glyph_id);
         }
-        push_u16(&mut rule, input_glyph_ids.len() as u16);
+        push_u16(&mut rule, (input_glyph_ids.len() + 1) as u16);
         for glyph_id in input_glyph_ids {
             push_u16(&mut rule, *glyph_id);
         }
@@ -1189,8 +1206,9 @@ mod tests {
         for glyph_id in lookahead_glyph_ids {
             push_u16(&mut rule, *glyph_id);
         }
-        push_u16(&mut rule, lookup_indexes.len() as u16);
-        for lookup_index in lookup_indexes {
+        push_u16(&mut rule, lookup_records.len() as u16);
+        for (sequence_index, lookup_index) in lookup_records {
+            push_u16(&mut rule, *sequence_index);
             push_u16(&mut rule, *lookup_index);
         }
 
@@ -1818,7 +1836,7 @@ mod tests {
             *b"calt",
             &[0, 1],
             vec![
-                lookup_context_format1_record(10, &[11], &[2]),
+                lookup_context_format1_record(10, &[11], &[(0, 2)]),
                 lookup_context_format2_record(20, &[1, 2], &[2], 1, 3),
                 lookup_single_record(10, 70),
                 lookup_single_record(21, 99),
@@ -1865,7 +1883,7 @@ mod tests {
             *b"calt",
             &[0],
             vec![
-                lookup_chaining_context_format1_record(11, &[10], &[], &[12], &[1]),
+                lookup_chaining_context_format1_record(11, &[10], &[], &[12], &[(0, 1)]),
                 lookup_single_record(11, 66),
             ],
         ));
@@ -1897,6 +1915,473 @@ mod tests {
         gsub.apply_feature_sequence(&mut glyphs, None, &[*b"calt"]);
 
         assert_eq!(glyphs, vec![(19, 0), (20, 1), (123, 2), (22, 3)]);
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn gsub_context_format1_preserves_nonzero_sequence_indices_and_size_changes() {
+        // Decompose the first glyph, then address the final original glyph at
+        // its updated sequence index, and finally ligate the expansion.
+        let gsub = parse_gsub(build_gsub_table_with_feature_lookups(
+            *b"rclt",
+            &[0],
+            vec![
+                lookup_context_format1_record(10, &[11], &[(0, 1), (2, 2), (0, 3)]),
+                lookup_multiple_record(10, &[20, 21]),
+                lookup_single_record(11, 30),
+                lookup_ligature_record(20, &[21], 40),
+            ],
+        ));
+        use crate::opentype::extentions::gsub::GsubGlyph;
+        let mut glyphs = vec![
+            GsubGlyph {
+                glyph_id: 10,
+                source_index: 4,
+                ligature_components: 1,
+            },
+            GsubGlyph {
+                glyph_id: 11,
+                source_index: 5,
+                ligature_components: 1,
+            },
+        ];
+        gsub.apply_feature_glyphs(&mut glyphs, None, &[*b"rclt"]);
+        assert_eq!(
+            glyphs,
+            vec![
+                GsubGlyph {
+                    glyph_id: 40,
+                    source_index: 4,
+                    ligature_components: 2
+                },
+                GsubGlyph {
+                    glyph_id: 30,
+                    source_index: 5,
+                    ligature_components: 1
+                },
+            ]
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn gsub_chaining_format1_targets_second_input_and_preserves_context() {
+        let gsub = parse_gsub(build_gsub_table_with_feature_lookups(
+            *b"vert",
+            &[0],
+            vec![
+                lookup_chaining_context_format1_record(11, &[10], &[12], &[13], &[(1, 1)]),
+                lookup_single_record(12, 99),
+            ],
+        ));
+        let mut glyphs = vec![(10, 0), (11, 1), (12, 2), (13, 3)];
+        gsub.apply_feature_sequence(&mut glyphs, None, &[*b"vert"]);
+        assert_eq!(glyphs, vec![(10, 0), (11, 1), (99, 2), (13, 3)]);
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn gsub_context_ignores_later_rules_after_noop_and_bounds_recursion() {
+        for records in [vec![], vec![(0, 0)], vec![(0, 0), (0, 0)]] {
+            let mut gsub = parse_gsub(build_gsub_table_with_feature_lookups(
+                *b"calt",
+                &[0],
+                vec![
+                    lookup_context_format1_record(10, &[11], &records),
+                    lookup_context_format1_record(10, &[11], &[(0, 2)]),
+                    lookup_single_record(10, 99),
+                ],
+            ));
+            let later = gsub.lookups.lookups[1].subtables[0].clone();
+            gsub.lookups.lookups[0].subtables.push(later);
+            let mut glyphs = vec![(10, 0), (11, 1)];
+            gsub.apply_feature_sequence(&mut glyphs, None, &[*b"calt"]);
+            assert_eq!(glyphs, vec![(10, 0), (11, 1)]);
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn gsub_context_advances_past_full_matched_input() {
+        let gsub = parse_gsub(build_gsub_table_with_feature_lookups(
+            *b"calt",
+            &[0],
+            vec![
+                lookup_context_format1_record(10, &[10], &[(0, 1)]),
+                lookup_single_record(10, 20),
+            ],
+        ));
+        let mut glyphs = vec![(10, 0), (10, 1), (10, 2)];
+        gsub.apply_feature_sequence(&mut glyphs, None, &[*b"calt"]);
+        assert_eq!(glyphs, vec![(20, 0), (10, 1), (10, 2)]);
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn gsub_context_sequence_orders_and_deduplicates_lookups() {
+        let gsub = parse_gsub(build_gsub_table_with_feature_lookups(
+            *b"calt",
+            &[1, 0, 1],
+            vec![lookup_single_record(10, 20), lookup_single_record(20, 30)],
+        ));
+        let mut glyphs = vec![(10, 0)];
+        gsub.apply_feature_sequence(&mut glyphs, None, &[*b"calt"]);
+        assert_eq!(glyphs, vec![(30, 0)]);
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn gsub_context_skips_unsupported_filter_flags_at_nested_lookup() {
+        let mut gsub = parse_gsub(build_gsub_table_with_feature_lookups(
+            *b"calt",
+            &[0],
+            vec![
+                lookup_context_format1_record(10, &[11], &[(0, 1)]),
+                lookup_single_record(10, 20),
+            ],
+        ));
+        for flag in [0x0002, 0x0004, 0x0008, 0x0010, 0x0100] {
+            gsub.lookups.lookups[1].lookup_flag = flag;
+            let mut glyphs = vec![(10, 0), (11, 1)];
+            gsub.apply_feature_sequence(&mut glyphs, None, &[*b"calt"]);
+            assert_eq!(glyphs, vec![(10, 0), (11, 1)]);
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn gsub_flagged_ligatures_require_gdef_proof_and_recheck_nested_lookups() {
+        use crate::opentype::extentions::{gdef::Gdef, gsub::GsubGlyph};
+        use crate::opentype::layouts::classdef::{ClassDef, ClassDefFormat1};
+        let gdef = Gdef {
+            major_versionn: 1,
+            minor_version: 0,
+            glyph_class_def: Some(ClassDef::Format1(ClassDefFormat1 {
+                class_format: 1,
+                start_glyph_id: 10,
+                glyph_count: 3,
+                class_value_array: vec![1, 1, 3],
+            })),
+            attach_list: None,
+            lig_caret_list: None,
+            mark_attach_class_def: None,
+            mark_glyph_sets_def: None,
+            item_var_store_offset: None,
+        };
+        let original = vec![
+            GsubGlyph {
+                glyph_id: 10,
+                source_index: 0,
+                ligature_components: 1,
+            },
+            GsubGlyph {
+                glyph_id: 11,
+                source_index: 1,
+                ligature_components: 1,
+            },
+        ];
+        for nested in [false, true] {
+            let (indices, lookups) = if nested {
+                (
+                    vec![0],
+                    vec![
+                        lookup_context_format1_record(10, &[11], &[(0, 1)]),
+                        lookup_ligature_record(10, &[11], 20),
+                    ],
+                )
+            } else {
+                (vec![0], vec![lookup_ligature_record(10, &[11], 20)])
+            };
+            let mut gsub = parse_gsub(build_gsub_table_with_feature_lookups(
+                *b"liga", &indices, lookups,
+            ));
+            for flag in [0x0008, 0x0010, 0x0100] {
+                gsub.lookups.lookups[usize::from(nested)].lookup_flag = flag;
+                let mut glyphs = original.clone();
+                gsub.apply_feature_glyphs_with_gdef(&mut glyphs, None, &[*b"liga"], Some(&gdef));
+                assert_eq!(
+                    glyphs,
+                    vec![GsubGlyph {
+                        glyph_id: 20,
+                        source_index: 0,
+                        ligature_components: 2
+                    }]
+                );
+                let mut glyphs = original.clone();
+                gsub.apply_feature_glyphs_with_gdef(&mut glyphs, None, &[*b"liga"], None);
+                assert_eq!(glyphs, original);
+                let mut with_mark = original.clone();
+                with_mark.push(GsubGlyph {
+                    glyph_id: 12,
+                    source_index: 2,
+                    ligature_components: 1,
+                });
+                let mut glyphs = with_mark.clone();
+                gsub.apply_feature_glyphs_with_gdef(&mut glyphs, None, &[*b"liga"], Some(&gdef));
+                assert_eq!(glyphs, with_mark);
+            }
+            gsub.lookups.lookups[usize::from(nested)].lookup_flag = 0x0002;
+            let mut glyphs = original.clone();
+            gsub.apply_feature_glyphs_with_gdef(&mut glyphs, None, &[*b"liga"], Some(&gdef));
+            assert_eq!(glyphs, original);
+        }
+    }
+
+    #[cfg(feature = "layout")]
+    fn gsub_class_count_test_gdef() -> crate::opentype::extentions::gdef::Gdef {
+        use crate::opentype::extentions::gdef::Gdef;
+        use crate::opentype::layouts::classdef::{ClassDef, ClassDefFormat1};
+        Gdef {
+            major_versionn: 1,
+            minor_version: 0,
+            glyph_class_def: Some(ClassDef::Format1(ClassDefFormat1 {
+                class_format: 1,
+                start_glyph_id: 10,
+                glyph_count: 6,
+                class_value_array: vec![1, 2, 3, 1, 3, 1],
+            })),
+            attach_list: None,
+            lig_caret_list: None,
+            mark_attach_class_def: None,
+            mark_glyph_sets_def: None,
+            item_var_store_offset: None,
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn gsub_cached_classes_follow_every_substitution_kind() {
+        use crate::opentype::extentions::gsub::GsubGlyph;
+        let gdef = gsub_class_count_test_gdef();
+        let reverse = |from, to| {
+            build_lookup_record_with_subtables(
+                LookupType::ReverseChainingContextualSingleSubstitution as u16,
+                vec![build_reverse_chain_subtable(&[from], to, &[], &[])],
+            )
+        };
+        for (lookup, input, expected) in [
+            (lookup_single_record(10, 12), vec![10, 13], vec![12, 13]),
+            (lookup_single_record(12, 10), vec![12, 13], vec![10, 15]),
+            (
+                lookup_multiple_record(10, &[12, 13]),
+                vec![10, 13],
+                vec![12, 13, 13],
+            ),
+            (lookup_multiple_record(12, &[]), vec![12, 13], vec![15]),
+            (
+                lookup_ligature_record(10, &[13], 12),
+                vec![10, 13, 13],
+                vec![12, 13],
+            ),
+            (
+                lookup_ligature_record(12, &[13], 10),
+                vec![12, 13, 13],
+                vec![10, 15],
+            ),
+            (reverse(10, 12), vec![10, 13], vec![12, 13]),
+            (reverse(12, 10), vec![12, 13], vec![10, 15]),
+        ] {
+            let mut gsub = parse_gsub(build_gsub_table_with_feature_lookups(
+                *b"calt",
+                &[0, 1],
+                vec![lookup, lookup_single_record(13, 15)],
+            ));
+            gsub.lookups.lookups[1].lookup_flag = 0x0008;
+            let mut glyphs: Vec<_> = input
+                .into_iter()
+                .enumerate()
+                .map(|(source_index, glyph_id)| GsubGlyph {
+                    glyph_id,
+                    source_index,
+                    ligature_components: 1,
+                })
+                .collect();
+            gsub.apply_feature_glyphs_with_gdef(&mut glyphs, None, &[*b"calt"], Some(&gdef));
+            assert_eq!(
+                glyphs
+                    .iter()
+                    .map(|glyph| glyph.glyph_id)
+                    .collect::<Vec<_>>(),
+                expected
+            );
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn gsub_cached_classes_update_inside_context_and_during_flagged_lookup() {
+        use crate::opentype::extentions::gsub::GsubGlyph;
+        let gdef = gsub_class_count_test_gdef();
+        let mut gsub = parse_gsub(build_gsub_table_with_feature_lookups(
+            *b"calt",
+            &[0],
+            vec![
+                lookup_context_format1_record(10, &[13], &[(0, 1), (1, 2)]),
+                lookup_single_record(10, 12),
+                lookup_single_record(13, 15),
+            ],
+        ));
+        gsub.lookups.lookups[2].lookup_flag = 0x0008;
+        let mut glyphs = vec![
+            GsubGlyph {
+                glyph_id: 10,
+                source_index: 0,
+                ligature_components: 1,
+            },
+            GsubGlyph {
+                glyph_id: 13,
+                source_index: 1,
+                ligature_components: 1,
+            },
+        ];
+        gsub.apply_feature_glyphs_with_gdef(&mut glyphs, None, &[*b"calt"], Some(&gdef));
+        assert_eq!(
+            glyphs
+                .iter()
+                .map(|glyph| glyph.glyph_id)
+                .collect::<Vec<_>>(),
+            vec![12, 13]
+        );
+        let mut gsub = parse_gsub(build_gsub_table(
+            *b"calt",
+            vec![lookup_single_record(10, 11)],
+        ));
+        gsub.lookups.lookups[0].lookup_flag = 0x0004;
+        let mut glyphs = vec![
+            GsubGlyph {
+                glyph_id: 10,
+                source_index: 0,
+                ligature_components: 1,
+            },
+            GsubGlyph {
+                glyph_id: 10,
+                source_index: 1,
+                ligature_components: 1,
+            },
+        ];
+        gsub.apply_feature_glyphs_with_gdef(&mut glyphs, None, &[*b"calt"], Some(&gdef));
+        assert_eq!(
+            glyphs
+                .iter()
+                .map(|glyph| glyph.glyph_id)
+                .collect::<Vec<_>>(),
+            vec![11, 10]
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn gsub_cached_classes_keep_long_flagged_runs_linear() {
+        use crate::opentype::extentions::gsub::GsubGlyph;
+        let gdef = gsub_class_count_test_gdef();
+        for count in [10_000, 100_000] {
+            for (source, expected) in [(99, 10), (10, 13)] {
+                let mut gsub = parse_gsub(build_gsub_table(
+                    *b"calt",
+                    vec![lookup_single_record(source, 13)],
+                ));
+                gsub.lookups.lookups[0].lookup_flag = 0x0008;
+                let mut glyphs: Vec<_> = (0..count)
+                    .map(|source_index| GsubGlyph {
+                        glyph_id: 10,
+                        source_index,
+                        ligature_components: 1,
+                    })
+                    .collect();
+                let start = std::time::Instant::now();
+                gsub.apply_feature_glyphs_with_gdef(&mut glyphs, None, &[*b"calt"], Some(&gdef));
+                println!(
+                    "flagged GSUB: count={count}, matched={}, elapsed={:?}",
+                    source == 10,
+                    start.elapsed()
+                );
+                assert!(glyphs.iter().all(|glyph| glyph.glyph_id == expected));
+            }
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn gsub_context_reverse_extension_scans_from_right_to_left() {
+        let lookup = build_lookup_record_with_subtables(
+            LookupType::ReverseChainingContextualSingleSubstitution as u16,
+            vec![
+                build_reverse_chain_subtable(&[1], 10, &[], &[]),
+                build_reverse_chain_subtable(&[2], 20, &[1], &[]),
+            ],
+        );
+        let mut gsub = parse_gsub(build_gsub_table(*b"calt", vec![lookup]));
+        let lookup = &mut gsub.lookups.lookups[0];
+        lookup.lookup_type = 7;
+        lookup.subtables = lookup
+            .subtables
+            .iter()
+            .cloned()
+            .map(|subtable| {
+                LookupSubstitution::ExtensionSubstitution(
+                    crate::opentype::layouts::lookup::ExtensionSubstitutionFormat1 {
+                        subst_format: 1,
+                        extension_lookup_type: 8,
+                        extension_offset: 8,
+                        subtable: Box::new(subtable),
+                    },
+                )
+            })
+            .collect();
+        let mut glyphs = vec![(1, 0), (2, 1), (3, 2)];
+        gsub.apply_feature_sequence(&mut glyphs, None, &[*b"calt"]);
+        assert_eq!(glyphs, vec![(10, 0), (20, 1), (3, 2)]);
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn gsub_context_deletion_keeps_next_original_input_and_updated_record_index() {
+        let gsub = parse_gsub(build_gsub_table_with_feature_lookups(
+            *b"calt",
+            &[0],
+            vec![
+                lookup_context_format1_record(10, &[], &[(0, 1)]),
+                lookup_multiple_record(10, &[]),
+            ],
+        ));
+        let mut glyphs = vec![(10, 0), (10, 1), (11, 2)];
+        gsub.apply_feature_sequence(&mut glyphs, None, &[*b"calt"]);
+        assert_eq!(glyphs, vec![(11, 2)]);
+        let gsub = parse_gsub(build_gsub_table_with_feature_lookups(
+            *b"calt",
+            &[0],
+            vec![
+                lookup_context_format1_record(10, &[11, 12], &[(0, 1), (1, 2)]),
+                lookup_ligature_record(10, &[11], 20),
+                lookup_single_record(12, 30),
+            ],
+        ));
+        let mut glyphs = vec![(10, 0), (11, 1), (12, 2)];
+        gsub.apply_feature_sequence(&mut glyphs, None, &[*b"calt"]);
+        assert_eq!(glyphs, vec![(20, 0), (30, 2)]);
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn gsub_nested_budget_does_not_truncate_ordinary_subtable_scans() {
+        let mut gsub = parse_gsub(build_gsub_table(
+            *b"calt",
+            vec![lookup_single_record(10, 20)],
+        ));
+        let unmatched = parse_gsub(build_gsub_table(
+            *b"calt",
+            vec![lookup_single_record(99, 100)],
+        ))
+        .lookups
+        .lookups[0]
+            .subtables[0]
+            .clone();
+        let matching = gsub.lookups.lookups[0].subtables[0].clone();
+        gsub.lookups.lookups[0].subtables = vec![unmatched; 300];
+        gsub.lookups.lookups[0].subtables.push(matching);
+        let mut glyphs: Vec<_> = (0..5000).map(|index| (10, index)).collect();
+        gsub.apply_feature_sequence(&mut glyphs, None, &[*b"calt"]);
+        assert!(glyphs.iter().all(|glyph| glyph.0 == 20));
     }
 
     #[test]

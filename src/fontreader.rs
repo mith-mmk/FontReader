@@ -1481,74 +1481,39 @@ impl Font {
     #[cfg(feature = "layout")]
     fn apply_gsub_sequence_stages(
         &self,
-        glyphs: &mut Vec<(usize, usize)>,
+        glyphs: &mut Vec<crate::opentype::extentions::gsub::GsubGlyph>,
         locale: Option<&str>,
         is_right_to_left: bool,
         font_variant: crate::commands::FontVariant,
+        orientation: Option<TextRunMode>,
     ) {
         let Some(gsub) = self.current_gsub() else {
             return;
         };
-
-        // Keep the shaping order explicit:
-        // 1. canonical composition / decomposition
-        // 2. locale / variant specific substitutions
-        // 3. RTL joining and contextual forms
-        gsub.apply_ccmp_sequence(glyphs);
-        gsub.apply_variant_sequence(glyphs, locale, font_variant);
+        let mut tags = vec![*b"ccmp"];
+        tags.extend_from_slice(font_variant.gsub_feature_tags());
         if is_right_to_left {
-            gsub.apply_joining_sequence(glyphs, locale);
-            gsub.apply_rtl_contextual_sequence(glyphs, locale);
+            // Joining retains the established composition/variant boundary.
+            gsub.apply_feature_glyphs_with_gdef(glyphs, locale, &tags, self.current_gdef());
+            gsub.apply_joining_glyphs(glyphs, locale);
+            tags.clear();
         }
-    }
-
-    #[cfg(feature = "layout")]
-    fn apply_gsub_ligature_stage(
-        &self,
-        output: &mut Vec<ResolvedTextUnit>,
-        expanded_glyphs: &[ResolvedGlyph],
-        locale: Option<&str>,
-        is_right_to_left: bool,
-    ) {
-        let Some(gsub) = self.current_gsub() else {
-            output.extend(expanded_glyphs.iter().copied().map(ResolvedTextUnit::Glyph));
-            return;
-        };
-
-        const MAX_LIGATURE_COMPONENTS: usize = 8;
-        let glyph_ids: Vec<usize> = expanded_glyphs.iter().map(|glyph| glyph.glyph_id).collect();
-        let mut index = 0;
-        while index < expanded_glyphs.len() {
-            let max_len = (expanded_glyphs.len() - index).min(MAX_LIGATURE_COMPONENTS);
-            let mut matched = None;
-            for len in (2..=max_len).rev() {
-                if is_right_to_left {
-                    if let Some(glyph_id) =
-                        gsub.lookup_rlig_sequence(&glyph_ids[index..index + len], locale)
-                    {
-                        matched = Some((glyph_id, len));
-                        break;
-                    }
-                }
-                if let Some(glyph_id) = gsub.lookup_liga_sequence(&glyph_ids[index..index + len]) {
-                    matched = Some((glyph_id, len));
-                    break;
-                }
-            }
-
-            if let Some((glyph_id, len)) = matched {
-                output.push(ResolvedTextUnit::Glyph(ResolvedGlyph {
-                    ch: expanded_glyphs[index].ch,
-                    glyph_id,
-                    prefer_color: expanded_glyphs[index].prefer_color,
-                    ligature_components: len as u16,
-                }));
-                index += len;
-            } else {
-                output.push(ResolvedTextUnit::Glyph(expanded_glyphs[index]));
-                index += 1;
-            }
-        }
+        // Contextual features are not specific to RTL scripts. Select them
+        // together so font-authored LookupList order can place cleanup after
+        // contextual substitutions (including cmap format 14 placeholders).
+        tags.extend_from_slice(&[*b"rlig", *b"rclt", *b"calt", *b"clig", *b"liga"]);
+        let orientation_tag = orientation.map(|mode| match mode {
+            TextRunMode::SidewaysLtr => *b"vrtr",
+            TextRunMode::MixedUpright => gsub.selected_vertical_tag(true),
+            TextRunMode::Standard => gsub.selected_vertical_tag(false),
+        });
+        gsub.apply_feature_glyphs_with_orientation_and_gdef(
+            glyphs,
+            locale,
+            &tags,
+            orientation_tag,
+            self.current_gdef(),
+        );
     }
 
     fn flush_shaped_glyphs(
@@ -1558,9 +1523,10 @@ impl Font {
         locale: Option<&str>,
         is_right_to_left: bool,
         font_variant: crate::commands::FontVariant,
+        orientation: Option<TextRunMode>,
     ) {
         #[cfg(not(feature = "layout"))]
-        let _ = (locale, is_right_to_left, font_variant);
+        let _ = (locale, is_right_to_left, font_variant, orientation);
 
         if glyphs.is_empty() {
             return;
@@ -1571,24 +1537,31 @@ impl Font {
             let mut ccmp_glyphs = glyphs
                 .iter()
                 .enumerate()
-                .map(|(source_index, glyph)| (glyph.glyph_id, source_index))
+                .map(
+                    |(source_index, glyph)| crate::opentype::extentions::gsub::GsubGlyph {
+                        glyph_id: glyph.glyph_id,
+                        source_index,
+                        ligature_components: glyph.ligature_components,
+                    },
+                )
                 .collect::<Vec<_>>();
             self.apply_gsub_sequence_stages(
                 &mut ccmp_glyphs,
                 locale,
                 is_right_to_left,
                 font_variant,
+                orientation,
             );
             let expanded_glyphs = ccmp_glyphs
                 .into_iter()
-                .map(|(glyph_id, source_index)| ResolvedGlyph {
-                    ch: glyphs[source_index].ch,
-                    glyph_id,
-                    prefer_color: glyphs[source_index].prefer_color,
-                    ligature_components: glyphs[source_index].ligature_components,
+                .map(|item| ResolvedGlyph {
+                    ch: glyphs[item.source_index].ch,
+                    glyph_id: item.glyph_id,
+                    prefer_color: glyphs[item.source_index].prefer_color,
+                    ligature_components: item.ligature_components,
                 })
                 .collect::<Vec<_>>();
-            self.apply_gsub_ligature_stage(output, &expanded_glyphs, locale, is_right_to_left);
+            output.extend(expanded_glyphs.into_iter().map(ResolvedTextUnit::Glyph));
             glyphs.clear();
             return;
         }
@@ -1605,9 +1578,33 @@ impl Font {
         locale: Option<&str>,
         font_variant: crate::commands::FontVariant,
     ) -> Result<Vec<ResolvedTextUnit>, Error> {
+        self.shape_text_units_mode(
+            text,
+            is_vert,
+            is_right_to_left,
+            locale,
+            font_variant,
+            TextRunMode::Standard,
+        )
+    }
+
+    fn shape_text_units_mode(
+        &self,
+        text: &str,
+        is_vert: bool,
+        is_right_to_left: bool,
+        locale: Option<&str>,
+        font_variant: crate::commands::FontVariant,
+        mode: TextRunMode,
+    ) -> Result<Vec<ResolvedTextUnit>, Error> {
         #[cfg(not(feature = "layout"))]
         let _ = (is_vert, locale, is_right_to_left, font_variant);
 
+        let orientation = if mode != TextRunMode::Standard || is_vert {
+            Some(mode)
+        } else {
+            None
+        };
         let mut output = Vec::new();
         let mut pending_glyphs = Vec::new();
 
@@ -1620,6 +1617,7 @@ impl Font {
                         locale,
                         is_right_to_left,
                         font_variant,
+                        orientation,
                     );
                     output.push(ResolvedTextUnit::Newline);
                 }
@@ -1630,14 +1628,15 @@ impl Font {
                         locale,
                         is_right_to_left,
                         font_variant,
+                        orientation,
                     );
                     output.push(ResolvedTextUnit::Tab);
                 }
                 ParsedTextUnit::Glyph { text, .. } => {
                     let prefer_color = Self::text_prefers_color_glyph(&text);
                     for (ch, variation_selector) in Self::cluster_glyph_scalars(&text) {
-                        // Text shaping applies vertical alternates after all other GSUB
-                        // stages. Raw glyph APIs retain the helper's direct alternate path.
+                        // Text shaping selects orientation features in the sequence pass.
+                        // Raw glyph APIs retain the direct single-glyph alternate path.
                         let glyph_id =
                             self.resolve_glyph_id_with_uvs(ch, variation_selector, false)?;
                         #[cfg(feature = "layout")]
@@ -1667,21 +1666,8 @@ impl Font {
             locale,
             is_right_to_left,
             font_variant,
+            orientation,
         );
-        #[cfg(feature = "layout")]
-        if is_vert {
-            if let Some(gsub) = self.current_gsub() {
-                // The selected vertical feature is the final GSUB stage, including
-                // for ligatures. Metrics, outline origins, and GPOS consume these IDs.
-                for unit in &mut output {
-                    if let ResolvedTextUnit::Glyph(glyph) = unit {
-                        if let Some(glyph_id) = gsub.lookup_vertical(glyph.glyph_id as u16) {
-                            glyph.glyph_id = glyph_id as usize;
-                        }
-                    }
-                }
-            }
-        }
         Ok(output)
     }
 
@@ -2230,34 +2216,14 @@ impl Font {
         let mut cursor_y = 0.0f32;
         let tab_advance = line_height;
         #[allow(unused_mut)]
-        let mut shaped_units = self.shape_text_units(
+        let shaped_units = self.shape_text_units_mode(
             text,
             is_vertical && mode == TextRunMode::Standard,
             is_right_to_left,
             options.locale,
             options.font_variant,
+            mode,
         )?;
-        #[cfg(feature = "layout")]
-        if mode != TextRunMode::Standard {
-            if let Some(gsub) = self.current_gsub() {
-                // Ordinary GSUB is complete. The explicit route selects exactly
-                // one orientation feature before metrics and GPOS, never vrt2.
-                for unit in &mut shaped_units {
-                    if let ResolvedTextUnit::Glyph(glyph) = unit {
-                        let id = match mode {
-                            TextRunMode::SidewaysLtr => gsub.lookup_sideways(glyph.glyph_id as u16),
-                            TextRunMode::MixedUpright => {
-                                gsub.lookup_mixed_upright(glyph.glyph_id as u16)
-                            }
-                            TextRunMode::Standard => None,
-                        };
-                        if let Some(id) = id {
-                            glyph.glyph_id = id as usize;
-                        }
-                    }
-                }
-            }
-        }
         let adjustments =
             self.position_adjustments(&shaped_units, options.locale, is_vertical, scale_x, scale_y);
         let mut unit_glyph_indices = vec![None; shaped_units.len()];

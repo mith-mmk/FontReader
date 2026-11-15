@@ -123,7 +123,7 @@ raw glyph/SVG APIs are unchanged. TrueType ignores VORG as required by OpenType.
 - Text APIs apply variation selectors and basic `locl` / `liga` / `dlig` / `ccmp`
 - Direction-aware APIs support vertical flow and RTL layout
 - Arabic shaping currently covers `isol` / `init` / `medi` / `fina`
-- Arabic shaping also applies `rlig`, `rclt`, `calt`, and `clig` when present
+- Text shaping applies `rlig`, `rclt`, `calt`, and `clig` in both LTR and RTL modes when present
 - Locale-aware lookup collection prefers matching scripts such as `arab`, `hebr`, and `syrc`
 - Language-system selection also uses full locale subtags such as `ur-Arab-PK`
 - Japanese variant forms can be requested through `FontOptions::font_variant`
@@ -272,13 +272,15 @@ for pre-rotated alternates and mutual exclusivity of these features.
 This preserves the current global scope: all scripts, their default and named
 LangSys records, and required features participate, including non-DFLT-only
 fonts. It does not implement script-run selection or Unicode mixed orientation.
-High-level text shaping resolves cmap/UVS first and applies the selected vertical
-feature after ordinary GSUB stages (composition, locale/variant, RTL forms, and
-ligatures). Metrics, outline origins, and GPOS use those final glyph IDs. Raw
+High-level text shaping resolves cmap/UVS and the existing locale prepass first.
+LTR shaping merges the selected vertical feature with ordinary selected GSUB
+features in LookupList order, once per lookup. RTL retains its composition and
+joining boundary before the contextual/ligature/orientation pass. Metrics,
+outline origins, and GPOS use the resulting final glyph IDs. Raw
 `get_glyph_with_uvs_axis()` keeps its direct vertical alternate behavior without
 running the text shaping stages. Source-cluster representation is unchanged.
 Vertical single-feature lookup chaining is described below.
-Horizontal flow and builds without `layout` remain unchanged. MIT synthetic
+Builds without `layout` remain unchanged. MIT synthetic
 fixtures verify selection, final glyph bounds/advance, measure, and SVG output;
 see `tests/fixtures/manifest.toml` for provenance and hash.
 `vertical-gsub-order.ttc` covers composition, variants, locale, ligatures, UVS,
@@ -298,9 +300,8 @@ returns `Some(original_id)`, while no applicable substitution returns `None`.
 This single-glyph API skips Multiple, Alternate, Ligature, contextual and reverse
 contextual lookups, including Extension wrappers of those types. It does not
 flatten their results or discard context to manufacture a single replacement.
-Unsupported/empty lookups do not trigger per-glyph `vert` fallback. The global
-Script/LangSys scope and generic non-vertical feature helpers are unchanged.
-This is not a full sequence-aware vertical shaping implementation.
+Unsupported/empty lookups do not trigger per-glyph `vert` fallback. The scalar API retains its global Script/LangSys scope. Text APIs use the
+sequence engine described below; this scalar API remains deliberately limited.
 
 See [OpenType common layout: feature and lookup processing](https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#feature-table)
 and [GSUB substitution types](https://learn.microsoft.com/en-us/typography/opentype/spec/gsub).
@@ -327,10 +328,8 @@ variant, supported variation coordinates, font size, horizontal stretch, and
 SVG units are retained. No persistent mode, required public fields, or public
 enum variants are added; the existing generic and legacy raw APIs are unchanged.
 
-With `layout`, ordinary horizontal GSUB runs first, followed by `vrtr`, then
-metrics and GPOS using the resulting glyph IDs. This ordering is an
-implementation choice, not a specification requirement that `vrtr` run last;
-the explicit last-feature requirement applies to `vrt2`. Sideways calls never
+With `layout`, `vrtr` joins the ordinary selected LTR GSUB lookups in
+LookupList order, followed by metrics and GPOS using the resulting glyph IDs. Sideways calls never
 select `vert` or `vrt2`, and a missing or unsupported `vrtr` substitution does
 not fall back to either feature. Without `layout`, rotation still works but
 OpenType layout substitution and positioning are unavailable.
@@ -467,7 +466,7 @@ GSUB/GPOS deliberately do not cross orientation boundaries. This avoids inferrin
 orientation from substituted glyph IDs or incomplete substitution provenance.
 
 Upright groups use existing vertical metrics/origins and select **only `vert`**
-after ordinary GSUB, before final metrics and GPOS. They never select `vrt2` or
+together with ordinary GSUB in LookupList order, before final metrics and GPOS. They never select `vrt2` or
 `vrtr`. `Tr` with no applicable `vert` alternate, including identity substitution,
 stays upright; rotated fallback synthesis is not implemented. Sideways groups
 use horizontal LTR metrics/GPOS and **only `vrtr`**, then the existing clockwise
@@ -598,3 +597,40 @@ call. Broad real-font/HarfBuzz parity remains unverified.
 
 References: [GPOS pair adjustment](https://learn.microsoft.com/en-us/typography/opentype/spec/gpos#lookup-type-2-pair-adjustment-positioning-subtable)
 and [lookup flags](https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#lookupFlags).
+
+
+### Contextual sequence shaping (unreleased)
+
+LTR text applies selected `ccmp`, variants, `rlig`, `rclt`, `calt`, `clig`, `liga`
+and the route's single orientation feature in deduplicated LookupList order.
+The orientation lookup scope remains all-script/all-LangSys, independently of
+ordinary locale selection. RTL retains composition/variant then joining before
+its contextual/ligature/orientation pass. This is a bounded shaping policy, not
+full script itemization or HarfBuzz parity. The legacy locale prepass is unchanged.
+
+Context and chaining formats 1/2/3, including nested Single, Multiple and
+Ligature substitutions, retain source indexes and ligature component counts for
+GPOS. Format 1 now reads both fields of every SequenceLookupRecord. Matched
+zero-action rules block later rules; reverse chaining also works through an
+Extension wrapper. Newline, tab and mixed-orientation group boundaries still
+stop sequence matching. Alternate selection and general glyph reordering are
+not added.
+
+A font can deliberately place contextual replacement before `ccmp` cleanup, as
+Furifont v0.7.0 does for IVS placeholders. This implementation honors the selected
+LookupList order rather than forcing orientation after cleanup. OpenType's
+`vrt2` recommendation to be the last substitution **in the font** is a font
+ordering recommendation; this engine does not reorder an authored LookupList to
+enforce it. It still selects `vrt2` when available, otherwise `vert`, never both;
+mixed upright uses only `vert`, sideways only `vrtr`. See [LookupList processing](https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#lookuplist-table)
+and [vertical alternates and rotation](https://learn.microsoft.com/en-us/typography/opentype/spec/features_uz#tag-vrt2).
+
+GDEF-dependent flags do not yet support matching across excluded glyphs. A
+flagged sequence lookup is permitted only when a declared GDEF class definition
+proves that no glyph in the current run would be excluded; mark attachment or
+filter-set flags conservatively require no declared marks. Otherwise the lookup
+is skipped, including nested lookups. This keeps ordinary flagged ligatures in
+mark-free runs without ignoring flags. Raw scalar vertical APIs still skip all
+GDEF-dependent flags. Malformed recursion is bounded at 32 nested lookups and
+4096 nested operations per root position; expanding sequences are capped at
+1,000,000 glyphs. Hitting a limit stops that substitution without a public error.

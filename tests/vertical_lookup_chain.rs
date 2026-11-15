@@ -63,7 +63,7 @@ fn vertical_lookups_apply_once_and_stop_at_first_matching_subtable() {
 #[cfg(feature = "layout")]
 #[test]
 fn vertical_lookups_do_not_flatten_or_ignore_context() {
-    for index in [8, 9, 10, 11, 12, 14, 15, 17] {
+    for index in [9, 10, 11, 12, 14] {
         check(index, "A");
     }
 }
@@ -102,4 +102,36 @@ fn vertical_lookups_skip_gdef_dependent_flags_but_keep_right_to_left() {
     }
     check(40, "B");
     check(41, "\u{3001}");
+}
+
+#[cfg(feature = "layout")]
+#[test]
+fn vertical_sequences_keep_all_multiple_substitution_outputs() {
+    let file = FontFile::from_buffer(FONTS).unwrap();
+    let base = FontFile::from_buffer(BASE).unwrap();
+    let base_face = base.face(0).unwrap();
+    let reference = base_face
+        .engine()
+        .with_font_size(1000.0)
+        .with_vertical_flow();
+    for index in [8, 15, 17] {
+        let face = file.face(index).unwrap();
+        let engine = face.engine().with_font_size(1000.0).with_vertical_flow();
+        let actual = engine.shape("AA").unwrap();
+        let expected = reference.shape("B、B、").unwrap();
+        assert_eq!(actual.glyphs.len(), 4, "face {index}");
+        for (a, b) in actual.glyphs.iter().zip(&expected.glyphs) {
+            assert_eq!(a.glyph.metrics.bounds, b.glyph.metrics.bounds);
+            assert_eq!(a.glyph.metrics.advance_y, b.glyph.metrics.advance_y);
+            assert_eq!((a.x, a.y), (b.x, b.y));
+        }
+        assert_eq!(
+            engine.measure("A").unwrap(),
+            reference.measure("B、").unwrap()
+        );
+        assert_eq!(
+            engine.render_svg("A").unwrap(),
+            reference.render_svg("B、").unwrap()
+        );
+    }
 }

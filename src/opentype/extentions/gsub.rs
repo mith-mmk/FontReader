@@ -7,6 +7,7 @@
 use std::collections::HashSet;
 use std::io::SeekFrom;
 
+use crate::opentype::extentions::gdef::{Gdef, GlyphClass};
 use crate::opentype::layouts::{
     feature::Feature,
     lookup::{Lookup, LookupResult, LookupType},
@@ -16,7 +17,91 @@ use crate::opentype::layouts::{
 use bin_rs::reader::BinaryReader;
 
 const MAX_GSUB_GLYPHS: usize = 1_000_000;
-const MAX_GSUB_LOOKUP_APPLICATIONS: usize = 1_000_000;
+// Bound nested execution per input position without truncating ordinary scans.
+const MAX_GSUB_LOOKUP_APPLICATIONS: usize = 4096;
+
+const MAX_GSUB_NESTING: usize = 32;
+
+/// Metadata carried through every sequence substitution, before GPOS.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct GsubGlyph {
+    pub(crate) glyph_id: usize,
+    pub(crate) source_index: usize,
+    pub(crate) ligature_components: u16,
+}
+
+struct ApplyState<'a> {
+    gdef: Option<&'a Gdef>,
+    // Base, ligature, and mark counts for the current run. Updating just the
+    // replaced span keeps repeated flag checks constant-time, including after
+    // nested substitutions introduce or remove a filtered glyph class.
+    class_counts: [usize; 3],
+    remaining: usize,
+    depth: usize,
+    next_index: usize,
+}
+impl<'a> ApplyState<'a> {
+    fn new(gdef: Option<&'a Gdef>, glyphs: &[GsubGlyph]) -> Self {
+        let mut state = Self {
+            gdef: gdef.filter(|gdef| gdef.glyph_class_def.is_some()),
+            class_counts: [0; 3],
+            remaining: MAX_GSUB_LOOKUP_APPLICATIONS,
+            depth: 0,
+            next_index: 0,
+        };
+        state.replace_classes(&[], glyphs);
+        state
+    }
+
+    fn class_index(&self, glyph_id: usize) -> Option<usize> {
+        match self.gdef?.glyph_class(glyph_id as u16) {
+            Some(GlyphClass::Base) => Some(0),
+            Some(GlyphClass::Ligature) => Some(1),
+            Some(GlyphClass::Mark) => Some(2),
+            _ => None,
+        }
+    }
+
+    fn replace_classes(&mut self, removed: &[GsubGlyph], added: &[GsubGlyph]) {
+        if self.gdef.is_none() {
+            return;
+        }
+        for glyph in removed {
+            if let Some(index) = self.class_index(glyph.glyph_id) {
+                self.class_counts[index] -= 1;
+            }
+        }
+        for glyph in added {
+            if let Some(index) = self.class_index(glyph.glyph_id) {
+                self.class_counts[index] += 1;
+            }
+        }
+    }
+
+    fn allows_lookup(&self, lookup: &Lookup) -> bool {
+        let flag = lookup.lookup_flag;
+        if flag & 0xFF1E == 0 {
+            return true;
+        }
+        if self.gdef.is_none() {
+            return false;
+        }
+        // This engine does not yet skip filtered glyphs when matching. A flagged
+        // lookup is safe only when declared GDEF classes prove no glyph would
+        // be filtered. Attachment/filter-set flags remain conservative for marks.
+        (flag & 0x0002 == 0 || self.class_counts[0] == 0)
+            && (flag & 0x0004 == 0 || self.class_counts[1] == 0)
+            && (flag & 0xFF18 == 0 || self.class_counts[2] == 0)
+    }
+
+    fn enter(&mut self) -> bool {
+        if self.remaining == 0 {
+            return false;
+        }
+        self.remaining -= 1;
+        true
+    }
+}
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub(crate) struct JoiningForms {
@@ -554,24 +639,42 @@ impl Gsub {
 
     fn apply_subtable_at(
         subtable: &crate::opentype::layouts::lookup::LookupSubstitution,
-        glyphs: &mut Vec<(usize, usize)>,
+        glyphs: &mut Vec<GsubGlyph>,
         index: usize,
+        state: &mut ApplyState,
     ) -> bool {
-        let Some((glyph_id, source_index)) = glyphs.get(index).copied() else {
+        let Some(original) = glyphs.get(index).copied() else {
             return false;
         };
 
+        let glyph_id = original.glyph_id;
         match subtable {
             crate::opentype::layouts::lookup::LookupSubstitution::Single(single) => {
                 if let Some(replacement) = subtable.get_single_glyph_id(glyph_id as u16) {
-                    glyphs[index].0 = replacement as usize;
+                    state.replace_classes(
+                        &[original],
+                        &[GsubGlyph {
+                            glyph_id: replacement as usize,
+                            ..original
+                        }],
+                    );
+                    glyphs[index].glyph_id = replacement as usize;
+                    state.next_index = index + 1;
                     return true;
                 }
                 let _ = single;
             }
             crate::opentype::layouts::lookup::LookupSubstitution::Single2(_) => {
                 if let Some(replacement) = subtable.get_single_glyph_id(glyph_id as u16) {
-                    glyphs[index].0 = replacement as usize;
+                    state.replace_classes(
+                        &[original],
+                        &[GsubGlyph {
+                            glyph_id: replacement as usize,
+                            ..original
+                        }],
+                    );
+                    glyphs[index].glyph_id = replacement as usize;
+                    state.next_index = index + 1;
                     return true;
                 }
             }
@@ -589,8 +692,13 @@ impl Gsub {
                     let replacement = sequence_table
                         .substitute_glyph_ids
                         .iter()
-                        .map(|glyph_id| (*glyph_id as usize, source_index))
+                        .map(|glyph_id| GsubGlyph {
+                            glyph_id: *glyph_id as usize,
+                            ..original
+                        })
                         .collect::<Vec<_>>();
+                    state.next_index = index + replacement.len();
+                    state.replace_classes(&glyphs[index..index + 1], &replacement);
                     glyphs.splice(index..index + 1, replacement);
                     return true;
                 }
@@ -605,7 +713,7 @@ impl Gsub {
                         let Some(end) = index.checked_add(expected_len) else {
                             continue;
                         };
-                        if end > glyphs.len() {
+                        if expected_len == 0 || end > glyphs.len() {
                             continue;
                         }
                         if record
@@ -614,12 +722,20 @@ impl Gsub {
                             .map(|glyph_id| *glyph_id as usize)
                             .eq(glyphs[index + 1..index + expected_len]
                                 .iter()
-                                .map(|item| item.0))
+                                .map(|item| item.glyph_id))
                         {
-                            glyphs.splice(
-                                index..end,
-                                [(record.ligature_glyph as usize, source_index)],
-                            );
+                            state.next_index = index + 1;
+                            let replacement = GsubGlyph {
+                                glyph_id: record.ligature_glyph as usize,
+                                ligature_components: glyphs[index..end]
+                                    .iter()
+                                    .fold(0u16, |count, glyph| {
+                                        count.saturating_add(glyph.ligature_components)
+                                    }),
+                                ..original
+                            };
+                            state.replace_classes(&glyphs[index..end], &[replacement]);
+                            glyphs.splice(index..end, [replacement]);
                             return true;
                         }
                     }
@@ -628,7 +744,10 @@ impl Gsub {
             crate::opentype::layouts::lookup::LookupSubstitution::ExtensionSubstitution(
                 extension,
             ) => {
-                return Self::apply_subtable_at(&extension.subtable, glyphs, index);
+                if extension.subst_format != 1 || extension.extension_lookup_type == 7 {
+                    return false;
+                }
+                return Self::apply_subtable_at(&extension.subtable, glyphs, index, state);
             }
             crate::opentype::layouts::lookup::LookupSubstitution::ReverseChainSingle(reverse) => {
                 let Some(coverage_index) = reverse.coverage.contains(glyph_id) else {
@@ -648,7 +767,9 @@ impl Gsub {
                         .iter()
                         .enumerate()
                         .all(|(offset, coverage)| {
-                            coverage.contains(glyphs[index - 1 - offset].0).is_some()
+                            coverage
+                                .contains(glyphs[index - 1 - offset].glyph_id)
+                                .is_some()
                         });
                 let lookahead_matches =
                     reverse
@@ -657,7 +778,7 @@ impl Gsub {
                         .enumerate()
                         .all(|(offset, coverage)| {
                             coverage
-                                .contains(glyphs[index.saturating_add(1) + offset].0)
+                                .contains(glyphs[index.saturating_add(1) + offset].glyph_id)
                                 .is_some()
                         });
                 if !(backtrack_matches && lookahead_matches) {
@@ -666,7 +787,15 @@ impl Gsub {
                 let Some(&replacement) = reverse.substitute_glyph_ids.get(coverage_index) else {
                     return false;
                 };
-                glyphs[index].0 = replacement as usize;
+                state.replace_classes(
+                    &[original],
+                    &[GsubGlyph {
+                        glyph_id: replacement as usize,
+                        ..original
+                    }],
+                );
+                glyphs[index].glyph_id = replacement as usize;
+                state.next_index = index + 1;
                 return true;
             }
             _ => {}
@@ -677,7 +806,7 @@ impl Gsub {
 
     fn matches_input_coverages(
         coverages: &[crate::opentype::layouts::coverage::Coverage],
-        glyphs: &[(usize, usize)],
+        glyphs: &[GsubGlyph],
         start: usize,
     ) -> bool {
         let Some(end) = start.checked_add(coverages.len()) else {
@@ -690,27 +819,28 @@ impl Gsub {
         coverages
             .iter()
             .enumerate()
-            .all(|(offset, coverage)| coverage.contains(glyphs[start + offset].0).is_some())
+            .all(|(offset, coverage)| coverage.contains(glyphs[start + offset].glyph_id).is_some())
     }
 
     fn matches_backtrack_coverages(
         coverages: &[crate::opentype::layouts::coverage::Coverage],
-        glyphs: &[(usize, usize)],
+        glyphs: &[GsubGlyph],
         start: usize,
     ) -> bool {
         if coverages.len() > start {
             return false;
         }
 
-        coverages
-            .iter()
-            .enumerate()
-            .all(|(offset, coverage)| coverage.contains(glyphs[start - 1 - offset].0).is_some())
+        coverages.iter().enumerate().all(|(offset, coverage)| {
+            coverage
+                .contains(glyphs[start - 1 - offset].glyph_id)
+                .is_some()
+        })
     }
 
     fn matches_lookahead_coverages(
         coverages: &[crate::opentype::layouts::coverage::Coverage],
-        glyphs: &[(usize, usize)],
+        glyphs: &[GsubGlyph],
         start: usize,
     ) -> bool {
         let Some(end) = start.checked_add(coverages.len()) else {
@@ -723,59 +853,80 @@ impl Gsub {
         coverages
             .iter()
             .enumerate()
-            .all(|(offset, coverage)| coverage.contains(glyphs[start + offset].0).is_some())
+            .all(|(offset, coverage)| coverage.contains(glyphs[start + offset].glyph_id).is_some())
     }
 
     fn apply_lookup_index_at(
         &self,
         lookup_list_index: u16,
-        glyphs: &mut Vec<(usize, usize)>,
+        glyphs: &mut Vec<GsubGlyph>,
         index: usize,
+        state: &mut ApplyState,
     ) -> bool {
+        if state.depth >= MAX_GSUB_NESTING || !state.enter() {
+            return false;
+        }
         let Some(lookup) = self.lookups.lookups.get(lookup_list_index as usize) else {
             return false;
         };
-
-        for subtable in &lookup.subtables {
-            if self.apply_subtable_at_with_tables(subtable, glyphs, index) {
-                return true;
-            }
+        if !state.allows_lookup(lookup) {
+            return false;
         }
-
-        false
+        state.depth += 1;
+        let applied = lookup
+            .subtables
+            .iter()
+            .any(|subtable| self.apply_subtable_at_with_tables(subtable, glyphs, index, state));
+        state.depth -= 1;
+        applied
     }
 
     fn apply_sequence_lookup_records(
         &self,
         records: &crate::opentype::layouts::lookup::SequenceLookupRecords,
-        glyphs: &mut Vec<(usize, usize)>,
+        glyphs: &mut Vec<GsubGlyph>,
         start_index: usize,
+        input_count: usize,
+        state: &mut ApplyState,
     ) -> bool {
-        let mut changed = false;
-
+        if input_count == 0 {
+            return false;
+        }
+        let mut end = start_index.saturating_add(input_count).min(glyphs.len());
+        // SequenceIndex addresses the sequence after earlier records' changes.
         for record in &records.lookup_records {
-            let target_index = start_index.saturating_add(record.sequence_index as usize);
-            if target_index >= glyphs.len() {
+            if state.remaining == 0 {
+                break;
+            }
+            let target = start_index.saturating_add(record.sequence_index as usize);
+            if target >= end || target >= glyphs.len() {
                 continue;
             }
-            if self.apply_lookup_index_at(record.lookup_list_index, glyphs, target_index) {
-                changed = true;
+            let old_len = glyphs.len();
+            self.apply_lookup_index_at(record.lookup_list_index, glyphs, target, state);
+            if glyphs.len() >= old_len {
+                end = end.saturating_add(glyphs.len() - old_len);
+            } else {
+                end = end.saturating_sub(old_len - glyphs.len());
             }
         }
-
-        changed
+        state.next_index = end.max(start_index).min(glyphs.len());
+        // A matching context (including ignore/no-op rules) blocks later rules.
+        true
     }
 
     fn apply_subtable_at_with_tables(
         &self,
         subtable: &crate::opentype::layouts::lookup::LookupSubstitution,
-        glyphs: &mut Vec<(usize, usize)>,
+        glyphs: &mut Vec<GsubGlyph>,
         index: usize,
+        state: &mut ApplyState,
     ) -> bool {
-        let Some((glyph_id, _source_index)) = glyphs.get(index).copied() else {
+        let Some(original) = glyphs.get(index).copied() else {
             return false;
         };
 
+        let glyph_id = original.glyph_id;
         match subtable {
             crate::opentype::layouts::lookup::LookupSubstitution::ContextSubstitution(context) => {
                 let Some(rule_set_index) = context.coverage.contains(glyph_id) else {
@@ -796,21 +947,19 @@ impl Gsub {
                             .iter()
                             .enumerate()
                             .all(|(offset, expected)| {
-                                glyphs[index + 1 + offset].0 == *expected as usize
+                                glyphs[index + 1 + offset].glyph_id == *expected as usize
                             });
                     if !matches {
                         continue;
                     }
 
-                    let mut changed = false;
-                    for lookup_index in &rule.lookup_indexes {
-                        if self.apply_lookup_index_at(*lookup_index, glyphs, index) {
-                            changed = true;
-                        }
-                    }
-                    if changed {
-                        return true;
-                    }
+                    return self.apply_sequence_lookup_records(
+                        &rule.seq_lookup_records,
+                        glyphs,
+                        index,
+                        rule.input_sequence.len() + 1,
+                        state,
+                    );
                 }
                 false
             }
@@ -836,15 +985,19 @@ impl Gsub {
                             .all(|(offset, expected)| {
                                 context
                                     .class_def
-                                    .get_class(glyphs[index + 1 + offset].0 as u16)
+                                    .get_class(glyphs[index + 1 + offset].glyph_id as u16)
                                     == *expected
                             });
                     if !matches {
                         continue;
                     }
-                    if self.apply_sequence_lookup_records(&rule.seq_lookup_records, glyphs, index) {
-                        return true;
-                    }
+                    return self.apply_sequence_lookup_records(
+                        &rule.seq_lookup_records,
+                        glyphs,
+                        index,
+                        rule.input_sequences.len() + 1,
+                        state,
+                    );
                 }
                 false
             }
@@ -852,7 +1005,13 @@ impl Gsub {
                 if !Self::matches_input_coverages(&context.coverages, glyphs, index) {
                     return false;
                 }
-                self.apply_sequence_lookup_records(&context.seq_lookup_records, glyphs, index)
+                self.apply_sequence_lookup_records(
+                    &context.seq_lookup_records,
+                    glyphs,
+                    index,
+                    context.coverages.len(),
+                    state,
+                )
             }
             crate::opentype::layouts::lookup::LookupSubstitution::ChainingContextSubstitution(
                 chaining,
@@ -885,36 +1044,34 @@ impl Gsub {
                             .iter()
                             .enumerate()
                             .all(|(offset, expected)| {
-                                glyphs[index - 1 - offset].0 == *expected as usize
+                                glyphs[index - 1 - offset].glyph_id == *expected as usize
                             });
                     let input_matches =
                         rule.input_glyph_ids
                             .iter()
                             .enumerate()
                             .all(|(offset, expected)| {
-                                glyphs[index + 1 + offset].0 == *expected as usize
+                                glyphs[index + 1 + offset].glyph_id == *expected as usize
                             });
                     let lookahead_matches =
                         rule.lookahead_glyph_ids
                             .iter()
                             .enumerate()
                             .all(|(offset, expected)| {
-                                glyphs[index + 1 + rule.input_glyph_ids.len() + offset].0
+                                glyphs[index + 1 + rule.input_glyph_ids.len() + offset].glyph_id
                                     == *expected as usize
                             });
                     if !(backtrack_matches && input_matches && lookahead_matches) {
                         continue;
                     }
 
-                    let mut changed = false;
-                    for lookup_index in &rule.lookup_indexes {
-                        if self.apply_lookup_index_at(*lookup_index, glyphs, index) {
-                            changed = true;
-                        }
-                    }
-                    if changed {
-                        return true;
-                    }
+                    return self.apply_sequence_lookup_records(
+                        &rule.seq_lookup_records,
+                        glyphs,
+                        index,
+                        rule.input_glyph_ids.len() + 1,
+                        state,
+                    );
                 }
                 false
             }
@@ -949,49 +1106,55 @@ impl Gsub {
                         continue;
                     }
 
-                    let backtrack_matches = if let Some(backtrack_class_def) =
-                        chaining.backtrack_class_def.as_ref()
-                    {
-                        rule.backtrack_sequences
-                            .iter()
-                            .enumerate()
-                            .all(|(offset, expected)| {
-                                backtrack_class_def.get_class(glyphs[index - 1 - offset].0 as u16)
-                                    == *expected
-                            })
-                    } else {
-                        rule.backtrack_sequences.is_empty()
-                    };
+                    let backtrack_matches =
+                        if let Some(backtrack_class_def) = chaining.backtrack_class_def.as_ref() {
+                            rule.backtrack_sequences
+                                .iter()
+                                .enumerate()
+                                .all(|(offset, expected)| {
+                                    backtrack_class_def
+                                        .get_class(glyphs[index - 1 - offset].glyph_id as u16)
+                                        == *expected
+                                })
+                        } else {
+                            rule.backtrack_sequences.is_empty()
+                        };
                     let input_matches =
                         rule.input_sequences
                             .iter()
                             .enumerate()
                             .all(|(offset, expected)| {
-                                input_class_def.get_class(glyphs[index + 1 + offset].0 as u16)
+                                input_class_def
+                                    .get_class(glyphs[index + 1 + offset].glyph_id as u16)
                                     == *expected
                             });
-                    let lookahead_matches =
-                        if let Some(lookahead_class_def) = chaining.lookahead_class_def.as_ref() {
-                            rule.lookahead_class_ids
-                                .iter()
-                                .enumerate()
-                                .all(|(offset, expected)| {
-                                    lookahead_class_def.get_class(
-                                        glyphs[index + 1 + rule.input_sequences.len() + offset].0
-                                            as u16,
-                                    ) == *expected
-                                })
-                        } else {
-                            rule.lookahead_class_ids.is_empty()
-                        };
+                    let lookahead_matches = if let Some(lookahead_class_def) =
+                        chaining.lookahead_class_def.as_ref()
+                    {
+                        rule.lookahead_class_ids
+                            .iter()
+                            .enumerate()
+                            .all(|(offset, expected)| {
+                                lookahead_class_def.get_class(
+                                    glyphs[index + 1 + rule.input_sequences.len() + offset].glyph_id
+                                        as u16,
+                                ) == *expected
+                            })
+                    } else {
+                        rule.lookahead_class_ids.is_empty()
+                    };
 
                     if !(backtrack_matches && input_matches && lookahead_matches) {
                         continue;
                     }
 
-                    if self.apply_sequence_lookup_records(&rule.seq_lookup_records, glyphs, index) {
-                        return true;
-                    }
+                    return self.apply_sequence_lookup_records(
+                        &rule.seq_lookup_records,
+                        glyphs,
+                        index,
+                        rule.input_sequences.len() + 1,
+                        state,
+                    );
                 }
                 false
             }
@@ -1012,26 +1175,45 @@ impl Gsub {
                 ) {
                     return false;
                 }
-                self.apply_sequence_lookup_records(&chaining.seq_lookup_records, glyphs, index)
+                self.apply_sequence_lookup_records(
+                    &chaining.seq_lookup_records,
+                    glyphs,
+                    index,
+                    chaining.input_coverages.len(),
+                    state,
+                )
             }
             crate::opentype::layouts::lookup::LookupSubstitution::ExtensionSubstitution(
                 extension,
-            ) => self.apply_subtable_at_with_tables(&extension.subtable, glyphs, index),
-            _ => Self::apply_subtable_at(subtable, glyphs, index),
+            ) => {
+                if extension.subst_format != 1 || extension.extension_lookup_type == 7 {
+                    return false;
+                }
+                self.apply_subtable_at_with_tables(&extension.subtable, glyphs, index, state)
+            }
+            _ => Self::apply_subtable_at(subtable, glyphs, index, state),
         }
     }
 
     pub(crate) fn apply_lookup_once(lookup: &Lookup, glyphs: &mut Vec<(usize, usize)>) -> bool {
-        let mut index = 0usize;
-        while index < glyphs.len() {
-            for subtable in &lookup.subtables {
-                if Self::apply_subtable_at(subtable, glyphs, index) {
-                    return true;
+        let mut working = Self::with_metadata(glyphs);
+        let mut state = ApplyState::new(None, &working);
+        let mut applied = false;
+        if lookup.lookup_flag & 0xFF1E == 0 {
+            for index in 0..working.len() {
+                if lookup.subtables.iter().any(|subtable| {
+                    Self::apply_subtable_at(subtable, &mut working, index, &mut state)
+                }) {
+                    applied = true;
+                    break;
                 }
             }
-            index += 1;
         }
-        false
+        *glyphs = working
+            .into_iter()
+            .map(|glyph| (glyph.glyph_id, glyph.source_index))
+            .collect();
+        applied
     }
 
     pub(crate) fn apply_lookup_once_with_tables(
@@ -1039,65 +1221,86 @@ impl Gsub {
         lookup: &Lookup,
         glyphs: &mut Vec<(usize, usize)>,
     ) -> bool {
-        let mut index = 0usize;
-        while index < glyphs.len() {
-            for subtable in &lookup.subtables {
-                if self.apply_subtable_at_with_tables(subtable, glyphs, index) {
-                    return true;
+        let mut working = Self::with_metadata(glyphs);
+        let mut state = ApplyState::new(None, &working);
+        let mut applied = false;
+        if lookup.lookup_flag & 0xFF1E == 0 {
+            for index in 0..working.len() {
+                if lookup.subtables.iter().any(|subtable| {
+                    self.apply_subtable_at_with_tables(subtable, &mut working, index, &mut state)
+                }) {
+                    applied = true;
+                    break;
                 }
             }
-            index += 1;
         }
-        false
+        *glyphs = working
+            .into_iter()
+            .map(|glyph| (glyph.glyph_id, glyph.source_index))
+            .collect();
+        applied
     }
 
     fn apply_lookup_all_with_tables(
         &self,
         lookup: &Lookup,
-        glyphs: &mut Vec<(usize, usize)>,
-    ) -> bool {
-        let mut changed = false;
-        let mut applications = 0usize;
-
-        if lookup.lookup_type == LookupType::ReverseChainingContextualSingleSubstitution as u16 {
+        glyphs: &mut Vec<GsubGlyph>,
+        state: &mut ApplyState,
+    ) {
+        if !state.allows_lookup(lookup) {
+            return;
+        }
+        let reverse = lookup.lookup_type == LookupType::ReverseChainingContextualSingleSubstitution as u16
+            || (lookup.lookup_type == LookupType::ExtensionSubstitution as u16 && lookup.subtables.iter().any(|subtable| matches!(subtable,
+                crate::opentype::layouts::lookup::LookupSubstitution::ExtensionSubstitution(extension)
+                    if extension.extension_lookup_type == LookupType::ReverseChainingContextualSingleSubstitution as u16)));
+        if reverse {
             for index in (0..glyphs.len()).rev() {
+                if !state.allows_lookup(lookup) {
+                    break;
+                }
+                state.remaining = MAX_GSUB_LOOKUP_APPLICATIONS;
                 for subtable in &lookup.subtables {
-                    if self.apply_subtable_at_with_tables(subtable, glyphs, index) {
-                        changed = true;
+                    if self.apply_subtable_at_with_tables(subtable, glyphs, index, state) {
                         break;
                     }
                 }
             }
-            return changed;
+            return;
         }
-
-        let mut index = 0usize;
-        while index < glyphs.len() && applications < MAX_GSUB_LOOKUP_APPLICATIONS {
-            let source_index = glyphs[index].1;
-            let mut applied = false;
-            for subtable in &lookup.subtables {
-                if self.apply_subtable_at_with_tables(subtable, glyphs, index) {
-                    changed = true;
-                    applications += 1;
-                    applied = true;
-                    break;
-                }
+        let mut index = 0;
+        while index < glyphs.len() {
+            if !state.allows_lookup(lookup) {
+                break;
             }
-
+            state.remaining = MAX_GSUB_LOOKUP_APPLICATIONS;
+            let old_len = glyphs.len();
+            let old_index = index;
+            let applied = lookup
+                .subtables
+                .iter()
+                .any(|subtable| self.apply_subtable_at_with_tables(subtable, glyphs, index, state));
             if applied {
-                // Multiple substitution output inherits the source index of
-                // the consumed glyph. Skip that output so a self-referential
-                // lookup cannot recursively expand it. Empty output leaves
-                // the cursor in place, allowing the next original glyph to
-                // be processed.
-                while index < glyphs.len() && glyphs[index].1 == source_index {
-                    index += 1;
-                }
+                index = state.next_index;
             } else {
                 index += 1;
             }
+            // A matched empty context must not repeatedly match the same position.
+            if applied && index <= old_index && glyphs.len() >= old_len {
+                index = old_index + 1;
+            }
         }
-        changed
+    }
+
+    fn with_metadata(glyphs: &[(usize, usize)]) -> Vec<GsubGlyph> {
+        glyphs
+            .iter()
+            .map(|&(glyph_id, source_index)| GsubGlyph {
+                glyph_id,
+                source_index,
+                ligature_components: 1,
+            })
+            .collect()
     }
 
     pub(crate) fn apply_feature_sequence(
@@ -1106,16 +1309,110 @@ impl Gsub {
         locale: Option<&str>,
         feature_tags: &[[u8; 4]],
     ) {
-        let lookups = self.collect_feature_lookups(locale, feature_tags);
-        if lookups.is_empty() || glyphs.is_empty() {
-            return;
-        }
+        let mut working = Self::with_metadata(glyphs);
+        self.apply_feature_glyphs(&mut working, locale, feature_tags);
+        *glyphs = working
+            .into_iter()
+            .map(|glyph| (glyph.glyph_id, glyph.source_index))
+            .collect();
+    }
 
-        for lookup in lookups {
+    pub(crate) fn apply_feature_glyphs(
+        &self,
+        glyphs: &mut Vec<GsubGlyph>,
+        locale: Option<&str>,
+        feature_tags: &[[u8; 4]],
+    ) {
+        self.apply_selected_glyphs(
+            glyphs,
+            self.collect_feature_lookups(locale, feature_tags),
+            None,
+        );
+    }
+
+    /// Ordinary features use locale selection; orientation retains the legacy
+    /// all-script selection while sharing one ordered, deduplicated pass.
+    pub(crate) fn apply_feature_glyphs_with_orientation(
+        &self,
+        glyphs: &mut Vec<GsubGlyph>,
+        locale: Option<&str>,
+        feature_tags: &[[u8; 4]],
+        orientation_tag: Option<[u8; 4]>,
+    ) {
+        let mut selected = self.collect_feature_lookups(locale, feature_tags);
+        if let Some(tag) = orientation_tag {
+            selected.extend(self.collect_feature_lookups(None, &[tag]));
+        }
+        self.apply_selected_glyphs(glyphs, selected, None);
+    }
+
+    pub(crate) fn apply_feature_glyphs_with_gdef(
+        &self,
+        glyphs: &mut Vec<GsubGlyph>,
+        locale: Option<&str>,
+        feature_tags: &[[u8; 4]],
+        gdef: Option<&Gdef>,
+    ) {
+        self.apply_selected_glyphs(
+            glyphs,
+            self.collect_feature_lookups(locale, feature_tags),
+            gdef,
+        );
+    }
+
+    pub(crate) fn apply_feature_glyphs_with_orientation_and_gdef(
+        &self,
+        glyphs: &mut Vec<GsubGlyph>,
+        locale: Option<&str>,
+        feature_tags: &[[u8; 4]],
+        orientation_tag: Option<[u8; 4]>,
+        gdef: Option<&Gdef>,
+    ) {
+        let mut selected = self.collect_feature_lookups(locale, feature_tags);
+        if let Some(tag) = orientation_tag {
+            selected.extend(self.collect_feature_lookups(None, &[tag]));
+        }
+        self.apply_selected_glyphs(glyphs, selected, gdef);
+    }
+
+    pub(crate) fn selected_vertical_tag(&self, mixed_upright: bool) -> [u8; 4] {
+        if !mixed_upright && !self.collect_feature_lookups(None, &[*b"vrt2"]).is_empty() {
+            *b"vrt2"
+        } else {
+            *b"vert"
+        }
+    }
+
+    pub(crate) fn apply_orientation_glyphs(
+        &self,
+        glyphs: &mut Vec<GsubGlyph>,
+        feature_tag: [u8; 4],
+    ) {
+        let mut selected = self.collect_feature_lookups(None, &[feature_tag]);
+        if feature_tag == *b"vrt2" && selected.is_empty() {
+            selected = self.collect_feature_lookups(None, &[*b"vert"]);
+        }
+        self.apply_selected_glyphs(glyphs, selected, None);
+    }
+
+    fn apply_selected_glyphs(
+        &self,
+        glyphs: &mut Vec<GsubGlyph>,
+        selected: Vec<&Lookup>,
+        gdef: Option<&Gdef>,
+    ) {
+        let selected: HashSet<*const Lookup> = selected
+            .into_iter()
+            .map(|lookup| lookup as *const Lookup)
+            .collect();
+        let mut state = ApplyState::new(gdef, glyphs);
+        for lookup in &self.lookups.lookups {
             if glyphs.is_empty() {
                 break;
             }
-            self.apply_lookup_all_with_tables(lookup, glyphs);
+            if selected.contains(&(lookup as *const Lookup)) {
+                self.apply_lookup_all_with_tables(lookup, glyphs, &mut state);
+            }
         }
     }
 
@@ -1133,6 +1430,17 @@ impl Gsub {
             initial: self.lookup_single_feature(glyph_id, locale, &[*b"init"]),
             medial: self.lookup_single_feature(glyph_id, locale, &[*b"medi"]),
             final_form: self.lookup_single_feature(glyph_id, locale, &[*b"fina"]),
+        }
+    }
+
+    pub(crate) fn apply_joining_glyphs(&self, glyphs: &mut [GsubGlyph], locale: Option<&str>) {
+        let mut ids: Vec<_> = glyphs
+            .iter()
+            .map(|glyph| (glyph.glyph_id, glyph.source_index))
+            .collect();
+        self.apply_joining_sequence(&mut ids, locale);
+        for (glyph, (glyph_id, _)) in glyphs.iter_mut().zip(ids) {
+            glyph.glyph_id = glyph_id;
         }
     }
 
