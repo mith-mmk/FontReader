@@ -140,11 +140,23 @@ variant features を、受理した run 全体に対して LookupList 順でま�
 FontFamily の対応判定は、後の同一 face の run 結合で経路が変わっても欠字にならないよう、
 候補と従来経路の両方のグリフ coverage を確認します。
 
-この plan 内でのみ、GDEF が run 内の全グリフを除外しないと証明できる flagged GSUB
-lookup を実行します。IgnoreMarks、filter set、attachment class の優先順位と情報不足を
-検査し、nested 置換で存在するグリフ ID の集合が変われば証明キャッシュを無効にします。
-一般的な mark の飛び越しは未対応です。個別には処理できる二つの積み重ねでも、
-組み合わせると必要な lookup が別の記号を除外するため run 全体が従来経路へ戻る場合があります。
+既定の限定経路では、GDEF が run 内の全グリフを除外しないと証明できる flagged GSUB
+lookup だけを実行します。IgnoreMarks、filter set、attachment class の優先順位と
+必要情報を検査し、置換で存在するグリフ ID が変われば証明キャッシュを無効にします。
+
+新たな上母音付きスタックを含む run は、[限定的な filtered context の例外](../docs/filtered-context.md)
+を明示的に有効にします。全 run の証明ができない場合でも、Single、消費対象が連続する
+Ligature、入力が連続して全て対象に含まれる chaining context format 3（nested record は
+零個または一個）と対応する extension を扱います。前後の文脈は除外グリフを読み飛ばせますが、
+消費する入力の途中のマークは飛び越しません。nested lookup は自身の flags を使い、
+祖先の入力範囲を越えて消費しません。未対応の一致、所有情報の曖昧さ、実行・作業量上限への
+到達時は、部分的な結果を返さず候補全体を従来経路へ戻します。
+
+この例外は同じ presentation transaction 全体に適用され、受理済みの単純な基底・母音・
+下母音スタックの隣接部分も共有します。script itemization は追加せず、未対応母音・句読点・
+空白や別文字体系を含む run は引き続き除外します。新たな上母音スタックを含まない run は
+既定経路を維持します。単独で成功する入力も組合せや上限によって run 全体が戻る場合があり、
+完全なチベット文字・フォント互換性を意味しません。
 
 #### 範囲を限定した canonical 正規化
 

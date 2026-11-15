@@ -1,8 +1,10 @@
 # Bounded GSUB filtered-context prerequisite
 
-This is an internal, default-off prerequisite, not general GSUB filtering support
-or a standalone Tibetan upper-stack positioning fix. Existing presentation
-callers continue to use the whole-run no-skip proof.
+This is an internal, default-off API, not general GSUB filtering support or a
+standalone Tibetan upper-stack positioning fix. The bounded Tibetan caller opts
+in only when its normalized run contains a newly admitted stack plus one upper
+vowel, and separately certifies ownership and anchors. Other presentation runs
+continue to use the whole-run no-skip proof.
 
 ## API and admitted operations
 

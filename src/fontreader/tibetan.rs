@@ -198,12 +198,13 @@ impl Font {
             TextRunMode::MixedUpright => gsub.selected_vertical_tag(true),
             TextRunMode::Standard => gsub.selected_vertical_tag(false),
         });
-        if !gsub.apply_tibetan_stack_presentation(
+        if !gsub.apply_tibetan_stack_presentation_with_filtering(
             &mut candidate,
             locale,
             variant,
             orientation_tag,
             self.current_gdef(),
+            new_upper_stack,
         ) {
             return None;
         }

@@ -158,14 +158,27 @@ its scalar `locl`. Generic GPOS ligature-component selection remains unchanged.
 Family support probing checks both candidate and legacy glyph coverage because
 later same-face grouping can disable the plan.
 
-Only this plan can execute a flagged GSUB lookup when GDEF proves **every glyph
-currently in the run is included**. It reads the lookup's mark-filtering set,
-respects IgnoreMarks/filter-set/attachment-class precedence, and rejects missing
-classes or needed filtering data. Cached proofs are invalidated when a nested
-substitution changes the set of present glyph IDs. General skip-over-mark
-matching is still unsupported. Consequently, two stacks that work individually
-can roll back when combined with another mark excluded by a required lookup.
-No full-font or full-script parity is claimed.
+The default bounded path executes flagged GSUB lookups only when GDEF proves
+**every glyph currently in the run is included**. It reads mark-filtering sets,
+respects IgnoreMarks/filter-set/attachment-class precedence, rejects missing
+required data, and invalidates cached proofs when substitutions change present IDs.
+
+A run containing a newly admitted stack plus one upper vowel explicitly enables
+the [bounded filtered-context exception](../docs/filtered-context.md). When the
+whole-run proof is unavailable, this permits Single and contiguous Ligature
+substitution, and chaining context format 3 with contiguous included input and
+zero or one nested record, including supported extension wrappers. Backtrack and
+lookahead may skip excluded glyphs; consumption may not skip an interior mark.
+Nested lookups use their own flags and remain inside ancestor input bounds.
+Unsupported matches, source ambiguity or exhausted execution/work limits restore
+the entire candidate, rather than returning a partially shaped run.
+
+This opt-in applies to the entire presentation transaction, including other
+admitted plain/simple-vowel/lower-stack neighbors in that run. It does not add
+script itemization: unsupported vowels, punctuation and mixed-script/spaced runs
+still disable the bounded plan. Runs without a new upper stack retain the default
+path. Individually supported stacks can still roll back in combination or when
+a limit is exhausted. No full-font or full-script parity is claimed.
 
 #### Bounded stack plus one upper vowel
 
@@ -186,8 +199,9 @@ Validation walks accepted clusters linearly rather than rescanning the output.
 
 This does not add AA+upper, compound U+0F73/U+0F81, mixed upper/lower sequences,
 multiple upper vowels, punctuation itemization, generic transformed-mark Mkmk,
-or a ccmp-only activation path. Existing lower-only and simple-vowel behavior
-is retained. Run context can still disable otherwise individually safe stacks.
+or a ccmp-only activation path. Runs without a newly admitted upper stack retain
+their existing lower-only and simple-vowel behavior. Run context can still disable
+individually safe stacks.
 
 #### Bounded canonical normalization
 

@@ -159,7 +159,7 @@ fn upper_stack_proof_retains_exact_sources_without_generic_mkmk_eligibility() {
             .shape_text_units(&text.repeat(2), false, false, None, FontVariant::Normal)
             .unwrap();
         assert_eq!(units.len(), 4);
-        for (cluster, pair) in units.chunks_exact(2).enumerate() {
+        for (cluster, pair) in units.as_chunks::<2>().0.iter().enumerate() {
             let ResolvedTextUnit::Glyph(base) = pair[0] else {
                 panic!("base")
             };
