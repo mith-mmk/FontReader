@@ -1612,20 +1612,20 @@ impl Gsub {
         }
     }
 
-    pub(crate) fn apply_joining_glyphs(&self, glyphs: &mut [GsubGlyph], locale: Option<&str>) {
-        let forms: Vec<_> = glyphs
-            .iter()
-            .map(|glyph| self.lookup_joining_forms(glyph.glyph_id, locale))
-            .collect();
-        for index in 0..glyphs.len() {
-            let join_prev =
-                index > 0 && forms[index - 1].can_join_to_next() && forms[index].can_join_to_prev();
-            let join_next = index + 1 < glyphs.len()
-                && forms[index].can_join_to_next()
-                && forms[index + 1].can_join_to_prev();
-            if let Some(glyph_id) = forms[index].selected_substitution(join_prev, join_next) {
-                glyphs[index].glyph_id = glyph_id;
-                glyphs[index].substituted = true;
+    pub(crate) fn apply_joining_glyphs(
+        &self,
+        glyphs: &mut [GsubGlyph],
+        locale: Option<&str>,
+        source_forms: &[Option<[u8; 4]>],
+    ) {
+        for glyph in glyphs {
+            if let Some(Some(tag)) = source_forms.get(glyph.source_index) {
+                if let Some(replacement) =
+                    self.lookup_single_feature(glyph.glyph_id, locale, &[*tag])
+                {
+                    glyph.glyph_id = replacement;
+                    glyph.substituted = true;
+                }
             }
         }
     }

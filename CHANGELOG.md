@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Added
+
+- Development-only explicit single-line horizontal LTR composite fonts with ordered Unicode-range rules, whole-EGC face selection, and rule-local fallback. Published 0.0.17 does not include this API.
+- Per-rule positive finite size multipliers and finite signed baseline shifts, with defaults of `1.0` and `0.0`. Size multiplies the requested nominal size before normal face shaping, preserving line-metric normalization. Positive baseline shifts move glyphs upward in output units without scaling the shift or changing advances.
+- Adjacent clusters share shaping context only for the same borrowed face object and exactly equal adjustments, including across rule boundaries. Invalid or overflowing effective sizes are rejected; runs using non-default adjustments also reject nonfinite transformed geometry. Existing face/family APIs are unchanged; vertical, multiline and RTL composition remain future work.
+
 ### Fixed
 
 - Keep the nominal base when a variation sequence is unsupported, including raw UVS glyph/SVG rendering wrappers. Prefer exact cmap14 support only after whole-cluster renderability checks; preserve explicit glyph-zero contextual repair, first-selector handling and marked/RTL continuity. Reject missing per-glyph coverage and out-of-range CFF/CFF2 CharStrings during family probing. Add original MIT fixtures; no public signature, version or release change. Font-authored unregistered sequences can differ from browser policy.
@@ -10,6 +16,9 @@
 - Apply font-authored GPOS `vert` SinglePos adjustments in vertical runs, including unclassified kana marks. Preserve horizontal/sideways behavior, lookup deduplication, GDEF filtering and static-value limits; no PairPos, generic mark fallback, public API or release changes.
 
 - With `layout`, compose 58 exact Unicode 17 canonical kana pairs before cmap when renderable, preserving source spans and existing vertical GSUB; share bounded invalid-GSUB rollback with modern Hangul. Ainu named sequences and raw/no-layout APIs remain unchanged. Add reproducible MIT fixtures, mapping/exclusion proofs and CFF/CFF2 boundary regressions. No public API, dependency, version or release change.
+
+- Keep SVG path clips and gradients in the same translated coordinate system as their positioned glyph, including composite baseline shifts and preceding-span advances. Plain paths retain their existing export format.
+- Select RTL Arabic-style joining forms from pinned Unicode Joining_Type values, rather than font feature availability or immediate glyph neighbors. Transparent marks, tatweel and join controls keep their source-character semantics through ccmp expansion/contraction. Add synthetic public-API regressions; this does not add AAT, full bidi, Syriac joining groups, or general mark-skipping GSUB.
 
 - Compose complete modern Hangul LV/LVT/LV+T graphemes before cmap when the face has a renderable syllable. Share family probing/rendering, retain original source characters and distinguish source counts from GSUB components. Restore usable original jamo if downstream GSUB invalidates a new composition, without losing composed-only neighbors. Old Hangul, marked/repeated/compatibility jamo, raw APIs and no-layout behavior remain outside the change.
 - Add reproducible original MIT Hangul fixtures, exhaustive 11,172-syllable algorithm checks, direct/family/orientation regressions and CFF/CFF2 missing-target guards. No public API, dependency, version or release change.
