@@ -29,11 +29,46 @@ locale の言語系選択は保持し、`DFLT` や無関係な script には広�
 GDEF lookup filtering に従い、必要な GDEF 情報がない flagged lookup は
 安全側に倒して適用しません。アンカー差分には既存の画面座標変換と倍率を適用します。
 
-完全なチベット文字 shaping ではありません。積み重ね、分解可能な母音の正規化、
-並べ替えや複数記号列、script itemization、GSUB feature plan は未対応です。
-`bo` / `dz` から `tibt` へのグローバル GSUB locale mapping も変更しません。
-下母音の一部は `blws` 置換を必要とし、単独の GPOS アンカーが正しくても
-完全な HarfBuzz shaping とは異なります。コミット済みの合成テストに外部フォントは不要です。
+### 範囲を限定したチベット文字の置換 run
+
+`layout` 有効時、明示的な `tibt` plan により、一グリフにまとまる積み重ねと
+単純母音の異体字を処理します。run 全体の各書記素が、分解不要なチベット基底子音、
+任意個の下付き子音、最大一個の単純母音という順序である場合だけが対象です。
+下付き子音の後の上母音は除外します。少なくとも一組の子音＋成分が必要です。
+空白・句読点・別の文字体系・分解対象文字・複合母音・複数母音・並べ替えが必要な列・
+VS・joiner が含まれる場合は run 全体を従来経路に戻します。タブと改行の既存境界は
+維持します。横書きと明示的な縦書き経路に共通する制限であり、汎用的な script
+itemization や完全な USE／チベット文字対応ではありません。
+
+選択した `tibt` 言語系に `abvs` または `blws` が必要です。`locl` / `ccmp` を
+書記素ごとに前処理し、その後 `abvs` / `blws` と既存の contextual / ligature /
+variant features を、受理した run 全体に対して LookupList 順でまとめて適用します。
+同じ段階内の lookup は重複実行しません。既存の縦書き feature 選択を保持し、
+`bo` / `dz` のグローバル script mapping や無関係な script への fallback は変更しません。
+
+候補に実際の `abvs` / `blws` 変更があり、全下母音・下付き子音が基底所有の合字へ
+統合され、元の各書記素内で成分の連続した所有範囲が正確に保たれた場合だけ採用します。
+展開・削除や書記素をまたぐ合字は除外し、失敗時は元の cmap と既存の scalar `locl`
+から従来処理をやり直します。GPOS と既存の合字除外条件は変更しません。
+FontFamily の対応判定は、後の同一 face の run 結合で経路が変わっても欠字にならないよう、
+候補と従来経路の両方のグリフ coverage を確認します。
+
+この plan 内でのみ、GDEF が run 内の全グリフを除外しないと証明できる flagged GSUB
+lookup を実行します。IgnoreMarks、filter set、attachment class の優先順位と情報不足を
+検査し、nested 置換で存在するグリフ ID の集合が変われば証明キャッシュを無効にします。
+一般的な mark の飛び越しは未対応です。個別には処理できる二つの積み重ねでも、
+組み合わせると必要な lookup が別の記号を除外するため run 全体が従来経路へ戻る場合があります。
+
+#### 正規化は次の独立した段階
+
+今後はフォントの成分 coverage を考慮し、元の fallback 書記素・source ownership と
+正規化後の shaping scalar を分離する必要があります。単純な NFD や CCC sort ではなく、
+HarfBuzz のチベット用修正 CCC、分解成分が欠ける場合の元文字維持、VS の扱いも検証します。
+U+0F73 / U+0F75 / U+0F76 / U+0F78 / U+0F81 と分解可能な子音の canonical equivalence
+を対象にし、compatibility 分解の U+0F77 / U+0F79 は混ぜません。孤立記号の dotted circle、
+合字積み重ね上の残存上母音、一般的な mark skipping は未対応です。
+[USE の feature 段階](https://learn.microsoft.com/en-us/typography/script-development/use#opentype-feature-application-ii)と
+[Unicode 17 正規化データ](https://www.unicode.org/Public/17.0.0/ucd/UnicodeData.txt)を参照してください。
 
 ### 縦メトリクスのフォールバック
 

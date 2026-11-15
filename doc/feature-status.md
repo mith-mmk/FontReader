@@ -31,13 +31,58 @@ It retains locale language-system selection and does not fall through to
 are skipped when the needed GDEF information is unavailable. Anchor deltas use
 the normal screen-coordinate conversion and font/stretch scale.
 
-This is not complete Tibetan shaping: stacks, normalization of decomposable
-vowels, reordered/multiple-mark sequences, script itemization, and a coherent
-Tibetan GSUB feature plan remain unsupported. The global `bo`/`dz` to `tibt`
-GSUB locale mapping is unchanged. In particular, some below-vowel cases need
-`blws` substitutions and therefore differ from full HarfBuzz shaping even when
-the standalone GPOS anchor is correct. No external font is required by the
-committed synthetic tests.
+### Bounded Tibetan substitution runs
+
+With `layout`, a separate `tibt` plan can form single-glyph stacks and select
+simple-vowel alternates. Every original grapheme in the current shaping run
+must be an already ordered, nondecomposable Tibetan base with optional
+subjoined consonants and at most one simple vowel. A stacked consonant followed
+by an above vowel is deliberately excluded. At least one base must have a
+component. Spaces, punctuation, another script, compound/decomposable scalars,
+multiple or reordered vowels, variation selectors and joiners disable this
+plan for the entire run. Tabs/newlines retain their existing run boundaries.
+This restriction applies to horizontal and explicit vertical routes; it is
+not general script itemization or complete USE/Tibetan support.
+
+The font must expose `abvs` or `blws` in the selected `tibt` language system.
+`locl`/`ccmp` run as cluster preprocessing; `abvs`, `blws`, existing contextual,
+ligature and variant features run together across the **entire accepted run**
+in LookupList order, deduplicated within each stage. Existing orientation
+selection remains separate from script selection. The plan keeps locale
+language selection without adding a global `bo`/`dz` script mapping or falling
+through to unrelated scripts.
+
+The candidate is transactional. It must contain an effective `abvs`/`blws`
+change, consume every below vowel/subjoined source into a base-owned ligature,
+and preserve exact contiguous component ownership within each original
+cluster. Executed expansion/deletion and cross-cluster ligatures are rejected.
+Failure restarts the unchanged legacy path from original cmap glyphs, including
+its scalar `locl`. GPOS, including the existing ligature exclusion, is unchanged.
+Family support probing checks both candidate and legacy glyph coverage because
+later same-face grouping can disable the plan.
+
+Only this plan can execute a flagged GSUB lookup when GDEF proves **every glyph
+currently in the run is included**. It reads the lookup's mark-filtering set,
+respects IgnoreMarks/filter-set/attachment-class precedence, and rejects missing
+classes or needed filtering data. Cached proofs are invalidated when a nested
+substitution changes the set of present glyph IDs. General skip-over-mark
+matching is still unsupported. Consequently, two stacks that work individually
+can roll back when combined with another mark excluded by a required lookup.
+No full-font or full-script parity is claimed.
+
+#### Normalization remains a separate next stage
+
+A future normalization stage must be font-aware, keep original fallback
+graphemes and source ownership separate from normalized shaping scalars, and
+preserve composed characters when decomposition components are unavailable.
+It must test canonical order and HarfBuzz's modified Tibetan combining classes,
+not apply blanket NFD/CCC sorting or change selector sequences. Canonical
+U+0F73/U+0F75/U+0F76/U+0F78/U+0F81 and decomposable consonants need equivalence
+and component-coverage tests. U+0F77/U+0F79 have compatibility decompositions
+and must not silently enter canonical normalization. Orphan dotted circles,
+retained upper vowels on ligated stacks, and general mark skipping remain
+unimplemented. See the [USE feature stages](https://learn.microsoft.com/en-us/typography/script-development/use#opentype-feature-application-ii)
+and [Unicode 17 normalization data](https://www.unicode.org/Public/17.0.0/ucd/UnicodeData.txt).
 
 ### Vertical metrics fallback
 

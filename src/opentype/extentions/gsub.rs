@@ -4,7 +4,7 @@
 
 // only check lookup Format1.1 , 4, 5, 6.1, 7
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::io::SeekFrom;
 
 use crate::opentype::extentions::gdef::{Gdef, GlyphClass};
@@ -32,6 +32,11 @@ pub(crate) struct GsubGlyph {
 
 struct ApplyState<'a> {
     gdef: Option<&'a Gdef>,
+    // Only the bounded Tibetan plan can prove exact no-skip filtering.
+    exact_glyph_counts: Option<HashMap<usize, usize>>,
+    // Cache for the current set of present IDs; invalidate on 0-count transitions.
+    exact_filter_proofs: HashMap<*const Lookup, bool>,
+    ambiguous_sources: bool,
     // Base, ligature, and mark counts for the current run. Updating just the
     // replaced span keeps repeated flag checks constant-time, including after
     // nested substitutions introduce or remove a filtered glyph class.
@@ -44,6 +49,9 @@ impl<'a> ApplyState<'a> {
     fn new(gdef: Option<&'a Gdef>, glyphs: &[GsubGlyph]) -> Self {
         let mut state = Self {
             gdef: gdef.filter(|gdef| gdef.glyph_class_def.is_some()),
+            exact_glyph_counts: None,
+            exact_filter_proofs: HashMap::new(),
+            ambiguous_sources: false,
             class_counts: [0; 3],
             remaining: MAX_GSUB_LOOKUP_APPLICATIONS,
             depth: 0,
@@ -63,6 +71,24 @@ impl<'a> ApplyState<'a> {
     }
 
     fn replace_classes(&mut self, removed: &[GsubGlyph], added: &[GsubGlyph]) {
+        if let Some(counts) = &mut self.exact_glyph_counts {
+            for glyph in removed {
+                if let Some(count) = counts.get_mut(&glyph.glyph_id) {
+                    *count -= 1;
+                    if *count == 0 {
+                        counts.remove(&glyph.glyph_id);
+                        self.exact_filter_proofs.clear();
+                    }
+                }
+            }
+            for glyph in added {
+                let count = counts.entry(glyph.glyph_id).or_default();
+                if *count == 0 {
+                    self.exact_filter_proofs.clear();
+                }
+                *count += 1;
+            }
+        }
         if self.gdef.is_none() {
             return;
         }
@@ -78,13 +104,48 @@ impl<'a> ApplyState<'a> {
         }
     }
 
-    fn allows_lookup(&self, lookup: &Lookup) -> bool {
+    fn allows_lookup(&mut self, lookup: &Lookup) -> bool {
         let flag = lookup.lookup_flag;
         if flag & 0xFF1E == 0 {
             return true;
         }
         if self.gdef.is_none() {
             return false;
+        }
+        if let Some(counts) = &self.exact_glyph_counts {
+            let pointer = lookup as *const Lookup;
+            if let Some(proven) = self.exact_filter_proofs.get(&pointer) {
+                return *proven;
+            }
+            let gdef = self.gdef.unwrap();
+            let proven = counts
+                .keys()
+                .all(|glyph_id| match gdef.glyph_class(*glyph_id as u16) {
+                    Some(GlyphClass::Base) => flag & 0x0002 == 0,
+                    Some(GlyphClass::Ligature) => flag & 0x0004 == 0,
+                    Some(GlyphClass::Component) => true,
+                    Some(GlyphClass::Mark) => {
+                        if flag & 0x0008 != 0 {
+                            return false;
+                        }
+                        if flag & 0x0010 != 0 {
+                            return lookup
+                                .mark_filtering_set
+                                .and_then(|index| {
+                                    gdef.mark_glyph_sets_def
+                                        .as_ref()?
+                                        .coverages
+                                        .get(index as usize)
+                                })
+                                .is_some_and(|coverage| coverage.contains(*glyph_id).is_some());
+                        }
+                        flag >> 8 == 0
+                            || gdef.mark_attachment_class(*glyph_id as u16) == Some(flag >> 8)
+                    }
+                    None => false,
+                });
+            self.exact_filter_proofs.insert(pointer, proven);
+            return proven;
         }
         // This engine does not yet skip filtered glyphs when matching. A flagged
         // lookup is safe only when declared GDEF classes prove no glyph would
@@ -683,6 +744,11 @@ impl Gsub {
                     let Some(sequence_table) = multiple.sequence_tables.get(coverage_index) else {
                         return false;
                     };
+                    // No exact source-set metadata is carried through expansion
+                    // or deletion. The bounded Tibetan caller must roll back.
+                    if sequence_table.substitute_glyph_ids.len() != 1 {
+                        state.ambiguous_sources = true;
+                    }
                     let new_length = glyphs.len().checked_sub(1).and_then(|length| {
                         length.checked_add(sequence_table.substitute_glyph_ids.len())
                     });
@@ -1373,6 +1439,107 @@ impl Gsub {
             selected.extend(self.collect_feature_lookups(None, &[tag]));
         }
         self.apply_selected_glyphs(glyphs, selected, gdef);
+    }
+
+    fn collect_tibetan_stack_lookups(
+        &self,
+        locale: Option<&str>,
+        tags: &[[u8; 4]],
+    ) -> Vec<&Lookup> {
+        self.collect_feature_lookups_from_scripts(
+            self.scripts
+                .scripts
+                .iter()
+                .filter(|script| script.script_tag == u32::from_be_bytes(*b"tibt"))
+                .collect(),
+            locale,
+            tags,
+        )
+    }
+
+    pub(crate) fn has_tibetan_stack_features(&self, locale: Option<&str>) -> bool {
+        !self
+            .collect_tibetan_stack_lookups(locale, &[*b"abvs", *b"blws"])
+            .is_empty()
+    }
+
+    pub(crate) fn preprocess_tibetan_stack(
+        &self,
+        glyphs: &mut Vec<GsubGlyph>,
+        locale: Option<&str>,
+        gdef: Option<&Gdef>,
+    ) -> bool {
+        self.apply_tibetan_selected_glyphs(
+            glyphs,
+            self.collect_tibetan_stack_lookups(locale, &[*b"locl", *b"ccmp"]),
+            &[],
+            gdef,
+        )
+        .0
+    }
+
+    /// Preprocessing is cluster-scoped; presentation uses the entire bounded
+    /// run, in font LookupList order, including contextual neighbors.
+    pub(crate) fn apply_tibetan_stack_presentation(
+        &self,
+        glyphs: &mut Vec<GsubGlyph>,
+        locale: Option<&str>,
+        variant: crate::commands::FontVariant,
+        orientation_tag: Option<[u8; 4]>,
+        gdef: Option<&Gdef>,
+    ) -> bool {
+        let tracked = self.collect_tibetan_stack_lookups(locale, &[*b"abvs", *b"blws"]);
+        let mut tags = vec![
+            *b"abvs", *b"blws", *b"rlig", *b"rclt", *b"calt", *b"clig", *b"liga",
+        ];
+        tags.extend_from_slice(variant.gsub_feature_tags());
+        let mut selected = self.collect_tibetan_stack_lookups(locale, &tags);
+        if let Some(tag) = orientation_tag {
+            selected.extend(self.collect_feature_lookups(None, &[tag]));
+        }
+        let (safe, changed) = self.apply_tibetan_selected_glyphs(glyphs, selected, &tracked, gdef);
+        safe && changed
+    }
+
+    fn apply_tibetan_selected_glyphs(
+        &self,
+        glyphs: &mut Vec<GsubGlyph>,
+        selected: Vec<&Lookup>,
+        tracked: &[&Lookup],
+        gdef: Option<&Gdef>,
+    ) -> (bool, bool) {
+        let selected: HashSet<*const Lookup> = selected
+            .into_iter()
+            .map(|lookup| lookup as *const Lookup)
+            .collect();
+        let tracked: HashSet<*const Lookup> = tracked
+            .iter()
+            .map(|lookup| *lookup as *const Lookup)
+            .collect();
+        let mut state = ApplyState::new(gdef, glyphs);
+        // Maintain only distinct IDs, rather than rescanning the run at every
+        // cursor. Counts are updated by every nested replacement as well.
+        let mut counts = HashMap::new();
+        for glyph in glyphs.iter() {
+            *counts.entry(glyph.glyph_id).or_default() += 1;
+        }
+        state.exact_glyph_counts = Some(counts);
+        let mut changed = false;
+        for lookup in &self.lookups.lookups {
+            if glyphs.is_empty() {
+                break;
+            }
+            let pointer = lookup as *const Lookup;
+            if selected.contains(&pointer) {
+                let before = tracked.contains(&pointer).then(|| glyphs.clone());
+                self.apply_lookup_all_with_tables(lookup, glyphs, &mut state);
+                changed |= before.is_some_and(|before| before != *glyphs);
+                if state.ambiguous_sources {
+                    return (false, changed);
+                }
+            }
+        }
+        (true, changed)
     }
 
     pub(crate) fn selected_vertical_tag(&self, mixed_upright: bool) -> [u8; 4] {

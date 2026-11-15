@@ -231,6 +231,8 @@ struct ResolvedGlyph {
     glyph_id: usize,
     prefer_color: bool,
     ligature_components: u16,
+    // Original bounded Tibetan grapheme, independent of post-GSUB source IDs.
+    tibetan_cluster: Option<usize>,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -1479,6 +1481,138 @@ impl Font {
     }
 
     #[cfg(feature = "layout")]
+    fn is_bounded_tibetan_stack(text: &str) -> bool {
+        // A bounded run plan, not normalization or a USE syllable parser.
+        let mut chars = text.chars();
+        let Some(base) = chars.next() else {
+            return false;
+        };
+        if !matches!(base, '\u{0f40}'..='\u{0f47}' | '\u{0f49}'..='\u{0f6c}')
+            || matches!(
+                base,
+                '\u{0f43}' | '\u{0f4d}' | '\u{0f52}' | '\u{0f57}' | '\u{0f5c}' | '\u{0f69}'
+            )
+        {
+            return false;
+        }
+        let mut subjoined = false;
+        let mut vowel = false;
+        for ch in chars {
+            if vowel {
+                return false;
+            }
+            if matches!(ch, '\u{0f90}'..='\u{0f97}' | '\u{0f99}'..='\u{0fbc}')
+                && !matches!(
+                    ch,
+                    '\u{0f93}' | '\u{0f9d}' | '\u{0fa2}' | '\u{0fa7}' | '\u{0fac}' | '\u{0fb9}'
+                )
+            {
+                subjoined = true;
+            } else if matches!(ch, '\u{0f71}' | '\u{0f74}')
+                || (!subjoined && matches!(ch, '\u{0f72}' | '\u{0f7a}'..='\u{0f7d}' | '\u{0f80}'))
+            {
+                vowel = true;
+            } else {
+                return false;
+            }
+        }
+        true
+    }
+
+    #[cfg(feature = "layout")]
+    fn try_tibetan_stack_run(
+        &self,
+        glyphs: &[ResolvedGlyph],
+        working: &mut Vec<crate::opentype::extentions::gsub::GsubGlyph>,
+        locale: Option<&str>,
+        variant: crate::commands::FontVariant,
+        orientation: Option<TextRunMode>,
+    ) -> bool {
+        let Some(gsub) = self.current_gsub() else {
+            return false;
+        };
+        if !glyphs
+            .iter()
+            .all(|g| g.tibetan_cluster.is_some() && g.glyph_id != 0)
+            || !glyphs
+                .windows(2)
+                .any(|p| p[0].tibetan_cluster == p[1].tibetan_cluster)
+            || !gsub.has_tibetan_stack_features(locale)
+        {
+            return false;
+        }
+        let mut candidate = Vec::new();
+        let mut start = 0;
+        while start < glyphs.len() {
+            let mut end = start + 1;
+            while end < glyphs.len() && glyphs[end].tibetan_cluster == glyphs[start].tibetan_cluster
+            {
+                end += 1;
+            }
+            let mut cluster = working[start..end].to_vec();
+            if !gsub.preprocess_tibetan_stack(&mut cluster, locale, self.current_gdef()) {
+                return false;
+            }
+            candidate.extend(cluster);
+            start = end;
+        }
+        let orientation_tag = orientation.map(|mode| match mode {
+            TextRunMode::SidewaysLtr => *b"vrtr",
+            TextRunMode::MixedUpright => gsub.selected_vertical_tag(true),
+            TextRunMode::Standard => gsub.selected_vertical_tag(false),
+        });
+        // Presentation retains the entire accepted run as context. No new
+        // Tibetan features are applied to mixed or unsupported input runs.
+        if !gsub.apply_tibetan_stack_presentation(
+            &mut candidate,
+            locale,
+            variant,
+            orientation_tag,
+            self.current_gdef(),
+        ) {
+            return false;
+        }
+        if candidate.iter().any(|g| {
+            matches!(
+                glyphs[g.source_index].ch,
+                '\u{0f71}' | '\u{0f74}' | '\u{0f90}'..='\u{0fbc}'
+            )
+        }) {
+            // Positional stacks and skip-over-mark matching are not supported.
+            // Never retain the shortened/shifted intermediate glyphs.
+            return false;
+        }
+        // Without expansion/deletion, exact contiguous component ownership
+        // can be proved from source_index and the unsaturated component count.
+        // Cross-cluster ligatures or any ambiguous provenance fall back too.
+        let mut next_source = 0;
+        for glyph in &candidate {
+            if glyph.source_index != next_source {
+                return false;
+            }
+            let Some(end) = next_source.checked_add(glyph.ligature_components as usize) else {
+                return false;
+            };
+            let Some(sources) = glyphs.get(next_source..end) else {
+                return false;
+            };
+            if sources.is_empty()
+                || sources
+                    .iter()
+                    .any(|g| g.tibetan_cluster != sources[0].tibetan_cluster)
+            {
+                return false;
+            }
+            next_source = end;
+        }
+        if next_source != glyphs.len() {
+            return false;
+        }
+        *working = candidate;
+        true
+    }
+
+    #[cfg(feature = "layout")]
     fn apply_gsub_sequence_stages(
         &self,
         glyphs: &mut Vec<crate::opentype::extentions::gsub::GsubGlyph>,
@@ -1553,14 +1687,32 @@ impl Font {
             } else {
                 Vec::new()
             };
-            self.apply_gsub_sequence_stages(
+            if !self.try_tibetan_stack_run(
+                glyphs,
                 &mut ccmp_glyphs,
-                &source_forms,
                 locale,
-                is_right_to_left,
                 font_variant,
                 orientation,
-            );
+            ) {
+                // Keep the established scalar locl and generic sequence path
+                // intact whenever the complete bounded run cannot be handled.
+                if let Some(locale) = locale {
+                    for glyph in &mut ccmp_glyphs {
+                        glyph.glyph_id = self
+                            .current_gsub()
+                            .unwrap()
+                            .lookup_locale(glyph.glyph_id, locale);
+                    }
+                }
+                self.apply_gsub_sequence_stages(
+                    &mut ccmp_glyphs,
+                    &source_forms,
+                    locale,
+                    is_right_to_left,
+                    font_variant,
+                    orientation,
+                );
+            }
             let expanded_glyphs = ccmp_glyphs
                 .into_iter()
                 .map(|item| ResolvedGlyph {
@@ -1568,6 +1720,7 @@ impl Font {
                     glyph_id: item.glyph_id,
                     prefer_color: glyphs[item.source_index].prefer_color,
                     ligature_components: item.ligature_components,
+                    tibetan_cluster: None,
                 })
                 .collect::<Vec<_>>();
             output.extend(expanded_glyphs.into_iter().map(ResolvedTextUnit::Glyph));
@@ -1606,6 +1759,28 @@ impl Font {
         font_variant: crate::commands::FontVariant,
         mode: TextRunMode,
     ) -> Result<Vec<ResolvedTextUnit>, Error> {
+        self.shape_text_units_mode_with_tibetan(
+            text,
+            is_vert,
+            is_right_to_left,
+            locale,
+            font_variant,
+            mode,
+            true,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn shape_text_units_mode_with_tibetan(
+        &self,
+        text: &str,
+        is_vert: bool,
+        is_right_to_left: bool,
+        locale: Option<&str>,
+        font_variant: crate::commands::FontVariant,
+        mode: TextRunMode,
+        _allow_tibetan: bool,
+    ) -> Result<Vec<ResolvedTextUnit>, Error> {
         #[cfg(not(feature = "layout"))]
         let _ = (is_vert, locale, is_right_to_left, font_variant);
 
@@ -1617,7 +1792,7 @@ impl Font {
         let mut output = Vec::new();
         let mut pending_glyphs = Vec::new();
 
-        for unit in Self::parse_text_units(text) {
+        for (_cluster_index, unit) in Self::parse_text_units(text).into_iter().enumerate() {
             match unit {
                 ParsedTextUnit::Newline => {
                     self.flush_shaped_glyphs(
@@ -1643,26 +1818,22 @@ impl Font {
                 }
                 ParsedTextUnit::Glyph { text, .. } => {
                     let prefer_color = Self::text_prefers_color_glyph(&text);
+                    let tibetan_cluster = None;
+                    #[cfg(feature = "layout")]
+                    let tibetan_cluster = (_allow_tibetan && Self::is_bounded_tibetan_stack(&text))
+                        .then_some(_cluster_index)
+                        .or(tibetan_cluster);
                     for (ch, variation_selector) in Self::cluster_glyph_scalars(&text) {
                         // Text shaping selects orientation features in the sequence pass.
                         // Raw glyph APIs retain the direct single-glyph alternate path.
                         let glyph_id =
                             self.resolve_glyph_id_with_uvs(ch, variation_selector, false)?;
-                        #[cfg(feature = "layout")]
-                        let glyph_id = if let Some(locale) = locale {
-                            if let Some(gsub) = self.current_gsub() {
-                                gsub.lookup_locale(glyph_id, locale)
-                            } else {
-                                glyph_id
-                            }
-                        } else {
-                            glyph_id
-                        };
                         pending_glyphs.push(ResolvedGlyph {
                             ch,
                             glyph_id,
                             prefer_color,
                             ligature_components: 1,
+                            tibetan_cluster,
                         });
                     }
                 }
@@ -1716,6 +1887,38 @@ impl Font {
                     return TextUnitSupport::default();
                 };
 
+                #[cfg(feature = "layout")]
+                if Self::is_bounded_tibetan_stack(text)
+                    && self
+                        .current_gsub()
+                        .is_some_and(|gsub| gsub.has_tibetan_stack_features(locale))
+                {
+                    // Family probing uses one grapheme, but later same-face
+                    // grouping may add an unsupported neighbor and select the
+                    // legacy path. Both outputs must have complete coverage.
+                    let Ok(legacy) = self.shape_text_units_mode_with_tibetan(
+                        text,
+                        is_vert,
+                        is_right_to_left,
+                        locale,
+                        font_variant,
+                        TextRunMode::Standard,
+                        false,
+                    ) else {
+                        return TextUnitSupport::default();
+                    };
+                    if legacy.is_empty()
+                        || legacy.iter().chain(&shaped_units).any(|unit| match unit {
+                            ResolvedTextUnit::Glyph(glyph) => {
+                                !self.resolved_glyph_support(glyph.glyph_id).is_supported()
+                            }
+                            _ => false,
+                        })
+                    {
+                        return TextUnitSupport::default();
+                    }
+                }
+
                 if !shaped_units
                     .iter()
                     .any(|unit| matches!(unit, ResolvedTextUnit::Glyph(_)))
@@ -1728,48 +1931,13 @@ impl Font {
                     let ResolvedTextUnit::Glyph(glyph) = unit else {
                         continue;
                     };
-                    if glyph.glyph_id == 0 {
+                    let current = self.resolved_glyph_support(glyph.glyph_id);
+                    if !current.has_glyph {
                         return TextUnitSupport::default();
                     }
-
                     support.has_glyph = true;
-
-                    #[cfg(feature = "cff")]
-                    if self.current_cff().is_some() {
-                        support.has_outline = true;
-                    }
-
-                    if self
-                        .current_glyf()
-                        .and_then(|glyf| glyf.get_glyph(glyph.glyph_id))
-                        .is_some()
-                    {
-                        support.has_outline = true;
-                    }
-
-                    if self
-                        .current_colr()
-                        .map(|colr| !colr.get_layer_record(glyph.glyph_id as u16).is_empty())
-                        .unwrap_or(false)
-                    {
-                        support.has_color = true;
-                    }
-
-                    if self
-                        .current_sbix()
-                        .and_then(|sbix| sbix.get_raster_glyph(glyph.glyph_id as u32, 16.0, "px"))
-                        .is_some()
-                    {
-                        support.has_color = true;
-                    }
-
-                    if self
-                        .current_svg_table()
-                        .map(|svg| svg.has_glyph(glyph.glyph_id as u32))
-                        .unwrap_or(false)
-                    {
-                        support.has_color = true;
-                    }
+                    support.has_outline |= current.has_outline;
+                    support.has_color |= current.has_color;
 
                     if !support.has_outline && !support.has_color {
                         return TextUnitSupport::default();
@@ -1779,6 +1947,35 @@ impl Font {
                 support
             }
         }
+    }
+
+    fn resolved_glyph_support(&self, glyph_id: usize) -> TextUnitSupport {
+        if glyph_id == 0 {
+            return TextUnitSupport::default();
+        }
+        let mut support = TextUnitSupport {
+            has_glyph: true,
+            ..TextUnitSupport::default()
+        };
+        #[cfg(feature = "cff")]
+        if self.current_cff().is_some() {
+            support.has_outline = true;
+        }
+        support.has_outline |= self
+            .current_glyf()
+            .and_then(|glyf| glyf.get_glyph(glyph_id))
+            .is_some();
+        support.has_color = self
+            .current_colr()
+            .is_some_and(|colr| !colr.get_layer_record(glyph_id as u16).is_empty())
+            || self
+                .current_sbix()
+                .and_then(|sbix| sbix.get_raster_glyph(glyph_id as u32, 16.0, "px"))
+                .is_some()
+            || self
+                .current_svg_table()
+                .is_some_and(|svg| svg.has_glyph(glyph_id as u32));
+        support
     }
 
     fn push_svg_html_unit(

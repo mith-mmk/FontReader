@@ -247,3 +247,10 @@ source = "tests/fixtures/generate_tibetan_vowel_positioning.py (fontTools 4.68.0
 license = "MIT (project test code)"
 sha256 = "5dddb90dc08a3afbeb49b316285b9752fc9387c5a1e92a4a15f2d062f05a5168"
 features = ["GPOS", "Tibetan", "abvm", "blwm", "mark", "mkmk", "script-selection", "LangSys", "lookup-flags", "GDEF", "mark-filtering-set", "Extension", "cmap-aliases", "ligature-exclusion", "no-layout-controls", "TTC"]
+
+[[fixture]]
+id = "tibetan-stack-substitution.ttc"
+source = "tests/fixtures/generate_tibetan_stack_substitution.py (fontTools 4.68.0; no external font)"
+license = "MIT (project test code)"
+sha256 = "e409fa5e283159baa51302dbcc097d9c332a32b64326dd6fae7f300ead4f7da0"
+features = ["Tibetan", "GSUB", "tibt", "locl", "ccmp", "abvs", "blws", "calt", "LangSys", "required-feature", "lookup-order", "source-ownership", "whole-run-context", "GDEF", "mark-filtering-set", "flag-precedence", "Extension", "rollback", "family-fallback", "orientation", "no-layout-controls", "TTC"]

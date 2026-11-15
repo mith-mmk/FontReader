@@ -1700,6 +1700,7 @@ mod tests {
     #[cfg(feature = "layout")]
     fn gsub_apply_lookup_once_supports_multiple_and_ligature_sequences() {
         let multiple_lookup = Lookup {
+            mark_filtering_set: None,
             lookup_type: LookupType::MultipleSubstitution as u16,
             lookup_flag: 0,
             subtables: vec![LookupSubstitution::Multiple(MultipleSubstitutionFormat1 {
@@ -1713,6 +1714,7 @@ mod tests {
             })],
         };
         let ligature_lookup = Lookup {
+            mark_filtering_set: None,
             lookup_type: LookupType::LigatureSubstitution as u16,
             lookup_flag: 0,
             subtables: vec![LookupSubstitution::Ligature(LigatureSubstitutionFormat1 {
