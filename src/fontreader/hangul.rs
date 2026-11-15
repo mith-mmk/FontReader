@@ -53,6 +53,7 @@ impl Font {
             return None;
         }
         Some(ResolvedGlyph {
+            kana_residual_mark: false,
             ch: text.chars().next()?,
             shaping_ch,
             source_start,

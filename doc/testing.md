@@ -323,3 +323,15 @@ inputs, expansion to a missing output and identity substitution of a missing
 neighbor. Internal tests additionally cover identity locale/joining operations
 and ensure a touched Tibetan identity is not a presentation change. This stage
 does not expose public source clusters or localize contextual causal effects.
+
+## Bounded residual kana advances
+
+`cargo test --test kana_residual` uses 22 original MIT fixture faces for GDEF
+absence versus absent/populated class definitions, effective SinglePos/PairPos
+ownership including zero records, GSUB provenance, missing glyphs, exact EGC
+admission, directions, no-layout behavior and composition rollback. Library
+tests check legacy raw export. `cargo test --all-features`, default,
+`--no-default-features` and `--features raw` cover the relevant API routes.
+The generator and SHA256 are in the fixture README/manifest. Licensed real-font
+checks stay local. See [policy limits](kana-residual-marks.md); shrinking advance
+does not guarantee good attachment or prevent following-glyph ink overlap.

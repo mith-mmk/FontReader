@@ -1360,15 +1360,16 @@ impl Gpos {
     /// Apply each selected PairPos lookup to the logical glyph sequence.
     /// None entries are boundaries (tabs/newlines), never skippable glyphs.
     /// Accumulate in i32 just like SinglePos, without intermediate i16 clipping.
-    pub(crate) fn pair_adjustments(
+    pub(crate) fn pair_adjustments_with_coverage(
         &self,
         glyphs: &[Option<u16>],
         is_vertical: bool,
         locale: Option<&str>,
         gdef: Option<&Gdef>,
-    ) -> Vec<SingleAdjustment> {
+    ) -> (Vec<SingleAdjustment>, Vec<bool>) {
         let tags = if is_vertical { [*b"vkrn"] } else { [*b"kern"] };
         let mut result = vec![SingleAdjustment::default(); glyphs.len()];
+        let mut covered = vec![false; glyphs.len()];
         for lookup in self.collect_lookups(locale, &tags) {
             if lookup.lookup_type != 2 && lookup.lookup_type != 9 {
                 continue;
@@ -1395,6 +1396,8 @@ impl Gpos {
                         .map(|pair| (pair, subtable.pair_consumes_second()))
                 });
                 if let Some((pair, consumes_second)) = matched {
+                    covered[first] = true;
+                    covered[second] = true;
                     result[first].add_assign(pair.first);
                     result[second].add_assign(pair.second);
                     // A zero record is still a match. ValueFormat2 == 0 lets
@@ -1405,7 +1408,19 @@ impl Gpos {
                 }
             }
         }
-        result
+        (result, covered)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn pair_adjustments(
+        &self,
+        glyphs: &[Option<u16>],
+        is_vertical: bool,
+        locale: Option<&str>,
+        gdef: Option<&Gdef>,
+    ) -> Vec<SingleAdjustment> {
+        self.pair_adjustments_with_coverage(glyphs, is_vertical, locale, gdef)
+            .0
     }
 
     // Legacy two-glyph parser assertions; production uses the sequence executor.

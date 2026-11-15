@@ -247,6 +247,8 @@ struct ResolvedGlyph {
     source_start: usize,
     #[cfg(feature = "layout")]
     source_end: usize,
+    #[cfg(feature = "layout")]
+    kana_residual_mark: bool,
     glyph_id: usize,
     prefer_color: bool,
     ligature_components: u16,
@@ -256,6 +258,7 @@ struct ResolvedGlyph {
 
 #[derive(Debug, Clone, Copy, Default)]
 struct GlyphPositionAdjustment {
+    authored_pair: bool,
     placement_x: f32,
     placement_y: f32,
     advance_x: f32,
@@ -1585,6 +1588,7 @@ impl Font {
                         .apply_locale_glyph(glyph, locale);
                 }
             }
+
             let source_forms = if is_right_to_left {
                 crate::unicode::joining::forms(
                     &glyphs.iter().map(|glyph| glyph.ch).collect::<Vec<_>>(),
@@ -1629,9 +1633,33 @@ impl Font {
                     return;
                 }
             }
+            // A nominal residual mark remains eligible only with one surviving
+            // base output from its own original two-scalar grapheme. Identity
+            // substitutions also count as authored substitution decisions.
+            let mut source_output_counts = vec![0usize; glyphs.len()];
+            for item in &ccmp_glyphs {
+                source_output_counts[item.source_index] += 1;
+            }
+            let residual_marks = ccmp_glyphs
+                .iter()
+                .enumerate()
+                .map(|(index, item)| {
+                    glyphs[item.source_index].kana_residual_mark
+                        && !item.substituted
+                        && item.ligature_components == 1
+                        && index.checked_sub(1).is_some_and(|previous| {
+                            let base = &ccmp_glyphs[previous];
+                            base.source_index + 1 == item.source_index
+                                && base.ligature_components == 1
+                                && source_output_counts[base.source_index] == 1
+                        })
+                })
+                .collect::<Vec<_>>();
             let expanded_glyphs = ccmp_glyphs
                 .into_iter()
-                .map(|item| ResolvedGlyph {
+                .zip(residual_marks)
+                .map(|(item, kana_residual_mark)| ResolvedGlyph {
+                    kana_residual_mark,
                     ch: glyphs[item.source_index].ch,
                     shaping_ch: glyphs[item.source_index].shaping_ch,
                     source_start: glyphs[item.source_index].source_start,
@@ -1772,6 +1800,8 @@ impl Font {
                             ch,
                             #[cfg(feature = "layout")]
                             shaping_ch: ch,
+                            #[cfg(feature = "layout")]
+                            kana_residual_mark: kana::residual_mark(&text) == Some(ch),
                             #[cfg(feature = "layout")]
                             source_start,
                             #[cfg(feature = "layout")]
@@ -2137,13 +2167,19 @@ impl Font {
             let glyphs: Vec<_> = (0..units.len())
                 .map(|index| Self::glyph_unit_at(units, index).map(|unit| unit.glyph_id as u16))
                 .collect();
-            let pairs = gpos.pair_adjustments(&glyphs, is_vertical, locale, self.current_gdef());
+            let (pairs, pair_coverage) = gpos.pair_adjustments_with_coverage(
+                &glyphs,
+                is_vertical,
+                locale,
+                self.current_gdef(),
+            );
             for (index, pair) in pairs.into_iter().enumerate() {
                 let Some(glyph) = glyphs[index] else { continue };
                 let single = gpos
                     .lookup_single_adjustment(glyph, is_vertical, locale, self.current_gdef())
                     .unwrap_or_default();
                 adjustments[index] = GlyphPositionAdjustment {
+                    authored_pair: pair_coverage[index],
                     placement_x: (pair.x_placement + single.x_placement) as f32 * scale_x,
                     placement_y: (pair.y_placement + single.y_placement) as f32 * scale_y,
                     advance_x: (pair.x_advance + single.x_advance) as f32 * scale_x,
@@ -2179,6 +2215,7 @@ impl Font {
                 return Some(GlyphAttachmentPlacement {
                     glyph_index,
                     adjustment: GlyphPositionAdjustment {
+                        authored_pair: false,
                         placement_x: adjustment.x_placement as f32 * scale_x,
                         // GPOS anchors are Y-up; glyph run and outline coordinates are Y-down.
                         placement_y: -(adjustment.y_placement as f32) * scale_y,
@@ -2241,6 +2278,7 @@ impl Font {
         Some(GlyphAttachmentPlacement {
             glyph_index,
             adjustment: GlyphPositionAdjustment {
+                authored_pair: false,
                 placement_x: adjustment.x_placement as f32 * scale_x,
                 // GPOS anchors are Y-up; glyph run and outline coordinates are Y-down.
                 placement_y: -(adjustment.y_placement as f32) * scale_y,
@@ -2614,7 +2652,16 @@ impl Font {
                         && attachment_base.is_some();
                     // Attached marks start with zero advance, then GPOS may
                     // explicitly add one. Do not erase SinglePos values afterward.
-                    if uses_mark_attachment {
+                    let zero_nominal_advance = uses_mark_attachment;
+                    #[cfg(feature = "layout")]
+                    let zero_nominal_advance = zero_nominal_advance
+                        || (!adjustment.authored_pair
+                            && self.zero_residual_kana_advance(
+                                &resolved,
+                                options.locale,
+                                is_vertical,
+                            ));
+                    if zero_nominal_advance {
                         metrics.advance_x = 0.0;
                         metrics.advance_y = 0.0;
                     }
@@ -2967,7 +3014,16 @@ impl Font {
                         FontLayout::Horizontal(layout) => layout.advance_width as f64,
                         FontLayout::Vertical(layout) => layout.advance_height as f64,
                         FontLayout::Unknown => 0.0,
-                    } + adjustment.advance_x as f64;
+                    };
+                    #[cfg(feature = "layout")]
+                    let advance_width = if !adjustment.authored_pair
+                        && self.zero_residual_kana_advance(&resolved, None, false)
+                    {
+                        0.0
+                    } else {
+                        advance_width
+                    };
+                    let advance_width = advance_width + adjustment.advance_x as f64;
                     let origin_x = cursor_x + adjustment.placement_x as f64;
                     let can_use_outline =
                         self.resolved_glyph_can_use_outline(open_type_glyph, glyph_data.glyph_id);

@@ -878,6 +878,14 @@ GDEF-dependent flags. Malformed recursion is bounded at 32 nested lookups and
 4096 nested operations per root position; expanding sequences are capped at
 1,000,000 glyphs. Hitting a limit stops that substitution without a public error.
 
+## Bounded residual kana mark advances
+
+With `layout`, exact original kana-plus-U+3099/U+309A graphemes can suppress an
+unpositioned nominal mark advance in GPOS faces without GDEF glyph classes.
+Authored positioning and GSUB decisions remain authoritative. This is not
+attachment repair: the mark can touch or overlap the following glyph. See the
+[precise admission policy and exclusions](kana-residual-marks.md).
+
 ## Unicode-based Arabic-style joining
 
 Explicit RTL text shaping analyzes original logical-order scalars with pinned
