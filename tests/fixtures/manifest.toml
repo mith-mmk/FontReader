@@ -221,6 +221,13 @@ sha256 = "0cddbba5fccde7c59d9a852a302aed222730b8bfea462785005b666a91dc7e16"
 features = ["gvar", "component-indices", "horizontal-and-vertical-phantoms", "nested-XY", "scaled-offsets", "sparse-tuples", "child-only-variation", "signed-fractional-deltas", "HVAR-VVAR-precedence", "TTC", "documented-fallbacks"]
 
 [[fixture]]
+id = "composite-adjustments-svg.ttf"
+source = "tests/fixtures/generate_composite_adjustments_svg.py (Python standard library)"
+license = "MIT (project test code)"
+sha256 = "428d0590352b6e1e7ebd57f135b9f79326d44ae2fdc1172f579eca444309d91d"
+features = ["composite-font", "svg-fonts", "clip", "linear-gradient", "radial-gradient"]
+
+[[fixture]]
 id = "contextual-gsub.ttc"
 source = "tests/fixtures/generate_contextual_gsub.py (fontTools 4.68.0; no external font)"
 license = "MIT (project test code)"
@@ -303,3 +310,10 @@ source = "generate_kana_residual.py (fontTools 4.68.0; no external font)"
 license = "MIT (project test code)"
 sha256 = "39e5ffeff12e8296dcf33ffa24f991b65718a467976ad898f5fe80a8070ebbcd"
 features = ["layout", "kana", "GDEF", "SinglePos", "PairPos", "GSUB-provenance", "no-layout-controls"]
+
+[[fixture]]
+id = "arabic-joining.ttf"
+source = "tests/fixtures/generate_arabic_joining.py (fontTools 4.68.0)"
+license = "MIT (project test code)"
+sha256 = "de6890b11416aac16b0dab636d269fcf47c321b1d3588984e1f97088863be729"
+features = ["arabic-joining", "ccmp", "source-mapping"]

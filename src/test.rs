@@ -2032,7 +2032,11 @@ mod tests {
             if tag == *b"locl" {
                 gsub.apply_locale_glyph(&mut glyphs[0], "en");
             } else {
-                gsub.apply_joining_glyphs(&mut glyphs, None);
+                gsub.apply_joining_glyphs(
+                    &mut glyphs,
+                    None,
+                    &crate::unicode::joining::forms(&['ب']),
+                );
             }
             assert!(glyphs[0].substituted);
             assert_eq!(glyphs[0].glyph_id, 0);
@@ -2515,6 +2519,98 @@ mod tests {
         gsub.apply_rtl_contextual_sequence(&mut glyphs, None);
 
         assert_eq!(glyphs, vec![(220, 0)]);
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn gsub_joining_uses_source_forms_not_available_font_forms() {
+        use crate::opentype::extentions::gsub::GsubGlyph;
+        // Missing fina must not prevent the preceding letter selecting init.
+        let gsub = parse_gsub(build_gsub_table_with_feature_lookups(
+            *b"init",
+            &[0],
+            vec![lookup_single_record(10, 100)],
+        ));
+        for text in ["بب", "بَب", "بـب", "ب\u{200d}ب"] {
+            let chars: Vec<_> = text.chars().collect();
+            let forms = crate::unicode::joining::forms(&chars);
+            let mut glyphs: Vec<_> = chars
+                .iter()
+                .enumerate()
+                .map(|(source_index, _)| GsubGlyph {
+                    glyph_id: 10,
+                    source_index,
+                    substituted: false,
+                    ligature_components: 1,
+                })
+                .collect();
+            gsub.apply_joining_glyphs(&mut glyphs, Some("ar"), &forms);
+            assert_eq!(glyphs[0].glyph_id, 100, "{text}");
+            assert!(glyphs[1..].iter().all(|g| g.glyph_id == 10), "{text}");
+        }
+        // ccmp expansion inherits its source form, not a false new neighbor.
+        let mut glyphs = vec![
+            GsubGlyph {
+                glyph_id: 10,
+                source_index: 0,
+                substituted: false,
+                ligature_components: 1,
+            },
+            GsubGlyph {
+                glyph_id: 10,
+                source_index: 0,
+                substituted: false,
+                ligature_components: 1,
+            },
+            GsubGlyph {
+                glyph_id: 10,
+                source_index: 1,
+                substituted: false,
+                ligature_components: 1,
+            },
+        ];
+        let forms = crate::unicode::joining::forms(&['ب', 'ب']);
+        gsub.apply_joining_glyphs(&mut glyphs, Some("ar"), &forms);
+        assert_eq!(
+            glyphs.iter().map(|g| g.glyph_id).collect::<Vec<_>>(),
+            [100, 100, 10]
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn gsub_joining_preserves_identity_substitution_provenance() {
+        use crate::opentype::extentions::gsub::GsubGlyph;
+        let gsub = parse_gsub(build_gsub_table_with_feature_lookups(
+            *b"init",
+            &[0],
+            vec![lookup_single_record(10, 10)],
+        ));
+        let forms = crate::unicode::joining::forms(&['ب', 'َ', 'ب']);
+        // Expanded outputs share the initial source mask. A transparent mark
+        // and the final source must not receive init despite identical GIDs.
+        let mut glyphs: Vec<_> = [0, 0, 1, 2]
+            .into_iter()
+            .map(|source_index| GsubGlyph {
+                glyph_id: 10,
+                source_index,
+                substituted: false,
+                ligature_components: 1,
+            })
+            .collect();
+        gsub.apply_joining_glyphs(&mut glyphs, Some("ar"), &forms);
+        assert!(glyphs.iter().all(|glyph| glyph.glyph_id == 10));
+        assert_eq!(
+            glyphs
+                .iter()
+                .map(|glyph| glyph.substituted)
+                .collect::<Vec<_>>(),
+            [true, true, false, false]
+        );
+        // No matching form must not clear provenance from an earlier stage.
+        glyphs[3].substituted = true;
+        gsub.apply_joining_glyphs(&mut glyphs, Some("ar"), &forms);
+        assert!(glyphs[3].substituted);
     }
 
     #[test]

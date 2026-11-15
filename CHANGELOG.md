@@ -2,8 +2,15 @@
 
 ## Unreleased
 
+### Added
+
+- Development-only explicit single-line horizontal LTR composite fonts with ordered Unicode-range rules, whole-EGC face selection, and rule-local fallback. Published 0.0.17 does not include this API.
+- Per-rule positive finite size multipliers and finite signed baseline shifts, with defaults of `1.0` and `0.0`. Size multiplies the requested nominal size before normal face shaping, preserving line-metric normalization. Positive baseline shifts move glyphs upward in output units without scaling the shift or changing advances.
+- Adjacent clusters share shaping context only for the same borrowed face object and exactly equal adjustments, including across rule boundaries. Invalid or overflowing effective sizes are rejected; runs using non-default adjustments also reject nonfinite transformed geometry. Existing face/family APIs are unchanged; vertical, multiline and RTL composition remain future work.
+
 ### Fixed
 
+- Keep SVG path clips and gradients in the same translated coordinate system as their positioned glyph, including composite baseline shifts and preceding-span advances. Plain paths retain their existing export format.
 - Bound residual kana mark advance suppression to untouched exact-pair EGCs in GPOS faces without GDEF glyph classes. Preserve effective SinglePos/PairPos ownership, nominal positions, raw text exports and no-layout controls. This removes an extra cell, not mark attachment or ink overlap; see [scope](doc/kana-residual-marks.md).
 
 - Keep the nominal base when a variation sequence is unsupported, including raw UVS glyph/SVG rendering wrappers. Prefer exact cmap14 support only after whole-cluster renderability checks; preserve explicit glyph-zero contextual repair, first-selector handling and marked/RTL continuity. Reject missing per-glyph coverage and out-of-range CFF/CFF2 CharStrings during family probing. Add original MIT fixtures; no public signature, version or release change. Font-authored unregistered sequences can differ from browser policy.
@@ -23,6 +30,8 @@
 - Keep family fallback safe when an isolated Tibetan support probe and a later grouped run choose different shaping paths, by requiring coverage in both. Add reproducible MIT fixtures for stages, ownership, filtering, rollback, context, required features, orientation and missing-glyph fallback. No GPOS, public API, version, dependency or release change.
 
 - Position adjacent, unligated Tibetan consonant/simple-vowel pairs using `tibt` `abvm`/`blwm` MarkToBase anchors only after existing mark attachment fails. Preserve locale selection and GDEF filtering; this anchor fallback itself does not cover ligated stacks or normalization.
+
+- Select RTL Arabic-style joining forms from pinned Unicode Joining_Type values, rather than font feature availability or immediate glyph neighbors. Transparent marks, tatweel and join controls keep their source-character semantics through ccmp expansion/contraction. Add synthetic public-API regressions; this does not add AAT, full bidi, Syriac joining groups, or general mark-skipping GSUB.
 
 - Apply LTR contextual GSUB and sequence-aware vertical/mixed/sideways substitutions in font-authored LookupList order, preserving source and ligature component metadata through size changes. Keep one orientation feature per route and unchanged layout-disabled behavior.
 - Correct context/chaining format 1 record parsing, matched no-op rules, reverse Extension traversal, and bounded nested execution. GDEF-proven mark-free runs retain flagged ligatures; general skip-over-mark GSUB remains unsupported.
