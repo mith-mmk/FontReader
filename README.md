@@ -14,8 +14,7 @@ For opt-in single-face, single-line mixed vertical LTR outlines, use
 Version 0.0.18 adds explicit single-line LTR composite-font selection
 through `CompositeFont`, with per-rule size multipliers and baseline shifts.
 See the [recipe](doc/api-recipes.md#explicit-composite-fonts-single-line-ltr).
-This source tree prepares 0.0.18; publication is a separate step. The additive
-API is not included in 0.0.17. Cargo requirements for 0.0.17 do not select 0.0.18.
+The additive API is not included in 0.0.17. Cargo requirements for 0.0.17 do not select 0.0.18.
 
 ## What To Use First
 

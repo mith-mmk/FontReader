@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.0.18 - pending publication
+## 0.0.18 - 2026-11-15
 
 ### Added
 
@@ -51,7 +51,7 @@
 ### Compatibility and verification
 
 - Continue the existing pre-1.0 version cadence at 0.0.18. Composite-font types and methods are additive; existing public signatures, features, dependency requirements, `MIT AND Unicode-3.0` licensing and Rust 1.91 minimum are retained. This is not an API-stability guarantee. Corrected shaping, fallback, metrics and SVG geometry can change output; malformed layout tables can now be rejected earlier.
-- Cargo's `fontcore = "0.0.17"` requirement does not select 0.0.18. Update the requirement explicitly after publication; this version-preparation change does not itself publish a crate or release.
+- Cargo's `fontcore = "0.0.17"` requirement does not select 0.0.18. Update the requirement explicitly to use 0.0.18.
 - Keep normal tests self-contained with original MIT synthetic fixtures. Unicode normalization, joining and grapheme data remain pinned to 17.0.0, separately from 18.0.0 scalar orientation/enclosing-mark data. Offline generator/hash checks, feature-matrix tests and the Rust 1.91 CI job cover these boundaries; see [testing](doc/testing.md) and [Unicode provenance](data/unicode/README.md).
 - Composite fonts remain explicit, single-line horizontal LTR only. Bounded script fixes do not establish full Tibetan/Arabic/Korean shaping, BiDi, AAT or broad HarfBuzz/browser parity. See the [feature status](doc/feature-status.md) for exact exclusions.
 
