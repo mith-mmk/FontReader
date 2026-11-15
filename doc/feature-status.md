@@ -59,10 +59,13 @@ guarantee. This does not repair generic contextual FontFamily fallback: a
 composed-only cluster that later becomes missing keeps the existing downstream
 missing-glyph policy, like its NFC equivalent. No public cluster/caret API,
 generic GSUB ligature source-span repair, or change to existing selector
-omission in internal run indices is added. The conservative guard checks the
-whole GSUB run, so an unrelated pre-existing missing glyph can also restore
-otherwise valid kana composition. NFC/NFD equality is not promised for partly
-unsupported mixed runs; this deliberately retains the prior bounded policy.
+omission in internal run indices is added. Untouched pre-existing missing
+neighbors no longer trigger restoration. An internal substitution flag retains
+the conservative whole-run guard for any unusable substituted output, including
+identity substitutions, expansions, ligatures and contextual substitutions. A
+composition can influence another glyph as context, so this is deliberately not
+exact causal localization. Such failures still restore every restorable kana or
+modern Hangul composition once, without splitting the GSUB run.
 
 This is not general NFC/NFKC, decomposition, reordering, Latin normalization,
 halfwidth conversion, Old Hangul or complete Ainu shaping. Extra marks,
@@ -101,7 +104,7 @@ FontFamily probes and rendering share this path and retain the original
 grapheme as the fallback unit. If a newly composed run produces an unrenderable
 GSUB output, it is retried once with every restorable composition replaced by
 its fully renderable original jamo. Composed-only neighbors stay composed.
-An unrelated pre-existing missing glyph does not prevent that retry. This is
+An untouched pre-existing missing glyph neither triggers nor prevents that retry. This is
 a bounded protection for newly composed inputs, not generic contextual fallback:
 a composed-only syllable that becomes missing under later context retains the
 existing downstream missing-glyph policy, as its NFC equivalent does. Restoration

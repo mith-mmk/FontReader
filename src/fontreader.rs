@@ -1564,6 +1564,7 @@ impl Font {
                     |(source_index, glyph)| crate::opentype::extentions::gsub::GsubGlyph {
                         glyph_id: glyph.glyph_id,
                         source_index,
+                        substituted: false,
                         ligature_components: glyph.ligature_components,
                     },
                 )
@@ -1579,10 +1580,9 @@ impl Font {
             }
             if let Some(locale) = locale {
                 for glyph in &mut ccmp_glyphs {
-                    glyph.glyph_id = self
-                        .current_gsub()
+                    self.current_gsub()
                         .unwrap()
-                        .lookup_locale(glyph.glyph_id, locale);
+                        .apply_locale_glyph(glyph, locale);
                 }
             }
             let source_forms = if is_right_to_left {
@@ -1601,11 +1601,18 @@ impl Font {
                 orientation,
             );
             if glyphs.iter().any(Self::is_bounded_composition)
-                && ccmp_glyphs
-                    .iter()
-                    .any(|glyph| !self.composition_glyph_is_renderable(glyph.glyph_id))
+                && ccmp_glyphs.iter().any(|glyph| {
+                    !self.composition_glyph_is_renderable(glyph.glyph_id)
+                        && (glyph.substituted
+                            || self.composition_glyph_is_renderable(
+                                glyphs[glyph.source_index].glyph_id,
+                            ))
+                })
             {
                 if let Some(mut restored) = self.restore_renderable_composition_sources(glyphs) {
+                    // Untouched pre-existing missing neighbors are not failures
+                    // of normalization. Substituted failures remain conservative:
+                    // a composition can be context rather than a consumed input.
                     // Composition must not turn renderable original scalars into
                     // a missing output through GSUB, including run context.
                     // Only restorable compositions are removed, so this retry

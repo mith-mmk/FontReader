@@ -156,9 +156,8 @@ fn cff2_charstrings_bounds_keep_original_kana() {
 }
 
 #[test]
-fn unrelated_missing_glyph_keeps_conservative_whole_run_rollback() {
-    // Without GSUB provenance, a missing neighbor also restores valid new kana.
-    // This inherits the bounded Hangul policy, not universal NFC/NFD equality.
+fn untouched_missing_neighbor_preserves_valid_composition() {
+    // An unchanged pre-existing missing neighbor is not a normalization failure.
     let font = font(4);
     assert_eq!(
         font.debug_shape_glyph_ids("ハ\u{309a}", None).unwrap(),
@@ -166,7 +165,7 @@ fn unrelated_missing_glyph_keeps_conservative_whole_run_rollback() {
     );
     assert_eq!(
         font.debug_shape_glyph_ids("ハ\u{309a}?", None).unwrap(),
-        [97, 63, 0]
+        [144, 0]
     );
     assert_eq!(font.debug_shape_glyph_ids("パ?", None).unwrap(), [144, 0]);
 }
