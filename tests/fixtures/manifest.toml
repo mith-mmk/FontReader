@@ -268,3 +268,17 @@ source = "tests/fixtures/generate_hangul_composition.py (fontTools 4.68.0; no ex
 license = "MIT (project test code)"
 sha256 = "a41378a96b1a21f90b74ee8bda886d0b7a07b8d4e92b841854b232f928f9a41f"
 features = ["Hangul", "Unicode17", "canonical-composition", "composed-only-cmap", "source-ownership", "GSUB", "contextual-rollback", "family-fallback", "orientation", "no-layout-controls", "TTC"]
+
+[[fixture]]
+id = "vertical-singlepos.ttf"
+source = "generate_vertical_singlepos.py (fontTools 4.68.0; no external font)"
+license = "MIT (project test code)"
+sha256 = "28e8bad7296fd6e08cb4a939b232190e94f1d75214401c6ef922993baebf9c33"
+features = ["layout", "vert", "SinglePos", "unclassified-kana-mark"]
+
+[[fixture]]
+id = "vertical-singlepos-control.ttf"
+source = "generate_vertical_singlepos.py (fontTools 4.68.0; no external font)"
+license = "MIT (project test code)"
+sha256 = "d66eb28a29bf85ef09248b8b8f68c5afbe4fb263e0c55cb9f7870f4575c7e323"
+features = ["layout", "vert", "SinglePos", "unclassified-kana-mark"]

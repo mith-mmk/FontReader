@@ -10,6 +10,8 @@
 
 ### Fixed
 
+- Apply font-authored GPOS `vert` SinglePos adjustments in vertical runs, including unclassified kana marks. Preserve horizontal/sideways behavior, lookup deduplication, GDEF filtering and static-value limits; no PairPos, generic mark fallback, public API or release changes.
+
 - With `layout`, compose 58 exact Unicode 17 canonical kana pairs before cmap when renderable, preserving source spans and existing vertical GSUB; share bounded invalid-GSUB rollback with modern Hangul. Ainu named sequences and raw/no-layout APIs remain unchanged. Add reproducible MIT fixtures, mapping/exclusion proofs and CFF/CFF2 boundary regressions. No public API, dependency, version or release change.
 
 - Keep SVG path clips and gradients in the same translated coordinate system as their positioned glyph, including composite baseline shifts and preceding-span advances. Plain paths retain their existing export format.

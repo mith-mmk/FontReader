@@ -1323,7 +1323,7 @@ impl Gpos {
         feature_indices
     }
 
-    /// SinglePos on the default spacing features. Device/variation deltas are
+    /// SinglePos on default spacing and vertical positioning features. Device/variation deltas are
     /// parsed but not evaluated, consistently with the existing pair path.
     pub(crate) fn lookup_single_adjustment(
         &self,
@@ -1332,14 +1332,14 @@ impl Gpos {
         locale: Option<&str>,
         gdef: Option<&Gdef>,
     ) -> Option<SingleAdjustment> {
-        let feature_tags = if is_vertical {
-            [*b"vkrn", *b"dist"]
+        let feature_tags: &[[u8; 4]] = if is_vertical {
+            &[*b"vkrn", *b"dist", *b"vert"]
         } else {
-            [*b"kern", *b"dist"]
+            &[*b"kern", *b"dist"]
         };
         let mut result = SingleAdjustment::default();
         let mut matched = false;
-        for lookup in self.collect_lookups(locale, &feature_tags) {
+        for lookup in self.collect_lookups(locale, feature_tags) {
             if (lookup.lookup_type != 1 && lookup.lookup_type != 9)
                 || !lookup.includes_glyph(glyph, gdef)
             {
@@ -1795,6 +1795,104 @@ mod tests {
                     "format {format}, length {length}"
                 );
             }
+        }
+    }
+
+    #[test]
+    fn vert_single_selects_extensions_deduplicates_and_preserves_zero_precedence() {
+        for extension in [false, true] {
+            for zero_first in [false, true] {
+                let parse = |values: [i16; 4]| {
+                    let mut bytes = single_bytes(1, &[10], &[values]);
+                    if extension {
+                        let mut header = vec![0, 1, 0, 1, 0, 0, 0, 8];
+                        header.append(&mut bytes);
+                        bytes = header;
+                    }
+                    Gpos::parse_subtable(
+                        &mut BytesReader::new(&bytes),
+                        if extension { 9 } else { 1 },
+                        0,
+                    )
+                    .unwrap()
+                };
+                let mut subtables = vec![parse([500, 1000, 0, -1000])];
+                if zero_first {
+                    subtables.insert(0, parse([0; 4]));
+                }
+                let mut gpos = single_gpos(subtables, 0);
+                let feature = gpos
+                    .features
+                    .features
+                    .iter_mut()
+                    .find(|f| f.feature_tag == u32::from_be_bytes(*b"kern"))
+                    .unwrap();
+                feature.feature_tag = u32::from_be_bytes(*b"vert");
+                let indices = feature.lookup_list_indices.clone();
+                for lookup in &mut gpos.lookups {
+                    lookup.lookup_type = if extension { 9 } else { 1 };
+                }
+                for locale in [None, Some("ja")] {
+                    assert!(gpos
+                        .lookup_single_adjustment(10, false, locale, None)
+                        .is_none());
+                    assert_eq!(
+                        gpos.lookup_single_adjustment(10, true, locale, None)
+                            .unwrap(),
+                        if zero_first {
+                            SingleAdjustment::default()
+                        } else {
+                            SingleAdjustment {
+                                x_placement: 500,
+                                y_placement: 1000,
+                                x_advance: 0,
+                                y_advance: -1000,
+                            }
+                        }
+                    );
+                }
+                for feature in &mut gpos.features.features {
+                    if [*b"vkrn", *b"dist"]
+                        .iter()
+                        .any(|tag| feature.feature_tag == u32::from_be_bytes(*tag))
+                    {
+                        feature.lookup_list_indices = indices.clone();
+                    }
+                }
+                for locale in [None, Some("ja")] {
+                    assert_eq!(
+                        gpos.lookup_single_adjustment(10, true, locale, None)
+                            .unwrap()
+                            .y_advance,
+                        if zero_first { 0 } else { -1000 }
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn vert_single_retains_gdef_inclusion_and_exclusion() {
+        let font =
+            crate::load_font_from_buffer(include_bytes!("../../../tests/fixtures/gpos-single.ttf"))
+                .unwrap();
+        let gdef = font.font().gdef.as_ref().unwrap();
+        for flag in [0, 8] {
+            let single = parse_single(&single_bytes(1, &[4], &[[500, 1000, 0, -1000]])).unwrap();
+            let mut gpos = single_gpos(vec![single], flag);
+            for feature in &mut gpos.features.features {
+                if feature.feature_tag == u32::from_be_bytes(*b"kern") {
+                    feature.feature_tag = u32::from_be_bytes(*b"vert");
+                }
+            }
+            assert_eq!(
+                gpos.lookup_single_adjustment(4, true, Some("ja"), Some(gdef))
+                    .is_some(),
+                flag == 0
+            );
+            assert!(gpos
+                .lookup_single_adjustment(4, true, Some("ja"), None)
+                .is_some());
         }
     }
 

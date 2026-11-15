@@ -1567,6 +1567,38 @@ mod tests {
 
     #[test]
     #[cfg(feature = "layout")]
+    fn vert_single_gpos_retains_required_feature_and_locale_selection() {
+        let single = |advance: i16| {
+            [1u16, 8, 8, advance as u16, 1, 1, 10]
+                .iter()
+                .flat_map(|v| v.to_be_bytes())
+                .collect()
+        };
+        let gpos = parse_gpos(build_gpos_table_with_scripted_features(
+            &[(*b"DFLT", 0, &[]), (*b"kana", 1, &[])],
+            &[(*b"vert", &[0]), (*b"vert", &[1])],
+            1,
+            vec![single(-1000), single(-500)],
+        ));
+        assert_eq!(
+            gpos.lookup_single_adjustment(10, true, Some("default"), None)
+                .unwrap()
+                .y_advance,
+            -1000
+        );
+        assert_eq!(
+            gpos.lookup_single_adjustment(10, true, Some("ja"), None)
+                .unwrap()
+                .y_advance,
+            -500
+        );
+        assert!(gpos
+            .lookup_single_adjustment(10, false, Some("ja"), None)
+            .is_none());
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
     fn single_gpos_selects_the_locale_script() {
         let single = |advance: i16| {
             [1u16, 8, 4, advance as u16, 1, 1, 10]
