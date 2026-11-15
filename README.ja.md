@@ -53,6 +53,7 @@ default feature には `layout` と `cff` が含まれます。
 - `layout`
   - GSUB / GPOS を使った shaping
   - 縦書き、RTL、locale、variant 指定
+  - 未リリース：[範囲を限定したチベット文字の置換 run](doc/feature-status.ja.md#範囲を限定したチベット文字の置換-run)。別文字体系・空白を含む run、正規化、一般的な mark skipping は対象外です。
 - `cff`
   - OpenType / CFF outline
 - `raw`

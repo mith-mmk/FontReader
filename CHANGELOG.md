@@ -4,7 +4,10 @@
 
 ### Fixed
 
-- Position adjacent, unligated Tibetan consonant/simple-vowel pairs using `tibt` `abvm`/`blwm` MarkToBase anchors only after existing mark attachment fails. Preserve locale selection and GDEF filtering; stacks, normalization, and global GSUB locale mapping remain out of scope.
+- Add a transactional, whole-run Tibetan `tibt` GSUB plan for ordered nondecomposable single-glyph stacks and simple-vowel alternates. Preserve whole-run presentation context, explicit language selection, and legacy output for mixed/unsupported/incomplete runs. Use exact no-excluded-glyph GDEF proofs only within this plan; general mark skipping and normalization remain unsupported.
+- Keep family fallback safe when an isolated Tibetan support probe and a later grouped run choose different shaping paths, by requiring coverage in both. Add reproducible MIT fixtures for stages, ownership, filtering, rollback, context, required features, orientation and missing-glyph fallback. No GPOS, public API, version, dependency or release change.
+
+- Position adjacent, unligated Tibetan consonant/simple-vowel pairs using `tibt` `abvm`/`blwm` MarkToBase anchors only after existing mark attachment fails. Preserve locale selection and GDEF filtering; this anchor fallback itself does not cover ligated stacks or normalization.
 
 - Apply LTR contextual GSUB and sequence-aware vertical/mixed/sideways substitutions in font-authored LookupList order, preserving source and ligature component metadata through size changes. Keep one orientation feature per route and unchanged layout-disabled behavior.
 - Correct context/chaining format 1 record parsing, matched no-op rules, reverse Extension traversal, and bounded nested execution. GDEF-proven mark-free runs retain flagged ligatures; general skip-over-mark GSUB remains unsupported.

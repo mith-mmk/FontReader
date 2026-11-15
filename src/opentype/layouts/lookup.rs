@@ -27,6 +27,7 @@ impl LookupList {
 pub(crate) struct Lookup {
     pub(crate) lookup_type: u16,
     pub(crate) lookup_flag: u16,
+    pub(crate) mark_filtering_set: Option<u16>,
     pub(crate) subtables: Vec<LookupSubstitution>,
 }
 
@@ -56,6 +57,7 @@ impl Lookup {
         Ok(Self {
             lookup_type: lookup.lookup_type,
             lookup_flag: lookup.lookup_flag,
+            mark_filtering_set: lookup.mark_filtering_set,
             subtables,
         })
     }
@@ -66,6 +68,7 @@ pub(crate) struct LookupRaw {
     pub(crate) offset: u64,
     pub(crate) lookup_type: u16,
     pub(crate) lookup_flag: u16,
+    pub(crate) mark_filtering_set: Option<u16>,
     pub(crate) subtable_offsets: Vec<u16>,
 }
 
@@ -80,10 +83,16 @@ impl LookupRaw {
         for _ in 0..subtable_count {
             subtable_offsets.push(reader.read_u16_be()?);
         }
+        let mark_filtering_set = if lookup_flag & 0x0010 != 0 {
+            Some(reader.read_u16_be()?)
+        } else {
+            None
+        };
         Ok(Self {
             offset,
             lookup_type,
             lookup_flag,
+            mark_filtering_set,
             subtable_offsets,
         })
     }
@@ -1541,5 +1550,29 @@ mod single_format1_tests {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod mark_filtering_set_tests {
+    use super::LookupRaw;
+    use bin_rs::reader::BytesReader;
+
+    #[test]
+    fn reads_optional_trailing_filter_set_and_rejects_truncation() {
+        let bytes = [0, 4, 0, 0x10, 0, 1, 0, 10, 0, 7];
+        let lookup = LookupRaw::new(&mut BytesReader::new(&bytes), 0).unwrap();
+        assert_eq!(lookup.subtable_offsets, [10]);
+        assert_eq!(lookup.mark_filtering_set, Some(7));
+        for length in 0..bytes.len() {
+            assert!(LookupRaw::new(&mut BytesReader::new(&bytes[..length]), 0).is_err());
+        }
+        let bytes = [0, 4, 0, 0, 0, 1, 0, 8];
+        assert_eq!(
+            LookupRaw::new(&mut BytesReader::new(&bytes), 0)
+                .unwrap()
+                .mark_filtering_set,
+            None
+        );
     }
 }
