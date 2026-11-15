@@ -112,8 +112,8 @@ fn woff(sfnt: &[u8]) -> Vec<u8> {
             data[8..12].fill(0);
         }
         data.resize((len + 3) & !3, 0);
-        let checksum = data.chunks_exact(4).fold(0u32, |sum, chunk| {
-            sum.wrapping_add(u32::from_be_bytes(chunk.try_into().unwrap()))
+        let checksum = data.as_chunks::<4>().0.iter().fold(0u32, |sum, chunk| {
+            sum.wrapping_add(u32::from_be_bytes(*chunk))
         });
         bytes[new + 16..new + 20].copy_from_slice(&checksum.to_be_bytes());
         let offset = bytes.len();
