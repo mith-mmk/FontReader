@@ -103,7 +103,7 @@ nominal cmap coverage が必要です。欠けた元 cmap を GSUB で補う独�
 
 raw 単一グリフ API と layout 無効時は変更しません。
 [Unicode 17 §3.12](https://www.unicode.org/versions/Unicode17.0.0/core-spec/chapter-3/#G24646)
-および [検証範囲](testing.md#bounded-modern-hangul-composition-unreleased)を参照してください。
+および [検証範囲](testing.md#bounded-modern-hangul-composition-0018)を参照してください。
 
 ### 基本的なチベット文字の母音アンカー
 
@@ -693,7 +693,7 @@ Lookup ごとに異なる隣接グリフ、広い範囲の加算、走査位置�
 
 ## 明示的な合成フォント選択
 
-開発中 API（公開済み 0.0.17 には未収録）の `CompositeFont`、`CompositeFontRule`、
+0.0.18 のソースツリーに追加した `CompositeFont`、`CompositeFontRule`、
 `UnicodeRange` は private fields を持つ追加型です。既存 `FontRef` の variant や
 `FontOptions`、descriptor、glyph の field は追加しません。
 
@@ -736,7 +736,7 @@ Lookup ごとに異なる隣接グリフ、広い範囲の加算、走査位置�
 適用し、フォント作者の cleanup 順序を保持します。合成フォントのサイズ・基線調整は
 その整形範囲を拡張せず、[Furifont](https://furifont.antfu.me/) の完全対応を意味しません。
 
-### 文脈依存の列整形（未リリース）
+### 文脈依存の列整形（0.0.18）
 
 LTR は ccmp・選択 variant・rlig/rclt/calt/clig/liga と方向別の単一 feature を、
 重複を除いた LookupList 順で適用する。方向 feature は従来どおり全 Script/LangSys、
@@ -758,6 +758,7 @@ Furifont v0.7.0 の IVS placeholder のように、文脈置換の後に ccmp cl
 根拠は [LookupList 処理](https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#lookuplist-table)
 と [vrt2](https://learn.microsoft.com/en-us/typography/opentype/spec/features_uz#tag-vrt2)。
 
+[限定的なチベット文字の filtered-context 例外](../docs/filtered-context.md)以外では、
 GDEF による除外グリフを飛び越すマッチングは未実装。宣言された GDEF class から
 現在の run に除外対象がないと確認できる場合だけ、flag 付き lookup を許可する。
 mark attachment/filter-set flag は mark がない場合だけ許可し、それ以外は入れ子も

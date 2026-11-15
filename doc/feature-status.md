@@ -114,7 +114,7 @@ guarantee.
 
 Raw scalar APIs and layout-disabled shaping stay unchanged. The algorithm
 follows [Unicode 17 section 3.12](https://www.unicode.org/versions/Unicode17.0.0/core-spec/chapter-3/#G24646).
-See [tests and limitations](testing.md#bounded-modern-hangul-composition-unreleased).
+See [tests and limitations](testing.md#bounded-modern-hangul-composition-0018).
 
 ### Basic Tibetan vowel anchors
 
@@ -826,7 +826,7 @@ and [lookup flags](https://learn.microsoft.com/en-us/typography/opentype/spec/ch
 
 ## Explicit composite font selection
 
-Development API (not published in 0.0.17): `CompositeFont`, `CompositeFontRule`
+Added in the 0.0.18 source tree: `CompositeFont`, `CompositeFontRule`
 and `UnicodeRange` are additive types with private fields. They do not add
 variants/fields to existing `FontRef`, `FontOptions`, descriptors or glyphs.
 
@@ -878,7 +878,7 @@ lookups as described below, including authored cleanup order. Composite size and
 baseline adjustments do not extend that shaping scope or imply full
 [Furifont](https://furifont.antfu.me/) support.
 
-### Contextual sequence shaping (unreleased)
+### Contextual sequence shaping (0.0.18)
 
 LTR text applies selected `ccmp`, variants, `rlig`, `rclt`, `calt`, `clig`, `liga`
 and the route's single orientation feature in deduplicated LookupList order.
@@ -904,7 +904,8 @@ enforce it. It still selects `vrt2` when available, otherwise `vert`, never both
 mixed upright uses only `vert`, sideways only `vrtr`. See [LookupList processing](https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#lookuplist-table)
 and [vertical alternates and rotation](https://learn.microsoft.com/en-us/typography/opentype/spec/features_uz#tag-vrt2).
 
-GDEF-dependent flags do not yet support matching across excluded glyphs. A
+Outside the [bounded Tibetan filtered-context exception](../docs/filtered-context.md),
+GDEF-dependent flags do not support matching across excluded glyphs. A
 flagged sequence lookup is permitted only when a declared GDEF class definition
 proves that no glyph in the current run would be excluded; mark attachment or
 filter-set flags conservatively require no declared marks. Otherwise the lookup

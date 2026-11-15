@@ -11,10 +11,10 @@ English: [README.md](README.md)
 [使用例](doc/api-recipes.ja.md#混在縦書き-ltr-のシェーピング計測svg)と
 [対応範囲](doc/feature-status.ja.md#明示的な混在縦書き-ltr-アウトライン)を参照してください。
 
-開発ブランチでは `CompositeFont` による明示的な文字範囲選択（単一行 LTR）と、
+0.0.18 では `CompositeFont` による明示的な文字範囲選択（単一行 LTR）と、
 ルール別のサイズ倍率・ベースライン移動を追加しています。
 [使用例](doc/api-recipes.ja.md#明示的な合成フォント単一行-ltr)を参照してください。
-この追加 API は公開済み 0.0.17 には含まれません。
+追加 API は 0.0.17 には含まれず、Cargo の 0.0.17 指定では 0.0.18 を選択しません。
 
 ## 最初に使うAPI
 
@@ -58,9 +58,9 @@ default feature には `layout` と `cff` が含まれます。
 - `layout`
   - GSUB / GPOS を使った shaping
   - 縦書き、RTL、locale、variant 指定
-  - 未リリース：[範囲を限定したチベット文字の置換 run](doc/feature-status.ja.md#範囲を限定したチベット文字の置換-run)。フォントの成分 coverage を確認する限定的な canonical 正規化に対応します。上母音付き積み重ね、別文字体系・空白を含む run、一般的な mark skipping は対象外です。
-  - 未リリース：[範囲を限定した仮名の canonical 合成](doc/feature-status.ja.md#範囲を限定した仮名の-canonical-合成)。濁点・半濁点の58組で元の文字と縦書き処理を維持します。canonical な合成先がないアイヌ語 named sequence は変更しません。
-  - 未リリース：[範囲を限定した現代ハングル合成](doc/feature-status.ja.md#範囲を限定した現代ハングル合成)。合成先を持つ face で現代 LV/LVT/LV+T 書記素を合成します。古ハングル、声調、韓国語全般の shaping は対象外です。
+  - [範囲を限定したチベット文字の置換 run](doc/feature-status.ja.md#範囲を限定したチベット文字の置換-run)。フォントの成分 coverage を確認する限定的な canonical 正規化に対応します。積み重ね＋上母音1個には、正確な Base+Mark 所有関係とフォントの `abvm` Base anchor が必要です。AA＋上母音、別文字体系・空白を含む run、一般的な mark skipping は対象外です。
+  - [範囲を限定した仮名の canonical 合成](doc/feature-status.ja.md#範囲を限定した仮名の-canonical-合成)。濁点・半濁点の58組で元の文字と縦書き処理を維持します。canonical な合成先がないアイヌ語 named sequence は変更しません。
+  - [範囲を限定した現代ハングル合成](doc/feature-status.ja.md#範囲を限定した現代ハングル合成)。合成先を持つ face で現代 LV/LVT/LV+T 書記素を合成します。古ハングル、声調、韓国語全般の shaping は対象外です。
 - `cff`
   - OpenType / CFF outline
 - `raw`
@@ -77,21 +77,21 @@ default feature には `layout` と `cff` が含まれます。
 
 ```toml
 [dependencies]
-fontcore = "0.0.17"
+fontcore = "0.0.18"
 ```
 
 低レイヤ parser API も必要な場合:
 
 ```toml
 [dependencies]
-fontcore = { version = "0.0.17", features = ["raw"] }
+fontcore = { version = "0.0.18", features = ["raw"] }
 ```
 
 SVG emoji font の暫定サポートも使う場合:
 
 ```toml
 [dependencies]
-fontcore = { version = "0.0.17", features = ["svg-fonts"] }
+fontcore = { version = "0.0.18", features = ["svg-fonts"] }
 ```
 
 ## 最小サンプル

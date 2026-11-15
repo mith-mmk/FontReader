@@ -329,7 +329,7 @@ features = ["layout", "GDEF", "MarkToBase", "MarkToLigature", "MarkToMark", "Ext
 id = "mkmk-predecessor.ttc"
 source = "generate_mkmk_predecessor.py (fontTools 4.68.0; original mark-coordinates.ttf)"
 license = "MIT (project test code)"
-sha256 = "8a36155b0e369b57233581e3b6ade48fafd813493241385f7196cfc7af0bd68b"
+sha256 = "ba7294a295dcf8e2708ce67eb6a6bcec079cbf950ca5a2d032a023b38a76da55"
 features = ["layout", "GDEF", "MarkToMark", "ExtensionPos", "lookup-target-filtering", "source-ownership", "no-layout-controls"]
 
 [[fixture]]

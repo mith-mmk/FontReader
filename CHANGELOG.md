@@ -1,36 +1,36 @@
 # Changelog
 
-## Unreleased
+## 0.0.18 - 2026-11-15
 
 ### Added
 
-- Development-only explicit single-line horizontal LTR composite fonts with ordered Unicode-range rules, whole-EGC face selection, and rule-local fallback. Published 0.0.17 does not include this API.
+- Explicit single-line horizontal LTR composite fonts with ordered Unicode-range rules, whole-EGC face selection, and rule-local fallback.
 - Per-rule positive finite size multipliers and finite signed baseline shifts, with defaults of `1.0` and `0.0`. Size multiplies the requested nominal size before normal face shaping, preserving line-metric normalization. Positive baseline shifts move glyphs upward in output units without scaling the shift or changing advances.
 - Adjacent clusters share shaping context only for the same borrowed face object and exactly equal adjustments, including across rule boundaries. Invalid or overflowing effective sizes are rejected; runs using non-default adjustments also reject nonfinite transformed geometry. Existing face/family APIs are unchanged; vertical, multiline and RTL composition remain future work.
 
 ### Fixed
 
-- Reject malformed GSUB/GPOS extension headers before following their offsets, preventing recursive extension parsing. Check extension offset arithmetic and preserve valid 32-bit extension targets (see [validation scope](doc/extension-parser-validation.md)); no public API, dependency, version or release change.
-- Filter the current input of ordinary GPOS mark attachment lookups using GDEF, including ExtensionPos. Preserve attachment-target search and the existing synthetic GDEF origin fallback; this is bounded HarfBuzz-compatible filtering, not general mark-layout parity. See [scope and tests](doc/mark-input-filtering.md).
+- Reject malformed GSUB/GPOS extension headers before following their offsets, preventing recursive extension parsing. Check extension offset arithmetic and preserve valid 32-bit extension targets (see [validation scope](doc/extension-parser-validation.md)); existing public APIs and dependency requirements are unchanged.
+- Filter the current input of ordinary GPOS mark attachment lookups using GDEF, including ExtensionPos. Preserve attachment-target search; the final unanchored-origin policy is described below. This is bounded HarfBuzz-compatible filtering, not general mark-layout parity. See [scope and tests](doc/mark-input-filtering.md).
 
 - Keep SVG path clips and gradients in the same translated coordinate system as their positioned glyph, including composite baseline shifts and preceding-span advances. Plain paths retain their existing export format.
 - Bound residual kana mark advance suppression to untouched exact-pair EGCs in GPOS faces without GDEF glyph classes. Preserve effective SinglePos/PairPos ownership, nominal positions, raw text exports and no-layout controls. This removes an extra cell, not mark attachment or ink overlap; see [scope](doc/kana-residual-marks.md).
 
-- Keep the nominal base when a variation sequence is unsupported, including raw UVS glyph/SVG rendering wrappers. Prefer exact cmap14 support only after whole-cluster renderability checks; preserve explicit glyph-zero contextual repair, first-selector handling and marked/RTL continuity. Reject missing per-glyph coverage and out-of-range CFF/CFF2 CharStrings during family probing. Add original MIT fixtures; no public signature, version or release change. Font-authored unregistered sequences can differ from browser policy.
+- Keep the nominal base when a variation sequence is unsupported, including raw UVS glyph/SVG rendering wrappers. Prefer exact cmap14 support only after whole-cluster renderability checks; preserve explicit glyph-zero contextual repair, first-selector handling and marked/RTL continuity. Reject missing per-glyph coverage and out-of-range CFF/CFF2 CharStrings during family probing. Add original MIT fixtures; existing public signatures are unchanged. Font-authored unregistered sequences can differ from browser policy.
 
 - Preserve valid bounded kana/modern Hangul composition beside untouched pre-existing missing glyphs. Keep conservative full-run rollback for unusable substituted outputs, including context-only dependencies, ligatures, expansions and identity substitutions. No public provenance API or general normalization change.
-- Apply font-authored GPOS `vert` SinglePos adjustments in vertical runs, including unclassified kana marks. Preserve horizontal/sideways behavior, lookup deduplication, GDEF filtering and static-value limits; no PairPos, generic mark fallback, public API or release changes.
+- Apply font-authored GPOS `vert` SinglePos adjustments in vertical runs, including unclassified kana marks. Preserve horizontal/sideways behavior, lookup deduplication, GDEF filtering and static-value limits; this does not add vertical PairPos or generic mark fallback, or change public APIs.
 
-- With `layout`, compose 58 exact Unicode 17 canonical kana pairs before cmap when renderable, preserving source spans and existing vertical GSUB; share bounded invalid-GSUB rollback with modern Hangul. Ainu named sequences and raw/no-layout APIs remain unchanged. Add reproducible MIT fixtures, mapping/exclusion proofs and CFF/CFF2 boundary regressions. No public API, dependency, version or release change.
+- With `layout`, compose 58 exact Unicode 17 canonical kana pairs before cmap when renderable, preserving source spans and existing vertical GSUB; share bounded invalid-GSUB rollback with modern Hangul. Ainu named sequences and raw/no-layout APIs remain unchanged. Add reproducible MIT fixtures, mapping/exclusion proofs and CFF/CFF2 boundary regressions. Existing public APIs and dependency requirements are unchanged.
 
 - Compose complete modern Hangul LV/LVT/LV+T graphemes before cmap when the face has a renderable syllable. Share family probing/rendering, retain original source characters and distinguish source counts from GSUB components. Restore usable original jamo if downstream GSUB invalidates a new composition, without losing composed-only neighbors. Old Hangul, marked/repeated/compatibility jamo, raw APIs and no-layout behavior remain outside the change.
-- Add reproducible original MIT Hangul fixtures, exhaustive 11,172-syllable algorithm checks, direct/family/orientation regressions and CFF/CFF2 missing-target guards. No public API, dependency, version or release change.
+- Add reproducible original MIT Hangul fixtures, exhaustive 11,172-syllable algorithm checks, direct/family/orientation regressions and CFF/CFF2 missing-target guards. Existing public APIs and dependency requirements are unchanged.
 
 - Add font-aware, transactional Unicode 17 canonical Tibetan decomposition and bounded ordering for fully collapsed consonant/subjoined forms and UU / AA+U / U+AA. Preserve original source/grapheme ownership independently of normalized glyph components and retain originals when coverage or stack validation fails.
-- Pin official normalization data with offline hash/generator checks and independent Rust tests. Add MIT fixtures for canonical equivalence, selectors, rollback, missing components, original-grapheme family selection and orientation. Upper-vowel stacks, II/vocalic R/L/reversed II, compatibility forms and mixed/punctuation runs remain outside this plan. No public API, version, dependency or release change.
+- Pin official normalization data with offline hash/generator checks and independent Rust tests. Add MIT fixtures for canonical equivalence, selectors, rollback, missing components, original-grapheme family selection and orientation. II/vocalic R/L/reversed II, compatibility forms and mixed/punctuation runs remain outside this normalization plan. Bounded upper-stack handling is described below. Existing public APIs and dependency requirements are unchanged.
 
-- Add a transactional, whole-run Tibetan `tibt` GSUB plan for ordered nondecomposable single-glyph stacks and simple-vowel alternates. Preserve whole-run presentation context, explicit language selection, and legacy output for mixed/unsupported/incomplete runs. Use exact no-excluded-glyph GDEF proofs only within this plan; general mark skipping remains unsupported; canonical preprocessing is bounded as described above.
-- Keep family fallback safe when an isolated Tibetan support probe and a later grouped run choose different shaping paths, by requiring coverage in both. Add reproducible MIT fixtures for stages, ownership, filtering, rollback, context, required features, orientation and missing-glyph fallback. No GPOS, public API, version, dependency or release change.
+- Add a transactional, whole-run Tibetan `tibt` GSUB plan for ordered nondecomposable single-glyph stacks and simple-vowel alternates. Preserve whole-run presentation context, explicit language selection, and legacy output for mixed/unsupported/incomplete runs. Use exact no-excluded-glyph GDEF proofs, with the bounded upper-stack filtered-context exception described below; general mark skipping remains unsupported; canonical preprocessing is bounded as described above.
+- Keep family fallback safe when an isolated Tibetan support probe and a later grouped run choose different shaping paths, by requiring coverage in both. Add reproducible MIT fixtures for stages, ownership, filtering, rollback, context, required features, orientation and missing-glyph fallback. This substitution path does not add GPOS or change existing public APIs or dependency requirements.
 
 - Position adjacent, unligated Tibetan consonant/simple-vowel pairs using `tibt` `abvm`/`blwm` MarkToBase anchors only after existing mark attachment fails. Preserve locale selection and GDEF filtering; this anchor fallback itself does not cover ligated stacks or normalization.
 
@@ -38,7 +38,22 @@
 
 - Apply LTR contextual GSUB and sequence-aware vertical/mixed/sideways substitutions in font-authored LookupList order, preserving source and ligature component metadata through size changes. Keep one orientation feature per route and unchanged layout-disabled behavior.
 - Correct context/chaining format 1 record parsing, matched no-op rules, reverse Extension traversal, and bounded nested execution. GDEF-proven mark-free runs retain flagged ligatures; general skip-over-mark GSUB remains unsupported.
-- Add small reproducible MIT fixtures for contextual features, IVS cleanup order, nested expansion, required ligatures, orientation selection, and mark anchors. Raw scalar APIs, version and dependencies are unchanged. See the EN/JA feature status for shaping and filtering limits.
+- Add small reproducible MIT fixtures for contextual features, IVS cleanup order, nested expansion, required ligatures, orientation selection, and mark anchors. Raw scalar APIs and dependency requirements are unchanged. See the EN/JA feature status for shaping and filtering limits.
+
+### Parser and mark-layout fixes
+
+- Bound SFNT GSUB/GPOS readers to declared table lengths, rejecting offsets that escape a layout table rather than reading adjacent font data.
+- Use actual GPOS anchors for mark attachment origins. With GPOS present, unanchored marks retain cursor/authored placement instead of a synthetic GDEF origin; preserve the legacy no-GPOS fallback.
+- Select bounded MarkToMark predecessors separately for each lookup with its own GDEF filtering. Preserve original single-source mark ownership through SingleSubst, and keep expansion/contraction and uncertain provenance outside the bounded path. See [scope and tests](doc/mkmk-predecessor-search.md).
+- Add internal, opt-in filtered GSUB contexts for the bounded Tibetan plan, preserving physical glyph slots, source ownership and transactional rollback. This is not general skip-over-mark GSUB support.
+- Support a bounded Tibetan stack plus one of six upper vowels only with exact Base+Mark ownership and a font-authored `abvm` Base anchor. Preserve ordinary mark priority, locale, filtering and geometry; reject unsupported normalization, uncertain ownership, missing anchors and mixed-script/unsupported runs transactionally; admitted old and new Tibetan neighbors may share the same transaction. See [verification](doc/testing.md#bounded-tibetan-upper-stack-proof-0018).
+
+### Compatibility and verification
+
+- Continue the existing pre-1.0 version cadence at 0.0.18. Composite-font types and methods are additive; existing public signatures, features, dependency requirements, `MIT AND Unicode-3.0` licensing and Rust 1.91 minimum are retained. This is not an API-stability guarantee. Corrected shaping, fallback, metrics and SVG geometry can change output; malformed layout tables can now be rejected earlier.
+- Cargo's `fontcore = "0.0.17"` requirement does not select 0.0.18. Update the requirement explicitly to use 0.0.18.
+- Keep normal tests self-contained with original MIT synthetic fixtures. Unicode normalization, joining and grapheme data remain pinned to 17.0.0, separately from 18.0.0 scalar orientation/enclosing-mark data. Offline generator/hash checks, feature-matrix tests and the Rust 1.91 CI job cover these boundaries; see [testing](doc/testing.md) and [Unicode provenance](data/unicode/README.md).
+- Composite fonts remain explicit, single-line horizontal LTR only. Bounded script fixes do not establish full Tibetan/Arabic/Korean shaping, BiDi, AAT or broad HarfBuzz/browser parity. See the [feature status](doc/feature-status.md) for exact exclusions.
 
 ## 0.0.17 - 2026-11-14
 
