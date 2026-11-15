@@ -16,7 +16,7 @@ jobs:
           - name: unicode-data
             command: python3 tools/generate_vertical_orientation.py --check && python3 tools/generate_enclosing_marks.py --check && python3 tools/generate_joining_types.py --check
           - name: grapheme-data
-            command: python3 tools/check_grapheme_data.py
+            command: python3 tools/check_grapheme_data.py && python3 tools/generate_tibetan_normalization.py --check
           - name: fmt
             command: cargo fmt --all -- --check
           - name: clippy

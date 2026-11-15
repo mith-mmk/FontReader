@@ -129,3 +129,57 @@ Repeated ka+subjoined-ka runs of 20/200/2000 clusters were approximately
 5.6/54/540 ms in a local debug build (previous stage: 2.2/20/206 ms). This is a
 near-linear, roughly 2.6x cost on that workload, not a general performance claim.
 External fonts, local logs and visual artifacts are not redistributed.
+
+### Bounded Tibetan canonical normalization (unreleased)
+
+`tests/tibetan_normalization.rs` uses eight original MIT synthetic faces with
+paired no-presentation controls. Regenerate with fontTools 4.68.0 using
+`python tests/fixtures/generate_tibetan_normalization.py`; fixed timestamps make
+the result byte-identical (checksum in the fixture manifest). The Rust suites
+need no external fonts, Python or network. Tests cover the 13 potentially admitted
+canonical mappings, lower-vowel order reversal, five locales, repeated runs,
+selector/compatibility/upper-vowel exclusions, missing components, missing final
+glyphs, expansion/filtering rollback, and original-grapheme family selection.
+The stack suite tests normalized GHA through distinct vertical-flow, mixed and
+sideways orientation alternatives. Private tests check original source exports,
+original scalar spans versus normalized ligature component counts, reordered
+provenance, and early rejection of 100,000 alternating marks.
+
+```console
+python tools/generate_tibetan_normalization.py --check
+cargo test --offline --lib tibetan
+cargo test --offline --test tibetan_normalization
+cargo test --offline --test tibetan_stack_substitution
+cargo test --offline --no-default-features --test tibetan_normalization
+```
+
+The official Unicode 17 original, license, source hash, all 17 canonical mappings
+and 19 nonzero CCC values are checked independently as described in
+[data provenance](../data/unicode/README.md#tibetan-canonical-properties-unicode-1700).
+Those data counts are not a promise that all 17 forms enter the shaping plan.
+The previous stack-only experiment above is historical; the current acceptance
+limits are in the feature-status documents. No general normalization, modified
+Tibetan CCC, upper-vowel stack positioning or punctuation itemization is claimed.
+
+An independent local comparison used official Noto Serif Tibetan 2.103, weight
+400 (SHA-256 `060ec022b04c306de3f58d051fb0e1cf81a5b610c5910fbfc43bba154c057cda`),
+and uharfbuzz 0.57.0 / HarfBuzz 15.0.0, explicit OpenType shaping, Tibetan script,
+LTR direction and default features. Across 77 literal codepoint patterns and
+five locales (385 configurations), all 41 changed outputs matched full-HarfBuzz
+glyph counts, total advances, individual origins and ink bounds within 1e-5 px;
+344 configurations retained byte-identical SVG and identical metrics to the
+preceding bounded-stack stage. Among 85 canonical pairs (17 mappings times five
+locales), fontcore equivalence gaps fell from 45 to 30; all 85 pairs agreed in
+HarfBuzz. The remaining gaps are documented limitations, not passing support.
+A separate 28-case Arabic nonregression set retained identical SVG and metrics
+against the same preceding stage; this does not validate Arabic parity.
+
+Browser visual inspection at 100%/200% covered UU/composed/decomposed/reordered
+forms, GHA/KSSA and deferred II/stack+I/tsheg cases, including reset and reload.
+It inspected the generated SVG comparison rather than claiming browser-native
+shaping parity. Independent full-HarfBuzz output was kept separate from earlier
+feature-disabled diagnostics. Repeated UU at 20/200/2000 clusters took about
+6/59/588 ms in a local debug build versus 3.5/26/258 ms before this stage: an
+observed near-linear workload, roughly 2.3x at the largest size, not a general
+performance claim. External fonts, local logs and visual reports are not
+redistributed in the repository.

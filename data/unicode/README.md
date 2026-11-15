@@ -173,6 +173,45 @@ Unicode 18 の書記素分割や、完全なシェーピング・BiDi・CSS 混�
 検証します。上記のスクリプトで原本とライセンスの SHA-256 をオフライン確認
 できます。Unicode の原本には同梱の Unicode-3.0 ライセンスが適用されます。
 
+## Tibetan canonical properties: Unicode 17.0.0
+
+The private bounded Tibetan shaping candidate pins canonical decompositions and
+canonical combining classes to **Unicode 17.0.0**, the same version as original
+grapheme boundaries. This does not change the separately pinned Unicode 18
+vertical-orientation/enclosing-mark tables or claim a complete Unicode normalizer.
+
+- Official original: <https://www.unicode.org/Public/17.0.0/ucd/UnicodeData.txt>
+- Local unchanged original: [`17.0.0/UnicodeData.txt`](17.0.0/UnicodeData.txt)
+- Retrieved: 2026-11-15; size: 2,198,209 bytes
+- SHA-256: `2e1efc1dcb59c575eedf5ccae60f95229f706ee6d031835247d843c11d96470c`
+- Copyright (c) 2025 Unicode, Inc.; **Unicode-3.0**, bundled unchanged
+  [Unicode License V3](LICENSE.txt), hash documented above.
+- Rules: [UAX #15 revision 57](https://www.unicode.org/reports/tr15/tr15-57.html).
+
+```console
+python tools/generate_tibetan_normalization.py --check
+cargo test --offline --lib tibetan
+```
+
+The generator verifies source size/hash and license hash before extracting all
+211 assigned Tibetan-block rows. Its 17 canonical mappings are terminal pairs;
+19 scalars have nonzero CCC. Tagged compatibility mappings, including U+0F77,
+U+0F79 and U+0F0C, are excluded. No recomposition is performed, so composition
+exclusions cannot be bypassed. U+0F39 and U+0FC6 retain Unicode CCC 216 and 220;
+HarfBuzz-modified classes are not substituted. The bounded plan rejects these
+marks instead of claiming general shaping equivalence.
+
+An independent Rust parser compares every scalar in U+0F00–U+0FFF against the
+original data and proves that all mappings are nonrecursive. The generator does
+not use Python's unicodedata, network access, or the host Unicode version.
+Runtime/build requires neither Python nor data parsing. Original bytes, generated
+Rust table, generator, license and tests are included in the source distribution.
+Review the version, hashes, counts and acceptance scope together on any update.
+
+内部の限定的なチベット正規化には、元書記素境界と同じ Unicode 17.0.0 を使用します。
+公式原本とライセンスのハッシュを検証し、canonical 分解 17 件・非ゼロ CCC 19 件を
+生成します。互換分解や再合成は行わず、Python の Unicode データにも依存しません。
+
 ## Arabic-style joining
 
 Internal logical-order joining uses Unicode 17.0.0 `DerivedJoiningType.txt`,

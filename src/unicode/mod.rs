@@ -8,6 +8,10 @@ pub(crate) mod graphemes;
 pub(crate) mod joining;
 #[cfg(feature = "layout")]
 mod joining_type_data;
+#[cfg(feature = "layout")]
+pub(crate) mod tibetan_normalization;
+#[cfg(feature = "layout")]
+mod tibetan_normalization_data;
 mod vertical_orientation_data;
 
 /// Whether a scalar has General_Category=Me in the pinned Unicode 18.0.0 data.

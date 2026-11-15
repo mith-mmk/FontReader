@@ -1,3 +1,6 @@
+#[cfg(feature = "layout")]
+mod tibetan;
+
 use base64::{engine::general_purpose, Engine as _};
 use bin_rs::reader::{BinaryReader, BytesReader};
 use std::collections::HashMap;
@@ -227,7 +230,16 @@ pub(crate) enum ParsedTextUnit {
 
 #[derive(Debug, Clone, Copy)]
 struct ResolvedGlyph {
+    // Public source character remains from the original text.
     ch: char,
+    // Internal scalar used for shaping classification, never source reporting.
+    #[cfg(feature = "layout")]
+    shaping_ch: char,
+    // Original scalar interval within this run. Decomposition copies ownership.
+    #[cfg(feature = "layout")]
+    source_start: usize,
+    #[cfg(feature = "layout")]
+    source_end: usize,
     glyph_id: usize,
     prefer_color: bool,
     ligature_components: u16,
@@ -1481,138 +1493,6 @@ impl Font {
     }
 
     #[cfg(feature = "layout")]
-    fn is_bounded_tibetan_stack(text: &str) -> bool {
-        // A bounded run plan, not normalization or a USE syllable parser.
-        let mut chars = text.chars();
-        let Some(base) = chars.next() else {
-            return false;
-        };
-        if !matches!(base, '\u{0f40}'..='\u{0f47}' | '\u{0f49}'..='\u{0f6c}')
-            || matches!(
-                base,
-                '\u{0f43}' | '\u{0f4d}' | '\u{0f52}' | '\u{0f57}' | '\u{0f5c}' | '\u{0f69}'
-            )
-        {
-            return false;
-        }
-        let mut subjoined = false;
-        let mut vowel = false;
-        for ch in chars {
-            if vowel {
-                return false;
-            }
-            if matches!(ch, '\u{0f90}'..='\u{0f97}' | '\u{0f99}'..='\u{0fbc}')
-                && !matches!(
-                    ch,
-                    '\u{0f93}' | '\u{0f9d}' | '\u{0fa2}' | '\u{0fa7}' | '\u{0fac}' | '\u{0fb9}'
-                )
-            {
-                subjoined = true;
-            } else if matches!(ch, '\u{0f71}' | '\u{0f74}')
-                || (!subjoined && matches!(ch, '\u{0f72}' | '\u{0f7a}'..='\u{0f7d}' | '\u{0f80}'))
-            {
-                vowel = true;
-            } else {
-                return false;
-            }
-        }
-        true
-    }
-
-    #[cfg(feature = "layout")]
-    fn try_tibetan_stack_run(
-        &self,
-        glyphs: &[ResolvedGlyph],
-        working: &mut Vec<crate::opentype::extentions::gsub::GsubGlyph>,
-        locale: Option<&str>,
-        variant: crate::commands::FontVariant,
-        orientation: Option<TextRunMode>,
-    ) -> bool {
-        let Some(gsub) = self.current_gsub() else {
-            return false;
-        };
-        if !glyphs
-            .iter()
-            .all(|g| g.tibetan_cluster.is_some() && g.glyph_id != 0)
-            || !glyphs
-                .windows(2)
-                .any(|p| p[0].tibetan_cluster == p[1].tibetan_cluster)
-            || !gsub.has_tibetan_stack_features(locale)
-        {
-            return false;
-        }
-        let mut candidate = Vec::new();
-        let mut start = 0;
-        while start < glyphs.len() {
-            let mut end = start + 1;
-            while end < glyphs.len() && glyphs[end].tibetan_cluster == glyphs[start].tibetan_cluster
-            {
-                end += 1;
-            }
-            let mut cluster = working[start..end].to_vec();
-            if !gsub.preprocess_tibetan_stack(&mut cluster, locale, self.current_gdef()) {
-                return false;
-            }
-            candidate.extend(cluster);
-            start = end;
-        }
-        let orientation_tag = orientation.map(|mode| match mode {
-            TextRunMode::SidewaysLtr => *b"vrtr",
-            TextRunMode::MixedUpright => gsub.selected_vertical_tag(true),
-            TextRunMode::Standard => gsub.selected_vertical_tag(false),
-        });
-        // Presentation retains the entire accepted run as context. No new
-        // Tibetan features are applied to mixed or unsupported input runs.
-        if !gsub.apply_tibetan_stack_presentation(
-            &mut candidate,
-            locale,
-            variant,
-            orientation_tag,
-            self.current_gdef(),
-        ) {
-            return false;
-        }
-        if candidate.iter().any(|g| {
-            matches!(
-                glyphs[g.source_index].ch,
-                '\u{0f71}' | '\u{0f74}' | '\u{0f90}'..='\u{0fbc}'
-            )
-        }) {
-            // Positional stacks and skip-over-mark matching are not supported.
-            // Never retain the shortened/shifted intermediate glyphs.
-            return false;
-        }
-        // Without expansion/deletion, exact contiguous component ownership
-        // can be proved from source_index and the unsaturated component count.
-        // Cross-cluster ligatures or any ambiguous provenance fall back too.
-        let mut next_source = 0;
-        for glyph in &candidate {
-            if glyph.source_index != next_source {
-                return false;
-            }
-            let Some(end) = next_source.checked_add(glyph.ligature_components as usize) else {
-                return false;
-            };
-            let Some(sources) = glyphs.get(next_source..end) else {
-                return false;
-            };
-            if sources.is_empty()
-                || sources
-                    .iter()
-                    .any(|g| g.tibetan_cluster != sources[0].tibetan_cluster)
-            {
-                return false;
-            }
-            next_source = end;
-        }
-        if next_source != glyphs.len() {
-            return false;
-        }
-        *working = candidate;
-        true
-    }
-
-    #[cfg(feature = "layout")]
     fn apply_gsub_sequence_stages(
         &self,
         glyphs: &mut Vec<crate::opentype::extentions::gsub::GsubGlyph>,
@@ -1680,6 +1560,23 @@ impl Font {
                     },
                 )
                 .collect::<Vec<_>>();
+            // The bounded candidate owns a separate normalized buffer. Failure
+            // leaves both original scalars and the legacy GSUB input untouched.
+            if let Some(candidate) =
+                self.try_tibetan_stack_run(glyphs, locale, font_variant, orientation)
+            {
+                output.extend(candidate.into_iter().map(ResolvedTextUnit::Glyph));
+                glyphs.clear();
+                return;
+            }
+            if let Some(locale) = locale {
+                for glyph in &mut ccmp_glyphs {
+                    glyph.glyph_id = self
+                        .current_gsub()
+                        .unwrap()
+                        .lookup_locale(glyph.glyph_id, locale);
+                }
+            }
             let source_forms = if is_right_to_left {
                 crate::unicode::joining::forms(
                     &glyphs.iter().map(|glyph| glyph.ch).collect::<Vec<_>>(),
@@ -1687,36 +1584,21 @@ impl Font {
             } else {
                 Vec::new()
             };
-            if !self.try_tibetan_stack_run(
-                glyphs,
+            self.apply_gsub_sequence_stages(
                 &mut ccmp_glyphs,
+                &source_forms,
                 locale,
+                is_right_to_left,
                 font_variant,
                 orientation,
-            ) {
-                // Keep the established scalar locl and generic sequence path
-                // intact whenever the complete bounded run cannot be handled.
-                if let Some(locale) = locale {
-                    for glyph in &mut ccmp_glyphs {
-                        glyph.glyph_id = self
-                            .current_gsub()
-                            .unwrap()
-                            .lookup_locale(glyph.glyph_id, locale);
-                    }
-                }
-                self.apply_gsub_sequence_stages(
-                    &mut ccmp_glyphs,
-                    &source_forms,
-                    locale,
-                    is_right_to_left,
-                    font_variant,
-                    orientation,
-                );
-            }
+            );
             let expanded_glyphs = ccmp_glyphs
                 .into_iter()
                 .map(|item| ResolvedGlyph {
                     ch: glyphs[item.source_index].ch,
+                    shaping_ch: glyphs[item.source_index].shaping_ch,
+                    source_start: glyphs[item.source_index].source_start,
+                    source_end: glyphs[item.source_index].source_end,
                     glyph_id: item.glyph_id,
                     prefer_color: glyphs[item.source_index].prefer_color,
                     ligature_components: item.ligature_components,
@@ -1820,16 +1702,25 @@ impl Font {
                     let prefer_color = Self::text_prefers_color_glyph(&text);
                     let tibetan_cluster = None;
                     #[cfg(feature = "layout")]
-                    let tibetan_cluster = (_allow_tibetan && Self::is_bounded_tibetan_stack(&text))
-                        .then_some(_cluster_index)
-                        .or(tibetan_cluster);
+                    let tibetan_cluster = (_allow_tibetan
+                        && Self::is_tibetan_normalization_cluster(&text))
+                    .then_some(_cluster_index)
+                    .or(tibetan_cluster);
                     for (ch, variation_selector) in Self::cluster_glyph_scalars(&text) {
                         // Text shaping selects orientation features in the sequence pass.
                         // Raw glyph APIs retain the direct single-glyph alternate path.
                         let glyph_id =
                             self.resolve_glyph_id_with_uvs(ch, variation_selector, false)?;
+                        #[cfg(feature = "layout")]
+                        let source_start = pending_glyphs.len();
                         pending_glyphs.push(ResolvedGlyph {
                             ch,
+                            #[cfg(feature = "layout")]
+                            shaping_ch: ch,
+                            #[cfg(feature = "layout")]
+                            source_start,
+                            #[cfg(feature = "layout")]
+                            source_end: source_start + 1,
                             glyph_id,
                             prefer_color,
                             ligature_components: 1,
@@ -1888,7 +1779,7 @@ impl Font {
                 };
 
                 #[cfg(feature = "layout")]
-                if Self::is_bounded_tibetan_stack(text)
+                if Self::is_tibetan_normalization_cluster(text)
                     && self
                         .current_gsub()
                         .is_some_and(|gsub| gsub.has_tibetan_stack_features(locale))
@@ -2261,9 +2152,9 @@ impl Font {
             let simple_pair = base_index + 1 == index
                 && base.ligature_components == 1
                 && current.ligature_components == 1
-                && matches!(base.ch, '\u{0f40}'..='\u{0f47}' | '\u{0f49}'..='\u{0f6c}')
+                && matches!(base.shaping_ch, '\u{0f40}'..='\u{0f47}' | '\u{0f49}'..='\u{0f6c}')
                 && matches!(
-                    current.ch,
+                    current.shaping_ch,
                     '\u{0f71}' | '\u{0f72}' | '\u{0f74}' | '\u{0f7a}'..='\u{0f7d}' | '\u{0f80}'
                 );
             if !simple_pair {
