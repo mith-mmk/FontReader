@@ -59,6 +59,7 @@ Default features include `layout` and `cff`.
   - GSUB / GPOS shaping
   - Vertical flow, RTL, locale, and variant selection
   - Unreleased: [bounded Tibetan stack substitution runs](doc/feature-status.md#bounded-tibetan-substitution-runs). Font-aware canonical Tibetan normalization is bounded to fully collapsed consonant/lower-vowel forms. Upper-vowel stacks, mixed/spaced runs and general mark skipping remain outside this plan.
+  - Unreleased: [bounded canonical kana composition](doc/feature-status.md#bounded-canonical-kana-composition) for 58 exact voiced/semi-voiced kana pairs, preserving sources and vertical shaping. Noncanonical Ainu named sequences remain unchanged.
   - Unreleased: [bounded modern Hangul composition](doc/feature-status.md#bounded-modern-hangul-composition) for complete modern LV/LVT/LV+T graphemes when the face has the composed glyph. Old Hangul, tones and general Korean shaping remain outside this stage.
 - `cff`
   - OpenType / CFF outlines

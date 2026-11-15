@@ -10,3 +10,6 @@
 
 /data/unicode/17.0.0/UnicodeData.txt -text
 /src/unicode/tibetan_normalization_data.rs text eol=lf
+
+/data/unicode/17.0.0/CompositionExclusions.txt -text whitespace=-blank-at-eol
+/src/unicode/kana_composition_data.rs text eol=lf

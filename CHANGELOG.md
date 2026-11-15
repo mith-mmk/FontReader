@@ -10,6 +10,8 @@
 
 ### Fixed
 
+- With `layout`, compose 58 exact Unicode 17 canonical kana pairs before cmap when renderable, preserving source spans and existing vertical GSUB; share bounded invalid-GSUB rollback with modern Hangul. Ainu named sequences and raw/no-layout APIs remain unchanged. Add reproducible MIT fixtures, mapping/exclusion proofs and CFF/CFF2 boundary regressions. No public API, dependency, version or release change.
+
 - Keep SVG path clips and gradients in the same translated coordinate system as their positioned glyph, including composite baseline shifts and preceding-span advances. Plain paths retain their existing export format.
 - Select RTL Arabic-style joining forms from pinned Unicode Joining_Type values, rather than font feature availability or immediate glyph neighbors. Transparent marks, tatweel and join controls keep their source-character semantics through ccmp expansion/contraction. Add synthetic public-API regressions; this does not add AAT, full bidi, Syriac joining groups, or general mark-skipping GSUB.
 

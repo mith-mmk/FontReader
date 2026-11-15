@@ -9,6 +9,8 @@ pub(crate) mod joining;
 #[cfg(feature = "layout")]
 mod joining_type_data;
 #[cfg(feature = "layout")]
+pub(crate) mod kana_composition_data;
+#[cfg(feature = "layout")]
 pub(crate) mod tibetan_normalization;
 #[cfg(feature = "layout")]
 mod tibetan_normalization_data;

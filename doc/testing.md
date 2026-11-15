@@ -226,3 +226,60 @@ GSUB source-span and contextual-family fallback policies remain unchanged;
 restoration requires nominal cmap coverage and does not cover custom GSUB
 repair of missing original cmap entries. This stage does not claim Old Hangul,
 full Korean, AAT or browser parity.
+
+### Bounded canonical kana composition (unreleased)
+
+The original MIT `kana-composition.ttc` generator covers all 58 Unicode17 pairs,
+including voiced iteration marks, with both-form/composed-only/original-only,
+invalid-target, orientation/context GSUB, fallback, and mixed Hangul rollback
+faces. Its marks deliberately have nonzero advance; Ainu named sequences are
+unchanged rather than hidden by a generic zero-advance workaround.
+Independent unit tests parse pinned UnicodeData and CompositionExclusions,
+prove table completeness, starters/nonrecursive bases/exclusion safety, reject
+extra marks/selectors/joiners/prepends/halfwidth input, and check source spans
+and CFF/CFF2 bounds. Existing Hangul and Tibetan tests exercise the shared guard.
+Integration checks cover direct/family shaping, six locales, horizontal/RTL/
+vertical/mixed/sideways layouts, composed-only coverage, whole-EGC fallback,
+missing targets, invalid GSUB in both mixed-script orders, composed-only
+neighbors, raw scalar access and no-layout behavior.
+
+This synthetic suite does not establish full shaping parity for Japanese, Ainu,
+Korean or Tibetan. Real-font comparison results are recorded separately when
+available; no GUI or independent comparison pass is implied by these tests.
+
+仮名58組と合成除外の独立検証、元文字・範囲、CFF/CFF2 の境界、両順序の
+ハングル混在復元、縦横・混在方向、フォールバック、raw／layout 無効時を検査します。
+アイヌ語 named sequence の送りは既存値を保ちます。これらは言語全般の shaping
+一致や GUI 検証の完了を意味しません。
+
+Independent real-font checks on 2026-11-15 used Noto Sans CJK JP Regular 2.004
+(SHA-256 `68a3fc98800b2a27b371f2fb79991daf3633bd89309d4ffaa6946fd587f375b5`)
+and locally installed Hiragino Sans W3 face 0, 22.0d2e1
+(`ff92033a300f55aff2f45f57479a560af2c5467973b425d3f724f870af07f83e`, not redistributed).
+The reference was uharfbuzz 0.57.0 / HarfBuzz 15.0.0, explicit OpenType shaper,
+Kana script, upem 1000, LTR/TTB with Y-down coordinate conversion; locale probes
+were absent/ain/ja/jpn/en (HB und/ain/ja/ja/en). Across two fonts, five locales
+and horizontal/vertical/mixed modes, all 1,740 isolated canonical pairs matched
+NFC geometry (baseline: zero); comparable LTR/TTB counts, advances, pen origins
+and ink matched HarfBuzz exactly. Glyph-ID parity was not assessed; mixed
+vertical was a fontcore NFC/NFD comparison without a HarfBuzz oracle. All 630 Ainu core cases and 6,570 no-layout outputs
+were unchanged. Separate prior controls retained 376 Hangul, 385 Tibetan,
+28 Arabic and eight mixed cases, including 797 byte-identical SVGs.
+
+Extra-mark, selector/joiner, Prepend and halfwidth controls were unchanged.
+Pure-kana words became canonical-equal, but nonligated vertical mark placement
+and some vertical punctuation still differ from HarfBuzz. Hiragino mixed runs
+containing unsupported Hangul can restore otherwise valid kana through the
+conservative whole-run rollback described above. Whole-buffer Kana-script
+HarfBuzz probes are not itemized mixed-script reference shaping.
+Generated SVGs were visually inspected in Chrome at 100% and 200%, including
+kana marks/iteration marks, Ainu named sequences and mixed words; selection,
+zoom and reload were checked. This tests fontcore SVG output, not Chrome's
+native text shaping, and does not imply all broader shaping issues are solved.
+
+独立実フォント検証では上記2フォントの単独58組×5 locale×3方向、計1,740件が
+NFC と等価になり、アイヌ630件と layout 無効6,570件は不変でした。既存の
+ハングル・チベット・アラビア文字等797 SVG も不変です。Chrome で生成 SVG を
+100/200%表示し代表例を目視確認しました。これは Chrome 自体の組版ではありません。
+未合字の縦書き記号、一部の縦約物、未対応ハングルを含む Hiragino の混植 run
+による保守的復元は残る制限であり、全面的な shaping 一致は主張しません。

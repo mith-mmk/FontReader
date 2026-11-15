@@ -1,5 +1,9 @@
 #[cfg(feature = "layout")]
+mod composition;
+#[cfg(feature = "layout")]
 mod hangul;
+#[cfg(feature = "layout")]
+mod kana;
 #[cfg(feature = "layout")]
 mod tibetan;
 
@@ -1595,13 +1599,13 @@ impl Font {
                 font_variant,
                 orientation,
             );
-            if glyphs.iter().any(Self::is_composed_modern_hangul)
+            if glyphs.iter().any(Self::is_bounded_composition)
                 && ccmp_glyphs
                     .iter()
-                    .any(|glyph| !self.hangul_glyph_is_renderable(glyph.glyph_id))
+                    .any(|glyph| !self.composition_glyph_is_renderable(glyph.glyph_id))
             {
-                if let Some(mut restored) = self.restore_renderable_hangul_sources(glyphs) {
-                    // Composition must not turn renderable original jamo into
+                if let Some(mut restored) = self.restore_renderable_composition_sources(glyphs) {
+                    // Composition must not turn renderable original scalars into
                     // a missing output through GSUB, including run context.
                     // Only restorable compositions are removed, so this retry
                     // cannot restore anything further or loop.
@@ -1726,12 +1730,20 @@ impl Font {
                 ParsedTextUnit::Glyph { text, .. } => {
                     let prefer_color = Self::text_prefers_color_glyph(&text);
                     #[cfg(feature = "layout")]
-                    if let Some(glyph) = self.composed_modern_hangul_glyph(
-                        &text,
-                        pending_glyphs.last().map_or(0, |g| g.source_end),
-                    ) {
+                    if let Some(glyph) = self
+                        .composed_modern_hangul_glyph(
+                            &text,
+                            pending_glyphs.last().map_or(0, |g| g.source_end),
+                        )
+                        .or_else(|| {
+                            self.composed_kana_glyph(
+                                &text,
+                                pending_glyphs.last().map_or(0, |g| g.source_end),
+                            )
+                        })
+                    {
                         // Before nominal cmap: a composed-only face can render
-                        // NFD even when none of its original jamo are mapped.
+                        // NFD even when none of its original scalars are mapped.
                         pending_glyphs.push(glyph);
                         continue;
                     }

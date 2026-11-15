@@ -212,6 +212,25 @@ Review the version, hashes, counts and acceptance scope together on any update.
 公式原本とライセンスのハッシュを検証し、canonical 分解 17 件・非ゼロ CCC 19 件を
 生成します。互換分解や再合成は行わず、Python の Unicode データにも依存しません。
 
+## Bounded kana canonical composition (Unicode 17.0.0)
+
+`tools/generate_kana_composition.py --check` verifies the existing pinned
+UnicodeData.txt and license, plus the unchanged official
+[CompositionExclusions.txt](https://www.unicode.org/Public/17.0.0/ucd/CompositionExclusions.txt),
+retrieved 2026-11-15 (9,007 bytes; SHA-256
+`2f239196ef3b5b61db5cc476e9bd80f534d15aa1b74e1be1dea5d042a344c85f`).
+This original is Unicode-3.0, copyright Unicode, Inc. The derived table covers
+exactly 58 canonical two-scalar mappings in U+3040–30FF, with 3099/309A second.
+Both target and base have CCC=0, bases have no decomposition, and no target is
+an explicit composition exclusion. These also rule out singleton/nonstarter
+exclusions under [UAX15 rev57](https://www.unicode.org/reports/tr15/tr15-57.html).
+An independent Rust test verifies these conditions and table completeness.
+No other canonical/compatibility mapping is enabled.
+
+仮名の58組は Unicode17 原本と合成除外表から検証します。合成先・基底文字の
+CCC=0、2文字の canonical 分解、基底文字の非分解性、合成除外でないことを確認し、
+一般的な正規化へは拡張しません。
+
 ## Arabic-style joining
 
 Internal logical-order joining uses Unicode 17.0.0 `DerivedJoiningType.txt`,
