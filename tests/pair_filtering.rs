@@ -81,29 +81,36 @@ fn pair_lookup_selects_its_own_neighbors_and_applies_both_records() {
                         glyph.glyph.metrics.advance_y,
                         plain.glyph.metrics.advance_y + ya * scale,
                     );
-                    // Existing GDEF attachment-class fallback stays separate
-                    // from PairPos filtering and uses the base glyph's origin.
-                    let attached = i == 1
+                    // Baselines deliberately have no GPOS and retain the old
+                    // GDEF-origin fallback. The GPOS face instead uses its cursor
+                    // when no real mark anchor applies. Compare pair deltas from
+                    // that nominal cursor, not the no-GPOS synthetic base origin.
+                    let legacy_baseline_attachment = i == 1
                         && (([5, 8].contains(&face_index) && text.contains('\u{301}'))
                             || (face_index == 7 && text.contains('\u{300}')));
-                    let origin_delta = if attached {
+                    let (plain_x, plain_y) = if legacy_baseline_attachment {
+                        let advance = &base.glyphs[0].glyph.metrics;
                         (
-                            run.glyphs[0].x - base.glyphs[0].x,
-                            run.glyphs[0].y - base.glyphs[0].y,
+                            if policy == ShapingPolicy::RightToLeft {
+                                -advance.advance_x
+                            } else {
+                                advance.advance_x
+                            },
+                            advance.advance_y,
                         )
                     } else {
-                        delta
+                        (plain.x, plain.y)
                     };
                     close(
                         glyph.x,
-                        plain.x + origin_delta.0 + xp * scale_x
-                            - if !attached && policy == ShapingPolicy::RightToLeft {
+                        plain_x + delta.0 + xp * scale_x
+                            - if policy == ShapingPolicy::RightToLeft {
                                 xa * scale_x
                             } else {
                                 0.0
                             },
                     );
-                    close(glyph.y, plain.y + origin_delta.1 - yp * scale);
+                    close(glyph.y, plain_y + delta.1 - yp * scale);
                     delta.0 += if policy == ShapingPolicy::RightToLeft {
                         -xa * scale_x
                     } else {

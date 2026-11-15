@@ -30,19 +30,32 @@ set index and applies its anchor, while this implementation rejects that lookup
 for a GDEF-classified mark, matching the existing SinglePos/PairPos helper.
 These missing-data cases are safety/compatibility controls, not HB parity tests.
 
-## Remaining GDEF fallback
+## Unanchored GDEF metadata
 
-The renderer still treats MarkAttachClassDef or AttachList evidence as permission
-for its historical synthetic base-origin placement when no GPOS anchor applies.
-This patch does not redesign that fallback. Thus a rejected GPOS anchor can
-still result in a mark at the base origin rather than the cursor. The fixture's
-`attach_mismatch` face and the helper-level unit test deliberately establish
-both facts: no usable GPOS anchor, but unchanged base-origin fallback. Do not
-claim final-position HarfBuzz parity for this case.
+When the selected face has a parsed GPOS table, GDEF MarkAttachClassDef or
+AttachList metadata no longer supplies a synthetic previous-base origin if no
+actual GPOS mark anchor applies. This includes filtered lookups and absent
+coverage. Zero-valued actual anchors remain successful attachments.
 
-No no-GPOS heuristics, generic mark advance zeroing, script/language selection,
-Japanese residual-mark geometry, or font substitution provenance were changed.
-Hiragino's observed residual-mark overlap is not repaired by this patch.
+Nominal advance zeroing remains a separate historical compatibility policy:
+marks with the existing GDEF evidence and an eligible previous spacing glyph
+still start at zero nominal advance. SinglePos and PairPos placements and
+advances are then preserved, including the previous glyph's cursor advances.
+This is not generic Unicode/GDEF mark zeroing. Leading marks retain their old
+behavior. Without a parsed GPOS table, historical base-origin fallback remains
+unchanged; no bounding-box fallback algorithm is introduced.
+
+Removing the synthetic attachment also stops inheritance of the previous
+base's vertical-origin translation. An unanchored mark uses its own vertical
+origin; an actual anchored mark still shares its base's translation. APIs and
+source-cluster handling are unchanged. Public Engine/Face/Family rendering
+shares the correction; the older parsed `text2commands` path is unchanged.
+
+This is a presence-based bounded policy, not a full HarfBuzz positioning plan.
+It does not distinguish unsupported GPOS types, script/language selection,
+AAT positioning, or malformed tables from other unsuccessful anchor searches.
+It makes no complete HarfBuzz or browser parity claim. Predecessor lookup
+filtering, ligature ownership and Japanese residual geometry remain separate.
 
 ## References and tests
 
@@ -62,16 +75,54 @@ anchors, locale controls, vertical admitted controls and layout-disabled output.
 
 ## Bounded real-font control
 
-An independent read-in-place run compared unchanged main and this patch on
+Read-in-place controls cover
 Arial5.01.2x, Georgia5.00x-4, NotoSansCJKjp2.004 and installed Hiragino Sans W3.
-Six cases, five locale settings and four orientations (480 runs) were
-byte-identical in serialized positions, advances, bounds and outline hashes.
+The original input-filter patch had six cases, five locale settings and four
+orientations (480 runs) byte-identical to its baseline. For the later unanchored
+origin correction, 460 of these 480 runs remain identical; only Arial `!` plus
+U+0301 changes in all 20 locale/orientation combinations.
 These are regression controls, not universal shaping/browser parity.
 
-Arial `!` + U+0301 makes the retained fallback visible: at UPEM2048, fontcore
-places acute at x0 in both versions, whereas HarfBuzz15 places it at x569 (the
-cursor). Arial `q` + U+0301 remains correctly anchored at (825,328) in Y-down
-coordinates in both versions and HarfBuzz. The mixed above/below stack remains
+Arial `!` + U+0301 exposes the old fallback: at UPEM2048, fontcore
+previously placed acute at x0. The unanchored-origin correction places it at
+x569 (the cursor), agreeing with HarfBuzz15 in LTR. Arial `q` + U+0301 remains correctly anchored at (825,328) in Y-down
+coordinates before and after the correction and in HarfBuzz. The mixed above/below stack remains
 outside this patch's predecessor/order claims. System fonts were not copied or
 modified. Japanese residual marks and authored Noto vertical behavior remained
 unchanged in the controls.
+
+## Unanchored-origin fixtures and rationale
+
+`tests/unanchored_mark.rs` uses 72 original MIT faces from
+`tests/fixtures/generate_unanchored_mark.py`: six modes (anchor, filtered,
+coverage absent, SinglePos, PairPos, no GPOS), zero/positive nominal advances,
+no evidence/attachment class/AttachList, with and without real vertical metrics.
+Controls exercise LTR/RTL/TTB, mixed upright/sideways groups, missing glyphs,
+leading marks, and layers/bounds against same-nominal-metric controls.
+The existing input-filter suite retains genuine zero anchors and ligature tests.
+
+GDEF describes classes and caches attachment point indices, not a matched
+base/mark anchor pair. GPOS establishes that relationship. HarfBuzz15 separately
+plans mark zeroing and fallback positioning, disabling fallback mark positioning
+when GPOS is active; its full plan is more nuanced than table presence.
+
+- GDEF metadata and attachment-point purpose:
+  https://learn.microsoft.com/en-us/typography/opentype/spec/gdef
+- HarfBuzz15 plan and position flow (`zero_marks`,
+  `adjust_mark_positioning_when_zeroing`, `fallback_mark_positioning`):
+  https://github.com/harfbuzz/harfbuzz/blob/15.0.0/src/hb-ot-shape.cc
+
+The 72-face LTR HarfBuzz15 comparison has 32 fully equal runs. Deliberate
+remaining differences include positive unanchored advances without legacy GDEF
+evidence, authored SinglePos/PairPos advances retained by this engine rather
+than HarfBuzz's mark-zeroing plan, cross-axis cursor behavior, and no-GPOS
+bounding-box fallback. These are not new parity claims or corrections.
+
+Expanded controls also expose changed residual origins in Noto Serif Tibetan.
+For example, U+0F40 U+0F90 U+0F72 is already excluded by the bounded Tibetan
+stack predicate (upper vowels after subjoined consonants are unsupported).
+Both versions emit three glyphs, while HarfBuzz's full Tibetan shaper emits
+two. The residual third mark moves from synthetic x0 to cursor x704. This is
+an expected consequence of the new origin policy, not a repaired Tibetan stack
+or evidence of better visual output. Unanchored vertical marks can also change
+outline translation while keeping positioned-glyph x/y unchanged.

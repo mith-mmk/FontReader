@@ -62,5 +62,14 @@ original `mark-coordinates.ttf`. Reproduce with
 `python tests/fixtures/generate_mark_input_filter.py` using FontTools4.68.0.
 The 17 ordinary faces and 17 ExtensionPos counterparts exercise current-input
 GDEF filtering without changing target-search rules; see
-`doc/mark-input-filtering.md` for the deliberately retained synthetic GDEF
-fallback and missing-class policy. No installed-font bytes are included.
+`doc/mark-input-filtering.md` for the bounded unanchored-origin correction
+and unchanged missing-class policy. No installed-font bytes are included.
+
+## Unanchored mark origins
+
+`unanchored-mark.ttc` and `generate_unanchored_mark.py` are original MIT data,
+derived only from `mark-coordinates.ttf` and `vertical-metrics.ttf`.
+Regenerate with fontTools4.68.0. Faces0–35: mode (anchor, filtered, absent base
+coverage, SinglePos, PairPos, no GPOS), then nominal advance0/150, then GDEF
+evidence none/class/AttachList. Faces36–71 repeat with real vertical metrics.
+Timestamps are fixed by the source fixtures. No installed fonts are included.

@@ -7,7 +7,7 @@ const CASES: usize = 17;
 fn mark_lookup_filters_only_current_input() {
     let file = FontFile::from_buffer(FONT).unwrap();
     // Original and Extension9 copies. Target IgnoreBase/IgnoreLigature flags
-    // remain admitted. MarkAttachClassDef's legacy origin fallback is explicit.
+    // remain admitted. GDEF metadata alone does not supply an attachment origin.
     // Missing/invalid sets (11/12) retain includes_glyph rejection; HB15 instead
     // admits these missing-data fixtures. They are not parity assertions.
     for extension in [0, CASES] {
@@ -28,7 +28,7 @@ fn mark_lookup_filters_only_current_input() {
                     let mark = run.glyphs.last().unwrap();
                     let expected = if admitted {
                         anchor
-                    } else if case == 6 || case == 15 {
+                    } else if case == 15 {
                         (0.0, 0.0)
                     } else {
                         (cursor, 0.0)

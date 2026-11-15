@@ -1606,15 +1606,15 @@ mod tests {
     use bin_rs::reader::BytesReader;
 
     #[test]
-    fn mark_input_filter_reports_no_anchor_despite_legacy_gdef_fallback() {
+    fn mark_input_filter_reports_no_anchor_despite_gdef_metadata() {
         let font = crate::load_font_from_buffer(include_bytes!(
             "../../../tests/fixtures/mark-coordinates.ttf"
         ))
         .unwrap();
         let mut gpos = font.font().gpos.clone().unwrap();
         let mut gdef = font.font().gdef.clone().unwrap();
-        // Acute (gid6) has attachment class1. The higher-level historical
-        // GDEF origin fallback is independent of these actual GPOS results.
+        // Acute (gid6) has attachment class1. GDEF metadata alone does not
+        // establish an anchor in these actual GPOS results.
         let bytes = [0u8, 1, 0, 6, 0, 1, 0, 1];
         gdef.mark_attach_class_def = Some(
             crate::opentype::layouts::ClassDef::new(&mut BytesReader::new(&bytes), 0).unwrap(),
