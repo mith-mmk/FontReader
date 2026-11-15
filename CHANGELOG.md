@@ -12,6 +12,10 @@
 
 - Keep SVG path clips and gradients in the same translated coordinate system as their positioned glyph, including composite baseline shifts and preceding-span advances. Plain paths retain their existing export format.
 
+- Apply LTR contextual GSUB and sequence-aware vertical/mixed/sideways substitutions in font-authored LookupList order, preserving source and ligature component metadata through size changes. Keep one orientation feature per route and unchanged layout-disabled behavior.
+- Correct context/chaining format 1 record parsing, matched no-op rules, reverse Extension traversal, and bounded nested execution. GDEF-proven mark-free runs retain flagged ligatures; general skip-over-mark GSUB remains unsupported.
+- Add small reproducible MIT fixtures for contextual features, IVS cleanup order, nested expansion, required ligatures, orientation selection, and mark anchors. Raw scalar APIs, version and dependencies are unchanged. See the EN/JA feature status for shaping and filtering limits.
+
 ## 0.0.17 - 2026-11-14
 
 ### Added

@@ -97,7 +97,7 @@ BASE と下記の静的COLR v0以外の色layer原点は別対応です。向き
 - text API では variation selector と基本的な `locl` / `liga` / `dlig` / `ccmp` を適用
 - 方向指定 API で縦書きと RTL を扱う
 - Arabic shaping は `isol` / `init` / `medi` / `fina` に対応
-- Arabic shaping では `rlig`, `rclt`, `calt`, `clig` も存在すれば適用
+- LTR/RTL 両方の text shaping で `rlig`, `rclt`, `calt`, `clig` を存在すれば適用
 - locale/script に応じた lookup 選択を行う
 - language system 選択では `ur-Arab-PK` のような full locale subtag も見る
 - 日本語 variant form は `FontOptions::font_variant` から要求可能
@@ -232,13 +232,14 @@ MITの再現可能なfixtureは`colr-vertical-origin.ttc`です。生成script�
 既存の探索範囲は維持する。全 Script の既定・名前付き LangSys と必須
 フィーチャーを含み、DFLT 以外だけを持つフォントも対象となる。
 Script run ごとの選択や Unicode の混在方向は未対応。
-高水準のテキスト整形では cmap/UVS を先に解決し、通常の GSUB 段階
-（合成、locale/variant、RTL 字形、合字）の後に選択した縦書きフィーチャーを
-適用する。メトリクス、輪郭の原点、GPOS は最終的なグリフ ID を使う。
+高水準のテキスト整形では cmap/UVS と従来の locale 前処理を先に解決する。
+LTR は選択した縦書きフィーチャーと通常の GSUB を LookupList 順に各一回適用する。
+RTL は合成・variant と joining の境界を維持し、その後に文脈・合字・方向の
+置換を行う。メトリクス、輪郭の原点、GPOS は最終グリフ ID を使う。
 raw の `get_glyph_with_uvs_axis()` はテキスト整形を
 行わず、従来どおり直接縦書き字形へ置換する。ソースクラスタ表現は変更しない。
 縦書きフィーチャー内の Lookup 連続適用は次節で説明する。
-横書きと `layout` 無効時は変更なし。MIT の合成フォントで選択結果、
+`layout` 無効時は変更なし。MIT の合成フォントで選択結果、
 最終字形の bounds・送り量、measure、SVG を検証する。
 出典とハッシュは `tests/fixtures/manifest.toml` を参照。
 `vertical-gsub-order.ttc` は合成、variant、locale、合字、UVS、最終字形の
@@ -257,8 +258,8 @@ Feature 内の参照順が逆でも、複数の LangSys から参照されても
 単一グリフ API では Multiple・Alternate・Ligature・文脈依存・逆方向文脈依存の
 Lookup と、それらを包む Extension はスキップする。複数出力の先頭だけを
 採用したり、文脈条件を無視したりしない。未対応・空の Lookup を理由に
-グリフ単位で `vert` へ戻ることもない。全 Script/LangSys の探索範囲と
-縦書き以外の共通ヘルパーは変更しない。完全な文脈依存縦書き処理ではない。
+グリフ単位で `vert` へ戻ることもない。単一グリフ API の全 Script/LangSys 探索範囲は維持する。
+text API は後述の列処理を使う。単一グリフ API 自体は引き続き限定的である。
 
 根拠は [OpenType 共通レイアウト仕様](https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#feature-table)
 と [GSUB 置換形式](https://learn.microsoft.com/en-us/typography/opentype/spec/gsub)。
@@ -284,9 +285,8 @@ options 自体は変更しない。style・locale・variant・対応済みの可
 文字サイズ・横伸縮・SVG 単位を保持する。永続的なモード、必須の公開フィールド、
 公開 enum の variant は追加せず、既存の汎用 API と旧 raw API も変更しない。
 
-`layout` 有効時は通常の横書き GSUB の後に `vrtr` を適用し、最終グリフ ID を
-メトリクスと GPOS に使う。この順序は実装方針であり、`vrtr` を最後に適用するという
-仕様上の義務ではない。最後に適用するという明示的な要件を持つのは `vrt2` である。
+`layout` 有効時は `vrtr` と通常の LTR GSUB を LookupList 順に適用し、
+最終グリフ ID をメトリクスと GPOS に使う。
 sideways 呼び出しでは `vert` と `vrt2` を選択せず、`vrtr` の置換がない場合や
 未対応の場合にも、いずれのフィーチャーへも fallback しない。`layout` 無効時も
 回転は行うが、OpenType layout による置換と位置調整は利用できない。
@@ -408,8 +408,8 @@ TAB はタブとして扱う。NUL・VT・FF・NEL・U+2028・U+2029 等を新�
 そのグループ内で通常 GSUB、合字、カーニング、マーク配置を行います。
 異なる向きの境界を GSUB/GPOS が越えないのは意図した制限です。
 
-正立グループは従来の縦メトリクス・原点を使い、通常 GSUB の後に **vert のみ**を
-適用します。vrt2/vrtr は選びません。Tr に vert 代替がない場合や同一字形への
+正立グループは従来の縦メトリクス・原点を使い、通常 GSUB と **vert のみ**を
+LookupList 順に適用します。vrt2/vrtr は選びません。Tr に vert 代替がない場合や同一字形への
 置換でも正立のままです。回転フォールバックの合成は未対応です。横倒しは横組み
 LTR と **vrtr のみ**を使用し、グループ全体を時計回りに回転します。従来の縦組みの
 vrt2 優先・なければ vert という選択は変えません。layout 無効時は同じ分割・
@@ -556,7 +556,36 @@ Lookup ごとに異なる隣接グリフ、広い範囲の加算、走査位置�
 縦書き、複数行、RTL の合成は今後の課題です。
 
 実フォントのスポット確認は、全般的なシェーピング保証ではありません。
-特に [Furifont](https://furifont.antfu.me/) の自動ルビは現状再現できません。
-LTR では必要な `rclt` を適用せず、縦書きの文脈依存 `vert` も別の制限として残ります。
-合成フォントのサイズ・基線調整はこれら既存の制限を解消するものではなく、
-Furifont の完全対応を意味しません。
+統合された文脈依存の列整形は、以下の範囲で LTR の `rclt` と方向別の文脈 lookup を
+適用し、フォント作者の cleanup 順序を保持します。合成フォントのサイズ・基線調整は
+その整形範囲を拡張せず、[Furifont](https://furifont.antfu.me/) の完全対応を意味しません。
+
+### 文脈依存の列整形（未リリース）
+
+LTR は ccmp・選択 variant・rlig/rclt/calt/clig/liga と方向別の単一 feature を、
+重複を除いた LookupList 順で適用する。方向 feature は従来どおり全 Script/LangSys、
+通常 feature は locale の選択範囲を使う。RTL の合成・variant → joining →
+文脈・合字・方向の境界と、既存 locale 前処理は維持する。完全な script itemization
+や HarfBuzz 互換を実装したという意味ではない。
+
+Context/Chaining の format 1/2/3 と、その中の Single/Multiple/Ligature 置換は、
+元グリフへの対応と合字の構成数を保持して GPOS へ渡す。format 1 の
+SequenceLookupRecord は sequenceIndex と lookupListIndex の両方を読む。
+一致した無操作ルールは後続ルールを抑止し、Extension 内の逆方向文脈置換も処理する。
+改行・タブ・混在方向グループの境界は越えない。Alternate の選択や一般的な
+グリフ並べ替えは追加しない。
+
+Furifont v0.7.0 の IVS placeholder のように、文脈置換の後に ccmp cleanup を置く
+フォントでは、その作者の LookupList 順に従う。vrt2 の「フォント内の最後の置換」
+という推奨を理由に、実装側で cleanup の後へ移動しない。vrt2 があればそれだけ、
+なければ vert、混在正立は vert のみ、横倒しは vrtr のみという選択は維持する。
+根拠は [LookupList 処理](https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#lookuplist-table)
+と [vrt2](https://learn.microsoft.com/en-us/typography/opentype/spec/features_uz#tag-vrt2)。
+
+GDEF による除外グリフを飛び越すマッチングは未実装。宣言された GDEF class から
+現在の run に除外対象がないと確認できる場合だけ、flag 付き lookup を許可する。
+mark attachment/filter-set flag は mark がない場合だけ許可し、それ以外は入れ子も
+含めて安全にスキップする。これにより mark のない通常の合字を維持しつつ flag を
+無視しない。raw 単一グリフの縦置換は従来どおり該当 flag を全てスキップする。
+再帰は32段、各ルート位置で4096回の入れ子処理、出力は100万グリフに制限する。
+上限到達時は公開エラーを返さず、その置換を停止する。

@@ -56,3 +56,20 @@ helpers in `src/test.rs` (including `ZenMaruGothic-Regular.ttf` and
 `NotoSansJP-Regular.otf`), then run `cargo test --all-features --lib` with the
 same variable. Some families have alternative filenames selected by the
 helpers. Unset the variable to return to the self-contained CI suite.
+
+
+### Contextual GSUB regressions (unreleased)
+
+`tests/contextual_gsub.rs` consumes the 13-face, original MIT
+`contextual-gsub.ttc`. Regenerate with fontTools 4.68.0 using
+`python tests/fixtures/generate_contextual_gsub.py`; ordinary Rust tests need
+neither Python nor installed fonts. The first five regressions fail against
+0.0.17/main and pass with sequence shaping enabled. Both default and
+`--no-default-features` behavior are asserted. Existing vertical lookup-chain
+faces 8/15/17 now explicitly assert complete Multiple output in text APIs;
+raw scalar tests continue to assert no flattened result.
+
+Unit regressions also cover format 1 records, nested lookup bounds, no-op rules,
+reverse Extension traversal, deletion, output cursor movement, ligature counts,
+and conservative GDEF filtering. This suite is not a claim of general script
+shaping, mark-skipping, or full real-font/HarfBuzz equivalence.

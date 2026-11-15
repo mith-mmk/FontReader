@@ -388,6 +388,13 @@ impl LookupList {
         }
         let mut rule_sets = Vec::new();
         for rule_set_offset in rule_set_offsets.iter() {
+            if *rule_set_offset == 0 {
+                rule_sets.push(SequenceRuleSet {
+                    rule_count: 0,
+                    rules: Vec::new(),
+                });
+                continue;
+            }
             let rule_set = Self::get_seq_rule_set(reader, offset + *rule_set_offset as u64)?;
             rule_sets.push(rule_set);
         }
@@ -423,6 +430,13 @@ impl LookupList {
         }
         let mut class_seq_rule_sets = Vec::new();
         for class_seq_rule_set_offset in class_seq_rule_set_offsets.iter() {
+            if *class_seq_rule_set_offset == 0 {
+                class_seq_rule_sets.push(ClassSequenceRuleSet {
+                    class_seq_rule_count: 0,
+                    class_seq_rules: Vec::new(),
+                });
+                continue;
+            }
             let offset = *class_seq_rule_set_offset as u64 + offset;
             let class_seq_rule_set = Self::get_class_seq_rule_set(reader, offset)?;
             class_seq_rule_sets.push(class_seq_rule_set);
@@ -615,15 +629,18 @@ impl LookupList {
         for _ in 0..glyph_count.saturating_sub(1) {
             input_sequence.push(reader.read_u16_be()?);
         }
-        let mut lookup_indexes = Vec::new();
+        let mut lookup_records = Vec::new();
         for _ in 0..lookup_count {
-            lookup_indexes.push(reader.read_u16_be()?);
+            lookup_records.push(LookupRecord {
+                sequence_index: reader.read_u16_be()?,
+                lookup_list_index: reader.read_u16_be()?,
+            });
         }
         Ok(SequenceRule {
             glyph_count,
             input_sequence,
             lookup_count,
-            lookup_indexes,
+            seq_lookup_records: SequenceLookupRecords { lookup_records },
         })
     }
 
@@ -680,6 +697,13 @@ impl LookupList {
                 }
                 let mut chain_sub_rule_set = Vec::new();
                 for chain_sub_rule_set_offset in chain_sub_rule_set_offsets.iter() {
+                    if *chain_sub_rule_set_offset == 0 {
+                        chain_sub_rule_set.push(ChainSubRuleSet {
+                            chain_sub_rule_count: 0,
+                            chain_sub_rule: Vec::new(),
+                        });
+                        continue;
+                    }
                     let offset = *chain_sub_rule_set_offset as u64 + offset;
                     reader.seek(SeekFrom::Start(offset))?;
                     let chain_sub_rule_count = reader.read_u16_be()?;
@@ -709,9 +733,12 @@ impl LookupList {
                             lookahead_glyph_ids.push(reader.read_u16_be()?);
                         }
                         let lookup_count = reader.read_u16_be()?;
-                        let mut lookup_indexes = Vec::new();
+                        let mut lookup_records = Vec::new();
                         for _ in 0..lookup_count {
-                            lookup_indexes.push(reader.read_u16_be()?);
+                            lookup_records.push(LookupRecord {
+                                sequence_index: reader.read_u16_be()?,
+                                lookup_list_index: reader.read_u16_be()?,
+                            });
                         }
                         chain_sub_rule.push(ChainSubRule {
                             backtrack_glyph_count,
@@ -721,7 +748,7 @@ impl LookupList {
                             lookahead_glyph_count,
                             lookahead_glyph_ids,
                             lookup_count,
-                            lookup_indexes,
+                            seq_lookup_records: SequenceLookupRecords { lookup_records },
                         });
                     }
                     chain_sub_rule_set.push(ChainSubRuleSet {
@@ -1302,7 +1329,7 @@ pub(crate) struct SequenceRule {
     pub(crate) glyph_count: u16,
     pub(crate) input_sequence: Vec<u16>,
     pub(crate) lookup_count: u16,
-    pub(crate) lookup_indexes: Vec<u16>,
+    pub(crate) seq_lookup_records: SequenceLookupRecords,
 }
 
 #[derive(Debug, Clone)]
@@ -1378,7 +1405,7 @@ pub(crate) struct ChainSubRule {
     pub(crate) lookahead_glyph_count: u16,
     pub(crate) lookahead_glyph_ids: Vec<u16>,
     pub(crate) lookup_count: u16,
-    pub(crate) lookup_indexes: Vec<u16>,
+    pub(crate) seq_lookup_records: SequenceLookupRecords,
 }
 
 // Lookup Type 6: Chaining Contextual Substitution Subtable Format 2
