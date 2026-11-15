@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- Select RTL Arabic-style joining forms from pinned Unicode Joining_Type values, rather than font feature availability or immediate glyph neighbors. Transparent marks, tatweel and join controls keep their source-character semantics through ccmp expansion/contraction. Add synthetic public-API regressions; this does not add AAT, full bidi, Syriac joining groups, or general mark-skipping GSUB.
+
 - Apply LTR contextual GSUB and sequence-aware vertical/mixed/sideways substitutions in font-authored LookupList order, preserving source and ligature component metadata through size changes. Keep one orientation feature per route and unchanged layout-disabled behavior.
 - Correct context/chaining format 1 record parsing, matched no-op rules, reverse Extension traversal, and bounded nested execution. GDEF-proven mark-free runs retain flagged ligatures; general skip-over-mark GSUB remains unsupported.
 - Add small reproducible MIT fixtures for contextual features, IVS cleanup order, nested expansion, required ligatures, orientation selection, and mark anchors. Raw scalar APIs, version and dependencies are unchanged. See the EN/JA feature status for shaping and filtering limits.

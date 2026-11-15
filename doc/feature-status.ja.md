@@ -96,7 +96,7 @@ BASE と下記の静的COLR v0以外の色layer原点は別対応です。向き
 - 実装済み: `lookup_locale()`, `lookup_liga()`
 - text API では variation selector と基本的な `locl` / `liga` / `dlig` / `ccmp` を適用
 - 方向指定 API で縦書きと RTL を扱う
-- Arabic shaping は `isol` / `init` / `medi` / `fina` に対応
+- Arabic-style RTL joining は Unicode Joining_Type から `isol` / `init` / `medi` / `fina` を選択（制限は下記）
 - LTR/RTL 両方の text shaping で `rlig`, `rclt`, `calt`, `clig` を存在すれば適用
 - locale/script に応じた lookup 選択を行う
 - language system 選択では `ur-Arab-PK` のような full locale subtag も見る
@@ -127,7 +127,7 @@ BASE と下記の静的COLR v0以外の色layer原点は別対応です。向き
 - 既定の実行対象は横組み `kern` / `dist`、縦組み `vkrn` / `dist`。既存の locale / script 選択を利用し、任意 feature 選択や contextual GPOS は追加しない。
 - 静的 ValueRecord の4値を shaping と測定へ反映する。付着する mark の明示 advance も保持し、lookup 間は i32 で加算する。同一 lookup ではゼロ値を含む最初の一致 subtable だけを適用する。
 - SinglePos は GDEF の glyph class、IgnoreBaseGlyphs / IgnoreLigatures / IgnoreMarks、MarkAttachmentType、MarkFilteringSet を尊重する。PairPos もこの filtering を共有する。mark attachment は従来の別経路を維持する。
-- Device / VariationIndex offset は読み進めるが delta は未評価。筆記体接続と Unicode Arabic joining は別の残件。
+- Device / VariationIndex offset は読み進めるが delta は未評価。筆記体接続と完全な Arabic shaping は別の残件。
 - MIT の合成フォント `tests/fixtures/gpos-single.ttf` と byte fixture により、切断入力、不正 coverage / count、lookup 加算、locale、拡縮、縦組み、mark 付着を検証する。広範な実フォント / HarfBuzz 比較は未実施。
 - 仕様: [OpenType GPOS Single Adjustment](https://learn.microsoft.com/en-us/typography/opentype/spec/gpos#lookup-type-1-single-adjustment-positioning-subtable)。
 
@@ -545,3 +545,30 @@ mark attachment/filter-set flag は mark がない場合だけ許可し、それ
 無視しない。raw 単一グリフの縦置換は従来どおり該当 flag を全てスキップする。
 再帰は32段、各ルート位置で4096回の入れ子処理、出力は100万グリフに制限する。
 上限到達時は公開エラーを返さず、その置換を停止する。
+
+## Unicode に基づく Arabic-style joining
+
+明示的な RTL text shaping では、ccmp の前に元の論理順の文字列を固定した
+Unicode 17.0.0 Joining_Type で解析する。両側・右・左の結合、透明な結合記号、
+tatweel、ZWJ、ZWNJ から字形を選び、フォント内の字形 feature の有無では
+接続可否を推定しない。ccmp による展開・合成後は source_index から選択を
+引き継ぎ、指定された字形がなければ別の接続字形に切り替えず元の glyph を保つ。
+透明文字と join-causing 文字自身には接続字形を適用しない。
+
+これは基本的な OpenType 経路の修正であり、完全なアラビア語対応ではない。
+接続字形の適用は従来の単一結果 helper のままで、一般的な文脈・複数 lookup
+処理にはしていない。GDEF を用いた GSUB の記号飛ばし、記号を挟む必須合字、
+筆記体接続、全ての記号配置、正規化、default-ignorable glyph の除去、
+Syriac 固有の joining-group 規則は対象外。source_index の継承は一般的な
+cluster 再構成ではない。ZWJ/ZWNJ は接続の意味だけを修正し、一部フォントでは
+送り量ゼロでも制御文字の glyph が描画される場合がある。SFArabic の記号配置は
+HarfBuzz との差が残るため、送り量の一致だけで描画位置の一致とはしない。
+RTL は呼び出し側が指定した run の方向であり、
+Latin・数字混在の Unicode bidi や script 分割は実装していない。
+GSUB を持たない AAT 専用フォント（macOS Geeza Pro など）は改善対象外。
+LTR と layout 無効時の経路は変更しない。
+
+全スカラー値の property、字形 feature の欠落、記号・制御文字の境界、
+実際の ccmp 展開・合成を通す合成フォントの公開 API を回帰検証する。
+ローカルの Arial・SFArabic と HarfBuzz 15 で通常の単語・記号・tatweel を
+限定比較した。全フォント・全位置の一致を主張せず、実フォントは配布しない。

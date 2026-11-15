@@ -2423,6 +2423,58 @@ mod tests {
 
     #[test]
     #[cfg(feature = "layout")]
+    fn gsub_joining_uses_source_forms_not_available_font_forms() {
+        use crate::opentype::extentions::gsub::GsubGlyph;
+        // Missing fina must not prevent the preceding letter selecting init.
+        let gsub = parse_gsub(build_gsub_table_with_feature_lookups(
+            *b"init",
+            &[0],
+            vec![lookup_single_record(10, 100)],
+        ));
+        for text in ["بب", "بَب", "بـب", "ب\u{200d}ب"] {
+            let chars: Vec<_> = text.chars().collect();
+            let forms = crate::unicode::joining::forms(&chars);
+            let mut glyphs: Vec<_> = chars
+                .iter()
+                .enumerate()
+                .map(|(source_index, _)| GsubGlyph {
+                    glyph_id: 10,
+                    source_index,
+                    ligature_components: 1,
+                })
+                .collect();
+            gsub.apply_joining_glyphs(&mut glyphs, Some("ar"), &forms);
+            assert_eq!(glyphs[0].glyph_id, 100, "{text}");
+            assert!(glyphs[1..].iter().all(|g| g.glyph_id == 10), "{text}");
+        }
+        // ccmp expansion inherits its source form, not a false new neighbor.
+        let mut glyphs = vec![
+            GsubGlyph {
+                glyph_id: 10,
+                source_index: 0,
+                ligature_components: 1,
+            },
+            GsubGlyph {
+                glyph_id: 10,
+                source_index: 0,
+                ligature_components: 1,
+            },
+            GsubGlyph {
+                glyph_id: 10,
+                source_index: 1,
+                ligature_components: 1,
+            },
+        ];
+        let forms = crate::unicode::joining::forms(&['ب', 'ب']);
+        gsub.apply_joining_glyphs(&mut glyphs, Some("ar"), &forms);
+        assert_eq!(
+            glyphs.iter().map(|g| g.glyph_id).collect::<Vec<_>>(),
+            [100, 100, 10]
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
     fn gsub_locale_specific_script_lookups_take_priority_over_dflt() {
         let gsub = parse_gsub(build_gsub_table_with_scripted_feature_lookups(
             &[(*b"DFLT", &[0]), (*b"arab", &[1])],
