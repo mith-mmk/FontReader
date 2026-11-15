@@ -134,7 +134,7 @@ With `layout`, a separate `tibt` plan can form single-glyph stacks and select
 simple-vowel alternates. After the bounded canonical preprocessing described
 below, every original grapheme must contain a Tibetan base, optional subjoined
 consonants, and at most one simple vowel or the lower-vowel tail AA+U. A stacked
-consonant followed by an above vowel remains excluded. At least one base needs
+consonant followed by exactly one upper vowel has the additional proof below. At least one base needs
 a component. Spaces, punctuation, another script, unsupported vowels, variation
 selectors and joiners disable the plan for the entire run. Tabs/newlines retain
 their existing run boundaries. This restriction applies to horizontal and
@@ -154,7 +154,7 @@ change, consume every below vowel/subjoined source into a base-owned ligature,
 and preserve exact contiguous component ownership within each original
 cluster. Executed expansion/deletion and cross-cluster ligatures are rejected.
 Failure restarts the unchanged legacy path from original cmap glyphs, including
-its scalar `locl`. GPOS, including the existing ligature exclusion, is unchanged.
+its scalar `locl`. Generic GPOS ligature-component selection remains unchanged.
 Family support probing checks both candidate and legacy glyph coverage because
 later same-face grouping can disable the plan.
 
@@ -166,6 +166,28 @@ substitution changes the set of present glyph IDs. General skip-over-mark
 matching is still unsupported. Consequently, two stacks that work individually
 can roll back when combined with another mark excluded by a required lookup.
 No full-font or full-script parity is claimed.
+
+#### Bounded stack plus one upper vowel
+
+The newly admitted normalized grammar is base + one or more subjoined consonants
++ exactly one of U+0F72/U+0F7A–U+0F7D/U+0F80. After all selected substitutions,
+each such cluster must produce exactly one explicit GDEF **Base** owning every
+consonant, followed by one explicit GDEF **Mark** owning the upper vowel. Exact
+contiguous original ownership is mandatory. Canonical consonant components may
+share one Base output; no original scalar may be split across outputs.
+
+A real selected `tibt` `abvm` MarkBasePos anchor (type 4 or extension-to-type-4)
+is mandatory before committing the run. Its unscaled adjustment is retained
+privately for positioning. Ordinary `mark` Base anchors retain priority; no
+type-5 component is guessed from the number of consumed consonants. Missing
+GDEF, unknown/wrong classes, absent anchors, filtered participants, missing
+outputs, or an unresolved subjoined glyph restore the complete legacy run.
+Validation walks accepted clusters linearly rather than rescanning the output.
+
+This does not add AA+upper, compound U+0F73/U+0F81, mixed upper/lower sequences,
+multiple upper vowels, punctuation itemization, generic transformed-mark Mkmk,
+or a ccmp-only activation path. Existing lower-only and simple-vowel behavior
+is retained. Run context can still disable otherwise individually safe stacks.
 
 #### Bounded canonical normalization
 
@@ -186,7 +208,7 @@ The accepted new forms are decomposable base/subjoined consonants and U+0F75
 (UU), including literal AA+U and reordered U+AA, **only if the font's selected
 lookups fully collapse all lower/subjoined components**. Some fonts still fall
 back for compound subjoined consonants. U+0F73/U+0F76/U+0F78/U+0F81, AA+above
-vowels, upper vowels on stacks, U+0F77/U+0F79 compatibility forms, orphan dotted
+vowels, multiple/mixed upper vowels, U+0F77/U+0F79 compatibility forms, orphan dotted
 circles and punctuation/mixed runs remain unsupported by this plan.
 
 Each candidate keeps the normalized shaping scalar separate from the original
@@ -195,7 +217,7 @@ ownership; reordering moves it; ligation must cover an exact contiguous original
 interval without sharing a decomposed source between outputs. GSUB ligature
 component counts still count normalized glyph components, not original scalars.
 Source-bearing legacy exports retain original characters. No public structs or
-source-mapping API are added. New normalized/AA+U candidates also roll back if
+source-mapping API are added. New normalized/AA+U/upper-stack candidates also roll back if
 the final output lacks coverage, preserving available originals. Unchanged
 previously admitted runs keep their prior missing-output fallback policy.
 

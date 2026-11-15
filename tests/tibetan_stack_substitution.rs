@@ -147,7 +147,7 @@ fn whole_run_context_is_retained_and_incomplete_stacks_roll_back() {
         widths(&shape(11, "\u{f40}\u{f40}\u{f90}", None)),
         [150.0, 170.0]
     );
-    for index in [0, 9, 10, 20] {
+    for index in [9, 20] {
         for text in [
             "\u{f40}\u{f90}\u{f72}",
             "\u{f40}\u{f90}\u{f40}\u{f90}\u{f72}",
