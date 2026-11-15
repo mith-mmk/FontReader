@@ -211,3 +211,13 @@ Review the version, hashes, counts and acceptance scope together on any update.
 内部の限定的なチベット正規化には、元書記素境界と同じ Unicode 17.0.0 を使用します。
 公式原本とライセンスのハッシュを検証し、canonical 分解 17 件・非ゼロ CCC 19 件を
 生成します。互換分解や再合成は行わず、Python の Unicode データにも依存しません。
+
+## Arabic-style joining
+
+Internal logical-order joining uses Unicode 17.0.0 `DerivedJoiningType.txt`,
+including derived Transparent values and default Non_Joining values.
+Source: https://www.unicode.org/Public/17.0.0/ucd/extracted/DerivedJoiningType.txt
+SHA-256: `f39ebe974825d6736aee15582250307aa532b2cfab3caf3f86bd23fddc9c5c4d`.
+Regenerate with `python3 tools/generate_joining_types.py`; verify with `--check`.
+The existing Unicode-3.0 license applies. This independently pinned property
+does not change the other tables or imply full Unicode script shaping.

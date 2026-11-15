@@ -11,6 +11,11 @@ English: [README.md](README.md)
 [使用例](doc/api-recipes.ja.md#混在縦書き-ltr-のシェーピング計測svg)と
 [対応範囲](doc/feature-status.ja.md#明示的な混在縦書き-ltr-アウトライン)を参照してください。
 
+開発ブランチでは `CompositeFont` による明示的な文字範囲選択（単一行 LTR）と、
+ルール別のサイズ倍率・ベースライン移動を追加しています。
+[使用例](doc/api-recipes.ja.md#明示的な合成フォント単一行-ltr)を参照してください。
+この追加 API は公開済み 0.0.17 には含まれません。
+
 ## 最初に使うAPI
 
 通常は次の 3 つから始めれば十分です。
