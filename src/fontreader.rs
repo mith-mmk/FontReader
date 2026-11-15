@@ -1551,6 +1551,8 @@ impl Font {
         );
     }
 
+    // Keep the legacy-probe switch explicit rather than encoding it in source metadata.
+    #[allow(clippy::too_many_arguments)]
     fn flush_shaped_glyphs(
         &self,
         output: &mut Vec<ResolvedTextUnit>,

@@ -87,8 +87,8 @@ impl Gsub {
             if mask == 0 {
                 continue;
             }
-            for i in 0..result.len() {
-                if masks[i] & mask == 0 {
+            for (i, source_mask) in masks.iter().enumerate() {
+                if source_mask & mask == 0 {
                     continue;
                 }
                 self.hangul_lookup(lookup, &mut result, i, &mut budget, false)

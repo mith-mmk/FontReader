@@ -63,7 +63,7 @@ References:
 
 ## Recorded validation
 Production checkpoint: 7483cd25939ad137ee78c0e38f1e9fb62d6d6820, based on
-6f45454c774660de6db57adc696529319a3a96cc (PR57). Subsequent changes add tests/docs only.
+6f45454c774660de6db57adc696529319a3a96cc (PR57). Subsequent changes add tests/docs and an equivalent mask-iterator lint cleanup.
 Noto font SHA256: 6bcb2a0703aa137e874fc2dffa85f6c21ba9a67fa329e81b8c801663af7e992a.
 fontTools 4.68.0, uharfbuzz 0.57.0, HarfBuzz 15.0.0 with explicit OT shaper.
 HB uses Hang/ko throughout, including the fontcore None/hang locale controls.
@@ -75,7 +75,10 @@ advance; the other 135 public outputs remain identical to 0.0.18. All 144
 trace-only outputs exactly equal the uninstrumented public probe. Apple coverage
 failures remain failures, not evidence of support. Final local suites: default
 422 passed, no-default-features 242 passed, all-features 540 passed (including doctests).
-These are local results, not CI.
+These are local results, not CI. Final strict clippy (all-targets/all-features),
+fmt, fixture byte regeneration and all 49 concrete manifest hashes pass.
+After the lint-only cleanup, 6 integration and 12 Hangul-related unit tests
+were rerun; all 144 public probe outputs still equal the recorded trace outputs.
 
 ![Static outline comparison](old-hangul-static-comparison.png)
 
