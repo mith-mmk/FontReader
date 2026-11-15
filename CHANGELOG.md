@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- Keep the nominal base when a variation sequence is unsupported, including raw UVS glyph/SVG rendering wrappers. Prefer exact cmap14 support only after whole-cluster renderability checks; preserve explicit glyph-zero contextual repair, first-selector handling and marked/RTL continuity. Reject missing per-glyph coverage and out-of-range CFF/CFF2 CharStrings during family probing. Add original MIT fixtures; no public signature, version or release change. Font-authored unregistered sequences can differ from browser policy.
+
 - Apply font-authored GPOS `vert` SinglePos adjustments in vertical runs, including unclassified kana marks. Preserve horizontal/sideways behavior, lookup deduplication, GDEF filtering and static-value limits; no PairPos, generic mark fallback, public API or release changes.
 
 - With `layout`, compose 58 exact Unicode 17 canonical kana pairs before cmap when renderable, preserving source spans and existing vertical GSUB; share bounded invalid-GSUB rollback with modern Hangul. Ainu named sequences and raw/no-layout APIs remain unchanged. Add reproducible MIT fixtures, mapping/exclusion proofs and CFF/CFF2 boundary regressions. No public API, dependency, version or release change.

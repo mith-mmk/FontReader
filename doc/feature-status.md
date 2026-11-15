@@ -3,6 +3,27 @@
 This document keeps the implementation-oriented notes that were previously in `README.md`.
 The README now focuses on the public API and runnable examples.
 
+## Variation-selector rendering and fallback
+
+Unsupported UVS/IVS render the nominal base with the selector ignored, whether
+the font lacks format 14, the selector record, or that base/selector pair.
+Exact default/nondefault mappings are retained; explicit glyph zero reaches
+contextual GSUB unchanged. This corrects the semantics of raw UVS glyph/SVG
+wrappers as well as layout rendering, without changing their signatures. The
+crate-private legacy cmap lookup keeps its historical return behavior.
+
+Family selection requires every shaped glyph in the EGC to be renderable
+before preferring exact support for all immediately paired selectors. It
+rejects invalid CFF/CFF2 CharString IDs even when color metadata exists. Existing
+marked/RTL continuity stays intact when no usable exact alternative exists.
+Only the first immediately attached selector is used; trailing/orphan selectors
+follow the existing parser policy. Original EGC text is retained, but internal
+GSUB indices omit selectors and are not original scalar offsets.
+
+No Unicode registered-sequence filter is added: a font-authored unregistered
+mapping can be honored here even where Chrome ignores it. This is not full CSS
+fallback or universal browser parity. See [fixture coverage](testing.md#variation-selector-regressions).
+
 ## Unicode vertical-orientation property
 
 `vertical_orientation(char)` exposes Unicode 18.0.0 `Vertical_Orientation` as

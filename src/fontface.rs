@@ -590,22 +590,12 @@ impl FontFamily {
                     pending_face = None;
                 }
                 fontreader::ParsedTextUnit::Glyph { .. } => {
-                    let face_index = if let Some(current_face) = pending_face {
-                        if unit_prefers_face_continuity(&unit, &options)
-                            && self.faces[current_face].font.font().supports_text_unit(
-                                &unit,
-                                options.text_direction,
-                                options.locale,
-                                options.font_variant,
-                            )
-                        {
-                            current_face
-                        } else {
-                            self.select_face_for_unit(&unit, &candidate_indices, &options)
-                        }
-                    } else {
-                        self.select_face_for_unit(&unit, &candidate_indices, &options)
-                    };
+                    let face_index = self.select_face_with_continuity(
+                        &unit,
+                        &candidate_indices,
+                        &options,
+                        pending_face,
+                    );
                     pending_face = Some(face_index);
                     face_indices.push(face_index);
                 }
@@ -714,22 +704,12 @@ impl FontFamily {
                     }
                 }
                 fontreader::ParsedTextUnit::Glyph { .. } => {
-                    let face_index = if let Some(current_face) = pending_face {
-                        if unit_prefers_face_continuity(&unit, &options)
-                            && self.faces[current_face].font.font().supports_text_unit(
-                                &unit,
-                                options.text_direction,
-                                options.locale,
-                                options.font_variant,
-                            )
-                        {
-                            current_face
-                        } else {
-                            self.select_face_for_unit(&unit, &candidate_indices, &options)
-                        }
-                    } else {
-                        self.select_face_for_unit(&unit, &candidate_indices, &options)
-                    };
+                    let face_index = self.select_face_with_continuity(
+                        &unit,
+                        &candidate_indices,
+                        &options,
+                        pending_face,
+                    );
                     if pending_face != Some(face_index) {
                         self.flush_family_segment(
                             &mut glyphs,
@@ -909,6 +889,40 @@ impl FontFamily {
         candidates.into_iter().map(|(_, _, index)| index).collect()
     }
 
+    fn select_face_with_continuity(
+        &self,
+        unit: &fontreader::ParsedTextUnit,
+        candidates: &[usize],
+        options: &FontOptions<'_>,
+        previous: Option<usize>,
+    ) -> usize {
+        if let Some(index) = previous {
+            let current = self.faces[index].font.font();
+            if unit_prefers_face_continuity(unit, options)
+                && current.supports_text_unit(
+                    unit,
+                    options.text_direction,
+                    options.locale,
+                    options.font_variant,
+                )
+            {
+                // Keep the old fast path for ordinary marked/RTL clusters and
+                // exact sequences. Scan only when base fallback could hide a
+                // genuinely supported variation in another face.
+                if current.has_exact_variations(unit) {
+                    return index;
+                }
+                let selected = self.select_face_for_unit(unit, candidates, options);
+                return if self.faces[selected].font.font().has_exact_variations(unit) {
+                    selected
+                } else {
+                    index
+                };
+            }
+        }
+        self.select_face_for_unit(unit, candidates, options)
+    }
+
     fn select_face_for_unit(
         &self,
         unit: &fontreader::ParsedTextUnit,
@@ -917,7 +931,7 @@ impl FontFamily {
     ) -> usize {
         let prefer_color = text_unit_prefers_color_glyph(unit);
         let mut best_face = None;
-        let mut best_rank = 0u8;
+        let mut best_rank = (false, 0u8);
 
         for &index in candidates {
             let support = self.faces[index].font.font().text_unit_support(
@@ -930,7 +944,12 @@ impl FontFamily {
                 continue;
             }
 
-            let rank = face_support_rank(support, prefer_color);
+            // Prefer a genuine supported sequence over nominal-base fallback,
+            // but only after the complete cluster passes shaped coverage.
+            let rank = (
+                self.faces[index].font.font().has_exact_variations(unit),
+                face_support_rank(support, prefer_color),
+            );
             if best_face.is_none() || rank > best_rank {
                 best_face = Some(index);
                 best_rank = rank;

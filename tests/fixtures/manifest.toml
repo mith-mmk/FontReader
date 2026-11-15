@@ -268,3 +268,24 @@ source = "generate_vertical_singlepos.py (fontTools 4.68.0; no external font)"
 license = "MIT (project test code)"
 sha256 = "d66eb28a29bf85ef09248b8b8f68c5afbe4fb263e0c55cb9f7870f4575c7e323"
 features = ["layout", "vert", "SinglePos", "unclassified-kana-mark"]
+
+[[fixture]]
+id = "unsupported-ivs-cff.ttc"
+source = "generate_unsupported_ivs.py (fontTools 4.68.0; no external font)"
+license = "MIT (project test code)"
+sha256 = "14518a254b321fc7ebd9577fc356e95e7f7b4ed865ba0f44625ff58d60af211a"
+features = ["UVS", "IVS", "cmap14", "family-fallback", "contextual-GSUB", "invalid-glyph-coverage"]
+
+[[fixture]]
+id = "unsupported-ivs.ttc"
+source = "generate_unsupported_ivs.py (fontTools 4.68.0; no external font)"
+license = "MIT (project test code)"
+sha256 = "bac0c3453fa8a149454434e7360d91be636b346e874eba63382cd9ee6d5867b1"
+features = ["UVS", "IVS", "cmap14", "family-fallback", "contextual-GSUB", "invalid-glyph-coverage"]
+
+[[fixture]]
+id = "unsupported-ivs-cff2.ttc"
+source = "generate_unsupported_ivs.py (fontTools 4.68.0; no external font)"
+license = "MIT (project test code)"
+sha256 = "81045fad26689b080f3b0048642668f060b0382e1c28d9cfedc3ee6b353d4fac"
+features = ["UVS", "IVS", "cmap14", "family-fallback", "contextual-GSUB", "invalid-glyph-coverage"]
