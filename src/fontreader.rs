@@ -255,6 +255,9 @@ struct ResolvedGlyph {
     simple_mkmk_cluster: Option<usize>,
     #[cfg(feature = "layout")]
     kana_residual_mark: bool,
+    // Selected abvm Base anchor, certified after bounded Tibetan ownership checks.
+    #[cfg(feature = "layout")]
+    tibetan_upper_anchor: Option<gpos::MarkAttachmentAdjustment>,
     glyph_id: usize,
     prefer_color: bool,
     ligature_components: u16,
@@ -1671,6 +1674,7 @@ impl Font {
                         && item.ligature_components == 1)
                         .then_some(glyphs[item.source_index].simple_mkmk_cluster)
                         .flatten(),
+                    tibetan_upper_anchor: None,
                     kana_residual_mark,
                     ch: glyphs[item.source_index].ch,
                     shaping_ch: glyphs[item.source_index].shaping_ch,
@@ -1827,6 +1831,8 @@ impl Font {
                             source_end: source_start + 1,
                             #[cfg(feature = "layout")]
                             simple_mkmk_cluster,
+                            #[cfg(feature = "layout")]
+                            tibetan_upper_anchor: None,
                             glyph_id,
                             prefer_color,
                             ligature_components: 1,
@@ -2252,7 +2258,23 @@ impl Font {
             .get(base_index)
             .and_then(|glyph_index| *glyph_index)?;
         let ligature_component_index = base.ligature_components.saturating_sub(1) as usize;
-        let adjustment = if base.ligature_components > 1 {
+        let adjustment = if let Some(anchor) = current.tibetan_upper_anchor {
+            // The certified output is a GDEF Base, not a Ligature. Never infer
+            // a MarkLigPos component from the number of consumed consonants.
+            if base_index + 1 != index
+                || base.tibetan_cluster != current.tibetan_cluster
+                || base.source_end != current.source_start
+            {
+                return None;
+            }
+            gpos.lookup_mark_to_base_adjustment(
+                base.glyph_id as u16,
+                current.glyph_id as u16,
+                locale,
+                self.current_gdef(),
+            )
+            .or(Some(anchor))
+        } else if base.ligature_components > 1 {
             gpos.lookup_mark_to_ligature_adjustment(
                 base.glyph_id as u16,
                 current.glyph_id as u16,

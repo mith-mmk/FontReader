@@ -55,6 +55,7 @@ impl Font {
         Some(ResolvedGlyph {
             kana_residual_mark: false,
             simple_mkmk_cluster: None,
+            tibetan_upper_anchor: None,
             ch: text.chars().next()?,
             shaping_ch,
             source_start,
