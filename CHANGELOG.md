@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- Bound residual kana mark advance suppression to untouched exact-pair EGCs in GPOS faces without GDEF glyph classes. Preserve effective SinglePos/PairPos ownership, nominal positions, raw text exports and no-layout controls. This removes an extra cell, not mark attachment or ink overlap; see [scope](doc/kana-residual-marks.md).
+
 - Keep the nominal base when a variation sequence is unsupported, including raw UVS glyph/SVG rendering wrappers. Prefer exact cmap14 support only after whole-cluster renderability checks; preserve explicit glyph-zero contextual repair, first-selector handling and marked/RTL continuity. Reject missing per-glyph coverage and out-of-range CFF/CFF2 CharStrings during family probing. Add original MIT fixtures; no public signature, version or release change. Font-authored unregistered sequences can differ from browser policy.
 
 - Preserve valid bounded kana/modern Hangul composition beside untouched pre-existing missing glyphs. Keep conservative full-run rollback for unusable substituted outputs, including context-only dependencies, ligatures, expansions and identity substitutions. No public provenance API or general normalization change.

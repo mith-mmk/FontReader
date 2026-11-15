@@ -169,3 +169,25 @@ fn untouched_missing_neighbor_preserves_valid_composition() {
     );
     assert_eq!(font.debug_shape_glyph_ids("パ?", None).unwrap(), [144, 0]);
 }
+
+#[test]
+fn residual_fallback_raw_export_keeps_nominal_origin_and_authored_values() {
+    let mut font =
+        Font::get_font_from_buffer(include_bytes!("../../tests/fixtures/kana-residual.ttc"))
+            .unwrap();
+    for (face, expected) in [
+        (0, 0.0),
+        (1, 0.0),
+        (2, 1000.0),
+        (3, 0.0),
+        (4, 1000.0),
+        (10, 0.0),
+        (11, 1000.0),
+    ] {
+        font.set_font(face).unwrap();
+        let raw = font.text2commands("あ\u{3099}B").unwrap();
+        assert_eq!(raw[1].advance_width, expected);
+        assert_eq!(raw[1].origin_x, if face == 3 { 1025.0 } else { 1000.0 });
+        assert_eq!(raw[2].origin_x, 1000.0 + expected);
+    }
+}

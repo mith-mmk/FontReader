@@ -41,3 +41,16 @@ Specification references: Unicode 17 chapter 23.4 (unsupported VS invisible and
 ignored), OpenType cmap format 14 (supported default/nondefault UVS), CSS Fonts
 4 section 5.3 (full variation support before base fallback). This patch does not
 claim full CSS fallback or normalization support.
+
+### Kana residual mark advances
+
+`kana-residual.ttc` and `generate_kana_residual.py` are original MIT fixtures,
+with fixed timestamps and no external font inputs. Regenerate using fontTools
+4.68.0. Faces: 0 no GDEF, 1 GDEF without GlyphClassDef, 2 populated class table
+with unclassified mark, 3 authored SinglePos cancellation, 4 zero SinglePos,
+5 substituted mark, 6 identity substitution, 7 multiple substitution, 8 ligature,
+9 vertical base substitution, 10 PairPos cancellation, 11 zero PairPos,
+12 no GPOS, 13 missing mark, 14 authored anchor, 15 expanded base,
+16 canonical-composition rollback, 17 missing base, 18 PairPos first-record
+cancellation, 19 first-only zero pair, 20 identity locl, 21 deleted base.
+Both nominal advances are 1000.

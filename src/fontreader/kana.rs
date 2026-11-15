@@ -40,6 +40,7 @@ impl Font {
             return None;
         }
         Some(ResolvedGlyph {
+            kana_residual_mark: false,
             ch: text.chars().next()?,
             shaping_ch,
             source_start,
@@ -55,3 +56,42 @@ impl Font {
 #[cfg(test)]
 #[path = "kana_tests.rs"]
 mod tests;
+
+// Deliberately exact: no selectors, joiners, repeated marks, or arbitrary Mn.
+// Extended kana letters used by Ainu are included; spacing voiced marks are not.
+pub(super) fn residual_mark(text: &str) -> Option<char> {
+    let mut chars = text.chars();
+    let base = chars.next()?;
+    let mark = chars.next()?;
+    (matches!(base, '\u{3041}'..='\u{3096}' | '\u{309d}'..='\u{309f}'
+        | '\u{30a1}'..='\u{30fa}' | '\u{30fd}'..='\u{30ff}' | '\u{31f0}'..='\u{31ff}')
+        && matches!(mark, '\u{3099}' | '\u{309a}')
+        && chars.next().is_none())
+    .then_some(mark)
+}
+
+impl Font {
+    pub(super) fn zero_residual_kana_advance(
+        &self,
+        glyph: &ResolvedGlyph,
+        locale: Option<&str>,
+        vertical: bool,
+    ) -> bool {
+        if !glyph.kana_residual_mark
+            || !self.composition_glyph_is_renderable(glyph.glyph_id)
+            || self
+                .current_gdef()
+                .is_some_and(|gdef| gdef.glyph_class_def.is_some())
+        {
+            return false;
+        }
+        // This fallback keeps nominal positions, rather than inventing anchors.
+        // Faces without GPOS need a separate fallback-positioning policy.
+        let Some(gpos) = self.current_gpos() else {
+            return false;
+        };
+        // Even a zero-valued authored record wins over our fallback.
+        gpos.lookup_single_adjustment(glyph.glyph_id as u16, vertical, locale, self.current_gdef())
+            .is_none()
+    }
+}

@@ -296,3 +296,10 @@ source = "generate_kana_composition.py (fontTools 4.68.0; no external font)"
 license = "MIT (project test code)"
 sha256 = "41c93aa5e5e0a8275f97330008e7b6c1036146ed1b7ea756d60a12fe2adb1b2c"
 features = ["layout", "kana", "hangul", "bounded-composition", "contextual-rollback"]
+
+[[fixture]]
+id = "kana-residual.ttc"
+source = "generate_kana_residual.py (fontTools 4.68.0; no external font)"
+license = "MIT (project test code)"
+sha256 = "39e5ffeff12e8296dcf33ffa24f991b65718a467976ad898f5fe80a8070ebbcd"
+features = ["layout", "kana", "GDEF", "SinglePos", "PairPos", "GSUB-provenance", "no-layout-controls"]
