@@ -88,3 +88,14 @@ can change serialized bytes; a pure-Python fontTools 4.68.0 regeneration was
 verified to have identical full TTX content across all 70 faces, excluding only
 `head.checkSumAdjustment`, without claiming byte-for-byte reproducibility.
 See `doc/mkmk-predecessor-search.md` for the conservative ownership bound.
+
+## Scalar localized and joining substitutions
+
+`scalar-locl.ttc` and `generate_scalar_locl.py` are original MIT fixtures,
+with no third-party font data. Regenerate with fontTools 4.68.0.
+21 faces: nominal face 0, direct faces 1–10, Extension counterparts 11–20.
+Modes: multi-input ligature, one-input ligature, later one-input record,
+identity one-input, later Single lookup, Single, Alternate, legacy Multiple,
+empty Multiple, and valid sequence liga following rejected scalar locl.
+The same lookups exercise locl and isol/init/medi/fina. Distinct outlines and
+advances detect accidental substitution. Timestamps are fixed.
