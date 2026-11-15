@@ -247,3 +247,10 @@ source = "tests/fixtures/generate_tibetan_normalization.py (fontTools 4.68.0; no
 license = "MIT (project test code)"
 sha256 = "16eebcff6b9dbb8c84f0488608162a17404d86e5e20a5174b6f4b63f70e27a7e"
 features = ["Tibetan", "Unicode17", "canonical-decomposition", "canonical-order", "source-ownership", "GSUB", "component-coverage", "transactional-rollback", "family-fallback", "no-layout-controls", "TTC"]
+
+[[fixture]]
+id = "hangul-composition.ttc"
+source = "tests/fixtures/generate_hangul_composition.py (fontTools 4.68.0; no external font)"
+license = "MIT (project test code)"
+sha256 = "a41378a96b1a21f90b74ee8bda886d0b7a07b8d4e92b841854b232f928f9a41f"
+features = ["Hangul", "Unicode17", "canonical-composition", "composed-only-cmap", "source-ownership", "GSUB", "contextual-rollback", "family-fallback", "orientation", "no-layout-controls", "TTC"]

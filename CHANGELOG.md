@@ -4,6 +4,9 @@
 
 ### Fixed
 
+- Compose complete modern Hangul LV/LVT/LV+T graphemes before cmap when the face has a renderable syllable. Share family probing/rendering, retain original source characters and distinguish source counts from GSUB components. Restore usable original jamo if downstream GSUB invalidates a new composition, without losing composed-only neighbors. Old Hangul, marked/repeated/compatibility jamo, raw APIs and no-layout behavior remain outside the change.
+- Add reproducible original MIT Hangul fixtures, exhaustive 11,172-syllable algorithm checks, direct/family/orientation regressions and CFF/CFF2 missing-target guards. No public API, dependency, version or release change.
+
 - Add font-aware, transactional Unicode 17 canonical Tibetan decomposition and bounded ordering for fully collapsed consonant/subjoined forms and UU / AA+U / U+AA. Preserve original source/grapheme ownership independently of normalized glyph components and retain originals when coverage or stack validation fails.
 - Pin official normalization data with offline hash/generator checks and independent Rust tests. Add MIT fixtures for canonical equivalence, selectors, rollback, missing components, original-grapheme family selection and orientation. Upper-vowel stacks, II/vocalic R/L/reversed II, compatibility forms and mixed/punctuation runs remain outside this plan. No public API, version, dependency or release change.
 

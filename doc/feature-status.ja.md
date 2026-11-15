@@ -18,6 +18,40 @@ README は公開APIと実行例を優先し、細かい対応状況はここに�
 
 `layout` feature は一部のみ実装されています。
 
+### 範囲を限定した現代ハングル合成
+
+`layout` 有効時、Unicode 17 の拡張書記素クラスタ全体が現代 L+V、L+V+T、
+または合成済み LV+T である場合だけ、cmap の前に音節へ合成します。現在の face に
+非ゼロで描画可能な合成先グリフが必要です。元の字母の cmap がなくても合成先だけ
+で描画でき、合成先がなければ元書記素全体を保ちます。LVT の LV 部分だけを
+合成することはありません。隣接するラテン文字などは合成を妨げません。
+
+これは現代音節の限定的な canonical 合成であり、**古ハングルや韓国語全般の
+shaping 対応ではありません**。古字母・拡張字母、filler、反復字母、互換字母、
+声調記号、variation selector、join control、Prepend、他の結合記号を含む書記素は
+全体を対象外とします。汎用 NFC/NFKC、音節分解、`ljmo/vjmo/tjmo` mask、
+声調の並べ替え、dotted circle、locale 対応変更、改行規則、ブラウザとの同等性は
+追加しません。後段の GSUB 選択と向き指定は従来経路を使います。
+
+合成グリフは元書記素全体の所有情報と最初の元文字を保ちます。元文字数と GSUB
+ligature component 数は別で、合成時点では一つの nominal glyph です。
+文字情報を持つ従来 export は元文字を返します。公開 cluster/caret API、
+一般的な GSUB 合字の source span 修正、内部 run index の従来の selector 省略処理
+の変更は含みません。
+
+FontFamily の判定と描画は共通経路を使い、元書記素を fallback 単位とします。
+新たな合成を含む run が GSUB 後に描画不能になった場合、元字母をすべて描画
+できる合成だけ元へ戻し、一度再試行します。合成先だけを持つ隣接音節は維持し、
+無関係な既存の欠字も再試行を妨げません。これは限定的な保護であり、汎用的な
+文脈依存 fallback の修正ではありません。元字母がない音節が後段の文脈で欠字に
+なる場合は、対応する NFC 入力と同じ従来方針を保ちます。元へ戻すには全元字母の
+nominal cmap coverage が必要です。欠けた元 cmap を GSUB で補う独自フォントの
+動作全般を保証するものではありません。
+
+raw 単一グリフ API と layout 無効時は変更しません。
+[Unicode 17 §3.12](https://www.unicode.org/versions/Unicode17.0.0/core-spec/chapter-3/#G24646)
+および [検証範囲](testing.md#bounded-modern-hangul-composition-unreleased)を参照してください。
+
 ### 基本的なチベット文字の母音アンカー
 
 `layout` 有効時、隣接する未合字のチベット子音（U+0F40–U+0F6C、

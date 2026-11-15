@@ -1,4 +1,6 @@
 #[cfg(feature = "layout")]
+mod hangul;
+#[cfg(feature = "layout")]
 mod tibetan;
 
 use base64::{engine::general_purpose, Engine as _};
@@ -235,7 +237,8 @@ struct ResolvedGlyph {
     // Internal scalar used for shaping classification, never source reporting.
     #[cfg(feature = "layout")]
     shaping_ch: char,
-    // Original scalar interval within this run. Decomposition copies ownership.
+    // Original scalar interval within this run, independent of glyph count.
+    // Decomposition copies ownership; composition owns the complete grapheme.
     #[cfg(feature = "layout")]
     source_start: usize,
     #[cfg(feature = "layout")]
@@ -1583,6 +1586,28 @@ impl Font {
                 font_variant,
                 orientation,
             );
+            if glyphs.iter().any(Self::is_composed_modern_hangul)
+                && ccmp_glyphs
+                    .iter()
+                    .any(|glyph| !self.hangul_glyph_is_renderable(glyph.glyph_id))
+            {
+                if let Some(mut restored) = self.restore_renderable_hangul_sources(glyphs) {
+                    // Composition must not turn renderable original jamo into
+                    // a missing output through GSUB, including run context.
+                    // Only restorable compositions are removed, so this retry
+                    // cannot restore anything further or loop.
+                    self.flush_shaped_glyphs(
+                        output,
+                        &mut restored,
+                        locale,
+                        is_right_to_left,
+                        font_variant,
+                        orientation,
+                    );
+                    glyphs.clear();
+                    return;
+                }
+            }
             let expanded_glyphs = ccmp_glyphs
                 .into_iter()
                 .map(|item| ResolvedGlyph {
@@ -1691,6 +1716,16 @@ impl Font {
                 }
                 ParsedTextUnit::Glyph { text, .. } => {
                     let prefer_color = Self::text_prefers_color_glyph(&text);
+                    #[cfg(feature = "layout")]
+                    if let Some(glyph) = self.composed_modern_hangul_glyph(
+                        &text,
+                        pending_glyphs.last().map_or(0, |g| g.source_end),
+                    ) {
+                        // Before nominal cmap: a composed-only face can render
+                        // NFD even when none of its original jamo are mapped.
+                        pending_glyphs.push(glyph);
+                        continue;
+                    }
                     let tibetan_cluster = None;
                     #[cfg(feature = "layout")]
                     let tibetan_cluster = (_allow_tibetan
@@ -1703,7 +1738,7 @@ impl Font {
                         let glyph_id =
                             self.resolve_glyph_id_with_uvs(ch, variation_selector, false)?;
                         #[cfg(feature = "layout")]
-                        let source_start = pending_glyphs.len();
+                        let source_start = pending_glyphs.last().map_or(0, |g| g.source_end);
                         pending_glyphs.push(ResolvedGlyph {
                             ch,
                             #[cfg(feature = "layout")]

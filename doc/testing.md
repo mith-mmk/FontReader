@@ -183,3 +183,46 @@ feature-disabled diagnostics. Repeated UU at 20/200/2000 clusters took about
 observed near-linear workload, roughly 2.3x at the largest size, not a general
 performance claim. External fonts, local logs and visual reports are not
 redistributed in the repository.
+
+
+### Bounded modern Hangul composition (unreleased)
+
+`tests/hangul_composition.rs` uses the original MIT, 11-face
+`hangul-composition.ttc`. Regenerate with fontTools 4.68.0 using
+`python tests/fixtures/generate_hangul_composition.py`; normal Rust tests
+require neither Python nor installed fonts. Timestamp-fixed fixture bytes and
+the generator are tracked with a manifest checksum.
+
+Unit tests enumerate all 11,172 modern syllables and canonical LV/LVT/LV+T
+forms. Synthetic font tests cover composed-only cmap, both forms, missing
+composed glyphs, no partial-LV substitution, missing original jamo, exact
+internal GIDs, original source characters and per-EGC spans, one nominal
+component after composition, GSUB/context/orientation/variant stages, mixed
+Latin, tabs/newlines, repeated syllables, non-unit size, LTR/RTL/vertical
+routes, whole-grapheme family fallback and layout-disabled controls.
+Out-of-scope old/extended jamo, fillers, repeated/compatibility jamo, tones,
+selectors, joiners, marks and Prepend characters remain nominal.
+
+A failed GSUB candidate is tested directly and after family run grouping,
+including a composed-only neighboring syllable and an unrelated pre-existing
+missing glyph. In-memory truncation of the original MIT CFF and CFF2 fixtures
+checks that an out-of-range target is rejected before outline access while
+valid original jamo remain renderable. No malformed external font is needed.
+A noncomposed-run predicate regression checks that the additional coverage
+probe is not entered for Latin, emoji, Tibetan or already-composed Hangul.
+
+Run the focused tests with default, all and no-default features:
+
+```sh
+cargo test --offline --lib hangul
+cargo test --offline --test hangul_composition
+cargo test --offline --all-features --lib hangul
+cargo test --offline --all-features --test hangul_composition
+cargo test --offline --no-default-features --test hangul_composition
+```
+
+The algorithm coverage is not an exhaustive font/shaping oracle. Generic
+GSUB source-span and contextual-family fallback policies remain unchanged;
+restoration requires nominal cmap coverage and does not cover custom GSUB
+repair of missing original cmap entries. This stage does not claim Old Hangul,
+full Korean, AAT or browser parity.

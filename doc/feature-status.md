@@ -19,6 +19,47 @@ See the [recipe](api-recipes.md#query-unicode-vertical-orientation) and
 
 `layout` is partially implemented.
 
+### Bounded modern Hangul composition
+
+With `layout`, text shaping can compose a complete Unicode 17 extended
+grapheme containing exactly modern L+V, L+V+T, or precomposed LV+T. The target
+is selected before nominal cmap mapping and only when this face contains a
+nonzero, renderable syllable glyph. A face may therefore support NFD even
+without its jamo cmap entries. Missing syllables preserve the complete original
+grapheme; a supported LV prefix never replaces part of an unsupported LVT.
+
+This is font-aware modern canonical composition, **not Old Hangul or general
+Korean shaping support**. Old/extended jamo, fillers, repeated jamo, compatibility
+jamo, tones, selectors, join controls, Prepend characters and unrelated marks
+exclude their entire grapheme. Adjacent Latin and other graphemes do not exclude
+a valid modern syllable. No general NFC/NFKC conversion, Hangul decomposition,
+`ljmo/vjmo/tjmo` masks, tone reordering, dotted-circle insertion, locale mapping,
+line-breaking or browser parity is added. Existing downstream GSUB selection
+and orientation stages remain in use.
+
+The composed glyph retains the first original source character and ownership
+of its complete admitted grapheme. Unicode source count is separate from GSUB
+ligature components: composition starts as one nominal glyph. Legacy
+source-bearing exports retain the original character. This does not add a
+public cluster/caret API or repair generic GSUB ligature source spans. Existing
+selector omission in internal run indices is unchanged.
+
+FontFamily probes and rendering share this path and retain the original
+grapheme as the fallback unit. If a newly composed run produces an unrenderable
+GSUB output, it is retried once with every restorable composition replaced by
+its fully renderable original jamo. Composed-only neighbors stay composed.
+An unrelated pre-existing missing glyph does not prevent that retry. This is
+a bounded protection for newly composed inputs, not generic contextual fallback:
+a composed-only syllable that becomes missing under later context retains the
+existing downstream missing-glyph policy, as its NFC equivalent does. Restoration
+requires nominal cmap coverage for every original scalar; custom fonts that
+repair missing original cmap entries through GSUB are not covered by this
+guarantee.
+
+Raw scalar APIs and layout-disabled shaping stay unchanged. The algorithm
+follows [Unicode 17 section 3.12](https://www.unicode.org/versions/Unicode17.0.0/core-spec/chapter-3/#G24646).
+See [tests and limitations](testing.md#bounded-modern-hangul-composition-unreleased).
+
 ### Basic Tibetan vowel anchors
 
 With `layout`, a bounded GPOS fallback handles an adjacent, unligated Tibetan
