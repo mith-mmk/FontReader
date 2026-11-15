@@ -408,3 +408,408 @@ fn mixed_face_svg_uses_the_composed_run_and_requested_unit() {
         family.text2svg_with_options("AB", "pt", options).unwrap()
     );
 }
+
+fn shifted(mut run: GlyphRun, up: f32) -> GlyphRun {
+    for glyph in &mut run.glyphs {
+        glyph.y -= up;
+    }
+    run
+}
+
+#[test]
+fn rule_adjustments_validate_inputs_and_keep_defaults() {
+    let face = FontFile::from_buffer(PAIRS).unwrap().face(0).unwrap();
+    let base = rule('A', 'Z', vec![&face]);
+    assert_eq!(base.size_multiplier(), 1.0);
+    assert_eq!(base.baseline_shift(), 0.0);
+    for value in [0.0, -0.0, -1.0, f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+        assert_eq!(
+            base.clone().with_size_multiplier(value).unwrap_err().kind(),
+            ErrorKind::InvalidInput
+        );
+    }
+    for value in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+        assert_eq!(
+            base.clone().with_baseline_shift(value).unwrap_err().kind(),
+            ErrorKind::InvalidInput
+        );
+    }
+    for value in [-f32::MAX, -3.0, -0.0, 0.0, 3.0, f32::MAX] {
+        assert_eq!(
+            base.clone()
+                .with_baseline_shift(value)
+                .unwrap()
+                .baseline_shift(),
+            value
+        );
+    }
+    assert_eq!(
+        base.clone()
+            .with_size_multiplier(f32::MIN_POSITIVE)
+            .unwrap()
+            .size_multiplier(),
+        f32::MIN_POSITIVE
+    );
+    let adjusted = base
+        .with_size_multiplier(1.25)
+        .unwrap()
+        .with_baseline_shift(-2.0)
+        .unwrap();
+    assert_eq!(adjusted.size_multiplier(), 1.25);
+    assert_eq!(adjusted.baseline_shift(), -2.0);
+}
+
+#[test]
+fn rule_size_scales_geometry_gpos_and_measure_before_shaping() {
+    let face = FontFile::from_buffer(PAIRS).unwrap().face(0).unwrap();
+    for scale in [0.5, 1.25, 2.0] {
+        let mut composite = CompositeFont::new(vec![&face])
+            .unwrap()
+            .with_font_size(80.0)
+            .with_font_stretch(FontStretch(1.3));
+        composite.add_rule(
+            rule('A', 'Z', vec![&face])
+                .with_size_multiplier(scale)
+                .unwrap(),
+        );
+        let engine = face.engine().with_options(
+            fontcore::FontOptions::new(&face)
+                .with_font_size(80.0 * scale)
+                .with_font_stretch(FontStretch(1.3)),
+        );
+        let expected = engine.shape("ABA").unwrap();
+        same(&composite.shape_ltr("ABA").unwrap(), &expected);
+        assert_eq!(
+            composite.measure_ltr("ABA").unwrap(),
+            expected
+                .glyphs
+                .iter()
+                .map(|g| g.glyph.metrics.advance_x)
+                .sum::<f32>() as f64
+        );
+        assert_eq!(
+            composite.render_svg_ltr("ABA").unwrap(),
+            engine.render_svg("ABA").unwrap()
+        );
+    }
+}
+
+#[test]
+fn baseline_is_absolute_positive_up_and_never_changes_following_cursor() {
+    let file = FontFile::from_buffer(PAIRS).unwrap();
+    let face = file.face(0).unwrap();
+    for shift in [-9.0, 7.0] {
+        let mut composite = CompositeFont::new(vec![&face])
+            .unwrap()
+            .with_font_size(100.0);
+        composite.add_rule(
+            rule('A', 'B', vec![&face])
+                .with_size_multiplier(1.5)
+                .unwrap()
+                .with_baseline_shift(shift)
+                .unwrap(),
+        );
+        let expected = concatenate(vec![
+            shifted(
+                face.engine().with_font_size(150.0).shape("AB").unwrap(),
+                shift,
+            ),
+            face.engine().with_font_size(100.0).shape(",").unwrap(),
+        ]);
+        same(&composite.shape_ltr("AB,").unwrap(), &expected);
+        let last = composite.shape_ltr("AB,").unwrap().glyphs.pop().unwrap();
+        let base = face.engine().with_font_size(150.0).shape("AB").unwrap();
+        assert_eq!(
+            last.y,
+            base.glyphs
+                .iter()
+                .map(|g| g.glyph.metrics.advance_y)
+                .sum::<f32>()
+        );
+        assert_eq!(
+            composite.measure_ltr("AB,").unwrap(),
+            expected
+                .glyphs
+                .iter()
+                .map(|g| g.glyph.metrics.advance_x)
+                .sum::<f32>() as f64
+        );
+        let svg = composite.render_svg_ltr("AB,").unwrap();
+        assert!(svg.contains("viewBox="));
+        assert!(!svg.contains("NaN") && !svg.contains("inf"));
+    }
+}
+
+#[test]
+fn adjustment_identity_controls_cross_rule_kerning_and_ligatures() {
+    let file = FontFile::from_buffer(PAIRS).unwrap();
+    let face = file.face(0).unwrap();
+    for (b_size, b_shift) in [(1.5, 4.0), (1.0, 4.0), (1.5, -4.0)] {
+        let mut composite = CompositeFont::new(vec![&face])
+            .unwrap()
+            .with_font_size(100.0);
+        composite.add_rule(
+            rule('A', 'A', vec![&face])
+                .with_size_multiplier(1.5)
+                .unwrap()
+                .with_baseline_shift(4.0)
+                .unwrap(),
+        );
+        composite.add_rule(
+            rule('B', 'B', vec![&face])
+                .with_size_multiplier(b_size)
+                .unwrap()
+                .with_baseline_shift(b_shift)
+                .unwrap(),
+        );
+        let expected = if b_size == 1.5 && b_shift == 4.0 {
+            shifted(
+                face.engine().with_font_size(150.0).shape("AB").unwrap(),
+                4.0,
+            )
+        } else {
+            concatenate(vec![
+                shifted(face.engine().with_font_size(150.0).shape("A").unwrap(), 4.0),
+                shifted(
+                    face.engine()
+                        .with_font_size(100.0 * b_size)
+                        .shape("B")
+                        .unwrap(),
+                    b_shift,
+                ),
+            ])
+        };
+        same(&composite.shape_ltr("AB").unwrap(), &expected);
+    }
+    let face = FontFile::from_buffer(SIDEWAYS).unwrap().face(3).unwrap();
+    for shift in [2.0, 3.0] {
+        let mut composite = CompositeFont::new(vec![&face]).unwrap();
+        composite.add_rule(
+            rule('A', 'A', vec![&face])
+                .with_baseline_shift(2.0)
+                .unwrap(),
+        );
+        composite.add_rule(
+            rule('B', 'B', vec![&face])
+                .with_baseline_shift(shift)
+                .unwrap(),
+        );
+        let expected = if shift == 2.0 {
+            shifted(face.shape("AB").unwrap(), 2.0)
+        } else {
+            concatenate(vec![
+                shifted(face.shape("A").unwrap(), 2.0),
+                shifted(face.shape("B").unwrap(), shift),
+            ])
+        };
+        same(&composite.shape_ltr("AB").unwrap(), &expected);
+    }
+}
+
+#[test]
+fn adjusted_rule_keeps_entire_egc_and_fallback_policy() {
+    let file = FontFile::from_buffer(GRAPHEMES).unwrap();
+    let primary = file.face(0).unwrap();
+    let full = file.face(1).unwrap();
+    let suffix = file.face(2).unwrap();
+    for text in [
+        "A\u{301}",
+        "\u{1f469}\u{1f3fd}\u{200d}\u{1f4bb}",
+        "\u{600}\u{627}",
+        "\u{915}\u{94d}\u{937}",
+        "一\u{e0100}",
+    ] {
+        let ch = text.chars().next().unwrap();
+        for (faces, expected) in [(vec![&full], &full), (vec![&primary, &suffix], &primary)] {
+            let mut composite = CompositeFont::new(vec![&full])
+                .unwrap()
+                .with_font_size(40.0);
+            composite.add_rule(
+                rule(ch, ch, faces)
+                    .with_size_multiplier(1.25)
+                    .unwrap()
+                    .with_baseline_shift(3.0)
+                    .unwrap(),
+            );
+            composite.add_rule(rule(ch, ch, vec![&full]));
+            same(
+                &composite.shape_ltr(text).unwrap(),
+                &shifted(
+                    expected.engine().with_font_size(50.0).shape(text).unwrap(),
+                    3.0,
+                ),
+            );
+        }
+    }
+}
+
+#[test]
+fn adjustment_extremes_reject_nonfinite_output_without_partial_results() {
+    let face = FontFile::from_buffer(PAIRS).unwrap().face(0).unwrap();
+    for (size, multiplier, shift) in [
+        (2.0, f32::MAX, 0.0),
+        (f32::MIN_POSITIVE, f32::MIN_POSITIVE, 0.0),
+        (f32::MAX, 2.0, 0.0),
+        (f32::MAX, 1.0, 1.0),
+    ] {
+        let mut composite = CompositeFont::new(vec![&face])
+            .unwrap()
+            .with_font_size(size);
+        composite.add_rule(
+            rule('A', 'B', vec![&face])
+                .with_size_multiplier(multiplier)
+                .unwrap()
+                .with_baseline_shift(shift)
+                .unwrap(),
+        );
+        // Unused rules do not introduce failures for empty text.
+        assert!(composite.shape_ltr("").unwrap().glyphs.is_empty());
+        assert_eq!(
+            composite.shape_ltr("AB").unwrap_err().kind(),
+            ErrorKind::InvalidInput
+        );
+        assert_eq!(
+            composite.measure_ltr("AB").unwrap_err().kind(),
+            ErrorKind::InvalidInput
+        );
+        assert_eq!(
+            composite.render_svg_ltr("AB").unwrap_err().kind(),
+            ErrorKind::InvalidInput
+        );
+    }
+    let mut opposite = CompositeFont::new(vec![&face]).unwrap();
+    opposite.add_rule(
+        rule('A', 'A', vec![&face])
+            .with_baseline_shift(f32::MAX)
+            .unwrap(),
+    );
+    opposite.add_rule(
+        rule('B', 'B', vec![&face])
+            .with_baseline_shift(-f32::MAX)
+            .unwrap(),
+    );
+    assert_eq!(
+        opposite.shape_ltr("AB").unwrap_err().kind(),
+        ErrorKind::InvalidInput
+    );
+}
+
+#[test]
+fn adjusted_color_and_variable_faces_keep_normal_engine_output() {
+    let color = FontFile::from_buffer(SIDEWAYS).unwrap().face(8).unwrap();
+    let variable = FontFile::from_buffer(include_bytes!("fixtures/horizontal-variations.ttc"))
+        .unwrap()
+        .face(0)
+        .unwrap();
+    for face in [&color, &variable] {
+        let mut composite = CompositeFont::new(vec![face])
+            .unwrap()
+            .with_font_size(50.0)
+            .with_variation("wght", 650.0);
+        composite.add_rule(
+            rule('A', 'A', vec![face])
+                .with_size_multiplier(1.5)
+                .unwrap()
+                .with_baseline_shift(4.0)
+                .unwrap(),
+        );
+        same(
+            &composite.shape_ltr("A").unwrap(),
+            &shifted(
+                face.engine()
+                    .with_font_size(75.0)
+                    .with_variation("wght", 650.0)
+                    .shape("A")
+                    .unwrap(),
+                4.0,
+            ),
+        );
+    }
+}
+
+#[test]
+fn adjusted_svg_viewbox_tracks_baseline_without_changing_size() {
+    let face = FontFile::from_buffer(PAIRS).unwrap().face(0).unwrap();
+    let normal = face.engine().with_font_size(75.0).render_svg("AB").unwrap();
+    let mut composite = CompositeFont::new(vec![&face])
+        .unwrap()
+        .with_font_size(50.0);
+    composite.add_rule(
+        rule('A', 'B', vec![&face])
+            .with_size_multiplier(1.5)
+            .unwrap()
+            .with_baseline_shift(4.0)
+            .unwrap(),
+    );
+    let shifted = composite.render_svg_ltr("AB").unwrap();
+    fn viewbox(svg: &str) -> Vec<f32> {
+        svg.split("viewBox=\"")
+            .nth(1)
+            .unwrap()
+            .split('"')
+            .next()
+            .unwrap()
+            .split_whitespace()
+            .map(|v| v.parse().unwrap())
+            .collect()
+    }
+    let before = viewbox(&normal);
+    let after = viewbox(&shifted);
+    assert_eq!(
+        after,
+        vec![before[0], before[1] - 4.0, before[2], before[3]]
+    );
+    assert_ne!(normal, shifted);
+}
+
+#[cfg(feature = "svg-fonts")]
+#[test]
+fn adjusted_svg_keeps_clips_and_user_space_gradients_with_the_path() {
+    use fontcore::{GlyphLayer, GlyphPaint};
+    let face = FontFile::from_buffer(include_bytes!("fixtures/composite-adjustments-svg.ttf"))
+        .unwrap()
+        .face(0)
+        .unwrap();
+    let mut composite = CompositeFont::new(vec![&face])
+        .unwrap()
+        .with_font_size(50.0);
+    composite.add_rule(
+        rule('A', 'A', vec![&face])
+            .with_size_multiplier(2.0)
+            .unwrap()
+            .with_baseline_shift(20.0)
+            .unwrap(),
+    );
+    let run = composite.shape_ltr("BA\u{fe0f}A\u{fe0f}").unwrap();
+    let svg = composite.render_svg_ltr("BA\u{fe0f}A\u{fe0f}").unwrap();
+    let mut translated_layers = 0;
+    for glyph in &run.glyphs[1..] {
+        for layer in &glyph.glyph.layers {
+            let GlyphLayer::Path(path) = layer else {
+                panic!("expected pathified SVG");
+            };
+            assert!(matches!(
+                path.paint,
+                GlyphPaint::LinearGradient(_) | GlyphPaint::RadialGradient(_)
+            ));
+            // Geometry, clip and paint must share a translated local coordinate
+            // system, including both the previous span advance and baseline.
+            let fontcore::Command::MoveTo(x, y) = path.commands[0] else {
+                panic!("fixture path must start with MoveTo");
+            };
+            assert!(svg.contains(&format!(
+                "<g transform=\"translate({} {})\"><path d=\"M{} {} ",
+                glyph.x + path.offset_x,
+                glyph.y + path.offset_y,
+                x,
+                y,
+            )));
+            translated_layers += 1;
+        }
+    }
+    assert_eq!(translated_layers, 4);
+    assert_eq!(svg.matches("<g transform=\"translate(").count(), 4);
+    assert_eq!(svg.matches("clip-path=\"url(").count(), 2);
+    assert!(svg.contains("<linearGradient") && svg.contains("<radialGradient"));
+    assert!(svg.contains("gradientUnits=\"userSpaceOnUse\""));
+}

@@ -12,7 +12,8 @@ For opt-in single-face, single-line mixed vertical LTR outlines, use
 [restricted scope](doc/feature-status.md#opt-in-mixed-vertical-ltr-outlines).
 
 Development branch: explicit single-line LTR composite-font selection is available
-through `CompositeFont`. See the [recipe](doc/api-recipes.md#explicit-composite-fonts-single-line-ltr).
+through `CompositeFont`, with per-rule size multipliers and baseline shifts.
+See the [recipe](doc/api-recipes.md#explicit-composite-fonts-single-line-ltr).
 This additive API is not included in the published 0.0.17 crate.
 
 ## What To Use First
