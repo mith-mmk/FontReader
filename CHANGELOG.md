@@ -10,6 +10,8 @@
 
 ### Fixed
 
+- Reject malformed GSUB/GPOS extension headers before following their offsets, preventing recursive extension parsing. Check extension offset arithmetic and preserve valid 32-bit extension targets (see [validation scope](doc/extension-parser-validation.md)); no public API, dependency, version or release change.
+
 - Keep SVG path clips and gradients in the same translated coordinate system as their positioned glyph, including composite baseline shifts and preceding-span advances. Plain paths retain their existing export format.
 - Bound residual kana mark advance suppression to untouched exact-pair EGCs in GPOS faces without GDEF glyph classes. Preserve effective SinglePos/PairPos ownership, nominal positions, raw text exports and no-layout controls. This removes an extra cell, not mark attachment or ink overlap; see [scope](doc/kana-residual-marks.md).
 

@@ -978,15 +978,27 @@ impl Gpos {
         offset: u64,
     ) -> Result<PositioningSubtable, std::io::Error> {
         reader.seek(SeekFrom::Start(offset))?;
-        let _pos_format = reader.read_u16_be()?;
+        let pos_format = reader.read_u16_be()?;
         let extension_lookup_type = reader.read_u16_be()?;
         let extension_offset = reader.read_u32_be()?;
+        // OpenType GPOS extension format 1 cannot point to another extension.
+        // Valid but unsupported types (3, 7, 8) retain their existing behavior.
+        if pos_format != 1 || !(1..=8).contains(&extension_lookup_type) || extension_offset == 0 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "invalid GPOS extension header",
+            ));
+        }
+        let offset = offset
+            .checked_add(u64::from(extension_offset))
+            .ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "GPOS extension offset overflow",
+                )
+            })?;
         Ok(PositioningSubtable::Extension(Box::new(
-            Self::parse_subtable(
-                reader,
-                extension_lookup_type,
-                offset + extension_offset as u64,
-            )?,
+            Self::parse_subtable(reader, extension_lookup_type, offset)?,
         )))
     }
 
@@ -2276,5 +2288,107 @@ mod tests {
                 y_placement: 19,
             }
         );
+    }
+}
+
+#[cfg(test)]
+mod extension_header_tests {
+    use super::*;
+    use bin_rs::reader::BytesReader;
+
+    fn header(format: u16, kind: u16, offset: u32) -> Vec<u8> {
+        [
+            format.to_be_bytes().as_slice(),
+            kind.to_be_bytes().as_slice(),
+            offset.to_be_bytes().as_slice(),
+        ]
+        .concat()
+    }
+
+    #[test]
+    fn extension_rejects_invalid_format_before_reading_target() {
+        for format in [0, 2, u16::MAX] {
+            // InvalidData, not a reader error: validate before following the pointer.
+            let absent_target = header(format, 1, u32::MAX);
+            assert_eq!(
+                Gpos::parse_extension(&mut BytesReader::new(&absent_target), 0)
+                    .unwrap_err()
+                    .kind(),
+                std::io::ErrorKind::InvalidData
+            );
+            let mut bytes = header(format, 1, 8);
+            bytes.extend([1u16, 6, 0, 1, 1, 10].iter().flat_map(|v| v.to_be_bytes()));
+            assert_eq!(
+                Gpos::parse_extension(&mut BytesReader::new(&bytes), 0)
+                    .unwrap_err()
+                    .kind(),
+                std::io::ErrorKind::InvalidData
+            );
+        }
+    }
+
+    #[test]
+    fn extension_rejects_self_nested_and_unknown_types_before_dispatch() {
+        for kind in [0, 9, 10, 65535] {
+            for offset in [0, 8, u32::MAX] {
+                let mut bytes = header(1, kind, offset);
+                // Even a finite nested extension is structurally invalid.
+                bytes.extend(header(1, 1, 8));
+                bytes.extend([1u16, 6, 0, 1, 1, 10].iter().flat_map(|v| v.to_be_bytes()));
+                assert_eq!(
+                    Gpos::parse_extension(&mut BytesReader::new(&bytes), 0)
+                        .unwrap_err()
+                        .kind(),
+                    std::io::ErrorKind::InvalidData
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn extension_rejects_null_truncated_and_out_of_range_targets() {
+        let bytes = header(1, 1, 8);
+        for length in 0..=bytes.len() {
+            assert!(Gpos::parse_extension(&mut BytesReader::new(&bytes[..length]), 0).is_err());
+        }
+        for offset in [0, 9, u32::MAX] {
+            assert!(
+                Gpos::parse_extension(&mut BytesReader::new(&header(1, 1, offset)), 0).is_err()
+            );
+        }
+    }
+
+    #[test]
+    fn extension_preserves_relative_single_and_valid_unsupported_types() {
+        for (base, relative) in [(0usize, 8usize), (13, 65544)] {
+            let mut bytes = vec![0; base];
+            bytes.extend(header(1, 1, relative as u32));
+            bytes.resize(base + relative, 0);
+            // SinglePos with xAdvance=3, coverage glyph 10.
+            let target: Vec<_> = [1u16, 8, 4, 3, 1, 1, 10]
+                .iter()
+                .flat_map(|v| v.to_be_bytes())
+                .collect();
+            bytes.extend(&target);
+            let extension =
+                Gpos::parse_extension(&mut BytesReader::new(&bytes), base as u64).unwrap();
+            assert_eq!(extension.lookup_single_adjustment(10).unwrap().x_advance, 3);
+            for length in 0..target.len() {
+                assert!(Gpos::parse_extension(
+                    &mut BytesReader::new(&bytes[..base + relative + length]),
+                    base as u64
+                )
+                .is_err());
+            }
+        }
+        for kind in [3, 7, 8] {
+            let bytes = header(1, kind, 8);
+            let PositioningSubtable::Extension(inner) =
+                Gpos::parse_extension(&mut BytesReader::new(&bytes), 0).unwrap()
+            else {
+                panic!("extension")
+            };
+            assert!(matches!(*inner, PositioningSubtable::Unsupported));
+        }
     }
 }
