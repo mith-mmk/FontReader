@@ -2,7 +2,16 @@
 
 ## Unreleased
 
+### Added
+
+- Development-only explicit single-line horizontal LTR composite fonts with ordered Unicode-range rules, whole-EGC face selection, and rule-local fallback. Published 0.0.17 does not include this API.
+- Per-rule positive finite size multipliers and finite signed baseline shifts, with defaults of `1.0` and `0.0`. Size multiplies the requested nominal size before normal face shaping, preserving line-metric normalization. Positive baseline shifts move glyphs upward in output units without scaling the shift or changing advances.
+- Adjacent clusters share shaping context only for the same borrowed face object and exactly equal adjustments, including across rule boundaries. Invalid or overflowing effective sizes are rejected; runs using non-default adjustments also reject nonfinite transformed geometry. Existing face/family APIs are unchanged; vertical, multiline and RTL composition remain future work.
+
 ### Fixed
+
+- Keep SVG path clips and gradients in the same translated coordinate system as their positioned glyph, including composite baseline shifts and preceding-span advances. Plain paths retain their existing export format.
+- Select RTL Arabic-style joining forms from pinned Unicode Joining_Type values, rather than font feature availability or immediate glyph neighbors. Transparent marks, tatweel and join controls keep their source-character semantics through ccmp expansion/contraction. Add synthetic public-API regressions; this does not add AAT, full bidi, Syriac joining groups, or general mark-skipping GSUB.
 
 - Add a transactional, whole-run Tibetan `tibt` GSUB plan for ordered nondecomposable single-glyph stacks and simple-vowel alternates. Preserve whole-run presentation context, explicit language selection, and legacy output for mixed/unsupported/incomplete runs. Use exact no-excluded-glyph GDEF proofs only within this plan; general mark skipping and normalization remain unsupported.
 - Keep family fallback safe when an isolated Tibetan support probe and a later grouped run choose different shaping paths, by requiring coverage in both. Add reproducible MIT fixtures for stages, ownership, filtering, rollback, context, required features, orientation and missing-glyph fallback. No GPOS, public API, version, dependency or release change.
