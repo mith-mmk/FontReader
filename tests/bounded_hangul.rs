@@ -59,7 +59,7 @@ fn strict_context_shared_masks_and_extension_match_explicit_outlines() {
 #[test]
 fn unsupported_wrong_category_or_missing_output_preserves_complete_legacy_run() {
     let file = FontFile::from_buffer(FONT).unwrap();
-    for index in [3, 4, 5, 8, 9, 10, 11, 12, 14] {
+    for index in [3, 4, 5, 8, 9, 10, 11, 12, 14, 17, 18] {
         same(
             file.face(index).unwrap().engine().shape(OLD).unwrap(),
             file.face(0).unwrap().engine().shape(OLD).unwrap(),
@@ -169,4 +169,49 @@ fn no_layout_leaves_jamo_nominal() {
         file.face(1).unwrap().engine().shape(OLD).unwrap(),
         file.face(0).unwrap().engine().shape(OLD).unwrap(),
     );
+}
+
+#[test]
+#[cfg(feature = "layout")]
+fn requested_language_is_selected_without_merging_default_or_other_languages() {
+    let file = FontFile::from_buffer(FONT).unwrap();
+    let face = file.face(16).unwrap();
+    same(
+        face.engine().shape(OLD).unwrap(),
+        file.face(0)
+            .unwrap()
+            .engine()
+            .shape("\u{e000}\u{e001}\u{e002}")
+            .unwrap(),
+    );
+    same(
+        face.engine().with_locale("kor").shape(OLD).unwrap(),
+        file.face(0)
+            .unwrap()
+            .engine()
+            .shape("\u{e003}\u{1161}\u{11eb}")
+            .unwrap(),
+    );
+}
+#[test]
+#[cfg(feature = "layout")]
+fn family_rejects_candidate_only_coverage_before_grouping() {
+    let file = FontFile::from_buffer(FONT).unwrap();
+    same(
+        file.face(13).unwrap().engine().shape(OLD).unwrap(),
+        file.face(0)
+            .unwrap()
+            .engine()
+            .shape("\u{e000}\u{e001}\u{e002}")
+            .unwrap(),
+    );
+    let mut family = FontFamily::new("Unsafe");
+    family.add_face(FontFaceDescriptor::new("Unsafe"), file.face(13).unwrap());
+    family.add_face(FontFaceDescriptor::new("Safe"), file.face(0).unwrap());
+    for text in [OLD, "A\u{1100}\u{1161}\u{11eb}"] {
+        same(
+            family.text2glyph_run(text, family.options()).unwrap(),
+            file.face(0).unwrap().engine().shape(text).unwrap(),
+        );
+    }
 }

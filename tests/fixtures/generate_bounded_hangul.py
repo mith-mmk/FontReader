@@ -1,5 +1,6 @@
 """Original MIT fixtures for bounded Old Hangul. fontTools 4.68.0; no external font data."""
 from pathlib import Path
+from copy import deepcopy
 from fontTools.fontBuilder import FontBuilder
 from fontTools.pens.ttGlyphPen import TTGlyphPen
 from fontTools.feaLib.builder import addOpenTypeFeaturesFromString
@@ -37,11 +38,10 @@ common+"""feature ljmo { sub L by l bad; } ljmo;""",
 common+"""feature ljmo { sub L by .notdef; } ljmo;""",
 common+good,
 common+good+"""feature rvrn { sub L by bad; } rvrn;""",
-common+"""feature ljmo { sub L' lookup L1 V T; } ljmo;
-feature vjmo { sub l V' lookup V1 T; } vjmo;
-feature tjmo { sub T by bad; } tjmo;""",
+common+good+"""feature calt { sub L by .notdef; } calt;""",
 common+good,
 common+good+"""feature ccmp { sub L V T by bad; } ccmp;""",
+common+good, common+good, common+good,
 ]
 def build(index):
     fb=FontBuilder(1000,isTTF=True)
@@ -88,6 +88,18 @@ def build(index):
         # Applicable contextual lookup with a nested out-of-range target.
         table=fb.font['GSUB'].table.LookupList.Lookup[3].SubTable[0]
         table.SubstLookupRecord[0].LookupListIndex=65535
+    if index==16:
+        gsub=fb.font['GSUB'].table
+        replacement=deepcopy(gsub.LookupList.Lookup[0]);replacement.SubTable[0].mapping={'L':'bad'}
+        li=len(gsub.LookupList.Lookup);gsub.LookupList.Lookup.append(replacement);gsub.LookupList.LookupCount+=1
+        record=otTables.FeatureRecord();record.FeatureTag='ljmo';record.Feature=otTables.Feature()
+        record.Feature.LookupListIndex=[li];record.Feature.LookupCount=1;record.Feature.FeatureParams=None
+        fi=len(gsub.FeatureList.FeatureRecord);gsub.FeatureList.FeatureRecord.append(record);gsub.FeatureList.FeatureCount+=1
+        lang=otTables.LangSysRecord();lang.LangSysTag='KOR ';lang.LangSys=otTables.LangSys()
+        lang.LangSys.LookupOrder=None;lang.LangSys.ReqFeatureIndex=65535;lang.LangSys.FeatureIndex=[fi];lang.LangSys.FeatureCount=1
+        script=gsub.ScriptList.ScriptRecord[0].Script;script.LangSysRecord=[lang];script.LangSysCount=1
+    if index==17: fb.font['GSUB'].table.LookupList.Lookup[3].LookupFlag=8
+    if index==18: fb.font['GSUB'].table.LookupList.Lookup[3].SubTable[0].SubstLookupRecord[0].LookupListIndex=3
     fb.font['head'].created=fb.font['head'].modified=2082844800
     return fb.font
 if __name__=='__main__':
