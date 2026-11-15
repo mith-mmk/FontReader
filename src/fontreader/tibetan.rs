@@ -75,6 +75,7 @@ impl Font {
                             for (ch, id) in parts.iter().zip([first, second]) {
                                 normalized.push(ResolvedGlyph {
                                     kana_residual_mark: false,
+                                    simple_mkmk_cluster: None,
                                     shaping_ch: *ch,
                                     glyph_id: id,
                                     ..*glyph
@@ -239,6 +240,7 @@ impl Font {
             }
             result.push(ResolvedGlyph {
                 kana_residual_mark: false,
+                simple_mkmk_cluster: None,
                 ch: original.get(next_original)?.ch,
                 shaping_ch: first.shaping_ch,
                 glyph_id: item.glyph_id,

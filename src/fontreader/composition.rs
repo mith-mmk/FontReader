@@ -57,6 +57,7 @@ impl Font {
                     let glyph_id = self.resolve_glyph_id_with_uvs(ch, '\0', false).ok()?;
                     self.composition_glyph_is_renderable(glyph_id)
                         .then_some(ResolvedGlyph {
+                            simple_mkmk_cluster: None,
                             ch,
                             shaping_ch: ch,
                             source_start: glyph.source_start + index,

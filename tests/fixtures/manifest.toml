@@ -324,3 +324,10 @@ source = "generate_mark_input_filter.py (fontTools 4.68.0; original mark-coordin
 license = "MIT (project test code)"
 sha256 = "1dd0f9913107c34df93014f51c418c4513ab0bf730bc29e3e590e3e5f48f16e3"
 features = ["layout", "GDEF", "MarkToBase", "MarkToLigature", "MarkToMark", "ExtensionPos", "lookup-input-filtering", "no-layout-controls"]
+
+[[fixture]]
+id = "mkmk-predecessor.ttc"
+source = "generate_mkmk_predecessor.py (fontTools 4.68.0; original mark-coordinates.ttf)"
+license = "MIT (project test code)"
+sha256 = "8a36155b0e369b57233581e3b6ade48fafd813493241385f7196cfc7af0bd68b"
+features = ["layout", "GDEF", "MarkToMark", "ExtensionPos", "lookup-target-filtering", "source-ownership", "no-layout-controls"]
