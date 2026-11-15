@@ -36,6 +36,7 @@ pub mod opentype;
 mod opentype;
 
 pub mod commands;
+pub mod compositefont;
 pub mod fontengine;
 pub mod fontface;
 pub mod fontfile;
@@ -57,6 +58,7 @@ pub use commands::{
     GlyphMetrics, GlyphPaint, GlyphRadialGradient, GlyphRun, PathGlyphLayer, PathPaintMode,
     PositionedGlyph, RasterGlyphLayer, RasterGlyphSource, TextDirection,
 };
+pub use compositefont::{CompositeFont, CompositeFontRule, UnicodeRange};
 pub use fontengine::{FontEngine, LayoutMetrics, ShapingPolicy};
 pub use fontface::{FontFace, FontFaceDescriptor, FontFamily, FontVariationAxis};
 pub use fontfile::{

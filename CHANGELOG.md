@@ -2,7 +2,15 @@
 
 ## Unreleased
 
+### Added
+
+- Development-only explicit single-line horizontal LTR composite fonts with ordered Unicode-range rules, whole-EGC face selection, and rule-local fallback. Published 0.0.17 does not include this API.
+- Per-rule positive finite size multipliers and finite signed baseline shifts, with defaults of `1.0` and `0.0`. Size multiplies the requested nominal size before normal face shaping, preserving line-metric normalization. Positive baseline shifts move glyphs upward in output units without scaling the shift or changing advances.
+- Adjacent clusters share shaping context only for the same borrowed face object and exactly equal adjustments, including across rule boundaries. Invalid or overflowing effective sizes are rejected; runs using non-default adjustments also reject nonfinite transformed geometry. Existing face/family APIs are unchanged; vertical, multiline and RTL composition remain future work.
+
 ### Fixed
+
+- Keep SVG path clips and gradients in the same translated coordinate system as their positioned glyph, including composite baseline shifts and preceding-span advances. Plain paths retain their existing export format.
 
 - Apply LTR contextual GSUB and sequence-aware vertical/mixed/sideways substitutions in font-authored LookupList order, preserving source and ligature component metadata through size changes. Keep one orientation feature per route and unchanged layout-disabled behavior.
 - Correct context/chaining format 1 record parsing, matched no-op rules, reverse Extension traversal, and bounded nested execution. GDEF-proven mark-free runs retain flagged ligatures; general skip-over-mark GSUB remains unsupported.

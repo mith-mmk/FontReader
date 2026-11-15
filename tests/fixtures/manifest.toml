@@ -221,6 +221,13 @@ sha256 = "0cddbba5fccde7c59d9a852a302aed222730b8bfea462785005b666a91dc7e16"
 features = ["gvar", "component-indices", "horizontal-and-vertical-phantoms", "nested-XY", "scaled-offsets", "sparse-tuples", "child-only-variation", "signed-fractional-deltas", "HVAR-VVAR-precedence", "TTC", "documented-fallbacks"]
 
 [[fixture]]
+id = "composite-adjustments-svg.ttf"
+source = "tests/fixtures/generate_composite_adjustments_svg.py (Python standard library)"
+license = "MIT (project test code)"
+sha256 = "428d0590352b6e1e7ebd57f135b9f79326d44ae2fdc1172f579eca444309d91d"
+features = ["composite-font", "svg-fonts", "clip", "linear-gradient", "radial-gradient"]
+
+[[fixture]]
 id = "contextual-gsub.ttc"
 source = "tests/fixtures/generate_contextual_gsub.py (fontTools 4.68.0; no external font)"
 license = "MIT (project test code)"
