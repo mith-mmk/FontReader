@@ -263,11 +263,12 @@ BASE と下記の静的COLR v0以外の色layer原点は別対応です。向き
 ### GPOS Single Positioning
 
 - Type 1 SinglePos Format 1/2 と、それを包む Type 9 をパースし、実行する。
-- 既定の実行対象は横組み `kern` / `dist`、縦組み `vkrn` / `dist`。既存の locale / script 選択を利用し、任意 feature 選択や contextual GPOS は追加しない。
+- 既定の実行対象は横組み `kern` / `dist`、縦組み `vkrn` / `dist` / `vert`。既存の locale / script 選択を利用し、任意 feature 選択や contextual GPOS は追加しない。
 - 静的 ValueRecord の4値を shaping と測定へ反映する。付着する mark の明示 advance も保持し、lookup 間は i32 で加算する。同一 lookup ではゼロ値を含む最初の一致 subtable だけを適用する。
 - SinglePos は GDEF の glyph class、IgnoreBaseGlyphs / IgnoreLigatures / IgnoreMarks、MarkAttachmentType、MarkFilteringSet を尊重する。PairPos もこの filtering を共有する。mark attachment は従来の別経路を維持する。
 - Device / VariationIndex offset は読み進めるが delta は未評価。筆記体接続と Unicode Arabic joining は別の残件。
 - MIT の合成フォント `tests/fixtures/gpos-single.ttf` と byte fixture により、切断入力、不正 coverage / count、lookup 加算、locale、拡縮、縦組み、mark 付着を検証する。広範な実フォント / HarfBuzz 比較は未実施。
+- 縦組みの `vert` 選択により、分類のない仮名結合記号にもフォント指定の SinglePos（Extension を含む）を適用する。`vert` PairPos、汎用 mark fallback、anchor 推測は追加しない。横組みと sideways は変更しない。合成テストで lookup 重複排除、ゼロ subtable 優先、GDEF、符号、拡縮、locale / required feature、公開 shape / measure / render / family 経路を検証する。Noto Sans CJK JP 2.004 は限定した実フォント例であり、日本語全般や HarfBuzz との完全一致を保証しない。
 - 仕様: [OpenType GPOS Single Adjustment](https://learn.microsoft.com/en-us/typography/opentype/spec/gpos#lookup-type-1-single-adjustment-positioning-subtable)。
 
 ### GDEF
