@@ -1433,14 +1433,20 @@ impl Gsub {
         }
     }
 
-    pub(crate) fn apply_joining_glyphs(&self, glyphs: &mut [GsubGlyph], locale: Option<&str>) {
-        let mut ids: Vec<_> = glyphs
-            .iter()
-            .map(|glyph| (glyph.glyph_id, glyph.source_index))
-            .collect();
-        self.apply_joining_sequence(&mut ids, locale);
-        for (glyph, (glyph_id, _)) in glyphs.iter_mut().zip(ids) {
-            glyph.glyph_id = glyph_id;
+    pub(crate) fn apply_joining_glyphs(
+        &self,
+        glyphs: &mut [GsubGlyph],
+        locale: Option<&str>,
+        source_forms: &[Option<[u8; 4]>],
+    ) {
+        for glyph in glyphs {
+            if let Some(Some(tag)) = source_forms.get(glyph.source_index) {
+                if let Some(replacement) =
+                    self.lookup_single_feature(glyph.glyph_id, locale, &[*tag])
+                {
+                    glyph.glyph_id = replacement;
+                }
+            }
         }
     }
 
