@@ -172,3 +172,13 @@ Unicode 18 の書記素分割や、完全なシェーピング・BiDi・CSS 混�
 公式の全 766 テストを省略せず同梱し、分割処理とレイアウト用の調整を別々に
 検証します。上記のスクリプトで原本とライセンスの SHA-256 をオフライン確認
 できます。Unicode の原本には同梱の Unicode-3.0 ライセンスが適用されます。
+
+## Arabic-style joining
+
+Internal logical-order joining uses Unicode 17.0.0 `DerivedJoiningType.txt`,
+including derived Transparent values and default Non_Joining values.
+Source: https://www.unicode.org/Public/17.0.0/ucd/extracted/DerivedJoiningType.txt
+SHA-256: `f39ebe974825d6736aee15582250307aa532b2cfab3caf3f86bd23fddc9c5c4d`.
+Regenerate with `python3 tools/generate_joining_types.py`; verify with `--check`.
+The existing Unicode-3.0 license applies. This independently pinned property
+does not change the other tables or imply full Unicode script shaping.

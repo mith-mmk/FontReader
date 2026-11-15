@@ -122,7 +122,7 @@ raw glyph/SVG APIs are unchanged. TrueType ignores VORG as required by OpenType.
 - Implemented: `lookup_locale()` and `lookup_liga()`
 - Text APIs apply variation selectors and basic `locl` / `liga` / `dlig` / `ccmp`
 - Direction-aware APIs support vertical flow and RTL layout
-- Arabic shaping currently covers `isol` / `init` / `medi` / `fina`
+- Arabic-style RTL joining selects `isol` / `init` / `medi` / `fina` from Unicode Joining_Type (see limits below)
 - Text shaping applies `rlig`, `rclt`, `calt`, and `clig` in both LTR and RTL modes when present
 - Locale-aware lookup collection prefers matching scripts such as `arab`, `hebr`, and `syrc`
 - Language-system selection also uses full locale subtags such as `ur-Arab-PK`
@@ -153,7 +153,7 @@ raw glyph/SVG APIs are unchanged. TrueType ignores VORG as required by OpenType.
 - Default execution covers `kern` / `dist` horizontally and `vkrn` / `dist` vertically, with the existing locale/script selection. Arbitrary feature selection and contextual GPOS are not added.
 - All four static ValueRecord fields reach shaping and measurement, including explicit advances on attached marks. Distinct lookups accumulate in i32, and the first matching subtable (including a zero record) wins within one lookup.
 - SinglePos observes GDEF glyph classes, IgnoreBaseGlyphs / IgnoreLigatures / IgnoreMarks, MarkAttachmentType, and MarkFilteringSet. PairPos now shares this filtering; mark attachment retains its existing separate behavior.
-- Device / VariationIndex offsets are consumed but their deltas are not evaluated. Cursive positioning and Unicode Arabic joining remain separate work.
+- Device / VariationIndex offsets are consumed but their deltas are not evaluated. Cursive positioning and complete Arabic shaping remain separate work.
 - Regressions use the committed MIT synthetic font (`tests/fixtures/gpos-single.ttf`) and byte fixtures for truncation, invalid coverage/counts, lookup accumulation, locale, scaling, vertical flow, and mark attachment. Broad real-font / HarfBuzz comparison is not yet covered.
 - Reference: [OpenType GPOS Single Adjustment](https://learn.microsoft.com/en-us/typography/opentype/spec/gpos#lookup-type-1-single-adjustment-positioning-subtable).
 
@@ -687,3 +687,36 @@ mark-free runs without ignoring flags. Raw scalar vertical APIs still skip all
 GDEF-dependent flags. Malformed recursion is bounded at 32 nested lookups and
 4096 nested operations per root position; expanding sequences are capped at
 1,000,000 glyphs. Hitting a limit stops that substitution without a public error.
+
+## Unicode-based Arabic-style joining
+
+Explicit RTL text shaping analyzes original logical-order scalars with pinned
+Unicode 17.0.0 Joining_Type data before ccmp. Dual/right/left joining, transparent
+marks, tatweel, ZWJ and ZWNJ determine joining independent of which form lookups
+the font supplies. Source-index metadata carries the selected form through
+ccmp expansion or contraction; missing selected forms retain the glyph rather
+than falling back to a different joining form. Transparent and join-causing
+characters do not themselves receive joining-form substitutions.
+
+This fixes the basic OT path, not complete Arabic shaping. Joining substitution
+retains the existing single-result feature helper, not a general contextual or
+multi-lookup form stage. GDEF-filtered GSUB skipping, marked required ligatures,
+cursive positioning, all mark positioning, normalization, default-ignorable
+glyph removal and Syriac joining-group rules remain outside this change.
+ZWJ/ZWNJ joining semantics are corrected, but their glyphs can still draw in
+some fonts despite zero advance. SFArabic marked samples can retain mark-position
+differences from HarfBuzz; matching advances alone does not validate ink placement.
+Source-index inheritance does not implement general cluster reconstruction.
+RTL positioning is a caller-selected run direction, not full Unicode bidi or
+script itemization: mixed Latin/digits need externally resolved directional runs.
+AAT-only fonts (for example macOS Geeza Pro with morx and no GSUB) do not gain
+OpenType shaping from this change. LTR and layout-disabled behavior is unchanged.
+
+Reproducible tests include every scalar's Joining_Type, missing font forms,
+mark/control boundaries, and a synthetic public shaping fixture with actual
+ccmp expansion and contraction. A bounded local comparison against HarfBuzz 15
+with Arial and SFArabic covered ordinary words, marks and tatweel; it is not a
+claim of all-font or all-position equivalence. The real comparison font binaries are not distributed.
+
+References: [Unicode data](https://www.unicode.org/Public/17.0.0/ucd/extracted/DerivedJoiningType.txt),
+[OpenType Arabic shaping](https://learn.microsoft.com/en-us/typography/script-development/arabic).

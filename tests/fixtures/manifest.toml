@@ -233,3 +233,10 @@ source = "tests/fixtures/generate_contextual_gsub.py (fontTools 4.68.0; no exter
 license = "MIT (project test code)"
 sha256 = "ed52278aa4055cd2da5b5de32e8fd249d34a93a008c0999703329f24e2792c5a"
 features = ["GSUB", "rclt", "calt", "clig", "rlig", "ccmp", "IVS", "vert", "vrt2", "vrtr", "contextual-multiple", "shared-lookup", "ligature-mark", "GDEF-flags"]
+
+[[fixture]]
+id = "arabic-joining.ttf"
+source = "tests/fixtures/generate_arabic_joining.py (fontTools 4.68.0)"
+license = "MIT (project test code)"
+sha256 = "de6890b11416aac16b0dab636d269fcf47c321b1d3588984e1f97088863be729"
+features = ["arabic-joining", "ccmp", "source-mapping"]

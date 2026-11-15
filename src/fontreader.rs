@@ -1482,6 +1482,7 @@ impl Font {
     fn apply_gsub_sequence_stages(
         &self,
         glyphs: &mut Vec<crate::opentype::extentions::gsub::GsubGlyph>,
+        source_forms: &[Option<[u8; 4]>],
         locale: Option<&str>,
         is_right_to_left: bool,
         font_variant: crate::commands::FontVariant,
@@ -1495,7 +1496,7 @@ impl Font {
         if is_right_to_left {
             // Joining retains the established composition/variant boundary.
             gsub.apply_feature_glyphs_with_gdef(glyphs, locale, &tags, self.current_gdef());
-            gsub.apply_joining_glyphs(glyphs, locale);
+            gsub.apply_joining_glyphs(glyphs, locale, source_forms);
             tags.clear();
         }
         // Contextual features are not specific to RTL scripts. Select them
@@ -1545,8 +1546,16 @@ impl Font {
                     },
                 )
                 .collect::<Vec<_>>();
+            let source_forms = if is_right_to_left {
+                crate::unicode::joining::forms(
+                    &glyphs.iter().map(|glyph| glyph.ch).collect::<Vec<_>>(),
+                )
+            } else {
+                Vec::new()
+            };
             self.apply_gsub_sequence_stages(
                 &mut ccmp_glyphs,
+                &source_forms,
                 locale,
                 is_right_to_left,
                 font_variant,
