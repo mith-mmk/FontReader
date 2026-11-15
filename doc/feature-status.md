@@ -19,6 +19,38 @@ See the [recipe](api-recipes.md#query-unicode-vertical-orientation) and
 
 `layout` is partially implemented.
 
+### Bounded canonical kana composition
+
+With `layout`, exactly 58 Unicode 17.0.0 canonical hiragana/katakana pairs
+(base plus U+3099 dakuten or U+309A handakuten), including voiced iteration
+marks, compose before cmap only when the entire extended grapheme is that pair
+and the selected face can render the composed glyph. Source characters and
+scalar spans remain original. Composed-only faces work; absent/invalid targets
+retain the original cluster and whole-grapheme fallback. CFF/CFF2 CharStrings
+bounds are checked. Hangul and kana share a single bounded restoration pass if
+downstream GSUB produces unusable output, preserving composed-only neighbors.
+Existing horizontal, vertical and mixed-orientation GSUB semantics still apply.
+Raw scalar APIs and builds without `layout` do not compose.
+
+Restoration requires nominal cmap coverage for every original scalar. Custom
+fonts that repair missing original cmap entries through GSUB are outside this
+guarantee. This does not repair generic contextual FontFamily fallback: a
+composed-only cluster that later becomes missing keeps the existing downstream
+missing-glyph policy, like its NFC equivalent. No public cluster/caret API,
+generic GSUB ligature source-span repair, or change to existing selector
+omission in internal run indices is added. The conservative guard checks the
+whole GSUB run, so an unrelated pre-existing missing glyph can also restore
+otherwise valid kana composition. NFC/NFD equality is not promised for partly
+unsupported mixed runs; this deliberately retains the prior bounded policy.
+
+This is not general NFC/NFKC, decomposition, reordering, Latin normalization,
+halfwidth conversion, Old Hangul or complete Ainu shaping. Extra marks,
+selectors, joiners and prepends exclude the whole grapheme from this stage.
+The four Ainu named sequences セ+309A, ツ+309A, ト+309A and ㇷ+309A have no
+canonical composed scalar and remain unchanged, as do U+31F0–31FF. Unligated
+marks are not assigned generic zero advance. Font-specific Ainu mark placement
+and broader script shaping remain unresolved; language and script are distinct.
+
 ### Bounded modern Hangul composition
 
 With `layout`, text shaping can compose a complete Unicode 17 extended

@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- With `layout`, compose 58 exact Unicode 17 canonical kana pairs before cmap when renderable, preserving source spans and existing vertical GSUB; share bounded invalid-GSUB rollback with modern Hangul. Ainu named sequences and raw/no-layout APIs remain unchanged. Add reproducible MIT fixtures, mapping/exclusion proofs and CFF/CFF2 boundary regressions. No public API, dependency, version or release change.
+
 - Compose complete modern Hangul LV/LVT/LV+T graphemes before cmap when the face has a renderable syllable. Share family probing/rendering, retain original source characters and distinguish source counts from GSUB components. Restore usable original jamo if downstream GSUB invalidates a new composition, without losing composed-only neighbors. Old Hangul, marked/repeated/compatibility jamo, raw APIs and no-layout behavior remain outside the change.
 - Add reproducible original MIT Hangul fixtures, exhaustive 11,172-syllable algorithm checks, direct/family/orientation regressions and CFF/CFF2 missing-target guards. No public API, dependency, version or release change.
 
