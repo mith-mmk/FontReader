@@ -11,10 +11,11 @@ For opt-in single-face, single-line mixed vertical LTR outlines, use
 [recipe](doc/api-recipes.md#mixed-vertical-ltr-shaping-measurement-and-svg) and
 [restricted scope](doc/feature-status.md#opt-in-mixed-vertical-ltr-outlines).
 
-Development branch: explicit single-line LTR composite-font selection is available
+Version 0.0.18 adds explicit single-line LTR composite-font selection
 through `CompositeFont`, with per-rule size multipliers and baseline shifts.
 See the [recipe](doc/api-recipes.md#explicit-composite-fonts-single-line-ltr).
-This additive API is not included in the published 0.0.17 crate.
+This source tree prepares 0.0.18; publication is a separate step. The additive
+API is not included in 0.0.17. Cargo requirements for 0.0.17 do not select 0.0.18.
 
 ## What To Use First
 
@@ -58,9 +59,9 @@ Default features include `layout` and `cff`.
 - `layout`
   - GSUB / GPOS shaping
   - Vertical flow, RTL, locale, and variant selection
-  - Unreleased: [bounded Tibetan stack substitution runs](doc/feature-status.md#bounded-tibetan-substitution-runs). Font-aware canonical Tibetan normalization is bounded to fully collapsed consonant/lower-vowel forms. A stack plus one upper vowel additionally requires exact Base+Mark ownership and an authored `abvm` Base anchor. AA+upper, mixed/spaced runs and general mark skipping remain outside this plan.
-  - Unreleased: [bounded canonical kana composition](doc/feature-status.md#bounded-canonical-kana-composition) for 58 exact voiced/semi-voiced kana pairs, preserving sources and vertical shaping. Noncanonical Ainu named sequences remain unchanged.
-  - Unreleased: [bounded modern Hangul composition](doc/feature-status.md#bounded-modern-hangul-composition) for complete modern LV/LVT/LV+T graphemes when the face has the composed glyph. Old Hangul, tones and general Korean shaping remain outside this stage.
+  - [bounded Tibetan stack substitution runs](doc/feature-status.md#bounded-tibetan-substitution-runs). Font-aware canonical Tibetan normalization is bounded to fully collapsed consonant/lower-vowel forms. A stack plus one upper vowel additionally requires exact Base+Mark ownership and an authored `abvm` Base anchor. AA+upper, mixed/spaced runs and general mark skipping remain outside this plan.
+  - [bounded canonical kana composition](doc/feature-status.md#bounded-canonical-kana-composition) for 58 exact voiced/semi-voiced kana pairs, preserving sources and vertical shaping. Noncanonical Ainu named sequences remain unchanged.
+  - [bounded modern Hangul composition](doc/feature-status.md#bounded-modern-hangul-composition) for complete modern LV/LVT/LV+T graphemes when the face has the composed glyph. Old Hangul, tones and general Korean shaping remain outside this stage.
 - `cff`
   - OpenType / CFF outlines
 - `raw`
@@ -78,21 +79,21 @@ The minimum supported Rust version (MSRV) is **1.91**, aligned with WML2.
 
 ```toml
 [dependencies]
-fontcore = "0.0.17"
+fontcore = "0.0.18"
 ```
 
 If you need the low-level parser API:
 
 ```toml
 [dependencies]
-fontcore = { version = "0.0.17", features = ["raw"] }
+fontcore = { version = "0.0.18", features = ["raw"] }
 ```
 
 If you also want provisional SVG emoji font support:
 
 ```toml
 [dependencies]
-fontcore = { version = "0.0.17", features = ["svg-fonts"] }
+fontcore = { version = "0.0.18", features = ["svg-fonts"] }
 ```
 
 ## Quick Start

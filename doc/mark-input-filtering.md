@@ -118,9 +118,12 @@ evidence, authored SinglePos/PairPos advances retained by this engine rather
 than HarfBuzz's mark-zeroing plan, cross-axis cursor behavior, and no-GPOS
 bounding-box fallback. These are not new parity claims or corrections.
 
-Expanded controls also expose changed residual origins in Noto Serif Tibetan.
-For example, U+0F40 U+0F90 U+0F72 is already excluded by the bounded Tibetan
-stack predicate (upper vowels after subjoined consonants are unsupported).
+The following is a historical comparison before the bounded upper-stack change,
+not a statement of the final 0.0.18 stack coverage. See the current
+[upper-stack conditions](feature-status.md#bounded-tibetan-substitution-runs).
+Expanded controls also exposed changed residual origins in Noto Serif Tibetan.
+For example, U+0F40 U+0F90 U+0F72 was excluded by the then-current bounded Tibetan
+stack predicate (upper vowels after subjoined consonants were unsupported).
 Both versions emit three glyphs, while HarfBuzz's full Tibetan shaper emits
 two. The residual third mark moves from synthetic x0 to cursor x704. This is
 an expected consequence of the new origin policy, not a repaired Tibetan stack

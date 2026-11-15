@@ -290,8 +290,7 @@ space-only input). See [scope and limitations](feature-status.md#explicit-tate-c
 
 ## Explicit composite fonts (single-line LTR)
 
-This additive API is on the development branch, not in the published 0.0.17
-crate. It deliberately chooses a face by character range even if the default
+This additive API is included in the 0.0.18 source tree, not in 0.0.17. It deliberately chooses a face by character range even if the default
 face already covers that text.
 
 ```rust,no_run
