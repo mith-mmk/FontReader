@@ -414,7 +414,9 @@ fn original_noto_opt_in_proof_and_work_measurements() {
     let count = u16::from_be_bytes(bytes[4..6].try_into().unwrap()) as usize;
     let locate = |tag: &[u8; 4]| {
         let entry = bytes[12..12 + count * 16]
-            .chunks_exact(16)
+            .as_chunks::<16>()
+            .0
+            .iter()
             .find(|e| &e[..4] == tag)
             .unwrap();
         (
