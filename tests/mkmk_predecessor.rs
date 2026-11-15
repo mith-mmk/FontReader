@@ -1,7 +1,7 @@
 use fontcore::FontFile;
 
 const FONT: &[u8] = include_bytes!("fixtures/mkmk-predecessor.ttc");
-const CASES: usize = 26;
+const CASES: usize = 35;
 
 #[cfg(feature = "layout")]
 fn positions(case: usize, text: &str, locale: Option<&str>, vertical: bool) -> Vec<(f32, f32)> {
@@ -118,8 +118,12 @@ fn unknown_targets_preserve_immediate_attachment() {
 #[cfg(feature = "layout")]
 fn substitutions_and_unknown_base_do_not_authorize_new_skipping() {
     for extension in [0, CASES] {
-        for case in [16, 17, 18, 19, 20, 21, 24, 25] {
-            let prefix = if matches!(case, 20 | 25) { "AA" } else { "A" };
+        for case in [18, 19, 20, 21, 24, 25, 29, 30, 31, 32] {
+            let prefix = if matches!(case, 20 | 25 | 32) {
+                "AA"
+            } else {
+                "A"
+            };
             let skip = positions(
                 extension + case,
                 &format!("{prefix}\u{301}\u{302}\u{301}"),
@@ -266,6 +270,19 @@ fn selectors_and_mapped_mark_joiners_do_not_authorize_skipping() {
                 assert_eq!(run[2], (300.0, 0.0), "mapped joiner {joiner:?}");
                 assert_eq!(*run.last().unwrap(), (200.0, 0.0), "joiner {joiner:?}");
             }
+        }
+    }
+}
+
+#[test]
+#[cfg(feature = "layout")]
+fn class_preserving_singles_retain_simple_owner() {
+    for extension in [0, CASES] {
+        for case in [16, 17, 26, 27, 28, 33, 34] {
+            assert_eq!(
+                positions(extension + case, "A\u{301}\u{302}\u{301}", None, false).last(),
+                Some(&(200.0, -100.0))
+            );
         }
     }
 }

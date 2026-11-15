@@ -12,9 +12,15 @@ Y-up to Y-down conversion remain unchanged.
 
 ## Ownership bound
 
-A private optional original-grapheme ID is retained only by nominal one-to-one
-inputs. All GSUB substitutions, including identity substitutions, clear it;
-so do composition, composition restoration and Tibetan normalized output.
+A private optional original-grapheme ID is retained by nominal one-to-one
+inputs and class-preserving table-driven Single/ReverseChainSingle substitutions
+(including identity, contextual and extension dispatch). Every such replacement
+must explicitly preserve GDEF Base or Mark class. A separate monotonic GSUB
+ambiguity bit records provenance loss without changing `substituted` semantics.
+Class changes (even if later reversed), unknown classes, every Multiple
+(including length one), Ligature, and direct locale/joining helpers invalidate
+this provenance. Composition, restoration and Tibetan normalized output also
+clear the original-grapheme ID.
 Multiple outputs cannot inherit simple ownership. Selector-consuming inputs and graphemes containing ZWJ/ZWNJ
 are excluded. This is provenance, not a claim that source intervals alone
 encode attachment ownership.
@@ -29,7 +35,7 @@ GDEF Base through the current Mark to have one common original grapheme ID,
 only GDEF Marks after that Base, one component per glyph, consecutive width-one
 source intervals, and already emitted predecessor glyphs. It stays within the
 renderer-provided face/run/orientation slice and cannot cross tabs/newlines.
-Leading marks, unclassified owners, ligatures, transformed/composed sources,
+Leading marks, unclassified owners, ligatures, other transformed/composed sources,
 and ambiguous ownership do not qualify.
 
 When this guard fails, the old immediate-target selection and target-filter
@@ -77,3 +83,22 @@ at (814,-25) and (572,721), respectively, in Y-down coordinates. The preceding
 version produced (825,328) and (575,424). Other glyph positions also match.
 These examples establish applicability without relying on canonical reordering;
 they are not a general shaping-parity claim. Installed fonts were not copied.
+
+## Single-substitution stage
+
+Original equal-CCC fixtures reproduce identity and Base-to-Base Single cases:
+PR52 ended at (200,0), while HB15 and this bounded extension end at (200,-100)
+in Y-down coordinates at size1000. Mark-to-Mark, contextual, reverse, GSUB
+extension and Single format2 variants exercise the same proof. Class roundtrips,
+unknown-class roundtrips, expansion/deletion followed by Single, and ligature
+followed by Single verify that provenance cannot be regained. Existing
+substitution flags, kana residual rules and Tibetan candidate checks remain
+independent and unchanged.
+
+GSUB still does not match across filtered glyphs: its conservative flag guard
+rejects a lookup when the run contains a class it would filter. Consequently
+IgnoreMarks ligatures need a separate matching change and stable per-mark
+ligature ID/component metadata. Source intervals and aggregate component counts
+cannot substitute for that metadata. This stage changes neither that matching
+nor mark-to-ligature component selection, sequential GPOS execution, reordering,
+script planning or BiDi behavior.

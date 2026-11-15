@@ -1972,12 +1972,14 @@ mod tests {
                 glyph_id: 10,
                 source_index: 4,
                 substituted: false,
+                mkmk_source_ambiguous: false,
                 ligature_components: 1,
             },
             GsubGlyph {
                 glyph_id: 11,
                 source_index: 5,
                 substituted: false,
+                mkmk_source_ambiguous: false,
                 ligature_components: 1,
             },
         ];
@@ -1989,12 +1991,14 @@ mod tests {
                     glyph_id: 40,
                     source_index: 4,
                     substituted: true,
+                    mkmk_source_ambiguous: true,
                     ligature_components: 2
                 },
                 GsubGlyph {
                     glyph_id: 30,
                     source_index: 5,
                     substituted: true,
+                    mkmk_source_ambiguous: true,
                     ligature_components: 1
                 },
             ]
@@ -2027,6 +2031,7 @@ mod tests {
                 glyph_id: 0,
                 source_index: 0,
                 substituted: false,
+                mkmk_source_ambiguous: false,
                 ligature_components: 1,
             }];
             if tag == *b"locl" {
@@ -2039,6 +2044,7 @@ mod tests {
                 );
             }
             assert!(glyphs[0].substituted);
+            assert!(glyphs[0].mkmk_source_ambiguous);
             assert_eq!(glyphs[0].glyph_id, 0);
         }
     }
@@ -2056,6 +2062,7 @@ mod tests {
             glyph_id: 10,
             source_index: 0,
             substituted: false,
+            mkmk_source_ambiguous: false,
             ligature_components: 1,
         }];
         assert!(!gsub.apply_tibetan_stack_presentation(
@@ -2066,6 +2073,7 @@ mod tests {
             None
         ));
         assert!(glyphs[0].substituted);
+        assert!(glyphs[0].mkmk_source_ambiguous);
         assert_eq!(glyphs[0].glyph_id, 10);
     }
 
@@ -2163,12 +2171,14 @@ mod tests {
                 glyph_id: 10,
                 source_index: 0,
                 substituted: false,
+                mkmk_source_ambiguous: false,
                 ligature_components: 1,
             },
             GsubGlyph {
                 glyph_id: 11,
                 source_index: 1,
                 substituted: false,
+                mkmk_source_ambiguous: false,
                 ligature_components: 1,
             },
         ];
@@ -2197,6 +2207,7 @@ mod tests {
                         glyph_id: 20,
                         source_index: 0,
                         substituted: true,
+                        mkmk_source_ambiguous: true,
                         ligature_components: 2
                     }]
                 );
@@ -2208,6 +2219,7 @@ mod tests {
                     glyph_id: 12,
                     source_index: 2,
                     substituted: false,
+                    mkmk_source_ambiguous: false,
                     ligature_components: 1,
                 });
                 let mut glyphs = with_mark.clone();
@@ -2288,6 +2300,7 @@ mod tests {
                     glyph_id,
                     source_index,
                     substituted: false,
+                    mkmk_source_ambiguous: false,
                     ligature_components: 1,
                 })
                 .collect();
@@ -2322,12 +2335,14 @@ mod tests {
                 glyph_id: 10,
                 source_index: 0,
                 substituted: false,
+                mkmk_source_ambiguous: false,
                 ligature_components: 1,
             },
             GsubGlyph {
                 glyph_id: 13,
                 source_index: 1,
                 substituted: false,
+                mkmk_source_ambiguous: false,
                 ligature_components: 1,
             },
         ];
@@ -2349,12 +2364,14 @@ mod tests {
                 glyph_id: 10,
                 source_index: 0,
                 substituted: false,
+                mkmk_source_ambiguous: false,
                 ligature_components: 1,
             },
             GsubGlyph {
                 glyph_id: 10,
                 source_index: 1,
                 substituted: false,
+                mkmk_source_ambiguous: false,
                 ligature_components: 1,
             },
         ];
@@ -2385,6 +2402,7 @@ mod tests {
                         glyph_id: 10,
                         source_index,
                         substituted: false,
+                        mkmk_source_ambiguous: false,
                         ligature_components: 1,
                     })
                     .collect();
@@ -2541,6 +2559,7 @@ mod tests {
                     glyph_id: 10,
                     source_index,
                     substituted: false,
+                    mkmk_source_ambiguous: false,
                     ligature_components: 1,
                 })
                 .collect();
@@ -2554,18 +2573,21 @@ mod tests {
                 glyph_id: 10,
                 source_index: 0,
                 substituted: false,
+                mkmk_source_ambiguous: false,
                 ligature_components: 1,
             },
             GsubGlyph {
                 glyph_id: 10,
                 source_index: 0,
                 substituted: false,
+                mkmk_source_ambiguous: false,
                 ligature_components: 1,
             },
             GsubGlyph {
                 glyph_id: 10,
                 source_index: 1,
                 substituted: false,
+                mkmk_source_ambiguous: false,
                 ligature_components: 1,
             },
         ];
@@ -2595,6 +2617,7 @@ mod tests {
                 glyph_id: 10,
                 source_index,
                 substituted: false,
+                mkmk_source_ambiguous: false,
                 ligature_components: 1,
             })
             .collect();

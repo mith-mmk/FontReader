@@ -162,6 +162,7 @@ impl Font {
                 glyph_id: glyph.glyph_id,
                 source_index,
                 substituted: false,
+                mkmk_source_ambiguous: false,
                 ligature_components: 1,
             })
             .collect();

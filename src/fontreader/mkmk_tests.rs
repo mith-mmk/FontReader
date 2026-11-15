@@ -116,3 +116,30 @@ fn simple_mkmk_metadata_excludes_composition_restoration_and_tibetan_candidates(
         }));
     }
 }
+
+#[test]
+fn simple_mkmk_provenance_survives_only_proven_single_paths() {
+    let mut font =
+        Font::get_font_from_buffer(include_bytes!("../../tests/fixtures/mkmk-predecessor.ttc"))
+            .unwrap();
+    for face in [16, 17, 26, 27, 28, 33, 34] {
+        font.set_font(face).unwrap();
+        let shaped = units(&font, "A\u{301}\u{302}\u{301}");
+        let emitted = [Some(0), Some(1), Some(2), None];
+        assert!(font.simple_mkmk_span(&shaped, &emitted, 3), "face {face}");
+    }
+    for face in [18, 19, 20, 24, 25, 29, 30, 31, 32] {
+        font.set_font(face).unwrap();
+        let text = if matches!(face, 20 | 25 | 32) {
+            "AA\u{301}\u{302}\u{301}"
+        } else {
+            "A\u{301}\u{302}\u{301}"
+        };
+        let shaped = units(&font, text);
+        let emitted: Vec<_> = (0..shaped.len()).map(Some).collect();
+        assert!(
+            !font.simple_mkmk_span(&shaped, &emitted, shaped.len() - 1),
+            "face {face}"
+        );
+    }
+}
