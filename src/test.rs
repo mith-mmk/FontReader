@@ -1971,11 +1971,13 @@ mod tests {
             GsubGlyph {
                 glyph_id: 10,
                 source_index: 4,
+                substituted: false,
                 ligature_components: 1,
             },
             GsubGlyph {
                 glyph_id: 11,
                 source_index: 5,
+                substituted: false,
                 ligature_components: 1,
             },
         ];
@@ -1986,11 +1988,13 @@ mod tests {
                 GsubGlyph {
                     glyph_id: 40,
                     source_index: 4,
+                    substituted: true,
                     ligature_components: 2
                 },
                 GsubGlyph {
                     glyph_id: 30,
                     source_index: 5,
+                    substituted: true,
                     ligature_components: 1
                 },
             ]
@@ -2011,6 +2015,54 @@ mod tests {
         let mut glyphs = vec![(10, 0), (11, 1), (12, 2), (13, 3)];
         gsub.apply_feature_sequence(&mut glyphs, None, &[*b"vert"]);
         assert_eq!(glyphs, vec![(10, 0), (11, 1), (99, 2), (13, 3)]);
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn locale_and_joining_identity_substitutions_are_tracked() {
+        use crate::opentype::extentions::gsub::GsubGlyph;
+        for tag in [*b"locl", *b"isol"] {
+            let gsub = parse_gsub(build_gsub_table(tag, vec![lookup_single_record(0, 0)]));
+            let mut glyphs = vec![GsubGlyph {
+                glyph_id: 0,
+                source_index: 0,
+                substituted: false,
+                ligature_components: 1,
+            }];
+            if tag == *b"locl" {
+                gsub.apply_locale_glyph(&mut glyphs[0], "en");
+            } else {
+                gsub.apply_joining_glyphs(&mut glyphs, None);
+            }
+            assert!(glyphs[0].substituted);
+            assert_eq!(glyphs[0].glyph_id, 0);
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "layout")]
+    fn tibetan_identity_substitution_is_touched_but_not_presentation_change() {
+        use crate::opentype::extentions::gsub::GsubGlyph;
+        let mut gsub = parse_gsub(build_gsub_table(
+            *b"abvs",
+            vec![lookup_single_record(10, 10)],
+        ));
+        gsub.scripts.scripts[0].script_tag = u32::from_be_bytes(*b"tibt");
+        let mut glyphs = vec![GsubGlyph {
+            glyph_id: 10,
+            source_index: 0,
+            substituted: false,
+            ligature_components: 1,
+        }];
+        assert!(!gsub.apply_tibetan_stack_presentation(
+            &mut glyphs,
+            None,
+            crate::commands::FontVariant::Normal,
+            None,
+            None
+        ));
+        assert!(glyphs[0].substituted);
+        assert_eq!(glyphs[0].glyph_id, 10);
     }
 
     #[test]
@@ -2106,11 +2158,13 @@ mod tests {
             GsubGlyph {
                 glyph_id: 10,
                 source_index: 0,
+                substituted: false,
                 ligature_components: 1,
             },
             GsubGlyph {
                 glyph_id: 11,
                 source_index: 1,
+                substituted: false,
                 ligature_components: 1,
             },
         ];
@@ -2138,6 +2192,7 @@ mod tests {
                     vec![GsubGlyph {
                         glyph_id: 20,
                         source_index: 0,
+                        substituted: true,
                         ligature_components: 2
                     }]
                 );
@@ -2148,6 +2203,7 @@ mod tests {
                 with_mark.push(GsubGlyph {
                     glyph_id: 12,
                     source_index: 2,
+                    substituted: false,
                     ligature_components: 1,
                 });
                 let mut glyphs = with_mark.clone();
@@ -2227,6 +2283,7 @@ mod tests {
                 .map(|(source_index, glyph_id)| GsubGlyph {
                     glyph_id,
                     source_index,
+                    substituted: false,
                     ligature_components: 1,
                 })
                 .collect();
@@ -2260,11 +2317,13 @@ mod tests {
             GsubGlyph {
                 glyph_id: 10,
                 source_index: 0,
+                substituted: false,
                 ligature_components: 1,
             },
             GsubGlyph {
                 glyph_id: 13,
                 source_index: 1,
+                substituted: false,
                 ligature_components: 1,
             },
         ];
@@ -2285,11 +2344,13 @@ mod tests {
             GsubGlyph {
                 glyph_id: 10,
                 source_index: 0,
+                substituted: false,
                 ligature_components: 1,
             },
             GsubGlyph {
                 glyph_id: 10,
                 source_index: 1,
+                substituted: false,
                 ligature_components: 1,
             },
         ];
@@ -2319,6 +2380,7 @@ mod tests {
                     .map(|source_index| GsubGlyph {
                         glyph_id: 10,
                         source_index,
+                        substituted: false,
                         ligature_components: 1,
                     })
                     .collect();

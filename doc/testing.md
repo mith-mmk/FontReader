@@ -311,3 +311,15 @@ independent fixture oracle. With `layout`, it also checks vertical metrics;
 without `layout`, it asserts `None` because this TTC's `vhea`/`vmtx` tables are
 not loaded. The test does not change runtime behavior or extend that assertion
 to other font containers.
+
+## Bounded composition beside unsupported neighbors
+
+`kana_composition` compares exact public glyph geometry for kana and modern
+Hangul beside untouched missing glyphs, including variation selectors,
+composed-only coverage, direct/family routes and horizontal, vertical, mixed
+and sideways rendering. Original synthetic fixture faces 10–13 retain the
+conservative rollback for context-only damage, non-first composed ligature
+inputs, expansion to a missing output and identity substitution of a missing
+neighbor. Internal tests additionally cover identity locale/joining operations
+and ensure a touched Tibetan identity is not a presentation change. This stage
+does not expose public source clusters or localize contextual causal effects.

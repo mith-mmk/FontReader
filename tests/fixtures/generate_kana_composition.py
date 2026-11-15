@@ -3,7 +3,9 @@ No external font input. Unicode 17.0 canonical pairs, fixed timestamps.
 Faces: 0 both forms, 1 composed only, 2 original only, 3 .notdef targets,
 4 ccmp/calt/vert, 5 missing ccmp output, 6 mixed contextual rollback,
 7 distinct fallback geometry, 8 incomplete original coverage,
-9 mixed rollback with composed-only hih neighbor.
+9 mixed rollback with composed-only hih neighbor; 10 context-only failure,
+11 non-first composed ligature input, 12 expansion failure, 13 identity missing
+contextual output.
 """
 from pathlib import Path
 from fontTools.fontBuilder import FontBuilder
@@ -134,6 +136,14 @@ def build(index):
           sub uAC01 u30D1' by .notdef;
           sub u30D1 uAC01' by .notdef;
         } calt;"""
+    if index == 10:
+        features = "languagesystem DFLT dflt; feature calt { sub u30D1 u304B' by .notdef; } calt;"
+    if index == 11:
+        features = 'languagesystem DFLT dflt; feature liga { sub u304B u30D1 by .notdef; } liga;'
+    if index == 12:
+        features = 'languagesystem DFLT dflt; feature ccmp { sub u30D1 by composed .notdef; } ccmp;'
+    if index == 13:
+        features = "languagesystem DFLT dflt; feature calt { sub u30D1 .notdef' by .notdef; } calt;"
     if features: addOpenTypeFeaturesFromString(fb.font, features)
     fb.font['head'].created = fb.font['head'].modified = 2082844800
     fb.font.recalcTimestamp = False
@@ -142,5 +152,5 @@ def build(index):
 
 if __name__ == '__main__':
     collection = TTCollection()
-    collection.fonts = [build(i) for i in range(10)]
+    collection.fonts = [build(i) for i in range(14)]
     collection.save(Path(__file__).with_name('kana-composition.ttc'))

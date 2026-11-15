@@ -27,6 +27,8 @@ const MAX_GSUB_NESTING: usize = 32;
 pub(crate) struct GsubGlyph {
     pub(crate) glyph_id: usize,
     pub(crate) source_index: usize,
+    // A sequence substitution may depend on normalized context, not only its owner.
+    pub(crate) substituted: bool,
     pub(crate) ligature_components: u16,
 }
 
@@ -182,23 +184,21 @@ impl JoiningForms {
     }
 
     pub(crate) fn substitute(self, glyph_id: usize, join_prev: bool, join_next: bool) -> usize {
-        if join_prev && join_next {
-            if let Some(glyph_id) = self.medial {
-                return glyph_id;
-            }
-        }
-        if join_prev {
-            if let Some(glyph_id) = self.final_form {
-                return glyph_id;
-            }
-        }
-        if join_next {
-            if let Some(glyph_id) = self.initial {
-                return glyph_id;
-            }
-        }
+        self.selected_substitution(join_prev, join_next)
+            .unwrap_or(glyph_id)
+    }
 
-        self.isolated.unwrap_or(glyph_id)
+    fn selected_substitution(self, join_prev: bool, join_next: bool) -> Option<usize> {
+        if join_prev && join_next && self.medial.is_some() {
+            return self.medial;
+        }
+        if join_prev && self.final_form.is_some() {
+            return self.final_form;
+        }
+        if join_next && self.initial.is_some() {
+            return self.initial;
+        }
+        self.isolated
     }
 }
 
@@ -720,6 +720,7 @@ impl Gsub {
                         }],
                     );
                     glyphs[index].glyph_id = replacement as usize;
+                    glyphs[index].substituted = true;
                     state.next_index = index + 1;
                     return true;
                 }
@@ -735,6 +736,7 @@ impl Gsub {
                         }],
                     );
                     glyphs[index].glyph_id = replacement as usize;
+                    glyphs[index].substituted = true;
                     state.next_index = index + 1;
                     return true;
                 }
@@ -760,6 +762,7 @@ impl Gsub {
                         .iter()
                         .map(|glyph_id| GsubGlyph {
                             glyph_id: *glyph_id as usize,
+                            substituted: true,
                             ..original
                         })
                         .collect::<Vec<_>>();
@@ -793,6 +796,7 @@ impl Gsub {
                             state.next_index = index + 1;
                             let replacement = GsubGlyph {
                                 glyph_id: record.ligature_glyph as usize,
+                                substituted: true,
                                 ligature_components: glyphs[index..end]
                                     .iter()
                                     .fold(0u16, |count, glyph| {
@@ -861,6 +865,7 @@ impl Gsub {
                     }],
                 );
                 glyphs[index].glyph_id = replacement as usize;
+                glyphs[index].substituted = true;
                 state.next_index = index + 1;
                 return true;
             }
@@ -1364,6 +1369,7 @@ impl Gsub {
             .map(|&(glyph_id, source_index)| GsubGlyph {
                 glyph_id,
                 source_index,
+                substituted: false,
                 ligature_components: 1,
             })
             .collect()
@@ -1533,7 +1539,13 @@ impl Gsub {
             if selected.contains(&pointer) {
                 let before = tracked.contains(&pointer).then(|| glyphs.clone());
                 self.apply_lookup_all_with_tables(lookup, glyphs, &mut state);
-                changed |= before.is_some_and(|before| before != *glyphs);
+                changed |= before.is_some_and(|before| {
+                    before.len() != glyphs.len()
+                        || before.iter().zip(glyphs.iter()).any(|(a, b)| {
+                            (a.glyph_id, a.source_index, a.ligature_components)
+                                != (b.glyph_id, b.source_index, b.ligature_components)
+                        })
+                });
                 if state.ambiguous_sources {
                     return (false, changed);
                 }
@@ -1601,13 +1613,20 @@ impl Gsub {
     }
 
     pub(crate) fn apply_joining_glyphs(&self, glyphs: &mut [GsubGlyph], locale: Option<&str>) {
-        let mut ids: Vec<_> = glyphs
+        let forms: Vec<_> = glyphs
             .iter()
-            .map(|glyph| (glyph.glyph_id, glyph.source_index))
+            .map(|glyph| self.lookup_joining_forms(glyph.glyph_id, locale))
             .collect();
-        self.apply_joining_sequence(&mut ids, locale);
-        for (glyph, (glyph_id, _)) in glyphs.iter_mut().zip(ids) {
-            glyph.glyph_id = glyph_id;
+        for index in 0..glyphs.len() {
+            let join_prev =
+                index > 0 && forms[index - 1].can_join_to_next() && forms[index].can_join_to_prev();
+            let join_next = index + 1 < glyphs.len()
+                && forms[index].can_join_to_next()
+                && forms[index + 1].can_join_to_prev();
+            if let Some(glyph_id) = forms[index].selected_substitution(join_prev, join_next) {
+                glyphs[index].glyph_id = glyph_id;
+                glyphs[index].substituted = true;
+            }
         }
     }
 
@@ -1749,6 +1768,15 @@ impl Gsub {
             }
         }
         applied.then_some(current)
+    }
+
+    pub(crate) fn apply_locale_glyph(&self, glyph: &mut GsubGlyph, locale: &str) {
+        if let Some(glyph_id) =
+            self.lookup_single_feature(glyph.glyph_id, Some(locale), &[*b"locl"])
+        {
+            glyph.glyph_id = glyph_id;
+            glyph.substituted = true;
+        }
     }
 
     // locl

@@ -289,3 +289,10 @@ source = "generate_unsupported_ivs.py (fontTools 4.68.0; no external font)"
 license = "MIT (project test code)"
 sha256 = "81045fad26689b080f3b0048642668f060b0382e1c28d9cfedc3ee6b353d4fac"
 features = ["UVS", "IVS", "cmap14", "family-fallback", "contextual-GSUB", "invalid-glyph-coverage"]
+
+[[fixture]]
+id = "kana-composition.ttc"
+source = "generate_kana_composition.py (fontTools 4.68.0; no external font)"
+license = "MIT (project test code)"
+sha256 = "41c93aa5e5e0a8275f97330008e7b6c1036146ed1b7ea756d60a12fe2adb1b2c"
+features = ["layout", "kana", "hangul", "bounded-composition", "contextual-rollback"]

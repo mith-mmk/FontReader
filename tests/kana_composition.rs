@@ -284,3 +284,92 @@ fn raw_single_scalar_apis_keep_independent_nominal_kana() {
         );
     }
 }
+
+#[test]
+#[cfg(feature = "layout")]
+fn unsupported_neighbor_does_not_decompose_valid_kana_or_hangul() {
+    let file = FontFile::from_buffer(FONT).unwrap();
+    for index in [1, 4, 9] {
+        let face = file.face(index).unwrap();
+        for direction in [
+            TextDirection::LeftToRight,
+            TextDirection::RightToLeft,
+            TextDirection::TopToBottom,
+        ] {
+            let engine = face
+                .engine()
+                .with_options(face.engine().options().with_text_direction(direction));
+            for (source, composed) in [("パ", "パ"), ("각", "각"), ("힣", "힣")]
+            {
+                for (left, right) in [
+                    ("☃", ""),
+                    ("", "☃"),
+                    ("☃か", "か☃"),
+                    ("☃\u{e0100}", "☃\u{fe00}"),
+                ] {
+                    let source = format!("{left}{source}{right}");
+                    let composed = format!("{left}{composed}{right}");
+                    same(
+                        &engine.shape(&source).unwrap(),
+                        &engine.shape(&composed).unwrap(),
+                    );
+                    same(
+                        &engine.shape_vertical_mixed_ltr(&source).unwrap(),
+                        &engine.shape_vertical_mixed_ltr(&composed).unwrap(),
+                    );
+                    same(
+                        &engine.shape_sideways_ltr(&source).unwrap(),
+                        &engine.shape_sideways_ltr(&composed).unwrap(),
+                    );
+                    let mut family = FontFamily::new("Primary");
+                    family.add_face(
+                        FontFaceDescriptor::new("Primary"),
+                        file.face(index).unwrap(),
+                    );
+                    let options = family.options().with_text_direction(direction);
+                    same(
+                        &family.text2glyph_run(&source, options.clone()).unwrap(),
+                        &family.text2glyph_run(&composed, options).unwrap(),
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
+#[cfg(feature = "layout")]
+fn touched_missing_outputs_preserve_conservative_contextual_rollback() {
+    let file = FontFile::from_buffer(FONT).unwrap();
+    for (index, text) in [(10, "パか"), (11, "かパ"), (12, "パ"), (13, "パ☃")] {
+        let face = file.face(index).unwrap();
+        let nominal = file.face(2).unwrap();
+        for direction in [
+            TextDirection::LeftToRight,
+            TextDirection::RightToLeft,
+            TextDirection::TopToBottom,
+        ] {
+            let options = face.engine().options().with_text_direction(direction);
+            let engine = face.engine().with_options(options.clone());
+            let control = nominal.engine().with_options(options.clone());
+            same(&engine.shape(text).unwrap(), &control.shape(text).unwrap());
+            same(
+                &engine.shape_vertical_mixed_ltr(text).unwrap(),
+                &control.shape_vertical_mixed_ltr(text).unwrap(),
+            );
+            same(
+                &engine.shape_sideways_ltr(text).unwrap(),
+                &control.shape_sideways_ltr(text).unwrap(),
+            );
+            let mut family = FontFamily::new("Primary");
+            family.add_face(
+                FontFaceDescriptor::new("Primary"),
+                file.face(index).unwrap(),
+            );
+            same(
+                &family.text2glyph_run(text, options).unwrap(),
+                &control.shape(text).unwrap(),
+            );
+        }
+    }
+}

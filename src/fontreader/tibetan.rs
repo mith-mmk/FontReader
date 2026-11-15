@@ -159,6 +159,7 @@ impl Font {
             .map(|(source_index, glyph)| GsubGlyph {
                 glyph_id: glyph.glyph_id,
                 source_index,
+                substituted: false,
                 ligature_components: 1,
             })
             .collect();
