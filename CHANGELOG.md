@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- Position adjacent, unligated Tibetan consonant/simple-vowel pairs using `tibt` `abvm`/`blwm` MarkToBase anchors only after existing mark attachment fails. Preserve locale selection and GDEF filtering; stacks, normalization, and global GSUB locale mapping remain out of scope.
+
 - Apply LTR contextual GSUB and sequence-aware vertical/mixed/sideways substitutions in font-authored LookupList order, preserving source and ligature component metadata through size changes. Keep one orientation feature per route and unchanged layout-disabled behavior.
 - Correct context/chaining format 1 record parsing, matched no-op rules, reverse Extension traversal, and bounded nested execution. GDEF-proven mark-free runs retain flagged ligatures; general skip-over-mark GSUB remains unsupported.
 - Add small reproducible MIT fixtures for contextual features, IVS cleanup order, nested expansion, required ligatures, orientation selection, and mark anchors. Raw scalar APIs, version and dependencies are unchanged. See the EN/JA feature status for shaping and filtering limits.

@@ -18,6 +18,23 @@ README は公開APIと実行例を優先し、細かい対応状況はここに�
 
 `layout` feature は一部のみ実装されています。
 
+### 基本的なチベット文字の母音アンカー
+
+`layout` 有効時、隣接する未合字のチベット子音（U+0F40–U+0F6C、
+未割当の U+0F48 を除く）と単純母音（U+0F71、U+0F72、U+0F74、
+U+0F7A–U+0F7D、U+0F80）に限定した GPOS fallback を行います。
+既存の `mkmk` / `mark` attachment を優先し、一致がない場合だけ
+明示的な `tibt` script の `abvm` / `blwm` MarkToBase を検索します。
+locale の言語系選択は保持し、`DFLT` や無関係な script には広げません。
+GDEF lookup filtering に従い、必要な GDEF 情報がない flagged lookup は
+安全側に倒して適用しません。アンカー差分には既存の画面座標変換と倍率を適用します。
+
+完全なチベット文字 shaping ではありません。積み重ね、分解可能な母音の正規化、
+並べ替えや複数記号列、script itemization、GSUB feature plan は未対応です。
+`bo` / `dz` から `tibt` へのグローバル GSUB locale mapping も変更しません。
+下母音の一部は `blws` 置換を必要とし、単独の GPOS アンカーが正しくても
+完全な HarfBuzz shaping とは異なります。コミット済みの合成テストに外部フォントは不要です。
+
 ### 縦メトリクスのフォールバック
 
 `FontEngine::shape`、計測、SVGは、vhea/vmtxの組がないfaceでも上から下への流れを保ちます。

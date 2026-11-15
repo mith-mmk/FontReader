@@ -19,6 +19,26 @@ See the [recipe](api-recipes.md#query-unicode-vertical-orientation) and
 
 `layout` is partially implemented.
 
+### Basic Tibetan vowel anchors
+
+With `layout`, a bounded GPOS fallback handles an adjacent, unligated Tibetan
+consonant (U+0F40–U+0F6C, excluding unassigned U+0F48) and simple vowel
+(U+0F71, U+0F72, U+0F74, U+0F7A–U+0F7D, or U+0F80). Existing `mkmk` and
+`mark` attachment retain priority. Only when they find no attachment does the
+fallback search `abvm`/`blwm` MarkToBase lookups in the explicit `tibt` script.
+It retains locale language-system selection and does not fall through to
+`DFLT` or unrelated scripts. GDEF lookup filtering is honored; flagged lookups
+are skipped when the needed GDEF information is unavailable. Anchor deltas use
+the normal screen-coordinate conversion and font/stretch scale.
+
+This is not complete Tibetan shaping: stacks, normalization of decomposable
+vowels, reordered/multiple-mark sequences, script itemization, and a coherent
+Tibetan GSUB feature plan remain unsupported. The global `bo`/`dz` to `tibt`
+GSUB locale mapping is unchanged. In particular, some below-vowel cases need
+`blws` substitutions and therefore differ from full HarfBuzz shaping even when
+the standalone GPOS anchor is correct. No external font is required by the
+committed synthetic tests.
+
 ### Vertical metrics fallback
 
 `FontEngine::shape`, measurement, and SVG keep top-to-bottom flow even when a
