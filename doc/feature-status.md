@@ -598,3 +598,40 @@ call. Broad real-font/HarfBuzz parity remains unverified.
 
 References: [GPOS pair adjustment](https://learn.microsoft.com/en-us/typography/opentype/spec/gpos#lookup-type-2-pair-adjustment-positioning-subtable)
 and [lookup flags](https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#lookupFlags).
+
+## Explicit composite font selection
+
+Development API (not published in 0.0.17): `CompositeFont`, `CompositeFontRule`
+and `UnicodeRange` are additive types with private fields. They do not add
+variants/fields to existing `FontRef`, `FontOptions`, descriptors or glyphs.
+
+- Inclusive scalar ranges, nonempty range sets and ordered face lists; reversed
+  endpoints and empty lists return `InvalidInput`.
+- Unicode 17.0 EGC boundaries and the existing parser representative are reused.
+  Prepend remains the representative; only it must match the range. Marks,
+  Hangul/Indic clusters, IVS and ZWJ sequences are not split between faces.
+- The first matching rule owns the cluster. Whole-cluster support is tested in
+  face-list order; on total failure its first face keeps `.notdef`. No later
+  rule or default list is tried. Existing support may accept a base glyph with
+  no requested UVS mapping; later UVS/color faces are not preferred. Coverage
+  does not promise complete contextual, Indic or emoji shaping.
+- Adjacent clusters choosing the same face object share a shaping span even
+  across rule boundaries. Face changes stop GSUB/GPOS context. A cloned face
+  is a distinct object. Both x and y advances carry across spans.
+- Size retains existing face-specific horizontal line-metric normalization
+  (ascender minus descender plus line gap, including supported variations),
+  not a shared UPEM normalization. Common stretch/locale/variant/axes are
+  forwarded. No per-rule size multiplier or baseline adjustment exists yet.
+- Only single-line horizontal LTR shape/measure/SVG is exposed. TAB, CR, LF,
+  VT, FF, NEL, U+2028 and U+2029 return `InvalidInput`. There is no vertical,
+  RTL/BiDi, wrapping, mixed-orientation or tate-chu-yoko composition API.
+- Measurement is the sum of horizontal advances, not ink width. SVG uses the
+  same composed run and existing exporter behavior. No feature is required;
+  optional shaping/color support remains governed by the existing features.
+
+Synthetic tests reuse the repository's MIT EGC, PairPos and ligature fixtures.
+Existing family fallback and horizontal/vertical APIs are unchanged.
+
+As with the existing face engine, extreme finite size/stretch and accumulated
+advances can overflow f32 geometry or measurements. This API does not add a
+numeric saturation or finite-output guarantee.

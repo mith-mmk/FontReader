@@ -431,7 +431,7 @@ impl<'a> FontEngine<'a> {
     }
 }
 
-fn validate_single_line(text: &str, context: &str) -> Result<(), Error> {
+pub(crate) fn validate_single_line(text: &str, context: &str) -> Result<(), Error> {
     if text.chars().any(|ch| {
         matches!(
             ch,

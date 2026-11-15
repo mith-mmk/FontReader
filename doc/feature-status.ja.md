@@ -514,3 +514,33 @@ Lookup ごとに異なる隣接グリフ、広い範囲の加算、走査位置�
 
 参照: [GPOS Pair Adjustment](https://learn.microsoft.com/en-us/typography/opentype/spec/gpos#lookup-type-2-pair-adjustment-positioning-subtable)、
 [Lookup Flags](https://learn.microsoft.com/en-us/typography/opentype/spec/chapter2#lookupFlags)。
+
+## 明示的な合成フォント選択
+
+開発中 API（公開済み 0.0.17 には未収録）の `CompositeFont`、`CompositeFontRule`、
+`UnicodeRange` は private fields を持つ追加型です。既存 `FontRef` の variant や
+`FontOptions`、descriptor、glyph の field は追加しません。
+
+- 範囲は両端を含む Unicode scalar。逆順、空の範囲集合・フェイス列は `InvalidInput`。
+- Unicode 17.0 EGC 境界と既存 parser の代表文字を使用。Prepend は代表文字のままです。
+  範囲一致は代表文字だけで判定し、結合文字、Hangul/Indic、IVS、ZWJ のクラスタを分割しません。
+- 最初に一致したルールが担当し、そのフェイス列でクラスタ全体の対応を順に確認します。
+  全候補が不足すれば先頭フェイスの `.notdef` を残し、別ルール・既定列へは移りません。
+  既存の対応判定は UVS mapping がない場合も基底グリフを許容します。
+  後続の UVS/color フェイスを優先せず、完全な Indic/emoji shaping を保証しません。
+- 同じフェイスオブジェクトの隣接クラスタはルール境界を越えて一緒に shaping します。
+  フェイス切替では GSUB/GPOS 文脈を区切り、x/y 両 advance を次の span に引き継ぎます。
+  clone したフェイスは別オブジェクトとして扱います。
+- サイズは既存のフェイス別行メトリクス（ascender − descender + line gap、対応する可変値を含む）
+  による正規化で、共通 UPEM への正規化ではありません。共通 stretch/locale/variant/可変軸を渡します。
+  ルール別倍率・ベースライン調整は次段階で、現 API にはありません。
+- 単一行の横書き LTR shape/measure/SVG 専用。TAB、CR、LF、VT、FF、NEL、U+2028、U+2029 は
+  `InvalidInput`。縦書き、RTL/BiDi、折返し、混在方向、縦中横との合成は提供しません。
+- 計測値は横 advance の合計で ink 幅ではありません。SVG は同じ合成 run を既存 exporter に渡します。
+  feature なしでも利用でき、追加 shaping/color 対応は既存 feature に従います。
+
+既存の MIT 合成 EGC・PairPos・ligature fixture で検証し、既存 family fallback と
+横書き・縦書き API の動作は変更しません。
+
+既存フェイスエンジンと同様、極端に大きい有限の size/stretch や advance の累積は
+f32 の座標・計測値で overflow を起こします。値の飽和処理や有限出力の保証は追加していません。
