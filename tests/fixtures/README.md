@@ -78,9 +78,13 @@ Timestamps are fixed by the source fixtures. No installed fonts are included.
 
 `mkmk-predecessor.ttc` and `generate_mkmk_predecessor.py` are original MIT
 fixtures derived only from `mark-coordinates.ttf`, with fixed timestamps.
-Regenerate using fontTools4.68.0. The 26 ordinary faces followed by 26 extension
+Regenerate using fontTools 4.68.0. The 35 ordinary faces followed by 35 extension
 copies cover filtering set/class, lookup fallback/order, target coverage/null
 anchor barriers, zero anchors, input precedence, explicit nonmark targets,
 missing/unknown classes, substitutions and ownership exclusions. Exact face
 names/order are in the generator. No installed-font bytes are included.
+The manifest hash identifies the committed bytes. Optional layout-table repacking
+can change serialized bytes; a pure-Python fontTools 4.68.0 regeneration was
+verified to have identical full TTX content across all 70 faces, excluding only
+`head.checkSumAdjustment`, without claiming byte-for-byte reproducibility.
 See `doc/mkmk-predecessor-search.md` for the conservative ownership bound.
