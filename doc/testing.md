@@ -304,6 +304,10 @@ registered-sequence filter, full CSS fallback, or universal Chrome parity.
 Font-authored unregistered mappings can differ from Chrome policy. Separate
 local real-font/Chrome checks are diagnostic, not required for the offline suite.
 
-The inherited `--no-default-features --features raw` combination still fails
-`raw_layout_getters_match_shaped_composite_metrics` in `tests/composite_gvar.rs`;
-this unrelated baseline limitation is not fixed by the selector change.
+The composite raw getter regression in `tests/composite_gvar.rs` runs with
+`--no-default-features --features raw` and with `raw,layout` (also included by
+`--all-features`). Both configurations check horizontal metrics against the
+independent fixture oracle. With `layout`, it also checks vertical metrics;
+without `layout`, it asserts `None` because this TTC's `vhea`/`vmtx` tables are
+not loaded. The test does not change runtime behavior or extend that assertion
+to other font containers.

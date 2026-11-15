@@ -214,22 +214,25 @@ fn raw_layout_getters_match_shaped_composite_metrics() {
         };
         let coordinates = [(f32::from(weight) - 400.0) / 500.0];
         let horizontal = font.get_horizontal_layout_with_coords(glyph_id, &coordinates);
-        let vertical = font
-            .get_vertical_layout_with_coords(glyph_id, &coordinates)
-            .unwrap();
         assert_eq!(
-            [
-                horizontal.advance_width,
-                horizontal.lsb,
-                vertical.advance_height,
-                vertical.tsb
-            ],
-            expected[..4]
-                .iter()
-                .copied()
-                .map(isize::from)
-                .collect::<Vec<_>>()
-                .as_slice(),
+            [horizontal.advance_width, horizontal.lsb],
+            [isize::from(expected[0]), isize::from(expected[1])],
+            "face {index}, weight {weight}, glyph {glyph}"
+        );
+        let vertical = font.get_vertical_layout_with_coords(glyph_id, &coordinates);
+        #[cfg(feature = "layout")]
+        {
+            let vertical = vertical.unwrap();
+            assert_eq!(
+                [vertical.advance_height, vertical.tsb],
+                [isize::from(expected[2]), isize::from(expected[3])],
+                "face {index}, weight {weight}, glyph {glyph}"
+            );
+        }
+        // This TTC's vhea/vmtx tables are only loaded with the layout feature.
+        #[cfg(not(feature = "layout"))]
+        assert!(
+            vertical.is_none(),
             "face {index}, weight {weight}, glyph {glyph}"
         );
     }
