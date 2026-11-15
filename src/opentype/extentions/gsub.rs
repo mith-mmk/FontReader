@@ -22,6 +22,8 @@ const MAX_GSUB_LOOKUP_APPLICATIONS: usize = 4096;
 
 const MAX_GSUB_NESTING: usize = 32;
 
+mod filtered_context;
+
 /// Metadata carried through every sequence substitution, before GPOS.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct GsubGlyph {
@@ -49,6 +51,7 @@ struct ApplyState<'a> {
     remaining: usize,
     depth: usize,
     next_index: usize,
+    filtered: filtered_context::FilteredState,
 }
 impl<'a> ApplyState<'a> {
     fn new(gdef: Option<&'a Gdef>, glyphs: &[GsubGlyph]) -> Self {
@@ -61,6 +64,7 @@ impl<'a> ApplyState<'a> {
             remaining: MAX_GSUB_LOOKUP_APPLICATIONS,
             depth: 0,
             next_index: 0,
+            filtered: filtered_context::FilteredState::default(),
         };
         state.replace_classes(&[], glyphs);
         state
@@ -167,6 +171,7 @@ impl<'a> ApplyState<'a> {
 
     fn enter(&mut self) -> bool {
         if self.remaining == 0 {
+            self.filtered.fail_if_enabled();
             return false;
         }
         self.remaining -= 1;
@@ -951,21 +956,43 @@ impl Gsub {
         state: &mut ApplyState,
     ) -> bool {
         if state.depth >= MAX_GSUB_NESTING || !state.enter() {
+            state.filtered.fail_if_enabled();
             return false;
         }
         let Some(lookup) = self.lookups.lookups.get(lookup_list_index as usize) else {
+            state.filtered.fail_if_enabled();
             return false;
         };
-        if !state.allows_lookup(lookup) {
-            return false;
-        }
         state.depth += 1;
-        let applied = lookup
-            .subtables
-            .iter()
-            .any(|subtable| self.apply_subtable_at_with_tables(subtable, glyphs, index, state));
+        let applied = self.dispatch_lookup_at(lookup, glyphs, index, state);
         state.depth -= 1;
         applied
+    }
+
+    fn dispatch_lookup_at(
+        &self,
+        lookup: &Lookup,
+        glyphs: &mut Vec<GsubGlyph>,
+        index: usize,
+        state: &mut ApplyState,
+    ) -> bool {
+        if state.filtered.failed {
+            return false;
+        }
+        let proven = state.allows_lookup(lookup);
+        if state.filtered.enabled && (!proven || state.filtered.input_bound.is_some()) {
+            return self.apply_filtered_lookup_at(lookup, glyphs, index, state);
+        }
+        if !proven {
+            return false;
+        }
+        for subtable in &lookup.subtables {
+            let applied = self.apply_subtable_at_with_tables(subtable, glyphs, index, state);
+            if applied || state.filtered.failed {
+                return applied;
+            }
+        }
+        false
     }
 
     fn apply_sequence_lookup_records(
@@ -983,6 +1010,7 @@ impl Gsub {
         // SequenceIndex addresses the sequence after earlier records' changes.
         for record in &records.lookup_records {
             if state.remaining == 0 {
+                state.filtered.fail_if_enabled();
                 break;
             }
             let target = start_index.saturating_add(record.sequence_index as usize);
@@ -1334,6 +1362,10 @@ impl Gsub {
         glyphs: &mut Vec<GsubGlyph>,
         state: &mut ApplyState,
     ) {
+        if state.filtered.enabled {
+            self.apply_filtered_transaction_lookup(lookup, glyphs, state);
+            return;
+        }
         if !state.allows_lookup(lookup) {
             return;
         }
@@ -1511,6 +1543,26 @@ impl Gsub {
         orientation_tag: Option<[u8; 4]>,
         gdef: Option<&Gdef>,
     ) -> bool {
+        self.apply_tibetan_stack_presentation_with_filtering(
+            glyphs,
+            locale,
+            variant,
+            orientation_tag,
+            gdef,
+            false,
+        )
+    }
+
+    /// Opt-in prerequisite only. Existing callers remain on the no-skip proof.
+    pub(crate) fn apply_tibetan_stack_presentation_with_filtering(
+        &self,
+        glyphs: &mut Vec<GsubGlyph>,
+        locale: Option<&str>,
+        variant: crate::commands::FontVariant,
+        orientation_tag: Option<[u8; 4]>,
+        gdef: Option<&Gdef>,
+        filtered_context: bool,
+    ) -> bool {
         let tracked = self.collect_tibetan_stack_lookups(locale, &[*b"abvs", *b"blws"]);
         let mut tags = vec![
             *b"abvs", *b"blws", *b"rlig", *b"rclt", *b"calt", *b"clig", *b"liga",
@@ -1520,7 +1572,13 @@ impl Gsub {
         if let Some(tag) = orientation_tag {
             selected.extend(self.collect_feature_lookups(None, &[tag]));
         }
-        let (safe, changed) = self.apply_tibetan_selected_glyphs(glyphs, selected, &tracked, gdef);
+        let (safe, changed) = self.apply_tibetan_selected_glyphs_with_filtering(
+            glyphs,
+            selected,
+            &tracked,
+            gdef,
+            filtered_context,
+        );
         safe && changed
     }
 
@@ -1531,6 +1589,18 @@ impl Gsub {
         tracked: &[&Lookup],
         gdef: Option<&Gdef>,
     ) -> (bool, bool) {
+        self.apply_tibetan_selected_glyphs_with_filtering(glyphs, selected, tracked, gdef, false)
+    }
+
+    fn apply_tibetan_selected_glyphs_with_filtering(
+        &self,
+        glyphs: &mut Vec<GsubGlyph>,
+        selected: Vec<&Lookup>,
+        tracked: &[&Lookup],
+        gdef: Option<&Gdef>,
+        filtered_context: bool,
+    ) -> (bool, bool) {
+        let original = filtered_context.then(|| glyphs.clone());
         let selected: HashSet<*const Lookup> = selected
             .into_iter()
             .map(|lookup| lookup as *const Lookup)
@@ -1540,6 +1610,7 @@ impl Gsub {
             .map(|lookup| *lookup as *const Lookup)
             .collect();
         let mut state = ApplyState::new(gdef, glyphs);
+        state.filtered.enabled = filtered_context;
         // Maintain only distinct IDs, rather than rescanning the run at every
         // cursor. Counts are updated by every nested replacement as well.
         let mut counts = HashMap::new();
@@ -1563,7 +1634,11 @@ impl Gsub {
                                 != (b.glyph_id, b.source_index, b.ligature_components)
                         })
                 });
-                if state.ambiguous_sources {
+                if state.ambiguous_sources || state.filtered.failed {
+                    if let Some(original) = original {
+                        *glyphs = original;
+                        return (false, false);
+                    }
                     return (false, changed);
                 }
             }
