@@ -2360,7 +2360,7 @@ impl Font {
     }
 
     #[cfg(feature = "layout")]
-    fn gdef_supports_mark_attachment(&self, glyph_id: u16) -> bool {
+    fn gdef_has_legacy_mark_evidence(&self, glyph_id: u16) -> bool {
         self.current_gdef()
             .map(|gdef| {
                 gdef.is_mark_glyph(glyph_id)
@@ -2371,7 +2371,7 @@ impl Font {
     }
 
     #[cfg(not(feature = "layout"))]
-    fn gdef_supports_mark_attachment(&self, glyph_id: u16) -> bool {
+    fn gdef_has_legacy_mark_evidence(&self, glyph_id: u16) -> bool {
         let _ = glyph_id;
         false
     }
@@ -2637,7 +2637,7 @@ impl Font {
                     );
                     let uses_gpos_mark_attachment = mark_attachment.is_some();
                     let gdef_attach_glyph_index = if !uses_gpos_mark_attachment
-                        && self.gdef_supports_mark_attachment(glyph_id as u16)
+                        && self.gdef_has_legacy_mark_evidence(glyph_id as u16)
                     {
                         self.find_previous_spacing_glyph_index(&shaped_units, index)
                             .and_then(|unit_index| unit_glyph_indices.get(unit_index))
@@ -2645,18 +2645,22 @@ impl Font {
                     } else {
                         None
                     };
-                    let uses_gdef_mark_attachment =
-                        !uses_gpos_mark_attachment && gdef_attach_glyph_index.is_some();
+                    // Keep the historical nominal-zeroing policy separate from
+                    // attachment. GDEF classes/AttachList do not supply an anchor.
+                    let zero_gdef_nominal_advance = gdef_attach_glyph_index
+                        .and_then(|index| glyphs.get(index))
+                        .is_some();
+                    #[cfg(feature = "layout")]
+                    let gdef_attach_glyph_index =
+                        gdef_attach_glyph_index.filter(|_| self.current_gpos().is_none());
                     let attach_glyph_index = mark_attachment
                         .map(|attachment| attachment.glyph_index)
                         .or(gdef_attach_glyph_index);
                     let attachment_base = attach_glyph_index.and_then(|index| glyphs.get(index));
-                    let uses_mark_attachment = (uses_gpos_mark_attachment
-                        || uses_gdef_mark_attachment)
-                        && attachment_base.is_some();
+                    let uses_mark_attachment = attachment_base.is_some();
                     // Attached marks start with zero advance, then GPOS may
                     // explicitly add one. Do not erase SinglePos values afterward.
-                    let zero_nominal_advance = uses_mark_attachment;
+                    let zero_nominal_advance = uses_mark_attachment || zero_gdef_nominal_advance;
                     #[cfg(feature = "layout")]
                     let zero_nominal_advance = zero_nominal_advance
                         || (!adjustment.authored_pair
@@ -5210,6 +5214,27 @@ mod text_control_tests {
         for ch in ['\u{000b}', '\u{000c}', '\u{0085}', '\u{2028}', '\u{2029}'] {
             let text = format!("A\u{200d}{ch}");
             assert_eq!(unit_texts(&text), ["A\u{200d}".to_owned(), ch.to_string()]);
+        }
+    }
+}
+
+#[cfg(test)]
+mod unanchored_legacy_tests {
+    use crate::FontFile;
+    const FONT: &[u8] = include_bytes!("../tests/fixtures/unanchored-mark.ttc");
+    #[test]
+    fn legacy_commands_do_not_inherit_new_gdef_origin_policy() {
+        let file = FontFile::from_buffer(FONT).unwrap();
+        for mode in 0..6 {
+            for advance in 0..2 {
+                let baseline = file.face(mode * 6 + advance * 3).unwrap();
+                let expected = baseline.font().text2commands("A\u{301}B").unwrap();
+                for evidence in 1..3 {
+                    let face = file.face(mode * 6 + advance * 3 + evidence).unwrap();
+                    let actual = face.font().text2commands("A\u{301}B").unwrap();
+                    assert_eq!(format!("{:?}", actual), format!("{:?}", expected));
+                }
+            }
         }
     }
 }
