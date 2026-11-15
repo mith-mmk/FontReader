@@ -10,6 +10,7 @@
 
 ### Fixed
 
+- Reject malformed GSUB/GPOS extension headers before following their offsets, preventing recursive extension parsing. Check extension offset arithmetic and preserve valid 32-bit extension targets (see [validation scope](doc/extension-parser-validation.md)); no public API, dependency, version or release change.
 - Filter the current input of ordinary GPOS mark attachment lookups using GDEF, including ExtensionPos. Preserve attachment-target search and the existing synthetic GDEF origin fallback; this is bounded HarfBuzz-compatible filtering, not general mark-layout parity. See [scope and tests](doc/mark-input-filtering.md).
 
 - Keep SVG path clips and gradients in the same translated coordinate system as their positioned glyph, including composite baseline shifts and preceding-span advances. Plain paths retain their existing export format.
