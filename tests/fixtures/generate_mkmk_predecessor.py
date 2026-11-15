@@ -20,6 +20,9 @@ CASES = [
     'identity', 'single', 'multiple', 'multiple_one', 'ligature',
     'unclassified_base', 'ignore_base', 'ignore_ligature',
     'expansion_deletion', 'ligature_multiple',
+    'mark_single', 'context_single', 'reverse_single', 'class_roundtrip',
+    'unknown_roundtrip', 'multiple_single', 'ligature_single',
+    'extension_single', 'single_format2',
 ]
 fonts = []
 for extension in [False, True]:
@@ -53,12 +56,21 @@ for extension in [False, True]:
             flag = 'lookupflag IgnoreLigatures UseMarkFilteringSet [acute bracket];'
         gsub = {
             'identity': 'sub A by A;', 'single': 'sub A by B;',
+            'mark_single': 'sub acute by bracket;',
+            'extension_single': 'sub A by B;',
+            'single_format2': 'sub [A acute] by [B acute];',
+            'context_single': "sub A' acute by B;",
+            'reverse_single': "rsub A' acute by B;",
+            'class_roundtrip': 'lookup X { sub A by comma; } X; lookup Y { sub comma by A; } Y;',
+            'unknown_roundtrip': 'lookup X { sub A by B; } X; lookup Y { sub B by A; } Y;',
+            'multiple_single': 'lookup X { sub A by A B; } X; lookup Y { sub B by NULL; } Y; lookup Z { sub A by A; } Z;',
+            'ligature_single': 'lookup X { sub A A by B; } X; lookup Y { sub B by A; } Y;',
             'multiple': 'sub A by A A;', 'multiple_one': 'sub A by A;',
             'ligature': 'sub A A by B;',
             'expansion_deletion': 'lookup Expand { sub A by A B; } Expand; lookup Delete { sub B by NULL; } Delete;',
             'ligature_multiple': 'lookup Lig { sub A A by B; } Lig; lookup Multi { sub B by A; } Multi;',
         }.get(name, '')
-        target = 'bracket' if name == 'zero_anchor' else 'acute'
+        target = 'bracket' if name in ['zero_anchor', 'mark_single'] else 'acute'
         if name in ['eligible_null_anchor', 'covered_base', 'covered_ligature', 'covered_component']:
             target = '[acute comma]'
         first = f'lookup First {{ {flag} pos mark {target} <anchor 100 800> mark @TOP; }} First;'
@@ -87,6 +99,8 @@ for extension in [False, True]:
             del f['GDEF']
         if name == 'unclassified':
             gdef.GlyphClassDef.classDefs.pop('acute')
+        if name == 'unknown_roundtrip':
+            gdef.GlyphClassDef.classDefs.pop('B')
         if name == 'unclassified_base':
             gdef.GlyphClassDef.classDefs.pop('A')
         if name == 'missing_classdef':
@@ -96,6 +110,14 @@ for extension in [False, True]:
             lookup = f['GSUB'].table.LookupList.Lookup[-1]
             sub = otTables.MultipleSubst(); sub.mapping = {'B': ['A']} if name == 'ligature_multiple' else {'A': ['A']}
             lookup.LookupType = 2; lookup.SubTable = [sub]
+        if name == 'extension_single':
+            for lookup in f['GSUB'].table.LookupList.Lookup:
+                wrapped = []
+                for sub in lookup.SubTable:
+                    e = otTables.ExtensionSubst(); e.Format = 1
+                    e.ExtensionLookupType = lookup.LookupType; e.ExtSubTable = sub
+                    wrapped.append(e)
+                lookup.LookupType = 7; lookup.SubTable = wrapped
         for lookup in f['GPOS'].table.LookupList.Lookup:
             if lookup.LookupType == 6:
                 for sub in lookup.SubTable:

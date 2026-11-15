@@ -249,7 +249,8 @@ struct ResolvedGlyph {
     source_start: usize,
     #[cfg(feature = "layout")]
     source_end: usize,
-    // Only untouched one-to-one nominal inputs retain their original grapheme.
+    // Nominal sources and proven class-preserving single substitutions retain
+    // their original grapheme; this never represents ligature components.
     #[cfg(feature = "layout")]
     simple_mkmk_cluster: Option<usize>,
     #[cfg(feature = "layout")]
@@ -1573,6 +1574,7 @@ impl Font {
                         glyph_id: glyph.glyph_id,
                         source_index,
                         substituted: false,
+                        mkmk_source_ambiguous: false,
                         ligature_components: glyph.ligature_components,
                     },
                 )
@@ -1664,7 +1666,7 @@ impl Font {
                 .into_iter()
                 .zip(residual_marks)
                 .map(|(item, kana_residual_mark)| ResolvedGlyph {
-                    simple_mkmk_cluster: (!item.substituted
+                    simple_mkmk_cluster: (!item.mkmk_source_ambiguous
                         && source_output_counts[item.source_index] == 1
                         && item.ligature_components == 1)
                         .then_some(glyphs[item.source_index].simple_mkmk_cluster)

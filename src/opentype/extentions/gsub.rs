@@ -29,6 +29,9 @@ pub(crate) struct GsubGlyph {
     pub(crate) source_index: usize,
     // A sequence substitution may depend on normalized context, not only its owner.
     pub(crate) substituted: bool,
+    // Monotonic: only class-preserving table-driven single substitutions keep
+    // original simple mark ownership. This is not ligature component metadata.
+    pub(crate) mkmk_source_ambiguous: bool,
     pub(crate) ligature_components: u16,
 }
 
@@ -70,6 +73,11 @@ impl<'a> ApplyState<'a> {
             Some(GlyphClass::Mark) => Some(2),
             _ => None,
         }
+    }
+
+    fn preserves_simple_class(&self, original: usize, replacement: usize) -> bool {
+        matches!(self.class_index(original), Some(0 | 2))
+            && self.class_index(original) == self.class_index(replacement)
     }
 
     fn replace_classes(&mut self, removed: &[GsubGlyph], added: &[GsubGlyph]) {
@@ -719,6 +727,8 @@ impl Gsub {
                             ..original
                         }],
                     );
+                    glyphs[index].mkmk_source_ambiguous |=
+                        !state.preserves_simple_class(glyph_id, replacement as usize);
                     glyphs[index].glyph_id = replacement as usize;
                     glyphs[index].substituted = true;
                     state.next_index = index + 1;
@@ -735,6 +745,8 @@ impl Gsub {
                             ..original
                         }],
                     );
+                    glyphs[index].mkmk_source_ambiguous |=
+                        !state.preserves_simple_class(glyph_id, replacement as usize);
                     glyphs[index].glyph_id = replacement as usize;
                     glyphs[index].substituted = true;
                     state.next_index = index + 1;
@@ -763,6 +775,7 @@ impl Gsub {
                         .map(|glyph_id| GsubGlyph {
                             glyph_id: *glyph_id as usize,
                             substituted: true,
+                            mkmk_source_ambiguous: true,
                             ..original
                         })
                         .collect::<Vec<_>>();
@@ -797,6 +810,7 @@ impl Gsub {
                             let replacement = GsubGlyph {
                                 glyph_id: record.ligature_glyph as usize,
                                 substituted: true,
+                                mkmk_source_ambiguous: true,
                                 ligature_components: glyphs[index..end]
                                     .iter()
                                     .fold(0u16, |count, glyph| {
@@ -864,6 +878,8 @@ impl Gsub {
                         ..original
                     }],
                 );
+                glyphs[index].mkmk_source_ambiguous |=
+                    !state.preserves_simple_class(glyph_id, replacement as usize);
                 glyphs[index].glyph_id = replacement as usize;
                 glyphs[index].substituted = true;
                 state.next_index = index + 1;
@@ -1370,6 +1386,7 @@ impl Gsub {
                 glyph_id,
                 source_index,
                 substituted: false,
+                mkmk_source_ambiguous: false,
                 ligature_components: 1,
             })
             .collect()
@@ -1625,6 +1642,7 @@ impl Gsub {
                 {
                     glyph.glyph_id = replacement;
                     glyph.substituted = true;
+                    glyph.mkmk_source_ambiguous = true;
                 }
             }
         }
@@ -1776,6 +1794,7 @@ impl Gsub {
         {
             glyph.glyph_id = glyph_id;
             glyph.substituted = true;
+            glyph.mkmk_source_ambiguous = true;
         }
     }
 
