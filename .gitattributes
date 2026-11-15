@@ -7,3 +7,6 @@
 # The generator emits LF regardless of the contributor's platform.
 /src/unicode/vertical_orientation_data.rs text eol=lf
 /src/unicode/enclosing_mark_data.rs text eol=lf
+
+/data/unicode/17.0.0/UnicodeData.txt -text
+/src/unicode/tibetan_normalization_data.rs text eol=lf

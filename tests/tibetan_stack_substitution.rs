@@ -103,9 +103,6 @@ fn unsupported_whole_clusters_and_cmap_aliases_keep_the_legacy_path() {
             "\u{f40}\u{301}",
             "\u{f48}\u{f90}",
             "\u{f6d}\u{f90}",
-            "\u{f43}\u{f90}",
-            "\u{f69}\u{f90}",
-            "\u{f40}\u{f93}",
             "\u{f40}\u{f98}",
             "\u{f40}\u{f73}",
             "\u{f40}\u{f75}",
@@ -231,24 +228,25 @@ fn scale_stretch_and_vertical_routes_keep_stack_and_mark_geometry() {
     );
     let face = file.face(21).unwrap();
     let engine = face.engine().with_font_size(1000.0);
-    let text = "\u{f40}\u{f90}";
-    assert_eq!(widths(&engine.shape(text).unwrap()), [170.0]);
-    assert_eq!(
-        widths(&engine.clone().with_vertical_flow().shape(text).unwrap()),
-        [180.0]
-    );
-    // Tibetan has Unicode R orientation. Both routes must select vrtr's
-    // distinct stage outline (160 wide), then rotate it, not just form a stack.
-    for run in [
-        engine.shape_vertical_mixed_ltr(text).unwrap(),
-        engine.shape_sideways_ltr(text).unwrap(),
-    ] {
-        assert_eq!(run.glyphs.len(), 1);
-        let bounds = run.glyphs[0].glyph.metrics.bounds.unwrap();
+    for text in ["\u{f40}\u{f90}", "\u{f43}"] {
+        assert_eq!(widths(&engine.shape(text).unwrap()), [170.0]);
         assert_eq!(
-            (bounds.max_x - bounds.min_x, bounds.max_y - bounds.min_y),
-            (400.0, 160.0)
+            widths(&engine.clone().with_vertical_flow().shape(text).unwrap()),
+            [180.0]
         );
+        // Tibetan has Unicode R orientation. Both routes must select vrtr's
+        // distinct stage outline (160 wide), then rotate it, not just form a stack.
+        for run in [
+            engine.shape_vertical_mixed_ltr(text).unwrap(),
+            engine.shape_sideways_ltr(text).unwrap(),
+        ] {
+            assert_eq!(run.glyphs.len(), 1);
+            let bounds = run.glyphs[0].glyph.metrics.bounds.unwrap();
+            assert_eq!(
+                (bounds.max_x - bounds.min_x, bounds.max_y - bounds.min_y),
+                (400.0, 160.0)
+            );
+        }
     }
 }
 
@@ -308,5 +306,21 @@ fn family_probe_checks_legacy_output_before_grouping_with_unsupported_neighbors(
             if text.contains('A') { 150.0 } else { 170.0 },
             "{text:?}"
         );
+    }
+}
+
+#[test]
+#[cfg(feature = "layout")]
+fn canonical_consonants_enter_the_bounded_stack_plan() {
+    for locale in [None, Some("bo"), Some("tibt"), Some("en")] {
+        for (compound, decomposed) in [
+            ("\u{f43}\u{f90}", "\u{f42}\u{fb7}\u{f90}"),
+            ("\u{f69}\u{f90}", "\u{f40}\u{fb5}\u{f90}"),
+            ("\u{f40}\u{f93}", "\u{f40}\u{f92}\u{fb7}"),
+        ] {
+            let actual = shape(0, compound, locale);
+            assert_eq!(widths(&actual), [180.0]);
+            same(&actual, &shape(0, decomposed, locale));
+        }
     }
 }

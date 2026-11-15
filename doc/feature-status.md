@@ -34,15 +34,15 @@ the normal screen-coordinate conversion and font/stretch scale.
 ### Bounded Tibetan substitution runs
 
 With `layout`, a separate `tibt` plan can form single-glyph stacks and select
-simple-vowel alternates. Every original grapheme in the current shaping run
-must be an already ordered, nondecomposable Tibetan base with optional
-subjoined consonants and at most one simple vowel. A stacked consonant followed
-by an above vowel is deliberately excluded. At least one base must have a
-component. Spaces, punctuation, another script, compound/decomposable scalars,
-multiple or reordered vowels, variation selectors and joiners disable this
-plan for the entire run. Tabs/newlines retain their existing run boundaries.
-This restriction applies to horizontal and explicit vertical routes; it is
-not general script itemization or complete USE/Tibetan support.
+simple-vowel alternates. After the bounded canonical preprocessing described
+below, every original grapheme must contain a Tibetan base, optional subjoined
+consonants, and at most one simple vowel or the lower-vowel tail AA+U. A stacked
+consonant followed by an above vowel remains excluded. At least one base needs
+a component. Spaces, punctuation, another script, unsupported vowels, variation
+selectors and joiners disable the plan for the entire run. Tabs/newlines retain
+their existing run boundaries. This restriction applies to horizontal and
+explicit vertical routes; it is not general script itemization or complete
+USE/Tibetan support.
 
 The font must expose `abvs` or `blws` in the selected `tibt` language system.
 `locl`/`ccmp` run as cluster preprocessing; `abvs`, `blws`, existing contextual,
@@ -70,19 +70,46 @@ matching is still unsupported. Consequently, two stacks that work individually
 can roll back when combined with another mark excluded by a required lookup.
 No full-font or full-script parity is claimed.
 
-#### Normalization remains a separate next stage
+#### Bounded canonical normalization
 
-A future normalization stage must be font-aware, keep original fallback
-graphemes and source ownership separate from normalized shaping scalars, and
-preserve composed characters when decomposition components are unavailable.
-It must test canonical order and HarfBuzz's modified Tibetan combining classes,
-not apply blanket NFD/CCC sorting or change selector sequences. Canonical
-U+0F73/U+0F75/U+0F76/U+0F78/U+0F81 and decomposable consonants need equivalence
-and component-coverage tests. U+0F77/U+0F79 have compatibility decompositions
-and must not silently enter canonical normalization. Orphan dotted circles,
-retained upper vowels on ligated stacks, and general mark skipping remain
-unimplemented. See the [USE feature stages](https://learn.microsoft.com/en-us/typography/script-development/use#opentype-feature-application-ii)
-and [Unicode 17 normalization data](https://www.unicode.org/Public/17.0.0/ucd/UnicodeData.txt).
+Canonical Tibetan properties are pinned to **Unicode 17.0.0**, matching the
+original grapheme boundaries, independently of the Unicode 18 property tables.
+The 17 canonical decompositions and 19 nonzero combining classes come from the
+checked-in official UnicodeData.txt, with a checksum-verifying offline generator
+and independent Rust source parser. There is no host-Python Unicode dependency.
+
+Only a private candidate buffer is decomposed, and only when both components
+have renderable cmap coverage in the current face. Missing components preserve
+the original scalar. Stable canonical ordering moves complete source records
+and stops at CCC 0 (including subjoined consonants). More than two nonzero-CCC
+marks are rejected before sorting. There is no recomposition, compatibility
+mapping, HarfBuzz-modified CCC, or general-purpose NFD API.
+
+The accepted new forms are decomposable base/subjoined consonants and U+0F75
+(UU), including literal AA+U and reordered U+AA, **only if the font's selected
+lookups fully collapse all lower/subjoined components**. Some fonts still fall
+back for compound subjoined consonants. U+0F73/U+0F76/U+0F78/U+0F81, AA+above
+vowels, upper vowels on stacks, U+0F77/U+0F79 compatibility forms, orphan dotted
+circles and punctuation/mixed runs remain unsupported by this plan.
+
+Each candidate keeps the normalized shaping scalar separate from the original
+source character, original grapheme, and scalar interval. Decomposition copies
+ownership; reordering moves it; ligation must cover an exact contiguous original
+interval without sharing a decomposed source between outputs. GSUB ligature
+component counts still count normalized glyph components, not original scalars.
+Source-bearing legacy exports retain original characters. No public structs or
+source-mapping API are added. New normalized/AA+U candidates also roll back if
+the final output lacks coverage, preserving available originals. Unchanged
+previously admitted runs keep their prior missing-output fallback policy.
+
+FontFamily still selects using original graphemes and requires both candidate
+and legacy coverage, since later grouping can disable the plan. Thus an explicit
+single face can normalize a missing compound from available components while
+FontFamily conservatively rejects that face if the original legacy path is
+incomplete. Raw single-glyph APIs and layout-disabled behavior are unchanged.
+See [Unicode data provenance](../data/unicode/README.md#tibetan-canonical-properties-unicode-1700),
+[USE feature stages](https://learn.microsoft.com/en-us/typography/script-development/use#opentype-feature-application-ii),
+and [UAX #15 revision 57](https://www.unicode.org/reports/tr15/tr15-57.html).
 
 ### Vertical metrics fallback
 

@@ -32,13 +32,13 @@ GDEF lookup filtering に従い、必要な GDEF 情報がない flagged lookup 
 ### 範囲を限定したチベット文字の置換 run
 
 `layout` 有効時、明示的な `tibt` plan により、一グリフにまとまる積み重ねと
-単純母音の異体字を処理します。run 全体の各書記素が、分解不要なチベット基底子音、
-任意個の下付き子音、最大一個の単純母音という順序である場合だけが対象です。
-下付き子音の後の上母音は除外します。少なくとも一組の子音＋成分が必要です。
-空白・句読点・別の文字体系・分解対象文字・複合母音・複数母音・並べ替えが必要な列・
-VS・joiner が含まれる場合は run 全体を従来経路に戻します。タブと改行の既存境界は
-維持します。横書きと明示的な縦書き経路に共通する制限であり、汎用的な script
-itemization や完全な USE／チベット文字対応ではありません。
+単純母音の異体字を処理します。後述の限定的な canonical 前処理後に、各元書記素が
+基底子音・任意個の下付き子音・最大一個の単純母音または下母音 AA+U の順になる
+場合だけが対象です。下付き子音の後の上母音は除外します。少なくとも一組の
+子音＋成分が必要です。空白・句読点・別文字体系・未対応母音・VS・joiner があれば
+run 全体を従来経路へ戻します。タブと改行の既存境界を維持します。横書きと
+明示的な縦書き経路に共通する制限であり、汎用的な script itemization や完全な
+USE／チベット文字対応ではありません。
 
 選択した `tibt` 言語系に `abvs` または `blws` が必要です。`locl` / `ccmp` を
 書記素ごとに前処理し、その後 `abvs` / `blws` と既存の contextual / ligature /
@@ -59,16 +59,40 @@ lookup を実行します。IgnoreMarks、filter set、attachment class の優�
 一般的な mark の飛び越しは未対応です。個別には処理できる二つの積み重ねでも、
 組み合わせると必要な lookup が別の記号を除外するため run 全体が従来経路へ戻る場合があります。
 
-#### 正規化は次の独立した段階
+#### 範囲を限定した canonical 正規化
 
-今後はフォントの成分 coverage を考慮し、元の fallback 書記素・source ownership と
-正規化後の shaping scalar を分離する必要があります。単純な NFD や CCC sort ではなく、
-HarfBuzz のチベット用修正 CCC、分解成分が欠ける場合の元文字維持、VS の扱いも検証します。
-U+0F73 / U+0F75 / U+0F76 / U+0F78 / U+0F81 と分解可能な子音の canonical equivalence
-を対象にし、compatibility 分解の U+0F77 / U+0F79 は混ぜません。孤立記号の dotted circle、
-合字積み重ね上の残存上母音、一般的な mark skipping は未対応です。
-[USE の feature 段階](https://learn.microsoft.com/en-us/typography/script-development/use#opentype-feature-application-ii)と
-[Unicode 17 正規化データ](https://www.unicode.org/Public/17.0.0/ucd/UnicodeData.txt)を参照してください。
+元の書記素境界と同じ **Unicode 17.0.0** の canonical 分解 17 件と非ゼロ CCC
+19 件を使用します。Unicode 18 の別プロパティ表とは独立しています。公式
+UnicodeData.txt 原本、ハッシュを検証するオフライン生成器、独立した Rust の
+原本照合テストを同梱し、ホスト Python の Unicode データには依存しません。
+
+分解は独立した候補バッファで行い、現在の face に両成分の描画可能な cmap coverage
+がある場合だけ採用します。欠ける場合は元文字を保ちます。canonical order は
+所有情報ごと安定に並べ替え、下付き子音を含む CCC 0 を越えません。非ゼロ CCC
+が三個以上なら並べ替え前に除外します。再合成・compatibility 分解・HarfBuzz 修正
+CCC・汎用 NFD API は実装しません。
+
+新たな対象は分解可能な基底／下付き子音と U+0F75（UU）、明示的な AA+U および
+逆順 U+AA です。ただし、選択された lookup により全下母音・下付き成分が
+完全に統合される場合に限ります。フォントによっては複合下付き子音も従来経路へ
+戻ります。U+0F73 / U+0F76 / U+0F78 / U+0F81、AA＋上母音、積み重ね上の上母音、
+compatibility 分解の U+0F77 / U+0F79、孤立記号の dotted circle、句読点・混植 run
+はこの plan の対象外です。
+
+shaping scalar と元の文字・書記素・スカラー範囲を分離します。分解は所有情報を
+複製し、並べ替えは情報ごと移動し、合字は元の連続範囲を正確に所有する必要が
+あります。同じ元文字を複数出力へ分割しません。GSUB の ligature component 数は
+元文字数ではなく正規化後のグリフ成分数です。文字情報を持つ従来 export では
+元文字を維持します。公開構造体や source mapping API は追加しません。
+新たな正規化／AA+U 候補の最終出力が欠字なら、利用可能な元文字へ戻します。
+従来から対象だった入力の欠字 fallback 方針は変更しません。
+
+FontFamily は元書記素で face を選び、候補と従来経路の両 coverage を確認します。
+そのため、単独 face では成分から欠けた複合文字を描画できても、後の run 結合で
+従来経路になり得る FontFamily では、その face を保守的に除外します。
+raw 単一グリフ API と layout 無効時の動作は変更しません。
+[Unicode データ出典](../data/unicode/README.md#tibetan-canonical-properties-unicode-1700)と
+[UAX #15 revision 57](https://www.unicode.org/reports/tr15/tr15-57.html)を参照してください。
 
 ### 縦メトリクスのフォールバック
 

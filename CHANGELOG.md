@@ -4,7 +4,10 @@
 
 ### Fixed
 
-- Add a transactional, whole-run Tibetan `tibt` GSUB plan for ordered nondecomposable single-glyph stacks and simple-vowel alternates. Preserve whole-run presentation context, explicit language selection, and legacy output for mixed/unsupported/incomplete runs. Use exact no-excluded-glyph GDEF proofs only within this plan; general mark skipping and normalization remain unsupported.
+- Add font-aware, transactional Unicode 17 canonical Tibetan decomposition and bounded ordering for fully collapsed consonant/subjoined forms and UU / AA+U / U+AA. Preserve original source/grapheme ownership independently of normalized glyph components and retain originals when coverage or stack validation fails.
+- Pin official normalization data with offline hash/generator checks and independent Rust tests. Add MIT fixtures for canonical equivalence, selectors, rollback, missing components, original-grapheme family selection and orientation. Upper-vowel stacks, II/vocalic R/L/reversed II, compatibility forms and mixed/punctuation runs remain outside this plan. No public API, version, dependency or release change.
+
+- Add a transactional, whole-run Tibetan `tibt` GSUB plan for ordered nondecomposable single-glyph stacks and simple-vowel alternates. Preserve whole-run presentation context, explicit language selection, and legacy output for mixed/unsupported/incomplete runs. Use exact no-excluded-glyph GDEF proofs only within this plan; general mark skipping remains unsupported; canonical preprocessing is bounded as described above.
 - Keep family fallback safe when an isolated Tibetan support probe and a later grouped run choose different shaping paths, by requiring coverage in both. Add reproducible MIT fixtures for stages, ownership, filtering, rollback, context, required features, orientation and missing-glyph fallback. No GPOS, public API, version, dependency or release change.
 
 - Position adjacent, unligated Tibetan consonant/simple-vowel pairs using `tibt` `abvm`/`blwm` MarkToBase anchors only after existing mark attachment fails. Preserve locale selection and GDEF filtering; this anchor fallback itself does not cover ligated stacks or normalization.

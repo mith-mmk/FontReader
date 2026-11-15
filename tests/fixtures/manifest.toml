@@ -240,3 +240,10 @@ source = "tests/fixtures/generate_tibetan_stack_substitution.py (fontTools 4.68.
 license = "MIT (project test code)"
 sha256 = "e409fa5e283159baa51302dbcc097d9c332a32b64326dd6fae7f300ead4f7da0"
 features = ["Tibetan", "GSUB", "tibt", "locl", "ccmp", "abvs", "blws", "calt", "LangSys", "required-feature", "lookup-order", "source-ownership", "whole-run-context", "GDEF", "mark-filtering-set", "flag-precedence", "Extension", "rollback", "family-fallback", "orientation", "no-layout-controls", "TTC"]
+
+[[fixture]]
+id = "tibetan-normalization.ttc"
+source = "tests/fixtures/generate_tibetan_normalization.py (fontTools 4.68.0; no external font)"
+license = "MIT (project test code)"
+sha256 = "16eebcff6b9dbb8c84f0488608162a17404d86e5e20a5174b6f4b63f70e27a7e"
+features = ["Tibetan", "Unicode17", "canonical-decomposition", "canonical-order", "source-ownership", "GSUB", "component-coverage", "transactional-rollback", "family-fallback", "no-layout-controls", "TTC"]

@@ -53,7 +53,7 @@ Default features include `layout` and `cff`.
 - `layout`
   - GSUB / GPOS shaping
   - Vertical flow, RTL, locale, and variant selection
-  - Unreleased: [bounded Tibetan stack substitution runs](doc/feature-status.md#bounded-tibetan-substitution-runs). Mixed-script/spaced runs, normalization and general mark skipping remain outside this plan.
+  - Unreleased: [bounded Tibetan stack substitution runs](doc/feature-status.md#bounded-tibetan-substitution-runs). Font-aware canonical Tibetan normalization is bounded to fully collapsed consonant/lower-vowel forms. Upper-vowel stacks, mixed/spaced runs and general mark skipping remain outside this plan.
 - `cff`
   - OpenType / CFF outlines
 - `raw`
