@@ -73,3 +73,14 @@ Regenerate with fontTools4.68.0. Faces0–35: mode (anchor, filtered, absent bas
 coverage, SinglePos, PairPos, no GPOS), then nominal advance0/150, then GDEF
 evidence none/class/AttachList. Faces36–71 repeat with real vertical metrics.
 Timestamps are fixed by the source fixtures. No installed fonts are included.
+
+## Lookup-specific Mkmk predecessors
+
+`mkmk-predecessor.ttc` and `generate_mkmk_predecessor.py` are original MIT
+fixtures derived only from `mark-coordinates.ttf`, with fixed timestamps.
+Regenerate using fontTools4.68.0. The 26 ordinary faces followed by 26 extension
+copies cover filtering set/class, lookup fallback/order, target coverage/null
+anchor barriers, zero anchors, input precedence, explicit nonmark targets,
+missing/unknown classes, substitutions and ownership exclusions. Exact face
+names/order are in the generator. No installed-font bytes are included.
+See `doc/mkmk-predecessor-search.md` for the conservative ownership bound.

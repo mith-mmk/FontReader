@@ -4,6 +4,8 @@ mod composition;
 mod hangul;
 #[cfg(feature = "layout")]
 mod kana;
+#[cfg(all(test, feature = "layout"))]
+mod mkmk_tests;
 #[cfg(feature = "layout")]
 mod tibetan;
 
@@ -247,6 +249,9 @@ struct ResolvedGlyph {
     source_start: usize,
     #[cfg(feature = "layout")]
     source_end: usize,
+    // Only untouched one-to-one nominal inputs retain their original grapheme.
+    #[cfg(feature = "layout")]
+    simple_mkmk_cluster: Option<usize>,
     #[cfg(feature = "layout")]
     kana_residual_mark: bool,
     glyph_id: usize,
@@ -1659,6 +1664,11 @@ impl Font {
                 .into_iter()
                 .zip(residual_marks)
                 .map(|(item, kana_residual_mark)| ResolvedGlyph {
+                    simple_mkmk_cluster: (!item.substituted
+                        && source_output_counts[item.source_index] == 1
+                        && item.ligature_components == 1)
+                        .then_some(glyphs[item.source_index].simple_mkmk_cluster)
+                        .flatten(),
                     kana_residual_mark,
                     ch: glyphs[item.source_index].ch,
                     shaping_ch: glyphs[item.source_index].shaping_ch,
@@ -1789,7 +1799,14 @@ impl Font {
                         && Self::is_tibetan_normalization_cluster(&text))
                     .then_some(_cluster_index)
                     .or(tibetan_cluster);
-                    for (ch, variation_selector) in Self::cluster_glyph_scalars(&text) {
+                    let scalars = Self::cluster_glyph_scalars(&text);
+                    #[cfg(feature = "layout")]
+                    let simple_mkmk_cluster = (scalars.len() == text.chars().count()
+                        && scalars.iter().all(|(ch, selector)| {
+                            *selector == '\0' && !matches!(*ch, '\u{200c}' | '\u{200d}')
+                        }))
+                    .then_some(_cluster_index);
+                    for (ch, variation_selector) in scalars {
                         // Text shaping selects orientation features in the sequence pass.
                         // Raw glyph APIs retain the direct single-glyph alternate path.
                         let glyph_id =
@@ -1806,6 +1823,8 @@ impl Font {
                             source_start,
                             #[cfg(feature = "layout")]
                             source_end: source_start + 1,
+                            #[cfg(feature = "layout")]
+                            simple_mkmk_cluster,
                             glyph_id,
                             prefer_color,
                             ligature_components: 1,
@@ -2202,29 +2221,27 @@ impl Font {
     ) -> Option<GlyphAttachmentPlacement> {
         let gpos = self.current_gpos()?;
         let current = Self::glyph_unit_at(units, index)?;
-        if let Some(previous_mark_unit_index) = self.find_previous_mark_glyph_index(units, index) {
-            let previous_mark = Self::glyph_unit_at(units, previous_mark_unit_index)?;
+        if let Some((previous_mark_unit_index, adjustment)) = gpos.lookup_mark_to_mark_attachment(
+            index,
+            |at| Self::glyph_unit_at(units, at).map(|glyph| glyph.glyph_id as u16),
+            || self.simple_mkmk_span(units, unit_glyph_indices, index),
+            locale,
+            self.current_gdef(),
+        ) {
             let glyph_index = unit_glyph_indices
                 .get(previous_mark_unit_index)
                 .and_then(|glyph_index| *glyph_index)?;
-            if let Some(adjustment) = gpos.lookup_mark_to_mark_adjustment(
-                previous_mark.glyph_id as u16,
-                current.glyph_id as u16,
-                locale,
-                self.current_gdef(),
-            ) {
-                return Some(GlyphAttachmentPlacement {
-                    glyph_index,
-                    adjustment: GlyphPositionAdjustment {
-                        authored_pair: false,
-                        placement_x: adjustment.x_placement as f32 * scale_x,
-                        // GPOS anchors are Y-up; glyph run and outline coordinates are Y-down.
-                        placement_y: -(adjustment.y_placement as f32) * scale_y,
-                        advance_x: 0.0,
-                        advance_y: 0.0,
-                    },
-                });
-            }
+            return Some(GlyphAttachmentPlacement {
+                glyph_index,
+                adjustment: GlyphPositionAdjustment {
+                    authored_pair: false,
+                    placement_x: adjustment.x_placement as f32 * scale_x,
+                    // GPOS anchors are Y-up; glyph run coordinates are Y-down.
+                    placement_y: -(adjustment.y_placement as f32) * scale_y,
+                    advance_x: 0.0,
+                    advance_y: 0.0,
+                },
+            });
         }
 
         let base_index = self.find_previous_spacing_glyph_index(units, index)?;
@@ -2307,13 +2324,46 @@ impl Font {
     }
 
     #[cfg(feature = "layout")]
-    fn find_previous_mark_glyph_index(
+    fn simple_mkmk_span(
         &self,
         units: &[ResolvedTextUnit],
+        emitted: &[Option<usize>],
         index: usize,
-    ) -> Option<usize> {
-        let cursor = index.checked_sub(1)?;
-        Self::glyph_unit_at(units, cursor).map(|_| cursor)
+    ) -> bool {
+        let Some(gdef) = self.current_gdef() else {
+            return false;
+        };
+        let Some(current) = Self::glyph_unit_at(units, index) else {
+            return false;
+        };
+        let Some(cluster) = current.simple_mkmk_cluster else {
+            return false;
+        };
+        let mut cursor = index;
+        let mut next_start = current.source_end;
+        loop {
+            let Some(glyph) = Self::glyph_unit_at(units, cursor) else {
+                return false;
+            };
+            if glyph.simple_mkmk_cluster != Some(cluster)
+                || glyph.ligature_components != 1
+                || glyph.source_start.checked_add(1) != Some(glyph.source_end)
+                || glyph.source_end != next_start
+                || (cursor != index && emitted.get(cursor).and_then(|item| *item).is_none())
+            {
+                return false;
+            }
+            match gdef.glyph_class(glyph.glyph_id as u16) {
+                Some(gdef::GlyphClass::Base) => return cursor < index,
+                Some(gdef::GlyphClass::Mark) => {}
+                _ => return false,
+            }
+            next_start = glyph.source_start;
+            let Some(previous) = cursor.checked_sub(1) else {
+                return false;
+            };
+            cursor = previous;
+        }
     }
 
     #[cfg(feature = "layout")]

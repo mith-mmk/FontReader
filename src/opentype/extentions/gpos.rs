@@ -422,22 +422,27 @@ impl PositioningLookup {
                 if self.lookup_flag & 0x0008 != 0 {
                     return false;
                 }
-                if self.lookup_flag & 0x0010 != 0 {
-                    return self
-                        .mark_filtering_set
-                        .and_then(|index| {
-                            gdef.mark_glyph_sets_def
-                                .as_ref()?
-                                .coverages
-                                .get(index as usize)
-                        })
-                        .is_some_and(|coverage| coverage.contains(glyph as usize).is_some());
-                }
-                let attachment_type = self.lookup_flag >> 8;
-                attachment_type == 0 || gdef.mark_attachment_class(glyph) == Some(attachment_type)
+                self.includes_mark_attachment_class(glyph, gdef)
             }
             _ => true,
         }
+    }
+
+    // Mkmk targets ignore the three IgnoreFlags, but retain set/class filtering.
+    fn includes_mark_attachment_class(&self, glyph: u16, gdef: &Gdef) -> bool {
+        if self.lookup_flag & 0x0010 != 0 {
+            return self
+                .mark_filtering_set
+                .and_then(|index| {
+                    gdef.mark_glyph_sets_def
+                        .as_ref()?
+                        .coverages
+                        .get(index as usize)
+                })
+                .is_some_and(|coverage| coverage.contains(glyph as usize).is_some());
+        }
+        let attachment_type = self.lookup_flag >> 8;
+        attachment_type == 0 || gdef.mark_attachment_class(glyph) == Some(attachment_type)
     }
 }
 
@@ -1558,6 +1563,7 @@ impl Gpos {
         None
     }
 
+    #[cfg(test)]
     pub(crate) fn lookup_mark_to_mark_adjustment(
         &self,
         base_mark: u16,
@@ -1565,25 +1571,67 @@ impl Gpos {
         locale: Option<&str>,
         gdef: Option<&Gdef>,
     ) -> Option<MarkAttachmentAdjustment> {
-        let feature_tags: &[[u8; 4]] = &[*b"mkmk"];
+        self.lookup_mark_to_mark_attachment(
+            1,
+            |index| [base_mark, combining_mark].get(index).copied(),
+            || false,
+            locale,
+            gdef,
+        )
+        .map(|(_, adjustment)| adjustment)
+    }
 
-        for lookup in self.collect_lookups(locale, feature_tags) {
-            // Only the current input is filtered here. In particular, IgnoreBase/
-            // IgnoreLigature must not reject the already selected attachment target.
+    pub(crate) fn lookup_mark_to_mark_attachment(
+        &self,
+        index: usize,
+        glyph_at: impl Fn(usize) -> Option<u16>,
+        allow_skipping: impl Fn() -> bool,
+        locale: Option<&str>,
+        gdef: Option<&Gdef>,
+    ) -> Option<(usize, MarkAttachmentAdjustment)> {
+        let combining_mark = glyph_at(index)?;
+        // Most adjacent attachments need no ownership walk. Cache the full
+        // guard only when a lookup actually needs to skip an excluded mark.
+        let mut skip_allowed = None;
+        for lookup in self.collect_lookups(locale, &[*b"mkmk"]) {
             if (lookup.lookup_type != 6 && lookup.lookup_type != 9)
                 || !lookup.includes_glyph(combining_mark, gdef)
             {
                 continue;
             }
+            let mut cursor = index.checked_sub(1)?;
+            let target = loop {
+                let Some(glyph) = glyph_at(cursor) else {
+                    break None;
+                };
+                match gdef.and_then(|table| table.glyph_class(glyph)) {
+                    Some(GlyphClass::Base | GlyphClass::Ligature | GlyphClass::Component) => {
+                        break None
+                    }
+                    Some(GlyphClass::Mark)
+                        if !lookup.includes_mark_attachment_class(glyph, gdef.unwrap())
+                            && *skip_allowed.get_or_insert_with(&allow_skipping) =>
+                    {
+                        let Some(previous) = cursor.checked_sub(1) else {
+                            break None;
+                        };
+                        cursor = previous;
+                    }
+                    // Unknown classes and guarded-out runs retain adjacent coverage
+                    // behavior; this is not a claim of complete HB target filtering.
+                    _ => break Some(glyph),
+                }
+            };
+            let Some(target) = target else { continue };
             for subtable in &lookup.subtables {
-                if let Some(found) =
-                    subtable.lookup_mark_to_mark_adjustment(base_mark, combining_mark)
+                if let Some(found) = subtable.lookup_mark_to_mark_adjustment(target, combining_mark)
                 {
-                    return Some(found);
+                    return Some((cursor, found));
                 }
             }
+            // Coverage/anchor failure cannot search past an admitted target.
+            // A later lookup starts a fresh search with its own properties.
         }
-
         None
     }
 }
@@ -1592,6 +1640,69 @@ impl Gpos {
 mod tests {
     use super::*;
     use bin_rs::reader::BytesReader;
+
+    #[test]
+    fn adjacent_mkmk_never_walks_ownership_and_skipping_checks_once() {
+        let file = crate::FontFile::from_buffer(include_bytes!(
+            "../../../tests/fixtures/mkmk-predecessor.ttc"
+        ))
+        .unwrap();
+        let font = file.face(3).unwrap(); // first uncovered target, then later lookup
+        let mut gpos = font.font().more_fonts[2].gpos.clone().unwrap();
+        let gdef = font.font().more_fonts[2].gdef.as_ref().unwrap();
+        // Both lookups now exclude comma; first lacks acute Mark2 coverage.
+        let properties = gpos
+            .lookups
+            .iter()
+            .rev()
+            .find(|l| l.lookup_type == 6)
+            .map(|l| (l.lookup_flag, l.mark_filtering_set))
+            .unwrap();
+        for lookup in gpos.lookups.iter_mut().filter(|l| l.lookup_type == 6) {
+            lookup.lookup_flag = properties.0;
+            lookup.mark_filtering_set = properties.1;
+        }
+        for index in 1..10_001 {
+            let result = gpos.lookup_mark_to_mark_attachment(
+                index,
+                |_| Some(6),
+                || panic!("admitted adjacent mark must not scan its full prefix"),
+                None,
+                Some(gdef),
+            );
+            assert_eq!(result.unwrap().0, index - 1);
+        }
+        let calls = std::cell::Cell::new(0);
+        let glyphs = [1, 6, 3, 6];
+        let result = gpos.lookup_mark_to_mark_attachment(
+            3,
+            |at| glyphs.get(at).copied(),
+            || {
+                calls.set(calls.get() + 1);
+                true
+            },
+            None,
+            Some(gdef),
+        );
+        assert_eq!(result.unwrap().0, 1);
+        assert_eq!(calls.get(), 1, "one cached ownership proof across lookups");
+        // A denied ownership proof preserves a covered immediate target even
+        // when that target is excluded by the lookup's set. Unknown ownership
+        // is compatibility behavior, not partial target filtering.
+        let mut covered = font.font().more_fonts[9].gpos.clone().unwrap();
+        for lookup in covered.lookups.iter_mut().filter(|l| l.lookup_type == 6) {
+            lookup.lookup_flag = properties.0;
+            lookup.mark_filtering_set = properties.1;
+        }
+        let result = covered.lookup_mark_to_mark_attachment(
+            3,
+            |at| glyphs.get(at).copied(),
+            || false,
+            None,
+            Some(gdef),
+        );
+        assert_eq!(result.unwrap().0, 2);
+    }
 
     #[test]
     fn mark_input_filter_reports_no_anchor_despite_gdef_metadata() {

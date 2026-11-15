@@ -57,6 +57,7 @@ fn reordered_candidate_moves_original_ownership_with_each_scalar() {
     let font = font();
     let make = |ch, index| ResolvedGlyph {
         kana_residual_mark: false,
+        simple_mkmk_cluster: None,
         ch,
         shaping_ch: ch,
         glyph_id: font.resolve_glyph_id_with_uvs(ch, '\0', false).unwrap(),
@@ -91,6 +92,7 @@ fn long_unsupported_combining_sequence_is_rejected_before_sorting() {
     let font = font();
     let mut input = vec![ResolvedGlyph {
         kana_residual_mark: false,
+        simple_mkmk_cluster: None,
         ch: '\u{f40}',
         shaping_ch: '\u{f40}',
         glyph_id: 1,
@@ -104,6 +106,7 @@ fn long_unsupported_combining_sequence_is_rejected_before_sorting() {
         let ch = if index % 2 == 0 { '\u{f71}' } else { '\u{f74}' };
         input.push(ResolvedGlyph {
             kana_residual_mark: false,
+            simple_mkmk_cluster: None,
             ch,
             shaping_ch: ch,
             source_start: index,

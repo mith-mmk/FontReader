@@ -15,9 +15,9 @@ The original fixtures establish the exact behavior implemented here.
 
 Do not apply the same filter to the attachment target. IgnoreBaseGlyphs and
 IgnoreLigatures do not invalidate otherwise usable base/ligature anchors.
-Predecessor search, lookup order, component ownership, and coordinate conversion
-are unchanged. In particular, lookup-specific MarkToMark predecessor skipping
-and ligature ownership remain separate work.
+Lookup order and coordinate conversion are unchanged. A subsequent bounded
+MarkToMark predecessor stage is documented in `mkmk-predecessor-search.md`;
+full ligature ownership remains separate work.
 
 Missing GDEF, missing GlyphClassDef, and unclassified glyphs retain the existing
 `includes_glyph` policy: no Unicode class is invented and the input is admitted.
