@@ -867,19 +867,31 @@ pub(crate) fn glyph_run_to_svg(run: &GlyphRun, fontunit: &str) -> Result<String,
         for layer in &glyph.glyph.layers {
             match layer {
                 GlyphLayer::Path(path) => {
-                    let d = draw_commands_to_svg_path(
-                        &path.commands,
-                        glyph.x + path.offset_x,
-                        glyph.y + path.offset_y,
-                    );
+                    let origin = (glyph.x + path.offset_x, glyph.y + path.offset_y);
+                    // Clips and user-space paints are expressed in the same local
+                    // coordinates as the path. Translating only d leaves those
+                    // definitions behind. Keep simple paths' existing output.
+                    let local = !path.clip_commands.is_empty()
+                        || matches!(
+                            path.paint,
+                            GlyphPaint::LinearGradient(_) | GlyphPaint::RadialGradient(_)
+                        );
+                    let (x, y) = if local { (0.0, 0.0) } else { origin };
+                    let d = draw_commands_to_svg_path(&path.commands, x, y);
                     if d.is_empty() {
                         continue;
+                    }
+                    if local {
+                        body += &format!("<g transform=\"translate({} {})\">", origin.0, origin.1);
                     }
                     body += &format!(
                         "<path d=\"{}\" {} />",
                         d,
                         path_to_svg_attributes(path, &mut registry)
                     );
+                    if local {
+                        body += "</g>";
+                    }
                 }
                 GlyphLayer::Raster(raster) => {
                     body += &raster_layer_to_svg_image(raster, glyph.x, glyph.y)?;

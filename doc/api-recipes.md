@@ -303,7 +303,9 @@ let mut composite = CompositeFont::new(vec![&japanese])?.with_font_size(32.0);
 composite.add_rule(CompositeFontRule::new(
     vec![UnicodeRange::new(' ', '~')?],
     vec![&latin, &japanese],
-)?);
+)?
+.with_size_multiplier(0.9)?
+.with_baseline_shift(2.0)?);
 let run = composite.shape_ltr("日本語 ABC")?;
 let advance = composite.measure_ltr("日本語 ABC")?;
 let svg = composite.render_svg_ltr("日本語 ABC")?;
@@ -317,6 +319,24 @@ there is no escape to another rule/default list when every candidate is missing
 part of the cluster. The first face then retains its normal missing glyphs.
 Unmatched clusters use the nonempty default list. This differs from automatic
 `FontFamily` fallback and does not change that API.
+
+`with_size_multiplier(f32)` accepts a positive finite multiplier (default `1.0`);
+`with_baseline_shift(f32)` accepts a finite signed shift (default `0.0`). Both
+consume and return the rule as `Result<Self, std::io::Error>`; the getters are
+`size_multiplier()` and `baseline_shift()`. In this example, the Latin rule
+passes `32.0 * 0.9` to the normal face engine before shaping. This preserves
+face-specific line-metric sizing, not em-based sizing. The shift is in engine
+output units: positive `2.0` moves glyphs upward (`glyph.y` decreases). It is
+not multiplied by size and does not change advances or the following cursor.
+The rule's adjustments also apply to its local fallback faces; unmatched
+clusters keep multiplier `1.0` and shift `0.0`.
+
+Adjacent clusters share GSUB/GPOS context only when they select the same
+borrowed face object and exactly equal adjustment values, even across rules.
+Changing either adjustment splits the shaping span. Invalid or overflowing
+effective sizes return errors. Runs using non-default adjustments also reject
+nonfinite transformed geometry rather than clamping it. Existing face and family
+APIs are unchanged.
 
 The dedicated builders configure shared size, stretch, locale, variant,
 variation axes and SVG units without accepting an ambiguous face selector.

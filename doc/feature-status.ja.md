@@ -528,12 +528,19 @@ Lookup ごとに異なる隣接グリフ、広い範囲の加算、走査位置�
   全候補が不足すれば先頭フェイスの `.notdef` を残し、別ルール・既定列へは移りません。
   既存の対応判定は UVS mapping がない場合も基底グリフを許容します。
   後続の UVS/color フェイスを優先せず、完全な Indic/emoji shaping を保証しません。
-- 同じフェイスオブジェクトの隣接クラスタはルール境界を越えて一緒に shaping します。
-  フェイス切替では GSUB/GPOS 文脈を区切り、x/y 両 advance を次の span に引き継ぎます。
+- 同じ借用フェイスオブジェクトで倍率とベースライン移動量も完全に等しい隣接クラスタは、
+  ルール境界を越えて一緒に shaping します。フェイスまたは調整値の切替で GSUB/GPOS 文脈を区切り、
+  x/y 両 advance を次の span に引き継ぎます。
   clone したフェイスは別オブジェクトとして扱います。
 - サイズは既存のフェイス別行メトリクス（ascender − descender + line gap、対応する可変値を含む）
   による正規化で、共通 UPEM への正規化ではありません。共通 stretch/locale/variant/可変軸を渡します。
-  ルール別倍率・ベースライン調整は次段階で、現 API にはありません。
+  ルール別 `with_size_multiplier` は正の有限倍率（既定 `1.0`）を受け取り、
+  要求した nominal size に掛けてから通常のエンジンで shaping します。
+- `with_baseline_shift` はエンジン出力単位の符号付き有限移動量（既定 `0.0`）です。
+  正値で y を減らして上へ移動します。サイズ倍率は掛けず、advance・後続カーソルは変えません。
+  両 builder は `Result<Self, std::io::Error>` を返し、getter は `size_multiplier()` と
+  `baseline_shift()` です。担当ルール内のフォールバック先にも同じ調整を適用します。
+  未指定範囲は倍率 `1.0`・移動 `0.0` を維持します。
 - 単一行の横書き LTR shape/measure/SVG 専用。TAB、CR、LF、VT、FF、NEL、U+2028、U+2029 は
   `InvalidInput`。縦書き、RTL/BiDi、折返し、混在方向、縦中横との合成は提供しません。
 - 計測値は横 advance の合計で ink 幅ではありません。SVG は同じ合成 run を既存 exporter に渡します。
@@ -542,5 +549,14 @@ Lookup ごとに異なる隣接グリフ、広い範囲の加算、走査位置�
 既存の MIT 合成 EGC・PairPos・ligature fixture で検証し、既存 family fallback と
 横書き・縦書き API の動作は変更しません。
 
-既存フェイスエンジンと同様、極端に大きい有限の size/stretch や advance の累積は
-f32 の座標・計測値で overflow を起こします。値の飽和処理や有限出力の保証は追加していません。
+合成フォントでは不正・overflow した実効サイズをエラーにします。既定値以外の調整を使う run は、
+変換後の非有限座標・advance などもエラーにし、値の飽和処理はしません。調整がすべて既定値の run は、
+極端な入力による overflow を含む既存の座標処理を維持します。
+既存フェイス・family エンジンの数値処理は変更しません。
+縦書き、複数行、RTL の合成は今後の課題です。
+
+実フォントのスポット確認は、全般的なシェーピング保証ではありません。
+特に [Furifont](https://furifont.antfu.me/) の自動ルビは現状再現できません。
+LTR では必要な `rclt` を適用せず、縦書きの文脈依存 `vert` も別の制限として残ります。
+合成フォントのサイズ・基線調整はこれら既存の制限を解消するものではなく、
+Furifont の完全対応を意味しません。

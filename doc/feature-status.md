@@ -615,13 +615,21 @@ variants/fields to existing `FontRef`, `FontOptions`, descriptors or glyphs.
   rule or default list is tried. Existing support may accept a base glyph with
   no requested UVS mapping; later UVS/color faces are not preferred. Coverage
   does not promise complete contextual, Indic or emoji shaping.
-- Adjacent clusters choosing the same face object share a shaping span even
-  across rule boundaries. Face changes stop GSUB/GPOS context. A cloned face
+- Adjacent clusters choosing the same borrowed face object and exactly equal
+  size multipliers and baseline shifts share a shaping span even across rule
+  boundaries. Face or adjustment changes stop GSUB/GPOS context. A cloned face
   is a distinct object. Both x and y advances carry across spans.
 - Size retains existing face-specific horizontal line-metric normalization
   (ascender minus descender plus line gap, including supported variations),
   not a shared UPEM normalization. Common stretch/locale/variant/axes are
-  forwarded. No per-rule size multiplier or baseline adjustment exists yet.
+  forwarded. Each rule's positive finite `with_size_multiplier` (default `1.0`)
+  multiplies the requested nominal size before the normal engine shapes the span.
+- `with_baseline_shift` accepts finite signed engine-output units (default `0.0`).
+  Positive shifts move glyphs upward by decreasing y; they are not scaled by size
+  and do not alter advances or the following cursor. Both adjustment builders
+  return `Result<Self, std::io::Error>`, with `size_multiplier()` and
+  `baseline_shift()` getters. Local fallback uses its owning rule's adjustments;
+  unmatched clusters retain multiplier `1.0` and shift `0.0`.
 - Only single-line horizontal LTR shape/measure/SVG is exposed. TAB, CR, LF,
   VT, FF, NEL, U+2028 and U+2029 return `InvalidInput`. There is no vertical,
   RTL/BiDi, wrapping, mixed-orientation or tate-chu-yoko composition API.
@@ -632,6 +640,15 @@ variants/fields to existing `FontRef`, `FontOptions`, descriptors or glyphs.
 Synthetic tests reuse the repository's MIT EGC, PairPos and ligature fixtures.
 Existing family fallback and horizontal/vertical APIs are unchanged.
 
-As with the existing face engine, extreme finite size/stretch and accumulated
-advances can overflow f32 geometry or measurements. This API does not add a
-numeric saturation or finite-output guarantee.
+Composite shaping rejects invalid or overflowing effective sizes. Runs using
+non-default adjustments also reject nonfinite transformed geometry and advances
+rather than saturating values. Identity-only runs retain the existing geometry
+behavior, including possible overflow for extreme inputs. These checks do not
+change the legacy face/family engines' numeric semantics. Vertical, multiline
+and RTL composition remain future work.
+
+Real-font spot checks are not a general shaping guarantee. In particular,
+[Furifont](https://furifont.antfu.me/)'s automatic ruby is not currently reproduced:
+LTR does not apply its required `rclt`, and contextual vertical `vert` behavior
+remains a separate limitation. Composite size/baseline adjustments do not resolve
+those existing shaping limits or imply full Furifont support.

@@ -297,7 +297,9 @@ let mut composite = CompositeFont::new(vec![&japanese])?.with_font_size(32.0);
 composite.add_rule(CompositeFontRule::new(
     vec![UnicodeRange::new(' ', '~')?],
     vec![&latin, &japanese],
-)?);
+)?
+.with_size_multiplier(0.9)?
+.with_baseline_shift(2.0)?);
 let run = composite.shape_ltr("日本語 ABC")?;
 let advance = composite.measure_ltr("日本語 ABC")?;
 let svg = composite.render_svg_ltr("日本語 ABC")?;
@@ -310,6 +312,21 @@ let svg = composite.render_svg_ltr("日本語 ABC")?;
 どれも不足する場合は担当列の先頭フェイスで欠落グリフを残し、別ルールや既定列へ
 暗黙に移動しません。未指定範囲だけが既定列を使用します。
 既存の `FontFamily` による自動フォールバックの動作は変更しません。
+
+`with_size_multiplier(f32)` は正の有限倍率（既定 `1.0`）、
+`with_baseline_shift(f32)` は符号付き有限移動量（既定 `0.0`）を受け取ります。
+どちらもルールを消費して `Result<Self, std::io::Error>` を返し、getter は
+`size_multiplier()` と `baseline_shift()` です。この例では通常のフェイスエンジンに
+`32.0 * 0.9` を渡してから shaping します。em 基準ではなく、既存のフェイス別行メトリクスに
+よるサイズ指定を維持します。移動量はエンジン出力単位で、正の `2.0` は上方向
+（`glyph.y` が減少）です。サイズ倍率は掛けず、advance や後続カーソルは変えません。
+担当ルール内のフォールバック先にも同じ調整を適用し、未指定範囲は倍率 `1.0`・移動 `0.0` です。
+
+隣接クラスタは、同じ借用フェイスオブジェクトと完全に等しい調整値を選んだ場合だけ、
+ルール境界を越えて GSUB/GPOS 文脈を共有します。調整値の変更でも shaping span を区切ります。
+不正・overflow した実効サイズはエラーです。既定値以外の調整を使う run では、
+変換後の非有限座標なども値を飽和させずエラーにします。
+既存のフェイス・family API は変更しません。
 
 専用 builder で共通のサイズ、stretch、locale、variant、可変軸、SVG 単位を指定します。
 単一行の横書き LTR 専用で、タブと改行制御はエラーです。
