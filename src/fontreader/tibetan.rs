@@ -21,12 +21,11 @@ impl Font {
         {
             return false;
         }
-        let mut subjoined = false;
         let mut vowel = None;
         for ch in chars {
             if let Some(previous) = vowel {
-                // Only AA+U is newly admitted. AA+above marks and upper vowels
-                // on ligated stacks need attachment handling not provided here.
+                // Only AA+U is admitted as a two-vowel tail. AA+upper
+                // would require shared original-scalar output ownership.
                 if previous == '\u{f71}' && ch == '\u{f74}' {
                     vowel = Some(ch);
                     continue;
@@ -36,16 +35,18 @@ impl Font {
             if matches!(ch, '\u{f90}'..='\u{f97}' | '\u{f99}'..='\u{fbc}')
                 && decomposition(ch).is_none()
             {
-                subjoined = true;
-            } else if matches!(ch, '\u{f71}' | '\u{f74}')
-                || (!subjoined && matches!(ch, '\u{f72}' | '\u{f7a}'..='\u{f7d}' | '\u{f80}'))
-            {
+                continue;
+            } else if matches!(ch, '\u{f71}' | '\u{f74}') || Self::is_tibetan_upper_vowel(ch) {
                 vowel = Some(ch);
             } else {
                 return false;
             }
         }
         true
+    }
+
+    fn is_tibetan_upper_vowel(ch: char) -> bool {
+        matches!(ch, '\u{f72}' | '\u{f7a}'..='\u{f7d}' | '\u{f80}')
     }
 
     fn normalized_tibetan_glyphs(&self, original: &[ResolvedGlyph]) -> Option<Vec<ResolvedGlyph>> {
@@ -76,6 +77,7 @@ impl Font {
                                 normalized.push(ResolvedGlyph {
                                     kana_residual_mark: false,
                                     simple_mkmk_cluster: None,
+                                    tibetan_upper_anchor: None,
                                     shaping_ch: *ch,
                                     glyph_id: id,
                                     ..*glyph
@@ -138,6 +140,16 @@ impl Font {
             return None;
         }
         let glyphs = self.normalized_tibetan_glyphs(original)?;
+        let upper_stack_clusters: Vec<_> = glyphs
+            .windows(2)
+            .filter(|p| {
+                p[0].tibetan_cluster == p[1].tibetan_cluster
+                    && matches!(p[0].shaping_ch, '\u{f90}'..='\u{fbc}')
+                    && Self::is_tibetan_upper_vowel(p[1].shaping_ch)
+            })
+            .map(|p| p[1].tibetan_cluster)
+            .collect();
+        let new_upper_stack = !upper_stack_clusters.is_empty();
         let normalization_changed = glyphs.len() != original.len()
             || glyphs
                 .iter()
@@ -186,12 +198,13 @@ impl Font {
             TextRunMode::MixedUpright => gsub.selected_vertical_tag(true),
             TextRunMode::Standard => gsub.selected_vertical_tag(false),
         });
-        if !gsub.apply_tibetan_stack_presentation(
+        if !gsub.apply_tibetan_stack_presentation_with_filtering(
             &mut candidate,
             locale,
             variant,
             orientation_tag,
             self.current_gdef(),
+            new_upper_stack,
         ) {
             return None;
         }
@@ -204,7 +217,7 @@ impl Font {
             // Preserve an available original if normalization would expose a
             // missing or unrenderable substituted component. Unchanged PR39
             // candidates retain their established fallback behavior.
-            if (normalization_changed || new_lower_vowel_tail)
+            if (normalization_changed || new_lower_vowel_tail || new_upper_stack)
                 && !self.resolved_glyph_support(item.glyph_id).is_supported()
             {
                 return None;
@@ -242,6 +255,7 @@ impl Font {
             result.push(ResolvedGlyph {
                 kana_residual_mark: false,
                 simple_mkmk_cluster: None,
+                tibetan_upper_anchor: None,
                 ch: original.get(next_original)?.ch,
                 shaping_ch: first.shaping_ch,
                 glyph_id: item.glyph_id,
@@ -256,6 +270,42 @@ impl Font {
         }
         if next_normalized != glyphs.len() || next_original != original.len() {
             return None;
+        }
+        // New grammar is accepted only with a complete, renderable Base+Mark
+        // transaction. Existing lower and simple-vowel clusters are unchanged.
+        let mut cursor = 0;
+        for cluster in upper_stack_clusters {
+            while result.get(cursor)?.tibetan_cluster != cluster {
+                cursor += 1;
+            }
+            let base = *result.get(cursor)?;
+            let mark = *result.get(cursor + 1)?;
+            if mark.tibetan_cluster != cluster
+                || result
+                    .get(cursor + 2)
+                    .is_some_and(|g| g.tibetan_cluster == cluster)
+            {
+                return None;
+            }
+            let gdef = self.current_gdef()?;
+            if base.ligature_components < 2
+                || mark.ligature_components != 1
+                || !Self::is_tibetan_upper_vowel(mark.shaping_ch)
+                || base.source_end != mark.source_start
+                || mark.source_end != mark.source_start + 1
+                || gdef.glyph_class(base.glyph_id as u16) != Some(super::gdef::GlyphClass::Base)
+                || gdef.glyph_class(mark.glyph_id as u16) != Some(super::gdef::GlyphClass::Mark)
+            {
+                return None;
+            }
+            let anchor = self.current_gpos()?.lookup_tibetan_upper_adjustment(
+                base.glyph_id as u16,
+                mark.glyph_id as u16,
+                locale,
+                Some(gdef),
+            )?;
+            result[cursor + 1].tibetan_upper_anchor = Some(anchor);
+            cursor += 2;
         }
         Some(result)
     }

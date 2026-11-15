@@ -58,6 +58,7 @@ impl Font {
                     self.composition_glyph_is_renderable(glyph_id)
                         .then_some(ResolvedGlyph {
                             simple_mkmk_cluster: None,
+                            tibetan_upper_anchor: None,
                             ch,
                             shaping_ch: ch,
                             source_start: glyph.source_start + index,

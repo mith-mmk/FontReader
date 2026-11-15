@@ -58,6 +58,7 @@ fn reordered_candidate_moves_original_ownership_with_each_scalar() {
     let make = |ch, index| ResolvedGlyph {
         kana_residual_mark: false,
         simple_mkmk_cluster: None,
+        tibetan_upper_anchor: None,
         ch,
         shaping_ch: ch,
         glyph_id: font.resolve_glyph_id_with_uvs(ch, '\0', false).unwrap(),
@@ -93,6 +94,7 @@ fn long_unsupported_combining_sequence_is_rejected_before_sorting() {
     let mut input = vec![ResolvedGlyph {
         kana_residual_mark: false,
         simple_mkmk_cluster: None,
+        tibetan_upper_anchor: None,
         ch: '\u{f40}',
         shaping_ch: '\u{f40}',
         glyph_id: 1,
@@ -107,6 +109,7 @@ fn long_unsupported_combining_sequence_is_rejected_before_sorting() {
         input.push(ResolvedGlyph {
             kana_residual_mark: false,
             simple_mkmk_cluster: None,
+            tibetan_upper_anchor: None,
             ch,
             shaping_ch: ch,
             source_start: index,
@@ -142,4 +145,50 @@ fn direct_face_can_normalize_missing_original_but_family_probe_cannot_assume_it(
         Some("tibt"),
         FontVariant::Normal
     ));
+}
+
+#[test]
+fn upper_stack_proof_retains_exact_sources_without_generic_mkmk_eligibility() {
+    let font = Font::get_font_from_buffer(include_bytes!(
+        "../../tests/fixtures/tibetan-upper-stack.ttc"
+    ))
+    .unwrap();
+    for (text, base_sources, components) in [("ཀྐི", 2, 2), ("གྷི", 1, 2), ("ཀྒྷི", 2, 3)]
+    {
+        let units = font
+            .shape_text_units(&text.repeat(2), false, false, None, FontVariant::Normal)
+            .unwrap();
+        assert_eq!(units.len(), 4);
+        for (cluster, pair) in units.as_chunks::<2>().0.iter().enumerate() {
+            let ResolvedTextUnit::Glyph(base) = pair[0] else {
+                panic!("base")
+            };
+            let ResolvedTextUnit::Glyph(mark) = pair[1] else {
+                panic!("mark")
+            };
+            let start = cluster * (base_sources + 1);
+            assert_eq!(
+                (base.source_start, base.source_end, base.ligature_components),
+                (start, start + base_sources, components)
+            );
+            assert_eq!(
+                (mark.source_start, mark.source_end, mark.ligature_components),
+                (start + base_sources, start + base_sources + 1, 1)
+            );
+            assert_eq!(base.tibetan_cluster, mark.tibetan_cluster);
+            assert_eq!(base.simple_mkmk_cluster, None);
+            assert_eq!(mark.simple_mkmk_cluster, None);
+            assert_eq!(base.tibetan_upper_anchor, None);
+            assert_eq!(
+                mark.tibetan_upper_anchor,
+                Some(
+                    crate::opentype::extentions::gpos::MarkAttachmentAdjustment {
+                        x_placement: 250,
+                        y_placement: 100
+                    }
+                )
+            );
+            assert_eq!(mark.ch, 'ི');
+        }
+    }
 }

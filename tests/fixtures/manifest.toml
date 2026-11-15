@@ -331,3 +331,10 @@ source = "generate_mkmk_predecessor.py (fontTools 4.68.0; original mark-coordina
 license = "MIT (project test code)"
 sha256 = "8a36155b0e369b57233581e3b6ade48fafd813493241385f7196cfc7af0bd68b"
 features = ["layout", "GDEF", "MarkToMark", "ExtensionPos", "lookup-target-filtering", "source-ownership", "no-layout-controls"]
+
+[[fixture]]
+id = "tibetan-upper-stack.ttc"
+source = "tests/fixtures/generate_tibetan_upper_stack.py (fontTools 4.68.0; no external font)"
+license = "MIT (project test code)"
+sha256 = "138e07c1117be3a79c570e7cb688305c667b124936e8ba788d7f6b4dbe8ac796"
+features = ["tibetan", "upper-stack", "GSUB", "abvm", "source-ownership", "rollback"]

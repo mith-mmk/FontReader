@@ -1516,13 +1516,34 @@ impl Gpos {
         locale: Option<&str>,
         gdef: Option<&Gdef>,
     ) -> Option<MarkAttachmentAdjustment> {
+        self.lookup_tibetan_base_adjustment(base, mark, locale, gdef, &[*b"abvm", *b"blwm"])
+    }
+
+    pub(crate) fn lookup_tibetan_upper_adjustment(
+        &self,
+        base: u16,
+        mark: u16,
+        locale: Option<&str>,
+        gdef: Option<&Gdef>,
+    ) -> Option<MarkAttachmentAdjustment> {
+        self.lookup_tibetan_base_adjustment(base, mark, locale, gdef, &[*b"abvm"])
+    }
+
+    fn lookup_tibetan_base_adjustment(
+        &self,
+        base: u16,
+        mark: u16,
+        locale: Option<&str>,
+        gdef: Option<&Gdef>,
+        tags: &[[u8; 4]],
+    ) -> Option<MarkAttachmentAdjustment> {
         let scripts = self
             .scripts
             .scripts
             .iter()
             .filter(|script| script.script_tag == u32::from_be_bytes(*b"tibt"))
             .collect();
-        for lookup in self.collect_lookups_from_scripts(scripts, locale, &[*b"abvm", *b"blwm"]) {
+        for lookup in self.collect_lookups_from_scripts(scripts, locale, tags) {
             if lookup.lookup_type != 4 && lookup.lookup_type != 9 {
                 continue;
             }
