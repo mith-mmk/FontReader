@@ -4076,9 +4076,12 @@ mod tests {
                     continue;
                 }
 
-                let Some(adjustment) =
-                    gpos.lookup_mark_to_base_adjustment(base_glyph, mark_glyph, Some(locale))
-                else {
+                let Some(adjustment) = gpos.lookup_mark_to_base_adjustment(
+                    base_glyph,
+                    mark_glyph,
+                    Some(locale),
+                    font.font().gdef.as_ref(),
+                ) else {
                     continue;
                 };
 
@@ -4120,9 +4123,12 @@ mod tests {
                 if mark1_glyph == 0 {
                     continue;
                 }
-                let Some(base_adjustment) =
-                    gpos.lookup_mark_to_base_adjustment(base_glyph, mark1_glyph, Some(locale))
-                else {
+                let Some(base_adjustment) = gpos.lookup_mark_to_base_adjustment(
+                    base_glyph,
+                    mark1_glyph,
+                    Some(locale),
+                    font.font().gdef.as_ref(),
+                ) else {
                     continue;
                 };
 
@@ -4134,9 +4140,12 @@ mod tests {
                     if mark2_glyph == 0 {
                         continue;
                     }
-                    let Some(mark_adjustment) =
-                        gpos.lookup_mark_to_mark_adjustment(mark1_glyph, mark2_glyph, Some(locale))
-                    else {
+                    let Some(mark_adjustment) = gpos.lookup_mark_to_mark_adjustment(
+                        mark1_glyph,
+                        mark2_glyph,
+                        Some(locale),
+                        font.font().gdef.as_ref(),
+                    ) else {
                         continue;
                     };
 

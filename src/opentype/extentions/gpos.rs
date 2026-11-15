@@ -412,7 +412,7 @@ struct PositioningLookup {
 }
 
 impl PositioningLookup {
-    // SinglePos and PairPos share GDEF filtering; mark attachment is separate.
+    // Filter lookup inputs, not attachment targets (whose search has separate rules).
     fn includes_glyph(&self, glyph: u16, gdef: Option<&Gdef>) -> bool {
         let Some(gdef) = gdef else { return true };
         match gdef.glyph_class(glyph) {
@@ -1481,11 +1481,16 @@ impl Gpos {
         base: u16,
         mark: u16,
         locale: Option<&str>,
+        gdef: Option<&Gdef>,
     ) -> Option<MarkAttachmentAdjustment> {
         let feature_tags: &[[u8; 4]] = &[*b"mark"];
 
         for lookup in self.collect_lookups(locale, feature_tags) {
-            if lookup.lookup_type != 4 && lookup.lookup_type != 9 {
+            // Only the current input is filtered here. In particular, IgnoreBase/
+            // IgnoreLigature must not reject the already selected attachment target.
+            if (lookup.lookup_type != 4 && lookup.lookup_type != 9)
+                || !lookup.includes_glyph(mark, gdef)
+            {
                 continue;
             }
             for subtable in &lookup.subtables {
@@ -1541,11 +1546,16 @@ impl Gpos {
         mark: u16,
         component_index: usize,
         locale: Option<&str>,
+        gdef: Option<&Gdef>,
     ) -> Option<MarkAttachmentAdjustment> {
         let feature_tags: &[[u8; 4]] = &[*b"mark"];
 
         for lookup in self.collect_lookups(locale, feature_tags) {
-            if lookup.lookup_type != 5 && lookup.lookup_type != 9 {
+            // Only the current input is filtered here. In particular, IgnoreBase/
+            // IgnoreLigature must not reject the already selected attachment target.
+            if (lookup.lookup_type != 5 && lookup.lookup_type != 9)
+                || !lookup.includes_glyph(mark, gdef)
+            {
                 continue;
             }
             for subtable in &lookup.subtables {
@@ -1565,11 +1575,16 @@ impl Gpos {
         base_mark: u16,
         combining_mark: u16,
         locale: Option<&str>,
+        gdef: Option<&Gdef>,
     ) -> Option<MarkAttachmentAdjustment> {
         let feature_tags: &[[u8; 4]] = &[*b"mkmk"];
 
         for lookup in self.collect_lookups(locale, feature_tags) {
-            if lookup.lookup_type != 6 && lookup.lookup_type != 9 {
+            // Only the current input is filtered here. In particular, IgnoreBase/
+            // IgnoreLigature must not reject the already selected attachment target.
+            if (lookup.lookup_type != 6 && lookup.lookup_type != 9)
+                || !lookup.includes_glyph(combining_mark, gdef)
+            {
                 continue;
             }
             for subtable in &lookup.subtables {
@@ -1589,6 +1604,43 @@ impl Gpos {
 mod tests {
     use super::*;
     use bin_rs::reader::BytesReader;
+
+    #[test]
+    fn mark_input_filter_reports_no_anchor_despite_legacy_gdef_fallback() {
+        let font = crate::load_font_from_buffer(include_bytes!(
+            "../../../tests/fixtures/mark-coordinates.ttf"
+        ))
+        .unwrap();
+        let mut gpos = font.font().gpos.clone().unwrap();
+        let mut gdef = font.font().gdef.clone().unwrap();
+        // Acute (gid6) has attachment class1. The higher-level historical
+        // GDEF origin fallback is independent of these actual GPOS results.
+        let bytes = [0u8, 1, 0, 6, 0, 1, 0, 1];
+        gdef.mark_attach_class_def = Some(
+            crate::opentype::layouts::ClassDef::new(&mut BytesReader::new(&bytes), 0).unwrap(),
+        );
+        for flag in [0, 2, 4, 8, 0x100, 0x200, 0x10] {
+            for lookup in &mut gpos.lookups {
+                lookup.lookup_flag = flag;
+            }
+            let expected = matches!(flag, 0 | 2 | 4 | 0x100);
+            assert_eq!(
+                gpos.lookup_mark_to_base_adjustment(1, 6, None, Some(&gdef))
+                    .is_some(),
+                expected
+            );
+            assert_eq!(
+                gpos.lookup_mark_to_ligature_adjustment(2, 6, 1, None, Some(&gdef))
+                    .is_some(),
+                expected
+            );
+            assert_eq!(
+                gpos.lookup_mark_to_mark_adjustment(6, 6, None, Some(&gdef))
+                    .is_some(),
+                expected
+            );
+        }
+    }
 
     fn single_bytes(format: u16, glyphs: &[u16], values: &[[i16; 4]]) -> Vec<u8> {
         let mut words = vec![format, 0, 0x000f];

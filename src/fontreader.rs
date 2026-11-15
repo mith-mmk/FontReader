@@ -2211,6 +2211,7 @@ impl Font {
                 previous_mark.glyph_id as u16,
                 current.glyph_id as u16,
                 locale,
+                self.current_gdef(),
             ) {
                 return Some(GlyphAttachmentPlacement {
                     glyph_index,
@@ -2238,12 +2239,14 @@ impl Font {
                 current.glyph_id as u16,
                 ligature_component_index,
                 locale,
+                self.current_gdef(),
             )
             .or_else(|| {
                 gpos.lookup_mark_to_base_adjustment(
                     base.glyph_id as u16,
                     current.glyph_id as u16,
                     locale,
+                    self.current_gdef(),
                 )
             })
         } else {
@@ -2251,6 +2254,7 @@ impl Font {
                 base.glyph_id as u16,
                 current.glyph_id as u16,
                 locale,
+                self.current_gdef(),
             )
         }
         .or_else(|| {

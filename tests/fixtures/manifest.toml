@@ -317,3 +317,10 @@ source = "tests/fixtures/generate_arabic_joining.py (fontTools 4.68.0)"
 license = "MIT (project test code)"
 sha256 = "de6890b11416aac16b0dab636d269fcf47c321b1d3588984e1f97088863be729"
 features = ["arabic-joining", "ccmp", "source-mapping"]
+
+[[fixture]]
+id = "mark-input-filter.ttc"
+source = "generate_mark_input_filter.py (fontTools 4.68.0; original mark-coordinates.ttf)"
+license = "MIT (project test code)"
+sha256 = "1dd0f9913107c34df93014f51c418c4513ab0bf730bc29e3e590e3e5f48f16e3"
+features = ["layout", "GDEF", "MarkToBase", "MarkToLigature", "MarkToMark", "ExtensionPos", "lookup-input-filtering", "no-layout-controls"]
