@@ -109,6 +109,9 @@ impl BidiCaretPosition {
 /// Formatting controls remain editable zero-width source boundaries. LRO/RLO,
 /// tabs, other separators, split EGCs, and unsupported shaping mappings error.
 /// Ligature-internal stops are approximate; no GDEF caret data is used.
+/// With `layout`, contextual joining that crosses a level-run boundary is
+/// rejected rather than silently shaping isolated forms (for example Arabic
+/// letters separated by LRM). Isolates remain genuine joining barriers.
 /// Arabic joining/GSUB requires the existing `layout` feature. This API does not
 /// expand the engine's script/mark support or claim general shaping conformance.
 #[derive(Debug, Clone)]
@@ -177,6 +180,8 @@ impl BidiParagraphLayout {
                 }
                 base_level = paragraph.level.number();
                 let (levels, visual) = bidi.visual_runs(paragraph, 0..line_text.len());
+                #[cfg(feature = "layout")]
+                validate_joining_boundaries(line_text, &visual)?;
                 for local in visual {
                     if boundaries.binary_search(&local.start).is_err()
                         || boundaries.binary_search(&local.end).is_err()
@@ -356,6 +361,39 @@ impl BidiParagraphLayout {
         Ok(best)
     }
 }
+// UAX #9 levels determine visual placement, not contextual joining boundaries.
+// For example LRM is joining-transparent but can occupy a separate LTR run
+// between Arabic letters. Independent run shaping would incorrectly isolate
+// those letters. Until the engine accepts cross-run joining context, reject
+// any partition that changes the existing joining analyzer's forms. Isolates
+// have joining type U, so genuine isolate barriers remain supported.
+#[cfg(feature = "layout")]
+fn validate_joining_boundaries(text: &str, runs: &[Range<usize>]) -> Result<(), Error> {
+    let chars: Vec<_> = text.chars().collect();
+    let full_forms = crate::unicode::joining::forms(&chars);
+    let mut offsets: Vec<_> = text.char_indices().map(|(index, _)| index).collect();
+    offsets.push(text.len());
+    for run in runs {
+        let start = offsets
+            .binary_search(&run.start)
+            .map_err(|_| unsupported("BiDi run splits a scalar"))?;
+        let end = offsets
+            .binary_search(&run.end)
+            .map_err(|_| unsupported("BiDi run splits a scalar"))?;
+        let local_forms = crate::unicode::joining::forms(&chars[start..end]);
+        if full_forms[start..end]
+            .iter()
+            .zip(&local_forms)
+            .any(|(expected, actual)| expected.is_some() && expected != actual)
+        {
+            return Err(unsupported(
+                "contextual joining crosses a BiDi level-run boundary",
+            ));
+        }
+    }
+    Ok(())
+}
+
 fn affinity_order(affinity: CaretAffinity) -> u8 {
     if affinity == CaretAffinity::Downstream {
         0
@@ -733,6 +771,47 @@ mod tests {
                 assert_eq!(before.x(), after.x());
             }
             assert_eq!(layout.hit_test(f32::MAX, 0.0).unwrap().x(), expected_width);
+        }
+    }
+    #[test]
+    fn cross_level_joining_is_explicitly_unsupported() {
+        let file = FontFile::from_buffer(FONT).unwrap();
+        let face = file.face(0).unwrap();
+        let engine = face.engine().with_font_size(1000.0);
+        let result =
+            BidiParagraphLayout::shape(&engine, "ب\u{200e}ب", BidiBaseDirection::RightToLeft);
+        if cfg!(feature = "layout") {
+            let error = result.unwrap_err();
+            assert_eq!(error.kind(), ErrorKind::Unsupported);
+            assert!(error.to_string().contains("contextual joining crosses"));
+        } else {
+            // Without layout, contextual joining is already absent by contract.
+            assert!(result.is_ok());
+        }
+        for text in ["بب", "ب\u{200c}ب", "ب\u{2066}\u{2069}ب"] {
+            assert!(
+                BidiParagraphLayout::shape(&engine, text, BidiBaseDirection::RightToLeft).is_ok(),
+                "{text:?}"
+            );
+        }
+        // Transparent controls that do not split the level run still join.
+        let joined = engine.clone().with_right_to_left().shape("بب").unwrap();
+        for control in ['\u{200f}', '\u{061c}'] {
+            let text = format!("ب{control}ب");
+            let layout =
+                BidiParagraphLayout::shape(&engine, &text, BidiBaseDirection::RightToLeft).unwrap();
+            let glyphs: Vec<_> = layout.lines()[0]
+                .visual_runs()
+                .iter()
+                .flat_map(|run| run.shaped().glyph_run().glyphs.iter())
+                .collect();
+            assert_eq!(glyphs.len(), 2);
+            for (actual, expected) in glyphs.iter().zip(&joined.glyphs) {
+                assert_eq!(
+                    format!("{:?}", actual.glyph.layers),
+                    format!("{:?}", expected.glyph.layers)
+                );
+            }
         }
     }
 }

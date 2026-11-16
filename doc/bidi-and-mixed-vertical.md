@@ -78,3 +78,15 @@ Isolate initiators/PDI remain shaping barriers after level resolution: unlike
 transparent direction marks, removing them must not join Arabic or form a
 ligature across an isolate boundary. They emit no glyph or advance but terminate
 GSUB/GPOS context. This follows the distinction in UAX #9 §3.5.
+
+### Joining across visual level runs
+
+With `layout` enabled, paragraph construction compares Arabic-style joining forms
+for the full logical line against forms for each resolved run. If splitting the
+line would lose joining context, construction returns `Unsupported`. For example,
+Arabic letters separated by LRM can become separate level runs while LRM remains
+transparent for joining; independently shaping those runs would incorrectly
+produce isolated forms. RLM/ALM that remain in the same run and isolate controls
+that intentionally break joining retain their supported behavior. This guard is
+not a contextual cross-run shaper. Without `layout`, contextual joining is absent
+as in the existing engine, so this feature-dependent guarantee does not apply.
