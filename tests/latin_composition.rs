@@ -1,5 +1,5 @@
 //! Original MIT synthetic fixtures; no installed fonts required.
-use fontcore::{FontFile, GlyphRun};
+use fontcore::FontFile;
 const FONT: &[u8] = include_bytes!("fixtures/latin-composition.ttc");
 const PAIRS: &[(&str, &str)] = &[
     ("a\u{303}\u{301}", "ã\u{301}"),
@@ -7,7 +7,8 @@ const PAIRS: &[(&str, &str)] = &[
     ("a\u{306}\u{301}", "ắ"),
 ];
 
-fn same(actual: &GlyphRun, expected: &GlyphRun) {
+#[cfg(feature = "layout")]
+fn same(actual: &fontcore::GlyphRun, expected: &fontcore::GlyphRun) {
     assert_eq!(actual.glyphs.len(), expected.glyphs.len());
     for (a, b) in actual.glyphs.iter().zip(&expected.glyphs) {
         assert_eq!((a.x, a.y), (b.x, b.y));
