@@ -73,6 +73,8 @@ dependencies = [
  "miniz_oxide",
  "num-derive",
  "num-traits",
+ "unicode-bidi",
+ "unicode-bidi-mirroring",
  "unicode-segmentation",
  "woff2-no-std",
 ]
@@ -187,6 +189,18 @@ dependencies = [
  "quote",
  "syn 3.0.4",
 ]
+
+[[package]]
+name = "unicode-bidi"
+version = "0.3.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5c1cb5db39152898a79168971543b1cb5020dff7fe43c8dc468b0885f5e29df5"
+
+[[package]]
+name = "unicode-bidi-mirroring"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5dfa6e8c60bb66d49db113e0125ee8711b7647b5579dc7f5f19c42357ed039fe"
 
 [[package]]
 name = "unicode-ident"

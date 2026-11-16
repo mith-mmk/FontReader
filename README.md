@@ -232,3 +232,6 @@ The crate supports `wasm32-unknown-unknown`.
 - Public API recipes: [doc/api-recipes.md](doc/api-recipes.md)
 - Current implementation status and limitations: [doc/feature-status.md](doc/feature-status.md)
 - CFF2 investigation notes: [doc/cff2-investigation.md](doc/cff2-investigation.md)
+- Original UTF-8 ownership and bounded single-line editing: [doc/mapped-shaping.md](doc/mapped-shaping.md)
+- Explicit LF/CRLF line layout: [doc/hard-line-layout.md](doc/hard-line-layout.md)
+- Bounded horizontal BiDi and mapped mixed vertical geometry: [doc/bidi-and-mixed-vertical.md](doc/bidi-and-mixed-vertical.md)
