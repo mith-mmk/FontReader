@@ -1,5 +1,10 @@
 # Feature Status
 
+## 0.0.19 opt-in layout additions
+
+New source-preserving and upper-layout APIs are described in [mapped shaping](mapped-shaping.md), [hard lines](hard-line-layout.md), and [bounded BiDi/mixed vertical](bidi-and-mixed-vertical.md). Legacy shaping limits in the sections below remain in force unless those opt-in routes explicitly say otherwise. Source ranges are conservative grapheme envelopes. GDEF carets are not implemented; internal ligature carets are approximate. Upper layouts do not provide family fallback, wrapping or cross-run joining. This is not general Unicode/script conformance.
+
+
 This document keeps the implementation-oriented notes that were previously in `README.md`.
 The README now focuses on the public API and runnable examples.
 

@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+## 0.0.19 - 2026-11-16
+
+### Added
+
+- Add immutable `ShapedText`/`GlyphSource` and mapped face, family and composite shaping without changing existing `GlyphRun`/`PositionedGlyph` fields. Original UTF-8 ranges are conservative contiguous grapheme ownership envelopes, not exact scalar causality; zero-glyph source text remains available.
+- Add bounded EGC caret/hit testing, explicit LF/CRLF hard-line layout, horizontal BiDi visual-run layout, and mapped upright/sideways vertical group transforms. Controls retain source positions, isolates preserve joining barriers, and mirroring changes shaping scalars without rewriting source text.
+- Add reproducible fixtures, 729 short mixed-input invariant cases, and real-font IPA/ISO-8859/European diagnostic corpora. Diagnostic comparisons are not a claim of full HarfBuzz/browser parity.
+
+### Limits and compatibility
+
+- GDEF font-authored ligature carets are **not implemented**. Internal ligature stops use explicitly labelled equal-advance approximation. Caret points do not imply caret heights, ink hit-testing or selection rectangles.
+- Upper line/BiDi/mixed-vertical layouts are single-face. They do not add family fallback, automatic wrapping, directional overrides, cross-run contextual joining or combined vertical paragraph BiDi. With `layout`, run splits that lose joining context (such as Arabic separated by LRM) return `Unsupported` instead of incorrect isolated forms. Existing mapped family/composite shaping remains separately available.
+- Pin `unicode-bidi` 0.3.18 and `unicode-bidi-mirroring` 0.4.0 (Unicode 16.0); existing grapheme/joining data are 17.0 and orientation data are 18.0. These are deliberately different versions, not uniform Unicode 18 conformance. Existing script/mark limits remain.
+- Preserve Rust 1.91 minimum and existing public signatures. Continue the pre-1.0 0.0.x cadence; Cargo's `fontcore = "0.0.18"` does not select 0.0.19. Update the dependency requirement explicitly. New dependencies use MIT/Apache-2.0 terms; the crate remains `MIT AND Unicode-3.0`.
+- Details: [source mapping](doc/mapped-shaping.md), [hard lines](doc/hard-line-layout.md), [BiDi and mixed vertical scope](doc/bidi-and-mixed-vertical.md).
+
+### Shaping fixes and bounded extensions
+
+- Compose the longest renderable canonical prefix for bounded ASCII-Latin NFD clusters, retaining rollback and residual-mark limits; this is not general normalization or full IPA support. See [scope](doc/bounded-latin-composition.md).
+- Add transactional Old Hangul tone placement for exactly one U+302E/U+302F on supported old L V [T] graphemes. Variable tone metrics and unsupported contexts stay excluded. See [scope](doc/bounded-hangul-tones.md).
+
 - Extend bounded Old Hangul to Standard top-to-bottom runs only when the chosen vertical GSUB feature belongs to the selected hang Script/LangSys. Preserve authored vertical metrics/GPOS and transactional fallback; see [scope](doc/bounded-vertical-hangul.md).
 
 ### Fixed

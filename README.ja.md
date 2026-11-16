@@ -11,10 +11,10 @@ English: [README.md](README.md)
 [使用例](doc/api-recipes.ja.md#混在縦書き-ltr-のシェーピング計測svg)と
 [対応範囲](doc/feature-status.ja.md#明示的な混在縦書き-ltr-アウトライン)を参照してください。
 
-0.0.18 では `CompositeFont` による明示的な文字範囲選択（単一行 LTR）と、
-ルール別のサイズ倍率・ベースライン移動を追加しています。
-[使用例](doc/api-recipes.ja.md#明示的な合成フォント単一行-ltr)を参照してください。
-追加 API は 0.0.17 には含まれず、Cargo の 0.0.17 指定では 0.0.18 を選択しません。
+0.0.19 は元 UTF-8 対応付き shaping と限定的な caret／行／BiDi／混在縦書き layout を追加します。
+合字内部 caret は近似で、GDEF caret・上位 layout の family fallback・自動折返し・
+cross-run joining は未対応です。[対応範囲](doc/bidi-and-mixed-vertical.md)を参照してください。
+Cargo の 0.0.18 指定では 0.0.19 を選択しないため、依存版を明示更新してください。
 
 ## 最初に使うAPI
 
@@ -77,21 +77,21 @@ default feature には `layout` と `cff` が含まれます。
 
 ```toml
 [dependencies]
-fontcore = "0.0.18"
+fontcore = "0.0.19"
 ```
 
 低レイヤ parser API も必要な場合:
 
 ```toml
 [dependencies]
-fontcore = { version = "0.0.18", features = ["raw"] }
+fontcore = { version = "0.0.19", features = ["raw"] }
 ```
 
 SVG emoji font の暫定サポートも使う場合:
 
 ```toml
 [dependencies]
-fontcore = { version = "0.0.18", features = ["svg-fonts"] }
+fontcore = { version = "0.0.19", features = ["svg-fonts"] }
 ```
 
 ## 最小サンプル
