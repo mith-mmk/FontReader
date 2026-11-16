@@ -156,6 +156,7 @@ def same_union(a, b):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument('--corpus', choices=('character', 'european'), default='character')
     ap.add_argument('--font', required=True, type=Path)
     ap.add_argument('--probe', required=True, type=Path)
     ap.add_argument('--output', required=True, type=Path)
@@ -164,7 +165,11 @@ def main():
         cmap = font.getBestCmap(); hhea = font['hhea']; upem = font['head'].unitsPerEm
         size = hhea.ascent-hhea.descent+hhea.lineGap
         font_version = font['name'].getDebugName(5)
-    rows = corpus()
+    if args.corpus == 'european':
+        from european_corpus import corpus as european_corpus
+        rows = european_corpus()
+    else:
+        rows = corpus()
     selected = [r for r in rows if all(ord(ch) in cmap for ch in r['text'])]
     payload = ''.join(f"{r['id']}\t{r['direction']}\t{r['locale']}\t{' '.join(f'{ord(c):X}' for c in r['text'])}\n" for r in selected)
     proc = subprocess.run([str(args.probe.resolve()), str(args.font.resolve()), str(size)],
@@ -188,7 +193,8 @@ def main():
         hb.destroy_font(hb.font)
     report = dict(font=args.font.name, sha256=hashlib.sha256(args.font.read_bytes()).hexdigest(),
                   font_version=font_version, harfbuzz=hb.version, python=platform.python_version(), unicode=U.unidata_version,
-                  mapping_source='Python standard-library iso8859 codecs; not downloaded Unicode mapping tables',
+                  mapping_source=('Explicit European sequences; Python Unicode NFC/NFD' if args.corpus == 'european'
+                                  else 'Python standard-library iso8859 codecs; not downloaded Unicode mapping tables'),
                   units_per_em=upem, fontcore_size=size, cases=len(rows), cmap_covered=len(selected),
                   matches=sum(r['matches'] for r in results),
                   ink_union_matches=sum(r['ink_union_matches'] for r in results),
