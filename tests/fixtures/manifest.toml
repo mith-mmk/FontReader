@@ -359,3 +359,10 @@ source = "tests/fixtures/generate_bounded_vertical_hangul.py + generate_bounded_
 license = "MIT (project test code)"
 sha256 = "cc53a3ec9baa3d793065fa5f912e206fc4642be70c95051a03845d8584860529"
 features = ["hangul", "vertical", "gsub", "gpos", "locale", "fallback", "layout"]
+
+[[fixture]]
+id = "hangul-tone.ttc"
+source = "tests/fixtures/generate_hangul_tone.py (fontTools 4.61.1)"
+license = "MIT (original synthetic outlines)"
+sha256 = "a836f648d530fe3caccc7da87dd75ee3b69fc022896cd1e4a11c2e85a834b8f3"
+features = ["layout", "hangul", "tone-order", "source-ownership"]

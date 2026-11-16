@@ -321,3 +321,44 @@ fn bounded_vertical_hangul_retains_source_spans_and_raw_mapping() {
         1
     );
 }
+
+#[test]
+#[cfg(feature = "layout")]
+fn toned_old_hangul_keeps_source_ownership_after_visual_reordering() {
+    let font =
+        Font::get_font_from_buffer(include_bytes!("../../tests/fixtures/hangul-tone.ttc")).unwrap();
+    let mut font = font;
+    font.current_font = 1;
+    let units = font
+        .shape_text_units(
+            "\u{1100}\u{1161}\u{11eb}\u{302e}\u{1100}\u{1161}\u{11eb}\u{302f}",
+            false,
+            false,
+            None,
+            crate::commands::FontVariant::Normal,
+        )
+        .unwrap();
+    let spans: Vec<_> = units
+        .iter()
+        .filter_map(|g| {
+            if let super::super::ResolvedTextUnit::Glyph(g) = g {
+                Some((g.ch, g.source_start, g.source_end, g.simple_mkmk_cluster))
+            } else {
+                None
+            }
+        })
+        .collect();
+    assert_eq!(
+        spans,
+        vec![
+            ('\u{302e}', 3, 4, None),
+            ('\u{1100}', 0, 1, None),
+            ('\u{1161}', 1, 2, None),
+            ('\u{11eb}', 2, 3, None),
+            ('\u{302f}', 7, 8, None),
+            ('\u{1100}', 4, 5, None),
+            ('\u{1161}', 5, 6, None),
+            ('\u{11eb}', 6, 7, None)
+        ]
+    );
+}

@@ -1944,6 +1944,7 @@ impl Font {
 
                 #[cfg(feature = "layout")]
                 if Self::is_old_hangul_text(text)
+                    || Self::is_toned_old_hangul_text(text)
                     || (Self::is_tibetan_normalization_cluster(text)
                         && self
                             .current_gsub()

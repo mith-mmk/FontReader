@@ -90,7 +90,9 @@ impl Gsub {
                     .contains(&tag)
                     || orientation_tag == Some(tag) =>
                 {
-                    7
+                    // Bits 1/2/4 select Jamo categories; bit 8 is a tone.
+                    // Only global features, never jmo features, apply to tones.
+                    15
                 }
                 // HarfBuzz disables calt on Jamo, not on unrelated text.
                 _ => continue,
