@@ -35,6 +35,10 @@ pub mod opentype;
 #[allow(dead_code, unused_imports)]
 mod opentype;
 
+pub mod bidi_layout;
+pub use bidi_layout::{
+    BidiBaseDirection, BidiCaretPosition, BidiLine, BidiParagraphLayout, BidiVisualRun,
+};
 pub mod caret;
 pub mod commands;
 pub use caret::{CaretAffinity, CaretLayout, CaretPosition, CaretQuality, TextPosition};
@@ -43,6 +47,10 @@ pub mod fontengine;
 pub mod fontface;
 pub mod fontfile;
 pub mod limits;
+pub mod lines;
+pub use lines::{HardLine, HardLineLayout, LineCaretPosition};
+pub mod vertical_mapped;
+pub use vertical_mapped::{VerticalCaretPosition, VerticalGroup, VerticalMappedLayout};
 pub mod mapped;
 pub use mapped::{GlyphSource, ShapedText};
 #[cfg(feature = "svg-fonts")]

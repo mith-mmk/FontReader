@@ -214,6 +214,23 @@ impl<'a> FontEngine<'a> {
         ))
     }
 
+    pub(crate) fn shape_bidi_run_mapped(
+        &self,
+        text: &str,
+        direction: TextDirection,
+    ) -> Result<crate::ShapedText, Error> {
+        let options = self.options().with_text_direction(direction);
+        let (run, ranges) = self
+            .face
+            .font()
+            .text2glyph_run_bidi_mapped(text, &options)?;
+        let sources = ranges
+            .into_iter()
+            .map(|range| crate::GlyphSource::new(range, 0, 0))
+            .collect();
+        Ok(crate::ShapedText::new(text, run, sources, direction))
+    }
+
     /// Shapes one horizontal LTR line, then rotates it 90 degrees clockwise.
     ///
     /// This per-call override ignores the engine's current direction without
@@ -328,6 +345,129 @@ impl<'a> FontEngine<'a> {
             glyphs.extend(run.glyphs);
         }
         Ok(GlyphRun::new(glyphs))
+    }
+
+    /// Shapes mixed vertical text while retaining original source ownership and
+    /// each orientation group's actual rotation/translation. Caret geometry is
+    /// available separately on the result and can reject unsupported mappings.
+    /// The rendering policy matches [`Self::shape_vertical_mixed_ltr`]. This
+    /// mapped API additionally rejects non-finite origins, transforms or advances.
+    pub fn shape_vertical_mixed_ltr_mapped(
+        &self,
+        text: &str,
+    ) -> Result<crate::vertical_mapped::VerticalMappedLayout, Error> {
+        use crate::vertical_mapped::{VerticalGroup, VerticalMappedLayout};
+        validate_single_line(text, "mixed vertical LTR")?;
+        let options = self.options();
+        let font = self.face.font();
+        let mut glyphs = Vec::new();
+        let mut sources = Vec::new();
+        let mut mapped_groups = Vec::new();
+        let (mut pen_x, mut pen_y) = (0.0f32, 0.0f32);
+        let mut byte_start = 0;
+        let mut groups = mixed_orientation_groups(text);
+        if groups.is_empty() {
+            groups.push((text, false));
+        }
+        for (group_index, (group, sideways)) in groups.into_iter().enumerate() {
+            let (local_run, ranges) = if sideways {
+                font.text2glyph_run_sideways_ltr_mapped(group, &options)?
+            } else {
+                font.text2glyph_run_mixed_upright_mapped(group, &options)?
+            };
+            let shift_x = if sideways {
+                local_run
+                    .glyphs
+                    .first()
+                    .and_then(|glyph| glyph.glyph.font)
+                    .map(|metrics| -(metrics.ascent - metrics.descent) / 2.0)
+                    .unwrap_or(0.0)
+            } else {
+                0.0
+            };
+            if !shift_x.is_finite() {
+                return Err(Error::new(
+                    ErrorKind::InvalidInput,
+                    "mixed vertical centering overflow",
+                ));
+            }
+            let local_sources = ranges
+                .iter()
+                .cloned()
+                .map(|range| crate::GlyphSource::new(range, 0, group_index))
+                .collect();
+            let local = crate::ShapedText::new(
+                group,
+                local_run.clone(),
+                local_sources,
+                if sideways {
+                    TextDirection::LeftToRight
+                } else {
+                    TextDirection::TopToBottom
+                },
+            );
+            let mut run = if sideways {
+                rotate_sideways_ltr(local_run)?
+            } else {
+                local_run
+            };
+            validate_outline_run(&run, "mixed vertical LTR")?;
+            let translation = (pen_x + shift_x, pen_y);
+            if !translation.0.is_finite() || !translation.1.is_finite() {
+                return Err(Error::new(
+                    ErrorKind::InvalidInput,
+                    "mixed vertical translation overflow",
+                ));
+            }
+            let (mut advance_x, mut advance_y) = (0.0, 0.0);
+            for glyph in &mut run.glyphs {
+                glyph.x += translation.0;
+                glyph.y += translation.1;
+                advance_x += glyph.glyph.metrics.advance_x;
+                advance_y += glyph.glyph.metrics.advance_y;
+                if !glyph.x.is_finite()
+                    || !glyph.y.is_finite()
+                    || !glyph.glyph.metrics.advance_x.is_finite()
+                    || !glyph.glyph.metrics.advance_y.is_finite()
+                    || !advance_x.is_finite()
+                    || !advance_y.is_finite()
+                {
+                    return Err(Error::new(
+                        ErrorKind::InvalidInput,
+                        "mixed vertical glyph or advance overflow",
+                    ));
+                }
+            }
+            mapped_groups.push(VerticalGroup::new(
+                byte_start..byte_start + group.len(),
+                local,
+                sideways,
+                translation,
+            ));
+            sources.extend(ranges.into_iter().map(|range| {
+                crate::GlyphSource::new(
+                    byte_start + range.start..byte_start + range.end,
+                    0,
+                    group_index,
+                )
+            }));
+            glyphs.extend(run.glyphs);
+            pen_x += advance_x;
+            pen_y += advance_y;
+            if !pen_x.is_finite() || !pen_y.is_finite() {
+                return Err(Error::new(
+                    ErrorKind::InvalidInput,
+                    "mixed vertical pen overflow",
+                ));
+            }
+            byte_start += group.len();
+        }
+        Ok(VerticalMappedLayout::new(
+            text,
+            GlyphRun::new(glyphs),
+            sources,
+            mapped_groups,
+        ))
     }
 
     /// Measures the absolute sum of the mixed run's final y advances.

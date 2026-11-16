@@ -81,6 +81,10 @@ pub struct CaretLayout {
     vertical: bool,
 }
 impl CaretLayout {
+    pub(crate) fn stops(&self) -> &[CaretPosition] {
+        &self.stops
+    }
+
     pub fn new(shaped: &ShapedText) -> Result<Self, Error> {
         let unsupported = |message| Error::new(ErrorKind::Unsupported, message);
         if shaped.text().chars().any(|c| {

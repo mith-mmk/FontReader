@@ -373,3 +373,10 @@ source = "tests/fixtures/generate_hangul_tone.py (fontTools 4.61.1)"
 license = "MIT (original synthetic outlines)"
 sha256 = "a836f648d530fe3caccc7da87dd75ee3b69fc022896cd1e4a11c2e85a834b8f3"
 features = ["layout", "hangul", "tone-order", "source-ownership"]
+
+[[fixture]]
+id = "bidi-layout.ttf"
+source = "tests/fixtures/generate_bidi_layout.py (fontTools 4.61.1)"
+license = "MIT (original synthetic outlines)"
+sha256 = "89b4791d6f45dad0185a2b19f5deec695090c5a8cf6ab21604635f21e28e34f8"
+features = ["bidi", "mirroring", "source-ownership", "formatting-controls", "ligature", "arabic-joining", "zero-advance-mark"]

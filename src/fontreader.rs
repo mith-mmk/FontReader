@@ -222,6 +222,8 @@ pub struct Font {
 
 #[derive(Debug, Clone, Copy)]
 enum ResolvedTextUnit {
+    // Invisible isolate boundary: no advance, no cross-boundary shaping/GPOS.
+    Boundary,
     Glyph(ResolvedGlyph),
     Newline,
     Tab,
@@ -1414,6 +1416,11 @@ impl Font {
         Ok(glyph_id)
     }
 
+    pub(crate) fn is_bidi_format_control(ch: char) -> bool {
+        matches!(ch, '\u{061c}' | '\u{200e}' | '\u{200f}' |
+            '\u{202a}'..='\u{202e}' | '\u{2066}'..='\u{2069}')
+    }
+
     fn is_variation_selector(ch: char) -> bool {
         (0xfe00..=0xfe0f).contains(&(ch as u32)) || (0xE0100..=0xE01EF).contains(&(ch as u32))
     }
@@ -1786,6 +1793,30 @@ impl Font {
         mode: TextRunMode,
         _allow_bounded_script_shaping: bool,
     ) -> Result<Vec<ResolvedTextUnit>, Error> {
+        self.shape_text_units_with_bidi_policy(
+            text,
+            is_vert,
+            is_right_to_left,
+            locale,
+            font_variant,
+            mode,
+            _allow_bounded_script_shaping,
+            false,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn shape_text_units_with_bidi_policy(
+        &self,
+        text: &str,
+        is_vert: bool,
+        is_right_to_left: bool,
+        locale: Option<&str>,
+        font_variant: crate::commands::FontVariant,
+        mode: TextRunMode,
+        _allow_bounded_script_shaping: bool,
+        bidi_run: bool,
+    ) -> Result<Vec<ResolvedTextUnit>, Error> {
         #[cfg(not(feature = "layout"))]
         let _ = (is_vert, locale, is_right_to_left, font_variant);
 
@@ -1875,10 +1906,44 @@ impl Font {
                         }))
                     .then_some(_cluster_index);
                     for (ch, variation_selector) in scalars {
+                        // Paragraph analysis has already consumed these controls.
+                        // Keep their original bytes in the source text, not a
+                        // missing glyph or advance in the shaped stream. Joiners
+                        // and variation selectors are deliberately not controls.
+                        if bidi_run && Self::is_bidi_format_control(ch) {
+                            if matches!(ch, '\u{2066}'..='\u{2069}') {
+                                // Isolate initiators and PDI have Joining_Type U.
+                                // Even an empty isolate must interrupt joining
+                                // (UAX #9 section 3.5), GSUB and positioning.
+                                self.flush_shaped_glyphs(
+                                    &mut output,
+                                    &mut pending_glyphs,
+                                    locale,
+                                    is_right_to_left,
+                                    font_variant,
+                                    orientation,
+                                    _allow_bounded_script_shaping,
+                                );
+                                output.push(ResolvedTextUnit::Boundary);
+                            }
+                            continue;
+                        }
+                        let shaping_ch = if bidi_run && is_right_to_left {
+                            match unicode_bidi_mirroring::get_mirrored(ch) {
+                                Some(mirrored) => mirrored,
+                                None if unicode_bidi_mirroring::is_mirroring(ch) => {
+                                    return Err(Error::new(ErrorKind::Unsupported,
+                                        "BiDi mirror requires a font-authored alternate not supported by this API"));
+                                }
+                                None => ch,
+                            }
+                        } else {
+                            ch
+                        };
                         // Text shaping selects orientation features in the sequence pass.
                         // Raw glyph APIs retain the direct single-glyph alternate path.
                         let glyph_id =
-                            self.resolve_glyph_id_with_uvs(ch, variation_selector, false)?;
+                            self.resolve_glyph_id_with_uvs(shaping_ch, variation_selector, false)?;
                         #[cfg(feature = "layout")]
                         let source_start = pending_glyphs.last().map_or(0, |g| g.source_end);
                         pending_glyphs.push(ResolvedGlyph {
@@ -1886,7 +1951,7 @@ impl Font {
                             byte_end: byte_range.end,
                             ch,
                             #[cfg(feature = "layout")]
-                            shaping_ch: ch,
+                            shaping_ch,
                             #[cfg(feature = "layout")]
                             kana_residual_mark: kana::residual_mark(&text) == Some(ch),
                             #[cfg(feature = "layout")]
@@ -2547,6 +2612,28 @@ impl Font {
         self.text2glyph_run_impl(text, &options, TextRunMode::MixedUpright)
     }
 
+    pub(crate) fn text2glyph_run_sideways_ltr_mapped(
+        &self,
+        text: &str,
+        options: &crate::commands::FontOptions<'_>,
+    ) -> Result<(GlyphRun, Vec<std::ops::Range<usize>>), Error> {
+        let options = options
+            .clone()
+            .with_text_direction(crate::commands::TextDirection::LeftToRight);
+        self.text2glyph_run_impl_mapped(text, &options, TextRunMode::SidewaysLtr)
+    }
+
+    pub(crate) fn text2glyph_run_mixed_upright_mapped(
+        &self,
+        text: &str,
+        options: &crate::commands::FontOptions<'_>,
+    ) -> Result<(GlyphRun, Vec<std::ops::Range<usize>>), Error> {
+        let options = options
+            .clone()
+            .with_text_direction(crate::commands::TextDirection::TopToBottom);
+        self.text2glyph_run_impl_mapped(text, &options, TextRunMode::MixedUpright)
+    }
+
     fn text2glyph_run_impl(
         &self,
         text: &str,
@@ -2570,6 +2657,48 @@ impl Font {
         text: &str,
         options: &crate::commands::FontOptions<'_>,
         mode: TextRunMode,
+    ) -> Result<(GlyphRun, Vec<std::ops::Range<usize>>), Error> {
+        self.text2glyph_run_layout_mapped(text, options, mode, false)
+    }
+
+    /// Shapes an upstream-resolved horizontal BiDi level run in logical order.
+    /// Mirroring changes only the shaping scalar, never the source byte envelope.
+    pub(crate) fn text2glyph_run_bidi_mapped(
+        &self,
+        text: &str,
+        options: &crate::commands::FontOptions<'_>,
+    ) -> Result<(GlyphRun, Vec<std::ops::Range<usize>>), Error> {
+        if options.text_direction.is_vertical()
+            || text.chars().any(|ch| {
+                matches!(
+                    ch,
+                    '\u{202d}'
+                        | '\u{202e}'
+                        | '\t'
+                        | '\r'
+                        | '\n'
+                        | '\u{000b}'
+                        | '\u{000c}'
+                        | '\u{0085}'
+                        | '\u{2028}'
+                        | '\u{2029}'
+                )
+            })
+        {
+            return Err(Error::new(
+                ErrorKind::Unsupported,
+                "BiDi run shaping requires one horizontal line without overrides or tabs",
+            ));
+        }
+        self.text2glyph_run_layout_mapped(text, options, TextRunMode::Standard, true)
+    }
+
+    fn text2glyph_run_layout_mapped(
+        &self,
+        text: &str,
+        options: &crate::commands::FontOptions<'_>,
+        mode: TextRunMode,
+        bidi_run: bool,
     ) -> Result<(GlyphRun, Vec<std::ops::Range<usize>>), Error> {
         let _ = self.current_head()?;
 
@@ -2606,13 +2735,15 @@ impl Font {
         let mut cursor_y = 0.0f32;
         let tab_advance = line_height;
         #[allow(unused_mut)]
-        let shaped_units = self.shape_text_units_mode(
+        let shaped_units = self.shape_text_units_with_bidi_policy(
             text,
             is_vertical && mode == TextRunMode::Standard,
             is_right_to_left,
             options.locale,
             options.font_variant,
             mode,
+            true,
+            bidi_run,
         )?;
         let adjustments =
             self.position_adjustments(&shaped_units, options.locale, is_vertical, scale_x, scale_y);
@@ -2620,6 +2751,7 @@ impl Font {
 
         for (index, unit) in shaped_units.iter().enumerate() {
             match *unit {
+                ResolvedTextUnit::Boundary => {}
                 ResolvedTextUnit::Newline => {
                     if is_vertical {
                         cursor_x -= line_height;
@@ -3159,6 +3291,7 @@ impl Font {
 
         for (index, unit) in shaped_units.iter().enumerate() {
             match *unit {
+                ResolvedTextUnit::Boundary => {}
                 ResolvedTextUnit::Newline => {
                     cursor_x = 0.0;
                     line_index += 1;
