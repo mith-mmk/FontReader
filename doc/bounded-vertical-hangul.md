@@ -65,3 +65,35 @@ References:
 - https://github.com/harfbuzz/harfbuzz/blob/15.0.0/src/hb-ot-shaper-hangul.cc
 - https://github.com/harfbuzz/harfbuzz/blob/15.0.0/src/hb-ot-shape.cc
 - https://learn.microsoft.com/en-us/typography/script-development/hangul
+
+## Recorded result and static comparison
+
+Production checkpoint `5c3616f539545082157e21d6ac17478c3996b2c0` builds on
+PR #58 head `8a666554d1165534c5d7e4447afc050cb30e60b7`.
+Local tests: default 429 passed / 1 ignored; no-default 244 passed;
+all-features 547 passed / 1 ignored. Strict all-target/all-feature Clippy and
+formatting pass. The 17-face fixture regenerates byte-identically; all 50 fixture
+manifest hashes match. These are local checks, not a substitute for final CI.
+
+The unchanged Noto font's U+1100 U+1161 U+11EB and U+A960 U+D7B0 U+D7CB
+now have the same per-glyph final ink bounds and advances as HB OT: one vertical
+cell (1000 units), not three. Actual public SVGs also match a separate expected-
+glyph diagnostic that keeps the original outlines and GPOS. The diagnostic
+uses PUA mappings and removes GSUB, so it isolates positioning and is not itself
+proof of original-font shaping. Original-font candidate results were checked
+separately. The old ccmp-only vowel control stays unchanged. Noto's vert/vrt2
+GSUB lists differ globally, but neither maps these representative Jamo glyphs.
+
+The columns below are PR #58 baseline / candidate / HarfBuzz 15 OT. These are
+actual vector-outline comparisons rendered to PNG, not GUI screenshots. Normal
+32 px/em and enlarged 128 px/em views were visually inspected independently.
+
+![Normal-size vertical Old Hangul comparison](bounded-vertical-hangul-normal.png)
+
+![Enlarged vertical Old Hangul comparison](bounded-vertical-hangul-enlarged.png)
+
+The tone control remains different: the candidate still leaves the tone a cell
+below, whereas HB places it before the syllable. This stage intentionally does
+not claim tone support, exhaustive Hangul coverage or browser/native GUI parity.
+
+![Unchanged tone ordering limitation](bounded-vertical-hangul-tone-control.png)
