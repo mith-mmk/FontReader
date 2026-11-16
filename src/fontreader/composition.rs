@@ -3,7 +3,9 @@ use super::{Font, ResolvedGlyph};
 
 impl Font {
     pub(super) fn is_bounded_composition(glyph: &ResolvedGlyph) -> bool {
-        Self::is_composed_modern_hangul(glyph) || Self::is_composed_kana(glyph)
+        Self::is_composed_modern_hangul(glyph)
+            || Self::is_composed_kana(glyph)
+            || Self::is_composed_latin(glyph)
     }
 
     pub(super) fn composition_glyph_is_renderable(&self, glyph_id: usize) -> bool {
@@ -41,6 +43,8 @@ impl Font {
                     chars.push(char::from_u32(0x11a7 + offset % 28).unwrap());
                 }
                 chars
+            } else if Self::is_composed_latin(glyph) {
+                super::latin::original(glyph.shaping_ch).unwrap().to_vec()
             } else {
                 super::kana::original_pair(glyph.shaping_ch)
                     .unwrap()

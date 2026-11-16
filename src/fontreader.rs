@@ -4,6 +4,8 @@ mod composition;
 mod hangul;
 #[cfg(feature = "layout")]
 mod kana;
+#[cfg(feature = "layout")]
+mod latin;
 #[cfg(all(test, feature = "layout"))]
 mod mkmk_tests;
 #[cfg(feature = "layout")]
@@ -1823,6 +1825,16 @@ impl Font {
                         // NFD even when none of its original scalars are mapped.
                         pending_glyphs.push(glyph);
                         continue;
+                    }
+                    #[cfg(feature = "layout")]
+                    if !is_right_to_left && !is_vert && mode == TextRunMode::Standard {
+                        if let Some(glyphs) = self.composed_latin_glyphs(
+                            &text,
+                            pending_glyphs.last().map_or(0, |g| g.source_end),
+                        ) {
+                            pending_glyphs.extend(glyphs);
+                            continue;
+                        }
                     }
                     let tibetan_cluster = None;
                     #[cfg(feature = "layout")]

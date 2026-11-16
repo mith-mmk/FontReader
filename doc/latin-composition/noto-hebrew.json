@@ -1,0 +1,2771 @@
+{
+  "font": "NotoSansHebrew-Regular.ttf",
+  "sha256": "436900d5ad77d33e4234247f3076eaecd25b92b9bea0519514f684140e3566a7",
+  "font_version": "Version 3.000; ttfautohint (v1.8.3) -l 8 -r 50 -G 200 -x 14 -D hebr -f none -a qsq -X \"\"",
+  "harfbuzz": "10.2.0",
+  "python": "3.12.14",
+  "unicode": "15.0.0",
+  "mapping_source": "Python standard-library iso8859 codecs; not downloaded Unicode mapping tables",
+  "units_per_em": 1000,
+  "fontcore_size": 1360,
+  "cases": 742,
+  "cmap_covered": 36,
+  "matches": 36,
+  "ink_union_matches": 36,
+  "missing": [
+    "iso-00A1",
+    "iso-00A2",
+    "iso-00A3",
+    "iso-00A4",
+    "iso-00A5",
+    "iso-00A6",
+    "iso-00A7",
+    "iso-00A8",
+    "iso-00A9",
+    "iso-00AA",
+    "iso-00AB",
+    "iso-00AC",
+    "iso-00AE",
+    "iso-00AF",
+    "iso-00B0",
+    "iso-00B1",
+    "iso-00B2",
+    "iso-00B3",
+    "iso-00B4",
+    "iso-00B5",
+    "iso-00B6",
+    "iso-00B7",
+    "iso-00B8",
+    "iso-00B9",
+    "iso-00BA",
+    "iso-00BB",
+    "iso-00BC",
+    "iso-00BD",
+    "iso-00BE",
+    "iso-00BF",
+    "iso-00C0",
+    "iso-00C1",
+    "iso-00C2",
+    "iso-00C3",
+    "iso-00C4",
+    "iso-00C5",
+    "iso-00C6",
+    "iso-00C7",
+    "iso-00C8",
+    "iso-00C9",
+    "iso-00CA",
+    "iso-00CB",
+    "iso-00CC",
+    "iso-00CD",
+    "iso-00CE",
+    "iso-00CF",
+    "iso-00D0",
+    "iso-00D1",
+    "iso-00D2",
+    "iso-00D3",
+    "iso-00D4",
+    "iso-00D5",
+    "iso-00D6",
+    "iso-00D7",
+    "iso-00D8",
+    "iso-00D9",
+    "iso-00DA",
+    "iso-00DB",
+    "iso-00DC",
+    "iso-00DD",
+    "iso-00DE",
+    "iso-00DF",
+    "iso-00E0",
+    "iso-00E1",
+    "iso-00E2",
+    "iso-00E3",
+    "iso-00E4",
+    "iso-00E5",
+    "iso-00E6",
+    "iso-00E7",
+    "iso-00E8",
+    "iso-00E9",
+    "iso-00EA",
+    "iso-00EB",
+    "iso-00EC",
+    "iso-00ED",
+    "iso-00EE",
+    "iso-00EF",
+    "iso-00F0",
+    "iso-00F1",
+    "iso-00F2",
+    "iso-00F3",
+    "iso-00F4",
+    "iso-00F5",
+    "iso-00F6",
+    "iso-00F7",
+    "iso-00F8",
+    "iso-00F9",
+    "iso-00FA",
+    "iso-00FB",
+    "iso-00FC",
+    "iso-00FD",
+    "iso-00FE",
+    "iso-00FF",
+    "iso-0100",
+    "iso-0101",
+    "iso-0102",
+    "iso-0103",
+    "iso-0104",
+    "iso-0105",
+    "iso-0106",
+    "iso-0107",
+    "iso-0108",
+    "iso-0109",
+    "iso-010A",
+    "iso-010B",
+    "iso-010C",
+    "iso-010D",
+    "iso-010E",
+    "iso-010F",
+    "iso-0110",
+    "iso-0111",
+    "iso-0112",
+    "iso-0113",
+    "iso-0116",
+    "iso-0117",
+    "iso-0118",
+    "iso-0119",
+    "iso-011A",
+    "iso-011B",
+    "iso-011C",
+    "iso-011D",
+    "iso-011E",
+    "iso-011F",
+    "iso-0120",
+    "iso-0121",
+    "iso-0122",
+    "iso-0123",
+    "iso-0124",
+    "iso-0125",
+    "iso-0126",
+    "iso-0127",
+    "iso-0128",
+    "iso-0129",
+    "iso-012A",
+    "iso-012B",
+    "iso-012E",
+    "iso-012F",
+    "iso-0130",
+    "iso-0131",
+    "iso-0134",
+    "iso-0135",
+    "iso-0136",
+    "iso-0137",
+    "iso-0138",
+    "iso-0139",
+    "iso-013A",
+    "iso-013B",
+    "iso-013C",
+    "iso-013D",
+    "iso-013E",
+    "iso-0141",
+    "iso-0142",
+    "iso-0143",
+    "iso-0144",
+    "iso-0145",
+    "iso-0146",
+    "iso-0147",
+    "iso-0148",
+    "iso-014A",
+    "iso-014B",
+    "iso-014C",
+    "iso-014D",
+    "iso-0150",
+    "iso-0151",
+    "iso-0152",
+    "iso-0153",
+    "iso-0154",
+    "iso-0155",
+    "iso-0156",
+    "iso-0157",
+    "iso-0158",
+    "iso-0159",
+    "iso-015A",
+    "iso-015B",
+    "iso-015C",
+    "iso-015D",
+    "iso-015E",
+    "iso-015F",
+    "iso-0160",
+    "iso-0161",
+    "iso-0162",
+    "iso-0163",
+    "iso-0164",
+    "iso-0165",
+    "iso-0166",
+    "iso-0167",
+    "iso-0168",
+    "iso-0169",
+    "iso-016A",
+    "iso-016B",
+    "iso-016C",
+    "iso-016D",
+    "iso-016E",
+    "iso-016F",
+    "iso-0170",
+    "iso-0171",
+    "iso-0172",
+    "iso-0173",
+    "iso-0174",
+    "iso-0175",
+    "iso-0176",
+    "iso-0177",
+    "iso-0178",
+    "iso-0179",
+    "iso-017A",
+    "iso-017B",
+    "iso-017C",
+    "iso-017D",
+    "iso-017E",
+    "iso-0218",
+    "iso-0219",
+    "iso-021A",
+    "iso-021B",
+    "iso-02C7",
+    "iso-02D8",
+    "iso-02D9",
+    "iso-02DB",
+    "iso-02DD",
+    "iso-037A",
+    "iso-0384",
+    "iso-0385",
+    "iso-0386",
+    "iso-0388",
+    "iso-0389",
+    "iso-038A",
+    "iso-038C",
+    "iso-038E",
+    "iso-038F",
+    "iso-0390",
+    "iso-0391",
+    "iso-0392",
+    "iso-0393",
+    "iso-0394",
+    "iso-0395",
+    "iso-0396",
+    "iso-0397",
+    "iso-0398",
+    "iso-0399",
+    "iso-039A",
+    "iso-039B",
+    "iso-039C",
+    "iso-039D",
+    "iso-039E",
+    "iso-039F",
+    "iso-03A0",
+    "iso-03A1",
+    "iso-03A3",
+    "iso-03A4",
+    "iso-03A5",
+    "iso-03A6",
+    "iso-03A7",
+    "iso-03A8",
+    "iso-03A9",
+    "iso-03AA",
+    "iso-03AB",
+    "iso-03AC",
+    "iso-03AD",
+    "iso-03AE",
+    "iso-03AF",
+    "iso-03B0",
+    "iso-03B1",
+    "iso-03B2",
+    "iso-03B3",
+    "iso-03B4",
+    "iso-03B5",
+    "iso-03B6",
+    "iso-03B7",
+    "iso-03B8",
+    "iso-03B9",
+    "iso-03BA",
+    "iso-03BB",
+    "iso-03BC",
+    "iso-03BD",
+    "iso-03BE",
+    "iso-03BF",
+    "iso-03C0",
+    "iso-03C1",
+    "iso-03C2",
+    "iso-03C3",
+    "iso-03C4",
+    "iso-03C5",
+    "iso-03C6",
+    "iso-03C7",
+    "iso-03C8",
+    "iso-03C9",
+    "iso-03CA",
+    "iso-03CB",
+    "iso-03CC",
+    "iso-03CD",
+    "iso-03CE",
+    "iso-0401",
+    "iso-0402",
+    "iso-0403",
+    "iso-0404",
+    "iso-0405",
+    "iso-0406",
+    "iso-0407",
+    "iso-0408",
+    "iso-0409",
+    "iso-040A",
+    "iso-040B",
+    "iso-040C",
+    "iso-040E",
+    "iso-040F",
+    "iso-0410",
+    "iso-0411",
+    "iso-0412",
+    "iso-0413",
+    "iso-0414",
+    "iso-0415",
+    "iso-0416",
+    "iso-0417",
+    "iso-0418",
+    "iso-0419",
+    "iso-041A",
+    "iso-041B",
+    "iso-041C",
+    "iso-041D",
+    "iso-041E",
+    "iso-041F",
+    "iso-0420",
+    "iso-0421",
+    "iso-0422",
+    "iso-0423",
+    "iso-0424",
+    "iso-0425",
+    "iso-0426",
+    "iso-0427",
+    "iso-0428",
+    "iso-0429",
+    "iso-042A",
+    "iso-042B",
+    "iso-042C",
+    "iso-042D",
+    "iso-042E",
+    "iso-042F",
+    "iso-0430",
+    "iso-0431",
+    "iso-0432",
+    "iso-0433",
+    "iso-0434",
+    "iso-0435",
+    "iso-0436",
+    "iso-0437",
+    "iso-0438",
+    "iso-0439",
+    "iso-043A",
+    "iso-043B",
+    "iso-043C",
+    "iso-043D",
+    "iso-043E",
+    "iso-043F",
+    "iso-0440",
+    "iso-0441",
+    "iso-0442",
+    "iso-0443",
+    "iso-0444",
+    "iso-0445",
+    "iso-0446",
+    "iso-0447",
+    "iso-0448",
+    "iso-0449",
+    "iso-044A",
+    "iso-044B",
+    "iso-044C",
+    "iso-044D",
+    "iso-044E",
+    "iso-044F",
+    "iso-0451",
+    "iso-0452",
+    "iso-0453",
+    "iso-0454",
+    "iso-0455",
+    "iso-0456",
+    "iso-0457",
+    "iso-0458",
+    "iso-0459",
+    "iso-045A",
+    "iso-045B",
+    "iso-045C",
+    "iso-045E",
+    "iso-045F",
+    "iso-0E01",
+    "iso-0E02",
+    "iso-0E03",
+    "iso-0E04",
+    "iso-0E05",
+    "iso-0E06",
+    "iso-0E07",
+    "iso-0E08",
+    "iso-0E09",
+    "iso-0E0A",
+    "iso-0E0B",
+    "iso-0E0C",
+    "iso-0E0D",
+    "iso-0E0E",
+    "iso-0E0F",
+    "iso-0E10",
+    "iso-0E11",
+    "iso-0E12",
+    "iso-0E13",
+    "iso-0E14",
+    "iso-0E15",
+    "iso-0E16",
+    "iso-0E17",
+    "iso-0E18",
+    "iso-0E19",
+    "iso-0E1A",
+    "iso-0E1B",
+    "iso-0E1C",
+    "iso-0E1D",
+    "iso-0E1E",
+    "iso-0E1F",
+    "iso-0E20",
+    "iso-0E21",
+    "iso-0E22",
+    "iso-0E23",
+    "iso-0E24",
+    "iso-0E25",
+    "iso-0E26",
+    "iso-0E27",
+    "iso-0E28",
+    "iso-0E29",
+    "iso-0E2A",
+    "iso-0E2B",
+    "iso-0E2C",
+    "iso-0E2D",
+    "iso-0E2E",
+    "iso-0E2F",
+    "iso-0E30",
+    "iso-0E31",
+    "iso-0E32",
+    "iso-0E33",
+    "iso-0E34",
+    "iso-0E35",
+    "iso-0E36",
+    "iso-0E37",
+    "iso-0E38",
+    "iso-0E39",
+    "iso-0E3A",
+    "iso-0E3F",
+    "iso-0E40",
+    "iso-0E41",
+    "iso-0E42",
+    "iso-0E43",
+    "iso-0E44",
+    "iso-0E45",
+    "iso-0E46",
+    "iso-0E47",
+    "iso-0E48",
+    "iso-0E49",
+    "iso-0E4A",
+    "iso-0E4B",
+    "iso-0E4C",
+    "iso-0E4D",
+    "iso-0E4E",
+    "iso-0E4F",
+    "iso-0E50",
+    "iso-0E51",
+    "iso-0E52",
+    "iso-0E53",
+    "iso-0E54",
+    "iso-0E55",
+    "iso-0E56",
+    "iso-0E57",
+    "iso-0E58",
+    "iso-0E59",
+    "iso-0E5A",
+    "iso-0E5B",
+    "iso-1E02",
+    "iso-1E03",
+    "iso-1E0A",
+    "iso-1E0B",
+    "iso-1E1E",
+    "iso-1E1F",
+    "iso-1E40",
+    "iso-1E41",
+    "iso-1E56",
+    "iso-1E57",
+    "iso-1E60",
+    "iso-1E61",
+    "iso-1E6A",
+    "iso-1E6B",
+    "iso-1E80",
+    "iso-1E81",
+    "iso-1E82",
+    "iso-1E83",
+    "iso-1E84",
+    "iso-1E85",
+    "iso-1EF2",
+    "iso-1EF3",
+    "iso-2015",
+    "iso-2017",
+    "iso-2018",
+    "iso-2019",
+    "iso-201C",
+    "iso-201D",
+    "iso-201E",
+    "iso-20AC",
+    "iso-20AF",
+    "iso-2116",
+    "ipa-0250",
+    "ipa-0251",
+    "ipa-0252",
+    "ipa-0253",
+    "ipa-0254",
+    "ipa-0255",
+    "ipa-0256",
+    "ipa-0257",
+    "ipa-0258",
+    "ipa-0259",
+    "ipa-025A",
+    "ipa-025B",
+    "ipa-025C",
+    "ipa-025D",
+    "ipa-025E",
+    "ipa-025F",
+    "ipa-0260",
+    "ipa-0261",
+    "ipa-0262",
+    "ipa-0263",
+    "ipa-0264",
+    "ipa-0265",
+    "ipa-0266",
+    "ipa-0267",
+    "ipa-0268",
+    "ipa-0269",
+    "ipa-026A",
+    "ipa-026B",
+    "ipa-026C",
+    "ipa-026D",
+    "ipa-026E",
+    "ipa-026F",
+    "ipa-0270",
+    "ipa-0271",
+    "ipa-0272",
+    "ipa-0273",
+    "ipa-0274",
+    "ipa-0275",
+    "ipa-0276",
+    "ipa-0277",
+    "ipa-0278",
+    "ipa-0279",
+    "ipa-027A",
+    "ipa-027B",
+    "ipa-027C",
+    "ipa-027D",
+    "ipa-027E",
+    "ipa-027F",
+    "ipa-0280",
+    "ipa-0281",
+    "ipa-0282",
+    "ipa-0283",
+    "ipa-0284",
+    "ipa-0285",
+    "ipa-0286",
+    "ipa-0287",
+    "ipa-0288",
+    "ipa-0289",
+    "ipa-028A",
+    "ipa-028B",
+    "ipa-028C",
+    "ipa-028D",
+    "ipa-028E",
+    "ipa-028F",
+    "ipa-0290",
+    "ipa-0291",
+    "ipa-0292",
+    "ipa-0293",
+    "ipa-0294",
+    "ipa-0295",
+    "ipa-0296",
+    "ipa-0297",
+    "ipa-0298",
+    "ipa-0299",
+    "ipa-029A",
+    "ipa-029B",
+    "ipa-029C",
+    "ipa-029D",
+    "ipa-029E",
+    "ipa-029F",
+    "ipa-02A0",
+    "ipa-02A1",
+    "ipa-02A2",
+    "ipa-02A3",
+    "ipa-02A4",
+    "ipa-02A5",
+    "ipa-02A6",
+    "ipa-02A7",
+    "ipa-02A8",
+    "ipa-02A9",
+    "ipa-02AA",
+    "ipa-02AB",
+    "ipa-02AC",
+    "ipa-02AD",
+    "ipa-02AE",
+    "ipa-02AF",
+    "ipa-02B0",
+    "ipa-02B1",
+    "ipa-02B2",
+    "ipa-02B3",
+    "ipa-02B4",
+    "ipa-02B5",
+    "ipa-02B6",
+    "ipa-02B7",
+    "ipa-02B8",
+    "ipa-02B9",
+    "ipa-02BA",
+    "ipa-02BB",
+    "ipa-02BC",
+    "ipa-02BD",
+    "ipa-02BE",
+    "ipa-02BF",
+    "ipa-02C0",
+    "ipa-02C1",
+    "ipa-02C2",
+    "ipa-02C3",
+    "ipa-02C4",
+    "ipa-02C5",
+    "ipa-02C6",
+    "ipa-02C7",
+    "ipa-02C8",
+    "ipa-02C9",
+    "ipa-02CA",
+    "ipa-02CB",
+    "ipa-02CC",
+    "ipa-02CD",
+    "ipa-02CE",
+    "ipa-02CF",
+    "ipa-02D0",
+    "ipa-02D1",
+    "ipa-02D2",
+    "ipa-02D3",
+    "ipa-02D4",
+    "ipa-02D5",
+    "ipa-02D6",
+    "ipa-02D7",
+    "ipa-02D8",
+    "ipa-02D9",
+    "ipa-02DA",
+    "ipa-02DB",
+    "ipa-02DC",
+    "ipa-02DD",
+    "ipa-02DE",
+    "ipa-02DF",
+    "ipa-02E0",
+    "ipa-02E1",
+    "ipa-02E2",
+    "ipa-02E3",
+    "ipa-02E4",
+    "ipa-02E5",
+    "ipa-02E6",
+    "ipa-02E7",
+    "ipa-02E8",
+    "ipa-02E9",
+    "ipa-02EA",
+    "ipa-02EB",
+    "ipa-02EC",
+    "ipa-02ED",
+    "ipa-02EE",
+    "ipa-02EF",
+    "ipa-02F0",
+    "ipa-02F1",
+    "ipa-02F2",
+    "ipa-02F3",
+    "ipa-02F4",
+    "ipa-02F5",
+    "ipa-02F6",
+    "ipa-02F7",
+    "ipa-02F8",
+    "ipa-02F9",
+    "ipa-02FA",
+    "ipa-02FB",
+    "ipa-02FC",
+    "ipa-02FD",
+    "ipa-02FE",
+    "ipa-02FF",
+    "ipa-voiceless-NFC",
+    "ipa-voiceless-NFD",
+    "ipa-syllabic-NFC",
+    "ipa-syllabic-NFD",
+    "ipa-stacked-NFC",
+    "ipa-stacked-NFD",
+    "ipa-two-sided-NFC",
+    "ipa-two-sided-NFD",
+    "ipa-tie-NFC",
+    "ipa-tie-NFD",
+    "ipa-aspirated-NFC",
+    "ipa-aspirated-NFD",
+    "ipa-length-NFC",
+    "ipa-length-NFD",
+    "ipa-stress-NFC",
+    "ipa-stress-NFD",
+    "latin-acute-NFC",
+    "latin-acute-NFD",
+    "latin-ring-NFC",
+    "latin-ring-NFD",
+    "latin-caron-NFC",
+    "latin-caron-NFD",
+    "latin-double-acute-NFC",
+    "latin-double-acute-NFD",
+    "latin-umlaut-NFC",
+    "latin-umlaut-NFD",
+    "latin-vietnamese-NFC",
+    "latin-vietnamese-NFD"
+  ],
+  "results": [
+    {
+      "id": "iso-00A0",
+      "text": " ",
+      "group": "iso-scalar",
+      "direction": "ltr",
+      "locale": "und",
+      "origins": [
+        [
+          1,
+          160
+        ],
+        [
+          2,
+          160
+        ],
+        [
+          3,
+          160
+        ],
+        [
+          4,
+          160
+        ],
+        [
+          5,
+          160
+        ],
+        [
+          7,
+          160
+        ],
+        [
+          8,
+          160
+        ],
+        [
+          9,
+          160
+        ],
+        [
+          10,
+          160
+        ],
+        [
+          11,
+          160
+        ],
+        [
+          13,
+          160
+        ],
+        [
+          14,
+          160
+        ],
+        [
+          15,
+          160
+        ],
+        [
+          16,
+          160
+        ]
+      ],
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "iso-00A0",
+        "advance": 260,
+        "glyphs": [
+          {
+            "advance": 260,
+            "bounds": null
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 260,
+        "glyphs": [
+          {
+            "advance": 260,
+            "bounds": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "iso-05D0",
+      "text": "א",
+      "group": "iso-scalar",
+      "direction": "rtl",
+      "locale": "he",
+      "origins": [
+        [
+          8,
+          224
+        ]
+      ],
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "iso-05D0",
+        "advance": 632,
+        "glyphs": [
+          {
+            "advance": 632,
+            "bounds": [
+              36,
+              -593,
+              596,
+              0
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 632,
+        "glyphs": [
+          {
+            "advance": 632,
+            "bounds": [
+              36,
+              -593,
+              596,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "iso-05D1",
+      "text": "ב",
+      "group": "iso-scalar",
+      "direction": "rtl",
+      "locale": "he",
+      "origins": [
+        [
+          8,
+          225
+        ]
+      ],
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "iso-05D1",
+        "advance": 572,
+        "glyphs": [
+          {
+            "advance": 572,
+            "bounds": [
+              41,
+              -593,
+              535,
+              0
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 572,
+        "glyphs": [
+          {
+            "advance": 572,
+            "bounds": [
+              41,
+              -593,
+              535,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "iso-05D2",
+      "text": "ג",
+      "group": "iso-scalar",
+      "direction": "rtl",
+      "locale": "he",
+      "origins": [
+        [
+          8,
+          226
+        ]
+      ],
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "iso-05D2",
+        "advance": 374,
+        "glyphs": [
+          {
+            "advance": 374,
+            "bounds": [
+              23,
+              -593,
+              351,
+              5
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 374,
+        "glyphs": [
+          {
+            "advance": 374,
+            "bounds": [
+              23,
+              -593,
+              351,
+              5
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "iso-05D3",
+      "text": "ד",
+      "group": "iso-scalar",
+      "direction": "rtl",
+      "locale": "he",
+      "origins": [
+        [
+          8,
+          227
+        ]
+      ],
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "iso-05D3",
+        "advance": 542,
+        "glyphs": [
+          {
+            "advance": 542,
+            "bounds": [
+              38,
+              -593,
+              511,
+              0
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 542,
+        "glyphs": [
+          {
+            "advance": 542,
+            "bounds": [
+              38,
+              -593,
+              511,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "iso-05D4",
+      "text": "ה",
+      "group": "iso-scalar",
+      "direction": "rtl",
+      "locale": "he",
+      "origins": [
+        [
+          8,
+          228
+        ]
+      ],
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "iso-05D4",
+        "advance": 627,
+        "glyphs": [
+          {
+            "advance": 627,
+            "bounds": [
+              53,
+              -593,
+              555,
+              0
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 627,
+        "glyphs": [
+          {
+            "advance": 627,
+            "bounds": [
+              53,
+              -593,
+              555,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "iso-05D5",
+      "text": "ו",
+      "group": "iso-scalar",
+      "direction": "rtl",
+      "locale": "he",
+      "origins": [
+        [
+          8,
+          229
+        ]
+      ],
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "iso-05D5",
+        "advance": 301,
+        "glyphs": [
+          {
+            "advance": 301,
+            "bounds": [
+              38,
+              -593,
+              221,
+              0
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 301,
+        "glyphs": [
+          {
+            "advance": 301,
+            "bounds": [
+              38,
+              -593,
+              221,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "iso-05D6",
+      "text": "ז",
+      "group": "iso-scalar",
+      "direction": "rtl",
+      "locale": "he",
+      "origins": [
+        [
+          8,
+          230
+        ]
+      ],
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "iso-05D6",
+        "advance": 330,
+        "glyphs": [
+          {
+            "advance": 330,
+            "bounds": [
+              42,
+              -593,
+              299,
+              -1
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 330,
+        "glyphs": [
+          {
+            "advance": 330,
+            "bounds": [
+              42,
+              -593,
+              299,
+              -1
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "iso-05D7",
+      "text": "ח",
+      "group": "iso-scalar",
+      "direction": "rtl",
+      "locale": "he",
+      "origins": [
+        [
+          8,
+          231
+        ]
+      ],
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "iso-05D7",
+        "advance": 662,
+        "glyphs": [
+          {
+            "advance": 662,
+            "bounds": [
+              44,
+              -593,
+              588,
+              0
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 662,
+        "glyphs": [
+          {
+            "advance": 662,
+            "bounds": [
+              44,
+              -593,
+              588,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "iso-05D8",
+      "text": "ט",
+      "group": "iso-scalar",
+      "direction": "rtl",
+      "locale": "he",
+      "origins": [
+        [
+          8,
+          232
+        ]
+      ],
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "iso-05D8",
+        "advance": 634,
+        "glyphs": [
+          {
+            "advance": 634,
+            "bounds": [
+              57,
+              -599,
+              583,
+              10
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 634,
+        "glyphs": [
+          {
+            "advance": 634,
+            "bounds": [
+              57,
+              -599,
+              583,
+              10
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "iso-05D9",
+      "text": "י",
+      "group": "iso-scalar",
+      "direction": "rtl",
+      "locale": "he",
+      "origins": [
+        [
+          8,
+          233
+        ]
+      ],
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "iso-05D9",
+        "advance": 295,
+        "glyphs": [
+          {
+            "advance": 295,
+            "bounds": [
+              38,
+              -593,
+              221,
+              -262
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 295,
+        "glyphs": [
+          {
+            "advance": 295,
+            "bounds": [
+              38,
+              -593,
+              221,
+              -262
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "iso-05DA",
+      "text": "ך",
+      "group": "iso-scalar",
+      "direction": "rtl",
+      "locale": "he",
+      "origins": [
+        [
+          8,
+          234
+        ]
+      ],
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "iso-05DA",
+        "advance": 545,
+        "glyphs": [
+          {
+            "advance": 545,
+            "bounds": [
+              43,
+              -593,
+              480,
+              191
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 545,
+        "glyphs": [
+          {
+            "advance": 545,
+            "bounds": [
+              43,
+              -593,
+              480,
+              191
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "iso-05DB",
+      "text": "כ",
+      "group": "iso-scalar",
+      "direction": "rtl",
+      "locale": "he",
+      "origins": [
+        [
+          8,
+          235
+        ]
+      ],
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "iso-05DB",
+        "advance": 515,
+        "glyphs": [
+          {
+            "advance": 515,
+            "bounds": [
+              45,
+              -593,
+              470,
+              0
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 515,
+        "glyphs": [
+          {
+            "advance": 515,
+            "bounds": [
+              45,
+              -593,
+              470,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "iso-05DC",
+      "text": "ל",
+      "group": "iso-scalar",
+      "direction": "rtl",
+      "locale": "he",
+      "origins": [
+        [
+          8,
+          236
+        ]
+      ],
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "iso-05DC",
+        "advance": 522,
+        "glyphs": [
+          {
+            "advance": 522,
+            "bounds": [
+              34,
+              -760,
+              487,
+              0
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 522,
+        "glyphs": [
+          {
+            "advance": 522,
+            "bounds": [
+              34,
+              -760,
+              487,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "iso-05DD",
+      "text": "ם",
+      "group": "iso-scalar",
+      "direction": "rtl",
+      "locale": "he",
+      "origins": [
+        [
+          8,
+          237
+        ]
+      ],
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "iso-05DD",
+        "advance": 684,
+        "glyphs": [
+          {
+            "advance": 684,
+            "bounds": [
+              49,
+              -593,
+              610,
+              0
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 684,
+        "glyphs": [
+          {
+            "advance": 684,
+            "bounds": [
+              49,
+              -593,
+              610,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "iso-05DE",
+      "text": "מ",
+      "group": "iso-scalar",
+      "direction": "rtl",
+      "locale": "he",
+      "origins": [
+        [
+          8,
+          238
+        ]
+      ],
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "iso-05DE",
+        "advance": 660,
+        "glyphs": [
+          {
+            "advance": 660,
+            "bounds": [
+              47,
+              -603,
+              621,
+              0
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 660,
+        "glyphs": [
+          {
+            "advance": 660,
+            "bounds": [
+              47,
+              -603,
+              621,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "iso-05DF",
+      "text": "ן",
+      "group": "iso-scalar",
+      "direction": "rtl",
+      "locale": "he",
+      "origins": [
+        [
+          8,
+          239
+        ]
+      ],
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "iso-05DF",
+        "advance": 329,
+        "glyphs": [
+          {
+            "advance": 329,
+            "bounds": [
+              44,
+              -593,
+              227,
+              191
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 329,
+        "glyphs": [
+          {
+            "advance": 329,
+            "bounds": [
+              44,
+              -593,
+              227,
+              191
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "iso-05E0",
+      "text": "נ",
+      "group": "iso-scalar",
+      "direction": "rtl",
+      "locale": "he",
+      "origins": [
+        [
+          8,
+          240
+        ]
+      ],
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "iso-05E0",
+        "advance": 379,
+        "glyphs": [
+          {
+            "advance": 379,
+            "bounds": [
+              48,
+              -593,
+              305,
+              0
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 379,
+        "glyphs": [
+          {
+            "advance": 379,
+            "bounds": [
+              48,
+              -593,
+              305,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "iso-05E1",
+      "text": "ס",
+      "group": "iso-scalar",
+      "direction": "rtl",
+      "locale": "he",
+      "origins": [
+        [
+          8,
+          241
+        ]
+      ],
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "iso-05E1",
+        "advance": 643,
+        "glyphs": [
+          {
+            "advance": 643,
+            "bounds": [
+              44,
+              -593,
+              593,
+              10
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 643,
+        "glyphs": [
+          {
+            "advance": 643,
+            "bounds": [
+              44,
+              -593,
+              593,
+              10
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "iso-05E2",
+      "text": "ע",
+      "group": "iso-scalar",
+      "direction": "rtl",
+      "locale": "he",
+      "origins": [
+        [
+          8,
+          242
+        ]
+      ],
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "iso-05E2",
+        "advance": 593,
+        "glyphs": [
+          {
+            "advance": 593,
+            "bounds": [
+              38,
+              -599,
+              545,
+              36
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 593,
+        "glyphs": [
+          {
+            "advance": 593,
+            "bounds": [
+              38,
+              -599,
+              545,
+              36
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "iso-05E3",
+      "text": "ף",
+      "group": "iso-scalar",
+      "direction": "rtl",
+      "locale": "he",
+      "origins": [
+        [
+          8,
+          243
+        ]
+      ],
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "iso-05E3",
+        "advance": 620,
+        "glyphs": [
+          {
+            "advance": 620,
+            "bounds": [
+              48,
+              -603,
+              548,
+              191
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 620,
+        "glyphs": [
+          {
+            "advance": 620,
+            "bounds": [
+              48,
+              -603,
+              548,
+              191
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "iso-05E4",
+      "text": "פ",
+      "group": "iso-scalar",
+      "direction": "rtl",
+      "locale": "he",
+      "origins": [
+        [
+          8,
+          244
+        ]
+      ],
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "iso-05E4",
+        "advance": 601,
+        "glyphs": [
+          {
+            "advance": 601,
+            "bounds": [
+              53,
+              -603,
+              552,
+              0
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 601,
+        "glyphs": [
+          {
+            "advance": 601,
+            "bounds": [
+              53,
+              -603,
+              552,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "iso-05E5",
+      "text": "ץ",
+      "group": "iso-scalar",
+      "direction": "rtl",
+      "locale": "he",
+      "origins": [
+        [
+          8,
+          245
+        ]
+      ],
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "iso-05E5",
+        "advance": 529,
+        "glyphs": [
+          {
+            "advance": 529,
+            "bounds": [
+              28,
+              -593,
+              482,
+              192
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 529,
+        "glyphs": [
+          {
+            "advance": 529,
+            "bounds": [
+              28,
+              -593,
+              482,
+              192
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "iso-05E6",
+      "text": "צ",
+      "group": "iso-scalar",
+      "direction": "rtl",
+      "locale": "he",
+      "origins": [
+        [
+          8,
+          246
+        ]
+      ],
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "iso-05E6",
+        "advance": 556,
+        "glyphs": [
+          {
+            "advance": 556,
+            "bounds": [
+              43,
+              -593,
+              509,
+              0
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 556,
+        "glyphs": [
+          {
+            "advance": 556,
+            "bounds": [
+              43,
+              -593,
+              509,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "iso-05E7",
+      "text": "ק",
+      "group": "iso-scalar",
+      "direction": "rtl",
+      "locale": "he",
+      "origins": [
+        [
+          8,
+          247
+        ]
+      ],
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "iso-05E7",
+        "advance": 627,
+        "glyphs": [
+          {
+            "advance": 627,
+            "bounds": [
+              64,
+              -593,
+              593,
+              191
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 627,
+        "glyphs": [
+          {
+            "advance": 627,
+            "bounds": [
+              64,
+              -593,
+              593,
+              191
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "iso-05E8",
+      "text": "ר",
+      "group": "iso-scalar",
+      "direction": "rtl",
+      "locale": "he",
+      "origins": [
+        [
+          8,
+          248
+        ]
+      ],
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "iso-05E8",
+        "advance": 523,
+        "glyphs": [
+          {
+            "advance": 523,
+            "bounds": [
+              40,
+              -593,
+              448,
+              0
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 523,
+        "glyphs": [
+          {
+            "advance": 523,
+            "bounds": [
+              40,
+              -593,
+              448,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "iso-05E9",
+      "text": "ש",
+      "group": "iso-scalar",
+      "direction": "rtl",
+      "locale": "he",
+      "origins": [
+        [
+          8,
+          249
+        ]
+      ],
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "iso-05E9",
+        "advance": 730,
+        "glyphs": [
+          {
+            "advance": 730,
+            "bounds": [
+              64,
+              -593,
+              665,
+              3
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 730,
+        "glyphs": [
+          {
+            "advance": 730,
+            "bounds": [
+              64,
+              -593,
+              665,
+              3
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "iso-05EA",
+      "text": "ת",
+      "group": "iso-scalar",
+      "direction": "rtl",
+      "locale": "he",
+      "origins": [
+        [
+          8,
+          250
+        ]
+      ],
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "iso-05EA",
+        "advance": 685,
+        "glyphs": [
+          {
+            "advance": 685,
+            "bounds": [
+              35,
+              -593,
+              611,
+              0
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 685,
+        "glyphs": [
+          {
+            "advance": 685,
+            "bounds": [
+              35,
+              -593,
+              611,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "hebrew-shalom-NFC",
+      "text": "שָׁלוֹם",
+      "group": "sequence",
+      "direction": "rtl",
+      "locale": "he",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "hebrew-shalom-NFC",
+        "advance": 2227,
+        "glyphs": [
+          {
+            "advance": 730,
+            "bounds": [
+              1561,
+              -593,
+              2162,
+              3
+            ]
+          },
+          {
+            "advance": 0,
+            "bounds": [
+              1776,
+              79,
+              1952,
+              214
+            ]
+          },
+          {
+            "advance": 0,
+            "bounds": [
+              2091,
+              -720,
+              2147,
+              -664
+            ]
+          },
+          {
+            "advance": 522,
+            "bounds": [
+              1009,
+              -760,
+              1462,
+              0
+            ]
+          },
+          {
+            "advance": 291,
+            "bounds": [
+              712,
+              -593,
+              895,
+              0
+            ]
+          },
+          {
+            "advance": 0,
+            "bounds": [
+              821,
+              -720,
+              877,
+              -664
+            ]
+          },
+          {
+            "advance": 684,
+            "bounds": [
+              49,
+              -593,
+              610,
+              0
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 2227,
+        "glyphs": [
+          {
+            "advance": 684,
+            "bounds": [
+              49,
+              -593,
+              610,
+              0
+            ]
+          },
+          {
+            "advance": 0,
+            "bounds": [
+              821,
+              -720,
+              877,
+              -664
+            ]
+          },
+          {
+            "advance": 291,
+            "bounds": [
+              712,
+              -593,
+              895,
+              0
+            ]
+          },
+          {
+            "advance": 522,
+            "bounds": [
+              1009,
+              -760,
+              1462,
+              0
+            ]
+          },
+          {
+            "advance": 0,
+            "bounds": [
+              1776,
+              79,
+              1952,
+              214
+            ]
+          },
+          {
+            "advance": 0,
+            "bounds": [
+              2091,
+              -720,
+              2147,
+              -664
+            ]
+          },
+          {
+            "advance": 730,
+            "bounds": [
+              1561,
+              -593,
+              2162,
+              3
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "hebrew-shalom-NFD",
+      "text": "שָׁלוֹם",
+      "group": "sequence",
+      "direction": "rtl",
+      "locale": "he",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "hebrew-shalom-NFD",
+        "advance": 2227,
+        "glyphs": [
+          {
+            "advance": 730,
+            "bounds": [
+              1561,
+              -593,
+              2162,
+              3
+            ]
+          },
+          {
+            "advance": 0,
+            "bounds": [
+              1776,
+              79,
+              1952,
+              214
+            ]
+          },
+          {
+            "advance": 0,
+            "bounds": [
+              2091,
+              -720,
+              2147,
+              -664
+            ]
+          },
+          {
+            "advance": 522,
+            "bounds": [
+              1009,
+              -760,
+              1462,
+              0
+            ]
+          },
+          {
+            "advance": 291,
+            "bounds": [
+              712,
+              -593,
+              895,
+              0
+            ]
+          },
+          {
+            "advance": 0,
+            "bounds": [
+              821,
+              -720,
+              877,
+              -664
+            ]
+          },
+          {
+            "advance": 684,
+            "bounds": [
+              49,
+              -593,
+              610,
+              0
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 2227,
+        "glyphs": [
+          {
+            "advance": 684,
+            "bounds": [
+              49,
+              -593,
+              610,
+              0
+            ]
+          },
+          {
+            "advance": 0,
+            "bounds": [
+              821,
+              -720,
+              877,
+              -664
+            ]
+          },
+          {
+            "advance": 291,
+            "bounds": [
+              712,
+              -593,
+              895,
+              0
+            ]
+          },
+          {
+            "advance": 522,
+            "bounds": [
+              1009,
+              -760,
+              1462,
+              0
+            ]
+          },
+          {
+            "advance": 0,
+            "bounds": [
+              1776,
+              79,
+              1952,
+              214
+            ]
+          },
+          {
+            "advance": 0,
+            "bounds": [
+              2091,
+              -720,
+              2147,
+              -664
+            ]
+          },
+          {
+            "advance": 730,
+            "bounds": [
+              1561,
+              -593,
+              2162,
+              3
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "hebrew-dagesh-NFC",
+      "text": "בַּ",
+      "group": "sequence",
+      "direction": "rtl",
+      "locale": "he",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "hebrew-dagesh-NFC",
+        "advance": 572,
+        "glyphs": [
+          {
+            "advance": 572,
+            "bounds": [
+              41,
+              -593,
+              535,
+              0
+            ]
+          },
+          {
+            "advance": 0,
+            "bounds": [
+              186,
+              79,
+              362,
+              118
+            ]
+          },
+          {
+            "advance": 0,
+            "bounds": [
+              181,
+              -327,
+              237,
+              -272
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 572,
+        "glyphs": [
+          {
+            "advance": 0,
+            "bounds": [
+              186,
+              79,
+              362,
+              118
+            ]
+          },
+          {
+            "advance": 0,
+            "bounds": [
+              181,
+              -327,
+              237,
+              -272
+            ]
+          },
+          {
+            "advance": 572,
+            "bounds": [
+              41,
+              -593,
+              535,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "hebrew-dagesh-NFD",
+      "text": "בַּ",
+      "group": "sequence",
+      "direction": "rtl",
+      "locale": "he",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "hebrew-dagesh-NFD",
+        "advance": 572,
+        "glyphs": [
+          {
+            "advance": 572,
+            "bounds": [
+              41,
+              -593,
+              535,
+              0
+            ]
+          },
+          {
+            "advance": 0,
+            "bounds": [
+              186,
+              79,
+              362,
+              118
+            ]
+          },
+          {
+            "advance": 0,
+            "bounds": [
+              181,
+              -327,
+              237,
+              -272
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 572,
+        "glyphs": [
+          {
+            "advance": 0,
+            "bounds": [
+              186,
+              79,
+              362,
+              118
+            ]
+          },
+          {
+            "advance": 0,
+            "bounds": [
+              181,
+              -327,
+              237,
+              -272
+            ]
+          },
+          {
+            "advance": 572,
+            "bounds": [
+              41,
+              -593,
+              535,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "hebrew-stack-NFC",
+      "text": "אַ֑",
+      "group": "sequence",
+      "direction": "rtl",
+      "locale": "he",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "hebrew-stack-NFC",
+        "advance": 632,
+        "glyphs": [
+          {
+            "advance": 632,
+            "bounds": [
+              36,
+              -593,
+              596,
+              0
+            ]
+          },
+          {
+            "advance": 0,
+            "bounds": [
+              219,
+              79,
+              395,
+              118
+            ]
+          },
+          {
+            "advance": 0,
+            "bounds": [
+              75,
+              77,
+              218,
+              215
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 632,
+        "glyphs": [
+          {
+            "advance": 0,
+            "bounds": [
+              75,
+              77,
+              218,
+              215
+            ]
+          },
+          {
+            "advance": 0,
+            "bounds": [
+              219,
+              79,
+              395,
+              118
+            ]
+          },
+          {
+            "advance": 632,
+            "bounds": [
+              36,
+              -593,
+              596,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "hebrew-stack-NFD",
+      "text": "אַ֑",
+      "group": "sequence",
+      "direction": "rtl",
+      "locale": "he",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "hebrew-stack-NFD",
+        "advance": 632,
+        "glyphs": [
+          {
+            "advance": 632,
+            "bounds": [
+              36,
+              -593,
+              596,
+              0
+            ]
+          },
+          {
+            "advance": 0,
+            "bounds": [
+              219,
+              79,
+              395,
+              118
+            ]
+          },
+          {
+            "advance": 0,
+            "bounds": [
+              75,
+              77,
+              218,
+              215
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 632,
+        "glyphs": [
+          {
+            "advance": 0,
+            "bounds": [
+              75,
+              77,
+              218,
+              215
+            ]
+          },
+          {
+            "advance": 0,
+            "bounds": [
+              219,
+              79,
+              395,
+              118
+            ]
+          },
+          {
+            "advance": 632,
+            "bounds": [
+              36,
+              -593,
+              596,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "hebrew-word-NFC",
+      "text": "שלום",
+      "group": "sequence",
+      "direction": "rtl",
+      "locale": "he",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "hebrew-word-NFC",
+        "advance": 2227,
+        "glyphs": [
+          {
+            "advance": 730,
+            "bounds": [
+              1561,
+              -593,
+              2162,
+              3
+            ]
+          },
+          {
+            "advance": 522,
+            "bounds": [
+              1009,
+              -760,
+              1462,
+              0
+            ]
+          },
+          {
+            "advance": 291,
+            "bounds": [
+              712,
+              -593,
+              895,
+              0
+            ]
+          },
+          {
+            "advance": 684,
+            "bounds": [
+              49,
+              -593,
+              610,
+              0
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 2227,
+        "glyphs": [
+          {
+            "advance": 684,
+            "bounds": [
+              49,
+              -593,
+              610,
+              0
+            ]
+          },
+          {
+            "advance": 291,
+            "bounds": [
+              712,
+              -593,
+              895,
+              0
+            ]
+          },
+          {
+            "advance": 522,
+            "bounds": [
+              1009,
+              -760,
+              1462,
+              0
+            ]
+          },
+          {
+            "advance": 730,
+            "bounds": [
+              1561,
+              -593,
+              2162,
+              3
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "hebrew-word-NFD",
+      "text": "שלום",
+      "group": "sequence",
+      "direction": "rtl",
+      "locale": "he",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "hebrew-word-NFD",
+        "advance": 2227,
+        "glyphs": [
+          {
+            "advance": 730,
+            "bounds": [
+              1561,
+              -593,
+              2162,
+              3
+            ]
+          },
+          {
+            "advance": 522,
+            "bounds": [
+              1009,
+              -760,
+              1462,
+              0
+            ]
+          },
+          {
+            "advance": 291,
+            "bounds": [
+              712,
+              -593,
+              895,
+              0
+            ]
+          },
+          {
+            "advance": 684,
+            "bounds": [
+              49,
+              -593,
+              610,
+              0
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 2227,
+        "glyphs": [
+          {
+            "advance": 684,
+            "bounds": [
+              49,
+              -593,
+              610,
+              0
+            ]
+          },
+          {
+            "advance": 291,
+            "bounds": [
+              712,
+              -593,
+              895,
+              0
+            ]
+          },
+          {
+            "advance": 522,
+            "bounds": [
+              1009,
+              -760,
+              1462,
+              0
+            ]
+          },
+          {
+            "advance": 730,
+            "bounds": [
+              1561,
+              -593,
+              2162,
+              3
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
