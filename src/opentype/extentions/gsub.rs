@@ -668,7 +668,12 @@ impl Gsub {
                         }
                     }
                     LookupResult::Ligature(results) => {
-                        if let Some(result) = results.first() {
+                        // This caller has exactly one input glyph. A ligature's
+                        // component count includes that first input; never invent
+                        // its remaining components in the scalar locl/joining path.
+                        if let Some(result) = results.iter().find(|result| {
+                            result.component_count == 1 && result.component_glyph_ids.is_empty()
+                        }) {
                             return Some(result.ligature_glyph as usize);
                         }
                     }
@@ -2036,6 +2041,105 @@ mod vertical_feature_tests {
                 replacement,
                 "face {index}"
             );
+        }
+    }
+}
+
+#[cfg(test)]
+mod scalar_feature_tests {
+    use super::GsubGlyph;
+
+    #[test]
+    fn scalar_features_require_complete_ligature_input() {
+        let font = crate::fontreader::Font::get_font_from_buffer(include_bytes!(
+            "../../../tests/fixtures/scalar-locl.ttc"
+        ))
+        .unwrap();
+        // Direct and Extension: multi-input, one-input, ordered, identity,
+        // next lookup, Single, Alternate, legacy Multiple, deletion, liga.
+        let expected = [
+            None,
+            Some(3),
+            Some(4),
+            Some(1),
+            Some(4),
+            Some(3),
+            Some(3),
+            Some(3),
+            None,
+            None,
+        ];
+        for extension in 0..2 {
+            for (mode, replacement) in expected.into_iter().enumerate() {
+                let gsub = font.more_fonts[extension * 10 + mode]
+                    .gsub
+                    .as_ref()
+                    .unwrap();
+                for tag in [*b"locl", *b"isol", *b"init", *b"medi", *b"fina"] {
+                    assert_eq!(
+                        gsub.lookup_single_feature(1, Some("san"), &[tag]),
+                        replacement,
+                        "extension {extension} mode {mode} tag {tag:?}"
+                    );
+                }
+                assert_eq!(gsub.lookup_locale(1, "san"), replacement.unwrap_or(1));
+                let original = GsubGlyph {
+                    glyph_id: 1,
+                    source_index: 7,
+                    substituted: false,
+                    mkmk_source_ambiguous: false,
+                    ligature_components: 0,
+                };
+                let mut glyph = original;
+                gsub.apply_locale_glyph(&mut glyph, "san");
+                let mut wanted = original;
+                if let Some(id) = replacement {
+                    wanted.glyph_id = id;
+                    wanted.substituted = true;
+                    wanted.mkmk_source_ambiguous = true;
+                }
+                assert_eq!(glyph, wanted, "provenance mode {mode}");
+                if mode == 9 {
+                    assert_eq!(gsub.lookup_standard_liga_sequence(&[1, 2]), Some(4));
+                }
+            }
+        }
+    }
+    #[test]
+    fn scalar_ligature_rejects_inconsistent_component_metadata() {
+        use crate::opentype::layouts::lookup::LookupSubstitution;
+        let font = crate::fontreader::Font::get_font_from_buffer(include_bytes!(
+            "../../../tests/fixtures/scalar-locl.ttc"
+        ))
+        .unwrap();
+        for extension in 0..2 {
+            for malformed in 0..3 {
+                let mut gsub = font.more_fonts[extension * 10 + 1]
+                    .gsub
+                    .as_ref()
+                    .unwrap()
+                    .clone();
+                for lookup in &mut gsub.lookups.lookups {
+                    for subtable in &mut lookup.subtables {
+                        let inner = match subtable {
+                            LookupSubstitution::ExtensionSubstitution(ext) => &mut *ext.subtable,
+                            other => other,
+                        };
+                        if let LookupSubstitution::Ligature(lig) = inner {
+                            let record = &mut lig.ligature_set[0].ligature_table[0];
+                            match malformed {
+                                0 => record.component_count = 0,
+                                1 => record.component_count = 2,
+                                _ => record.component_glyph_ids.push(2),
+                            }
+                        }
+                    }
+                }
+                assert_eq!(
+                    gsub.lookup_single_feature(1, Some("san"), &[*b"locl"]),
+                    None
+                );
+            }
         }
     }
 }

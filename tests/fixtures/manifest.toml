@@ -338,3 +338,10 @@ source = "tests/fixtures/generate_tibetan_upper_stack.py (fontTools 4.68.0; no e
 license = "MIT (project test code)"
 sha256 = "138e07c1117be3a79c570e7cb688305c667b124936e8ba788d7f6b4dbe8ac796"
 features = ["tibetan", "upper-stack", "GSUB", "abvm", "source-ownership", "rollback"]
+
+[[fixture]]
+id = "scalar-locl.ttc"
+source = "tests/fixtures/generate_scalar_locl.py (fontTools 4.68.0)"
+license = "MIT (project test code)"
+sha256 = "e23bd2b1a1bb89148f2ef75166565ba8f7d60fac934ef0562bf6b162e873bcbb"
+features = ["locl", "arabic-joining", "single-input-ligature", "extension-substitution"]
