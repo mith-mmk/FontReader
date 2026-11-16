@@ -65,7 +65,7 @@ fn authored_vertical_advance_is_applied_once_not_inferred_from_hmtx() {
 fn exclusions_and_no_layout_keep_original_units() {
     for text in [
         "A\u{1100}\u{1161}\u{11eb}",
-        "\u{1100}\u{1161}\u{11eb}\u{302e}",
+        "\u{1100}\u{1161}\u{11eb}\u{302e}\u{302e}",
         "\u{119e}",
     ] {
         same(run(1, text, None), run(0, text, None));

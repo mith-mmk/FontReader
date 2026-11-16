@@ -366,3 +366,10 @@ source = "tests/fixtures/generate_european_fallback.py (fontTools 4.61.1)"
 license = "MIT (project test code)"
 sha256 = "c046ffae054304ac4f8d37fac8d64606fd843481befa86fd1d9e9a4c98e5d2bd"
 features = ["latin", "umlaut", "family-fallback", "composite", "ligature-advance"]
+
+[[fixture]]
+id = "hangul-tone.ttc"
+source = "tests/fixtures/generate_hangul_tone.py (fontTools 4.61.1)"
+license = "MIT (original synthetic outlines)"
+sha256 = "a836f648d530fe3caccc7da87dd75ee3b69fc022896cd1e4a11c2e85a834b8f3"
+features = ["layout", "hangul", "tone-order", "source-ownership"]

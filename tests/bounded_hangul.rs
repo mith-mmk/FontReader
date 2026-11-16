@@ -75,7 +75,7 @@ fn exclusions_and_orientations_keep_legacy_output() {
         "\u{115f}\u{1161}",
         "\u{1100}\u{1160}",
         "\u{ac00}\u{11eb}",
-        "\u{1100}\u{1161}\u{11eb}\u{302e}",
+        "\u{1100}\u{1161}\u{11eb}\u{302e}\u{302e}",
         "\u{1100}\u{1161}\u{11eb}\u{fe00}",
         "\u{1100}\u{1161}\u{11eb}\u{200d}",
         "A\u{1100}\u{1161}\u{11eb}",
