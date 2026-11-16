@@ -97,3 +97,12 @@ below, whereas HB places it before the syllable. This stage intentionally does
 not claim tone support, exhaustive Hangul coverage or browser/native GUI parity.
 
 ![Unchanged tone ordering limitation](bounded-vertical-hangul-tone-control.png)
+
+The established 144-case Noto/Apple public-API matrix was also rerun against
+PR #58 with unchanged input strings, directions, locale controls and line-metric
+scaling. Only seven Noto TTB cases changed: old L/T, extended L/V/T/all and the
+NFD old-T duplicate. Their total vertical advances changed from 2000/3000 to
+1000, matching HB. The other 137 public outputs are exactly unchanged, including
+all LTR cases and every Apple control. This wider matrix checks public geometry;
+per-glyph ink/outline equality was independently established for the two pictured
+representative cases, not claimed for every matrix row.
