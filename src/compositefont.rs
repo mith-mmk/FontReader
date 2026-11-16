@@ -1,7 +1,8 @@
 //! Explicit character-range font selection, separate from family fallback.
 
 use crate::fontengine::{glyph_run_to_svg, validate_single_line};
-use crate::fontreader::{Font, ParsedTextUnit};
+use crate::fontface::{sourced_text_units, SegmentProvenance};
+use crate::fontreader::ParsedTextUnit;
 use crate::{FontFace, FontOptions, FontStretch, FontVariant, FontVariationSetting, GlyphRun};
 use std::io::{Error, ErrorKind};
 
@@ -254,6 +255,29 @@ impl<'a> CompositeFont<'a> {
     /// no partial result. Normal size/stretch validation also applies to empty
     /// text. Both x and y advances carry into subsequent face spans.
     pub fn shape_ltr(&self, text: &str) -> Result<GlyphRun, Error> {
+        Ok(self.shape_ltr_impl(text, false)?.0)
+    }
+
+    /// Shapes one LTR line with original UTF-8 source and face/span provenance.
+    ///
+    /// Face indices are the first occurrence in the default face list followed
+    /// by each rule's face list. Repeated borrowed faces share that index.
+    /// These indices are local to this composition, not stable font identifiers.
+    pub fn shape_mapped_ltr(&self, text: &str) -> Result<crate::mapped::ShapedText, Error> {
+        let (run, sources) = self.shape_ltr_impl(text, true)?;
+        Ok(crate::mapped::ShapedText::new(
+            text,
+            run,
+            sources,
+            crate::TextDirection::LeftToRight,
+        ))
+    }
+
+    fn shape_ltr_impl(
+        &self,
+        text: &str,
+        mapped: bool,
+    ) -> Result<(GlyphRun, Vec<crate::mapped::GlyphSource>), Error> {
         validate_single_line(text, "composite LTR")?;
         // Reuse normal option validation, including for empty text.
         let mut output = self.default_faces[0]
@@ -261,10 +285,11 @@ impl<'a> CompositeFont<'a> {
             .with_options(self.options.clone())
             .shape("")?;
         let mut cursor = (0.0, 0.0);
+        let mut provenance = SegmentProvenance::new(mapped);
         let mut pending = String::new();
         let mut previous: Option<SpanSelection<'_>> = None;
         let mut adjusted = false;
-        for unit in Font::parse_text_units_for_fallback(text) {
+        for (unit, source) in sourced_text_units(text) {
             let ParsedTextUnit::Glyph { ch, ref text, .. } = unit else {
                 unreachable!("line controls were rejected above");
             };
@@ -294,28 +319,46 @@ impl<'a> CompositeFont<'a> {
             adjusted |= selection.size_multiplier != 1.0 || selection.baseline_shift != 0.0;
             if let Some(old) = previous {
                 if !old.same_as(selection) {
-                    self.append_span(&mut output, &mut cursor, old, &pending)?;
+                    self.append_span(
+                        &mut output,
+                        &mut cursor,
+                        old,
+                        &pending,
+                        &mut provenance,
+                        mapped,
+                    )?;
                     pending.clear();
                 }
             }
             previous = Some(selection);
+            provenance.append(source);
             pending.push_str(text);
         }
         if let Some(face) = previous {
-            self.append_span(&mut output, &mut cursor, face, &pending)?;
+            self.append_span(
+                &mut output,
+                &mut cursor,
+                face,
+                &pending,
+                &mut provenance,
+                mapped,
+            )?;
         }
         if adjusted {
             validate_adjusted_run(&output)?;
         }
-        Ok(output)
+        Ok((output, provenance.sources))
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn append_span(
         &self,
         output: &mut GlyphRun,
         cursor: &mut (f32, f32),
         selection: SpanSelection<'_>,
         text: &str,
+        provenance: &mut SegmentProvenance,
+        mapped: bool,
     ) -> Result<(), Error> {
         let size = self.options.font_size * selection.size_multiplier;
         if !size.is_finite() || size <= 0.0 {
@@ -324,11 +367,23 @@ impl<'a> CompositeFont<'a> {
                 "composite effective size must be positive and finite",
             ));
         }
-        let mut run = selection
-            .face
-            .engine()
-            .with_options(self.options.clone().with_font_size(size))
-            .shape(text)?;
+        let options = self.options.clone().with_font_size(size);
+        let mut run = if mapped {
+            let (run, ranges) = selection
+                .face
+                .font()
+                .text2glyph_run_mapped(text, &options)?;
+            let face_index = self
+                .default_faces
+                .iter()
+                .chain(self.rules.iter().flat_map(|rule| rule.faces.iter()))
+                .position(|face| std::ptr::eq(*face, selection.face))
+                .expect("selected face belongs to the composition");
+            provenance.finish(ranges, face_index);
+            run
+        } else {
+            selection.face.engine().with_options(options).shape(text)?
+        };
         let mut delta = (0.0, 0.0);
         for glyph in &mut run.glyphs {
             glyph.x += cursor.0;
@@ -510,4 +565,47 @@ fn validate_adjusted_run(run: &GlyphRun) -> Result<(), Error> {
         ])?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod mapped_tests {
+    use super::*;
+    #[test]
+    fn mapped_composite_preserves_fallback_offsets_and_span_geometry() {
+        let file =
+            crate::FontFile::from_buffer(include_bytes!("../tests/fixtures/european-fallback.ttc"))
+                .unwrap();
+        let primary = file.face(0).unwrap();
+        let fallback = file.face(1).unwrap();
+        let mut font = CompositeFont::new(vec![&primary, &fallback]).unwrap();
+        font.add_rule(
+            CompositeFontRule::new(vec![UnicodeRange::new('f', 'i').unwrap()], vec![&fallback])
+                .unwrap()
+                .with_size_multiplier(1.25)
+                .unwrap()
+                .with_baseline_shift(2.0)
+                .unwrap(),
+        );
+        for text in ["Ba\u{308}Bfiß", "\u{fe0f}äB", "", "\u{fe0f}"] {
+            let mapped = font.shape_mapped_ltr(text).unwrap();
+            assert_eq!(
+                format!("{:?}", mapped.glyph_run()),
+                format!("{:?}", font.shape_ltr(text).unwrap())
+            );
+            assert_eq!(mapped.text(), text);
+            for source in mapped.glyph_sources() {
+                assert!(!text[source.byte_range()].is_empty());
+            }
+        }
+        let mapped = font.shape_mapped_ltr("BäB").unwrap();
+        assert_eq!(
+            mapped
+                .glyph_sources()
+                .iter()
+                .map(|s| (s.byte_range(), s.face_index(), s.run_index()))
+                .collect::<Vec<_>>(),
+            vec![(0..1, 0, 0), (1..3, 1, 1), (3..4, 0, 2)]
+        );
+        assert!(font.shape_mapped_ltr("B\nB").is_err());
+    }
 }

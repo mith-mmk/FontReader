@@ -271,6 +271,7 @@ struct PendingFontFace {
 
 struct FamilyLayoutResult {
     run: GlyphRun,
+    sources: Vec<crate::mapped::GlyphSource>,
     max_line_width: f32,
 }
 
@@ -531,6 +532,28 @@ impl FontFamily {
         Ok(self.layout_text_with_fallback(text, options)?.run)
     }
 
+    /// Shapes with original UTF-8 source ranges and fallback-face provenance.
+    ///
+    /// Face indices identify this family's insertion order; run indices identify
+    /// consecutive shaped segments. Neither is a globally stable font identity.
+    pub fn shape_mapped<'a>(
+        &'a self,
+        text: &str,
+        mut options: FontOptions<'a>,
+    ) -> Result<crate::mapped::ShapedText, Error> {
+        if options.font_family.is_none() {
+            options.font_family = Some(self.name());
+        }
+        let direction = options.text_direction;
+        let result = self.layout_text_with_fallback_impl(text, options, true)?;
+        Ok(crate::mapped::ShapedText::new(
+            text,
+            result.run,
+            result.sources,
+            direction,
+        ))
+    }
+
     /// Alias for [`FontFamily::text2glyph_run`].
     pub fn text2commands<'a>(
         &'a self,
@@ -608,7 +631,16 @@ impl FontFamily {
     fn layout_text_with_fallback<'a>(
         &'a self,
         text: &str,
+        options: FontOptions<'a>,
+    ) -> Result<FamilyLayoutResult, Error> {
+        self.layout_text_with_fallback_impl(text, options, false)
+    }
+
+    fn layout_text_with_fallback_impl<'a>(
+        &'a self,
+        text: &str,
         mut options: FontOptions<'a>,
+        mapped: bool,
     ) -> Result<FamilyLayoutResult, Error> {
         if self.faces.is_empty() {
             return Err(Error::new(
@@ -655,17 +687,19 @@ impl FontFamily {
         }
 
         let mut glyphs = Vec::new();
+        let mut provenance = SegmentProvenance::new(mapped);
         let mut cursor_x = 0.0f32;
         let mut cursor_y = 0.0f32;
         let mut max_line_width = 0.0f32;
         let mut pending_segment = String::new();
         let mut pending_face: Option<usize> = None;
 
-        for unit in fontreader::Font::parse_text_units_for_fallback(text) {
+        for (unit, source) in sourced_text_units(text) {
             match unit {
                 fontreader::ParsedTextUnit::Newline => {
                     self.flush_family_segment(
                         &mut glyphs,
+                        &mut provenance,
                         &mut pending_segment,
                         &mut pending_face,
                         &mut cursor_x,
@@ -691,6 +725,7 @@ impl FontFamily {
                 fontreader::ParsedTextUnit::Tab => {
                     self.flush_family_segment(
                         &mut glyphs,
+                        &mut provenance,
                         &mut pending_segment,
                         &mut pending_face,
                         &mut cursor_x,
@@ -713,6 +748,7 @@ impl FontFamily {
                     if pending_face != Some(face_index) {
                         self.flush_family_segment(
                             &mut glyphs,
+                            &mut provenance,
                             &mut pending_segment,
                             &mut pending_face,
                             &mut cursor_x,
@@ -721,6 +757,7 @@ impl FontFamily {
                         )?;
                         pending_face = Some(face_index);
                     }
+                    provenance.append(source);
                     push_text_unit(&mut pending_segment, &unit);
                 }
             }
@@ -728,6 +765,7 @@ impl FontFamily {
 
         self.flush_family_segment(
             &mut glyphs,
+            &mut provenance,
             &mut pending_segment,
             &mut pending_face,
             &mut cursor_x,
@@ -742,13 +780,16 @@ impl FontFamily {
 
         Ok(FamilyLayoutResult {
             run: GlyphRun::new(glyphs),
+            sources: provenance.sources,
             max_line_width,
         })
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn flush_family_segment<'a>(
         &'a self,
         glyphs: &mut Vec<PositionedGlyph>,
+        provenance: &mut SegmentProvenance,
         pending_segment: &mut String,
         pending_face: &mut Option<usize>,
         cursor_x: &mut f32,
@@ -768,7 +809,15 @@ impl FontFamily {
         let mut segment_options = options.clone();
         segment_options.font = Some(FontRef::Loaded(face));
 
-        let mut segment_run = face.text2glyph_run(pending_segment, segment_options)?;
+        let mut segment_run = if provenance.enabled {
+            let (run, ranges) = face
+                .font()
+                .text2glyph_run_mapped(pending_segment, &segment_options)?;
+            provenance.finish(ranges, face_index);
+            run
+        } else {
+            face.text2glyph_run(pending_segment, segment_options)?
+        };
         let (segment_advance_x, segment_advance_y) =
             glyph_run_cursor_delta(&segment_run, options.text_direction);
         for glyph in segment_run.glyphs.iter_mut() {
@@ -1201,5 +1250,186 @@ mod tests {
         let family = FontFamily::new("Test");
         let options = FontOptions::from_font_ref(FontRef::Family(&family));
         assert!(!unit_prefers_face_continuity(&unit, &options));
+    }
+}
+
+// The legacy parser may remove CR or leading orphan variation selectors.
+// Each retained byte keeps its ORIGINAL grapheme envelope, including a removed
+// leading selector when that same grapheme still contains a rendered mark.
+// Entirely discarded graphemes contribute no entry and remain source-only gaps.
+pub(crate) struct SourceCluster {
+    range: std::ops::Range<usize>,
+    retained_len: usize,
+}
+
+pub(crate) fn sourced_text_units(text: &str) -> Vec<(fontreader::ParsedTextUnit, SourceCluster)> {
+    let mut offset = 0;
+    let mut result = Vec::new();
+    for grapheme in crate::unicode::graphemes::extended_graphemes(text) {
+        for unit in fontreader::Font::parse_text_units_for_fallback(grapheme) {
+            let retained_len = match &unit {
+                fontreader::ParsedTextUnit::Glyph { text, .. } => text.len(),
+                _ => grapheme.len(),
+            };
+            let source = SourceCluster {
+                range: offset..offset + grapheme.len(),
+                retained_len,
+            };
+            result.push((unit, source));
+        }
+        offset += grapheme.len();
+    }
+    result
+}
+
+pub(crate) struct SegmentProvenance {
+    enabled: bool,
+    bytes: Vec<std::ops::Range<usize>>,
+    pub(crate) sources: Vec<crate::mapped::GlyphSource>,
+    run_index: usize,
+}
+
+impl SegmentProvenance {
+    pub(crate) fn new(enabled: bool) -> Self {
+        Self {
+            enabled,
+            bytes: Vec::new(),
+            sources: Vec::new(),
+            run_index: 0,
+        }
+    }
+
+    pub(crate) fn append(&mut self, source: SourceCluster) {
+        if self.enabled {
+            self.bytes
+                .extend(std::iter::repeat_n(source.range, source.retained_len));
+        }
+    }
+
+    pub(crate) fn finish(&mut self, ranges: Vec<std::ops::Range<usize>>, face_index: usize) {
+        for range in ranges {
+            // Core ranges are nonempty, in-bounds UTF-8 ranges over the pending
+            // segment. Preserve gaps from removed controls as conservative spans.
+            let source = self.bytes[range.start].start..self.bytes[range.end - 1].end;
+            self.sources.push(crate::mapped::GlyphSource::new(
+                source,
+                face_index,
+                self.run_index,
+            ));
+        }
+        self.bytes.clear();
+        self.run_index += 1;
+    }
+}
+
+#[cfg(test)]
+mod mapped_fallback_tests {
+    use super::*;
+    const FONT: &[u8] = include_bytes!("../tests/fixtures/european-fallback.ttc");
+
+    fn family() -> FontFamily {
+        let file = crate::FontFile::from_buffer(FONT).unwrap();
+        let mut family = FontFamily::new("Primary");
+        family.add_face(FontFaceDescriptor::new("Primary"), file.face(0).unwrap());
+        family.add_face(FontFaceDescriptor::new("Fallback"), file.face(1).unwrap());
+        family
+    }
+
+    #[test]
+    fn mapped_adapters_preserve_original_grapheme_with_trimmed_selector() {
+        let file = crate::FontFile::from_buffer(FONT).unwrap();
+        let face = file.face(1).unwrap();
+        let mut family = FontFamily::new("Single");
+        family.add_face(FontFaceDescriptor::new("Single"), face.clone());
+        let composite = crate::CompositeFont::new(vec![&face]).unwrap();
+        for (text, expected) in [
+            ("\u{fe0f}\u{0308}B", vec![0..5, 5..6]),
+            ("\u{fe0f}\u{e0100}\u{0308}B", vec![0..9, 9..10]),
+            ("\u{fe0f}B", std::iter::once(3..4).collect::<Vec<_>>()),
+            ("\u{fe0f}", vec![]),
+        ] {
+            let engine = face.engine().shape_mapped(text).unwrap();
+            let family = family.shape_mapped(text, family.options()).unwrap();
+            let composite = composite.shape_mapped_ltr(text).unwrap();
+            for mapped in [&engine, &family, &composite] {
+                assert_eq!(
+                    mapped
+                        .glyph_sources()
+                        .iter()
+                        .map(|s| s.byte_range())
+                        .collect::<Vec<_>>(),
+                    expected,
+                    "{text:?}"
+                );
+                assert!(mapped.glyph_sources().iter().all(|s| {
+                    let r = s.byte_range();
+                    text.is_char_boundary(r.start) && text.is_char_boundary(r.end)
+                }));
+            }
+        }
+    }
+
+    #[test]
+    fn mapped_family_preserves_original_bytes_and_legacy_geometry() {
+        let family = family();
+        for text in [
+            "Ba\u{308}Bßẞ",
+            "B\r\nä\tB",
+            "B\räB",
+            "\u{fe0f}äB",
+            "",
+            "\r\u{fe0f}",
+        ] {
+            let options = family.options().with_font_size(1000.0);
+            let mapped = family.shape_mapped(text, options.clone()).unwrap();
+            let legacy = family.text2glyph_run(text, options).unwrap();
+            assert_eq!(format!("{:?}", mapped.glyph_run()), format!("{legacy:?}"));
+            assert_eq!(mapped.text(), text);
+            assert_eq!(mapped.glyph_sources().len(), legacy.glyphs.len());
+            for source in mapped.glyph_sources() {
+                let slice = &text[source.byte_range()];
+                assert!(!slice.is_empty());
+                assert!(!slice.contains('\n') && !slice.contains('\t'));
+            }
+        }
+        let mapped = family.shape_mapped("Ba\u{308}B", family.options()).unwrap();
+        assert_eq!(mapped.glyph_sources().first().unwrap().byte_range(), 0..1);
+        assert_eq!(mapped.glyph_sources().last().unwrap().byte_range(), 4..5);
+        for source in &mapped.glyph_sources()[1..mapped.glyph_sources().len() - 1] {
+            assert_eq!(source.byte_range(), 1..4);
+            assert_eq!(source.face_index(), 1);
+        }
+    }
+
+    #[test]
+    fn mapped_family_retains_offsets_across_controls_in_all_directions() {
+        let family = family();
+        let text = "B\r\nä\tB";
+        for direction in [
+            TextDirection::LeftToRight,
+            TextDirection::RightToLeft,
+            TextDirection::TopToBottom,
+        ] {
+            let options = family.options().with_text_direction(direction);
+            let mapped = family.shape_mapped(text, options.clone()).unwrap();
+            assert_eq!(
+                format!("{:?}", mapped.glyph_run()),
+                format!("{:?}", family.text2glyph_run(text, options).unwrap())
+            );
+            let ranges: Vec<_> = mapped
+                .glyph_sources()
+                .iter()
+                .map(|s| s.byte_range())
+                .collect();
+            assert_eq!(ranges, vec![0..1, 3..5, 6..7]);
+            assert_eq!(
+                mapped
+                    .glyph_sources()
+                    .iter()
+                    .map(|s| s.run_index())
+                    .collect::<Vec<_>>(),
+                vec![0, 1, 2]
+            );
+        }
     }
 }

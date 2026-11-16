@@ -1969,6 +1969,8 @@ mod tests {
         use crate::opentype::extentions::gsub::GsubGlyph;
         let mut glyphs = vec![
             GsubGlyph {
+                byte_start: 0,
+                byte_end: 0,
                 glyph_id: 10,
                 source_index: 4,
                 substituted: false,
@@ -1976,6 +1978,8 @@ mod tests {
                 ligature_components: 1,
             },
             GsubGlyph {
+                byte_start: 0,
+                byte_end: 0,
                 glyph_id: 11,
                 source_index: 5,
                 substituted: false,
@@ -1988,6 +1992,8 @@ mod tests {
             glyphs,
             vec![
                 GsubGlyph {
+                    byte_start: 0,
+                    byte_end: 0,
                     glyph_id: 40,
                     source_index: 4,
                     substituted: true,
@@ -1995,6 +2001,8 @@ mod tests {
                     ligature_components: 2
                 },
                 GsubGlyph {
+                    byte_start: 0,
+                    byte_end: 0,
                     glyph_id: 30,
                     source_index: 5,
                     substituted: true,
@@ -2028,6 +2036,8 @@ mod tests {
         for tag in [*b"locl", *b"isol"] {
             let gsub = parse_gsub(build_gsub_table(tag, vec![lookup_single_record(0, 0)]));
             let mut glyphs = vec![GsubGlyph {
+                byte_start: 0,
+                byte_end: 0,
                 glyph_id: 0,
                 source_index: 0,
                 substituted: false,
@@ -2059,6 +2069,8 @@ mod tests {
         ));
         gsub.scripts.scripts[0].script_tag = u32::from_be_bytes(*b"tibt");
         let mut glyphs = vec![GsubGlyph {
+            byte_start: 0,
+            byte_end: 0,
             glyph_id: 10,
             source_index: 0,
             substituted: false,
@@ -2168,6 +2180,8 @@ mod tests {
         };
         let original = vec![
             GsubGlyph {
+                byte_start: 0,
+                byte_end: 0,
                 glyph_id: 10,
                 source_index: 0,
                 substituted: false,
@@ -2175,6 +2189,8 @@ mod tests {
                 ligature_components: 1,
             },
             GsubGlyph {
+                byte_start: 0,
+                byte_end: 0,
                 glyph_id: 11,
                 source_index: 1,
                 substituted: false,
@@ -2204,6 +2220,8 @@ mod tests {
                 assert_eq!(
                     glyphs,
                     vec![GsubGlyph {
+                        byte_start: 0,
+                        byte_end: 0,
                         glyph_id: 20,
                         source_index: 0,
                         substituted: true,
@@ -2216,6 +2234,8 @@ mod tests {
                 assert_eq!(glyphs, original);
                 let mut with_mark = original.clone();
                 with_mark.push(GsubGlyph {
+                    byte_start: 0,
+                    byte_end: 0,
                     glyph_id: 12,
                     source_index: 2,
                     substituted: false,
@@ -2297,6 +2317,8 @@ mod tests {
                 .into_iter()
                 .enumerate()
                 .map(|(source_index, glyph_id)| GsubGlyph {
+                    byte_start: 0,
+                    byte_end: 0,
                     glyph_id,
                     source_index,
                     substituted: false,
@@ -2332,6 +2354,8 @@ mod tests {
         gsub.lookups.lookups[2].lookup_flag = 0x0008;
         let mut glyphs = vec![
             GsubGlyph {
+                byte_start: 0,
+                byte_end: 0,
                 glyph_id: 10,
                 source_index: 0,
                 substituted: false,
@@ -2339,6 +2363,8 @@ mod tests {
                 ligature_components: 1,
             },
             GsubGlyph {
+                byte_start: 0,
+                byte_end: 0,
                 glyph_id: 13,
                 source_index: 1,
                 substituted: false,
@@ -2361,6 +2387,8 @@ mod tests {
         gsub.lookups.lookups[0].lookup_flag = 0x0004;
         let mut glyphs = vec![
             GsubGlyph {
+                byte_start: 0,
+                byte_end: 0,
                 glyph_id: 10,
                 source_index: 0,
                 substituted: false,
@@ -2368,6 +2396,8 @@ mod tests {
                 ligature_components: 1,
             },
             GsubGlyph {
+                byte_start: 0,
+                byte_end: 0,
                 glyph_id: 10,
                 source_index: 1,
                 substituted: false,
@@ -2399,6 +2429,8 @@ mod tests {
                 gsub.lookups.lookups[0].lookup_flag = 0x0008;
                 let mut glyphs: Vec<_> = (0..count)
                     .map(|source_index| GsubGlyph {
+                        byte_start: 0,
+                        byte_end: 0,
                         glyph_id: 10,
                         source_index,
                         substituted: false,
@@ -2556,6 +2588,8 @@ mod tests {
                 .iter()
                 .enumerate()
                 .map(|(source_index, _)| GsubGlyph {
+                    byte_start: 0,
+                    byte_end: 0,
                     glyph_id: 10,
                     source_index,
                     substituted: false,
@@ -2570,6 +2604,8 @@ mod tests {
         // ccmp expansion inherits its source form, not a false new neighbor.
         let mut glyphs = vec![
             GsubGlyph {
+                byte_start: 0,
+                byte_end: 0,
                 glyph_id: 10,
                 source_index: 0,
                 substituted: false,
@@ -2577,6 +2613,8 @@ mod tests {
                 ligature_components: 1,
             },
             GsubGlyph {
+                byte_start: 0,
+                byte_end: 0,
                 glyph_id: 10,
                 source_index: 0,
                 substituted: false,
@@ -2584,6 +2622,8 @@ mod tests {
                 ligature_components: 1,
             },
             GsubGlyph {
+                byte_start: 0,
+                byte_end: 0,
                 glyph_id: 10,
                 source_index: 1,
                 substituted: false,
@@ -2614,6 +2654,8 @@ mod tests {
         let mut glyphs: Vec<_> = [0, 0, 1, 2]
             .into_iter()
             .map(|source_index| GsubGlyph {
+                byte_start: 0,
+                byte_end: 0,
                 glyph_id: 10,
                 source_index,
                 substituted: false,

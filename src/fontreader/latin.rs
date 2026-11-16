@@ -53,6 +53,8 @@ impl Font {
                 continue;
             }
             let base = ResolvedGlyph {
+                byte_start: 0,
+                byte_end: 0,
                 ch: chars[0],
                 shaping_ch: *target,
                 source_start,

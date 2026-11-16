@@ -276,6 +276,8 @@ fn bounded_hangul_budget_and_length_fail_without_mutating_input() {
         f.lookup_list_indices = (0..100).collect();
     }
     let glyph = GsubGlyph {
+        byte_start: 0,
+        byte_end: 0,
         glyph_id: 1,
         source_index: 0,
         substituted: false,

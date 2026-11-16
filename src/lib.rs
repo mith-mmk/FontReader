@@ -35,12 +35,16 @@ pub mod opentype;
 #[allow(dead_code, unused_imports)]
 mod opentype;
 
+pub mod caret;
 pub mod commands;
+pub use caret::{CaretAffinity, CaretLayout, CaretPosition, CaretQuality, TextPosition};
 pub mod compositefont;
 pub mod fontengine;
 pub mod fontface;
 pub mod fontfile;
 pub mod limits;
+pub mod mapped;
+pub use mapped::{GlyphSource, ShapedText};
 #[cfg(feature = "svg-fonts")]
 pub(crate) mod svgparse;
 pub mod unicode;
