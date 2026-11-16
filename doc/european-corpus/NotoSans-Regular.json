@@ -1,0 +1,4272 @@
+{
+  "font": "NotoSans-Regular.ttf",
+  "sha256": "89c3c497f618fdaa0b2d1e98fef93582f28c71debd2c4a8cdf41f190ced2909d",
+  "font_version": "Version 2.004; ttfautohint (v1.8.3) -l 8 -r 50 -G 200 -x 14 -D latn -f none -a qsq -X \"\"",
+  "harfbuzz": "10.2.0",
+  "python": "3.12.14",
+  "unicode": "15.0.0",
+  "mapping_source": "Explicit European sequences; Python Unicode NFC/NFD",
+  "units_per_em": 1000,
+  "fontcore_size": 1362,
+  "cases": 55,
+  "cmap_covered": 55,
+  "matches": 55,
+  "ink_union_matches": 55,
+  "missing": [],
+  "results": [
+    {
+      "id": "ligature-00",
+      "text": "fi",
+      "group": "default-ligature",
+      "direction": "ltr",
+      "locale": "en",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "ligature-00",
+        "advance": 602,
+        "glyphs": [
+          {
+            "advance": 602,
+            "bounds": [
+              15,
+              -765,
+              525,
+              0
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 602,
+        "glyphs": [
+          {
+            "advance": 602,
+            "bounds": [
+              15,
+              -765,
+              525,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ligature-01",
+      "text": "fl",
+      "group": "default-ligature",
+      "direction": "ltr",
+      "locale": "en",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "ligature-01",
+        "advance": 602,
+        "glyphs": [
+          {
+            "advance": 602,
+            "bounds": [
+              15,
+              -765,
+              517,
+              0
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 602,
+        "glyphs": [
+          {
+            "advance": 602,
+            "bounds": [
+              15,
+              -765,
+              517,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ligature-02",
+      "text": "ff",
+      "group": "default-ligature",
+      "direction": "ltr",
+      "locale": "en",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "ligature-02",
+        "advance": 688,
+        "glyphs": [
+          {
+            "advance": 688,
+            "bounds": [
+              15,
+              -765,
+              731,
+              0
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 688,
+        "glyphs": [
+          {
+            "advance": 688,
+            "bounds": [
+              15,
+              -765,
+              731,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ligature-03",
+      "text": "ffi",
+      "group": "default-ligature",
+      "direction": "ltr",
+      "locale": "en",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "ligature-03",
+        "advance": 946,
+        "glyphs": [
+          {
+            "advance": 946,
+            "bounds": [
+              15,
+              -765,
+              869,
+              0
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 946,
+        "glyphs": [
+          {
+            "advance": 946,
+            "bounds": [
+              15,
+              -765,
+              869,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ligature-04",
+      "text": "ffl",
+      "group": "default-ligature",
+      "direction": "ltr",
+      "locale": "en",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "ligature-04",
+        "advance": 946,
+        "glyphs": [
+          {
+            "advance": 946,
+            "bounds": [
+              15,
+              -765,
+              861,
+              0
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 946,
+        "glyphs": [
+          {
+            "advance": 946,
+            "bounds": [
+              15,
+              -765,
+              861,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ligature-05",
+      "text": "st",
+      "group": "default-ligature",
+      "direction": "ltr",
+      "locale": "en",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "ligature-05",
+        "advance": 840,
+        "glyphs": [
+          {
+            "advance": 479,
+            "bounds": [
+              51,
+              -546,
+              434,
+              10
+            ]
+          },
+          {
+            "advance": 361,
+            "bounds": [
+              495,
+              -659,
+              818,
+              10
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 840,
+        "glyphs": [
+          {
+            "advance": 479,
+            "bounds": [
+              51,
+              -546,
+              434,
+              10
+            ]
+          },
+          {
+            "advance": 361,
+            "bounds": [
+              495,
+              -659,
+              818,
+              10
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ligature-06",
+      "text": "ct",
+      "group": "default-ligature",
+      "direction": "ltr",
+      "locale": "en",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "ligature-06",
+        "advance": 841,
+        "glyphs": [
+          {
+            "advance": 480,
+            "bounds": [
+              55,
+              -546,
+              447,
+              10
+            ]
+          },
+          {
+            "advance": 361,
+            "bounds": [
+              496,
+              -659,
+              819,
+              10
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 841,
+        "glyphs": [
+          {
+            "advance": 480,
+            "bounds": [
+              55,
+              -546,
+              447,
+              10
+            ]
+          },
+          {
+            "advance": 361,
+            "bounds": [
+              496,
+              -659,
+              819,
+              10
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ligature-07",
+      "text": "office",
+      "group": "default-ligature",
+      "direction": "ltr",
+      "locale": "en",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "ligature-07",
+        "advance": 2595,
+        "glyphs": [
+          {
+            "advance": 605,
+            "bounds": [
+              55,
+              -546,
+              551,
+              10
+            ]
+          },
+          {
+            "advance": 946,
+            "bounds": [
+              620,
+              -765,
+              1474,
+              0
+            ]
+          },
+          {
+            "advance": 480,
+            "bounds": [
+              1606,
+              -546,
+              1998,
+              10
+            ]
+          },
+          {
+            "advance": 564,
+            "bounds": [
+              2086,
+              -546,
+              2544,
+              10
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 2595,
+        "glyphs": [
+          {
+            "advance": 605,
+            "bounds": [
+              55,
+              -546,
+              551,
+              10
+            ]
+          },
+          {
+            "advance": 946,
+            "bounds": [
+              620,
+              -765,
+              1474,
+              0
+            ]
+          },
+          {
+            "advance": 480,
+            "bounds": [
+              1606,
+              -546,
+              1998,
+              10
+            ]
+          },
+          {
+            "advance": 564,
+            "bounds": [
+              2086,
+              -546,
+              2544,
+              10
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ligature-08",
+      "text": "afflict",
+      "group": "default-ligature",
+      "direction": "ltr",
+      "locale": "en",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "ligature-08",
+        "advance": 2606,
+        "glyphs": [
+          {
+            "advance": 561,
+            "bounds": [
+              46,
+              -545,
+              480,
+              10
+            ]
+          },
+          {
+            "advance": 946,
+            "bounds": [
+              576,
+              -765,
+              1422,
+              0
+            ]
+          },
+          {
+            "advance": 258,
+            "bounds": [
+              1585,
+              -737,
+              1688,
+              0
+            ]
+          },
+          {
+            "advance": 480,
+            "bounds": [
+              1820,
+              -546,
+              2212,
+              10
+            ]
+          },
+          {
+            "advance": 361,
+            "bounds": [
+              2261,
+              -659,
+              2584,
+              10
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 2606,
+        "glyphs": [
+          {
+            "advance": 561,
+            "bounds": [
+              46,
+              -545,
+              480,
+              10
+            ]
+          },
+          {
+            "advance": 946,
+            "bounds": [
+              576,
+              -765,
+              1422,
+              0
+            ]
+          },
+          {
+            "advance": 258,
+            "bounds": [
+              1585,
+              -737,
+              1688,
+              0
+            ]
+          },
+          {
+            "advance": 480,
+            "bounds": [
+              1820,
+              -546,
+              2212,
+              10
+            ]
+          },
+          {
+            "advance": 361,
+            "bounds": [
+              2261,
+              -659,
+              2584,
+              10
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ligature-09",
+      "text": "fifi",
+      "group": "default-ligature",
+      "direction": "ltr",
+      "locale": "en",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "ligature-09",
+        "advance": 1204,
+        "glyphs": [
+          {
+            "advance": 602,
+            "bounds": [
+              15,
+              -765,
+              525,
+              0
+            ]
+          },
+          {
+            "advance": 602,
+            "bounds": [
+              617,
+              -765,
+              1127,
+              0
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 1204,
+        "glyphs": [
+          {
+            "advance": 602,
+            "bounds": [
+              15,
+              -765,
+              525,
+              0
+            ]
+          },
+          {
+            "advance": 602,
+            "bounds": [
+              617,
+              -765,
+              1127,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ligature-10",
+      "text": "f f i",
+      "group": "default-ligature",
+      "direction": "ltr",
+      "locale": "en",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "ligature-10",
+        "advance": 1466,
+        "glyphs": [
+          {
+            "advance": 344,
+            "bounds": [
+              15,
+              -765,
+              387,
+              0
+            ]
+          },
+          {
+            "advance": 260,
+            "bounds": null
+          },
+          {
+            "advance": 344,
+            "bounds": [
+              619,
+              -765,
+              991,
+              0
+            ]
+          },
+          {
+            "advance": 260,
+            "bounds": null
+          },
+          {
+            "advance": 258,
+            "bounds": [
+              1286,
+              -737,
+              1389,
+              0
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 1466,
+        "glyphs": [
+          {
+            "advance": 344,
+            "bounds": [
+              15,
+              -765,
+              387,
+              0
+            ]
+          },
+          {
+            "advance": 260,
+            "bounds": null
+          },
+          {
+            "advance": 344,
+            "bounds": [
+              619,
+              -765,
+              991,
+              0
+            ]
+          },
+          {
+            "advance": 260,
+            "bounds": null
+          },
+          {
+            "advance": 258,
+            "bounds": [
+              1286,
+              -737,
+              1389,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ligature-11",
+      "text": "f‌i",
+      "group": "default-ligature",
+      "direction": "ltr",
+      "locale": "en",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "ligature-11",
+        "advance": 602,
+        "glyphs": [
+          {
+            "advance": 344,
+            "bounds": [
+              15,
+              -765,
+              387,
+              0
+            ]
+          },
+          {
+            "advance": 0,
+            "bounds": null
+          },
+          {
+            "advance": 258,
+            "bounds": [
+              422,
+              -737,
+              525,
+              0
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 602,
+        "glyphs": [
+          {
+            "advance": 344,
+            "bounds": [
+              15,
+              -765,
+              387,
+              0
+            ]
+          },
+          {
+            "advance": 0,
+            "bounds": null
+          },
+          {
+            "advance": 258,
+            "bounds": [
+              422,
+              -737,
+              525,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ligature-12",
+      "text": "f̈i",
+      "group": "default-ligature",
+      "direction": "ltr",
+      "locale": "en",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "ligature-12",
+        "advance": 602,
+        "glyphs": [
+          {
+            "advance": 344,
+            "bounds": [
+              15,
+              -765,
+              387,
+              0
+            ]
+          },
+          {
+            "advance": 0,
+            "bounds": [
+              112,
+              -959,
+              393,
+              -860
+            ]
+          },
+          {
+            "advance": 258,
+            "bounds": [
+              422,
+              -737,
+              525,
+              0
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 602,
+        "glyphs": [
+          {
+            "advance": 344,
+            "bounds": [
+              15,
+              -765,
+              387,
+              0
+            ]
+          },
+          {
+            "advance": 0,
+            "bounds": [
+              112,
+              -959,
+              393,
+              -860
+            ]
+          },
+          {
+            "advance": 258,
+            "bounds": [
+              422,
+              -737,
+              525,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ligature-13",
+      "text": "fï",
+      "group": "default-ligature",
+      "direction": "ltr",
+      "locale": "en",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "ligature-13",
+        "advance": 602,
+        "glyphs": [
+          {
+            "advance": 344,
+            "bounds": [
+              15,
+              -765,
+              387,
+              0
+            ]
+          },
+          {
+            "advance": 258,
+            "bounds": [
+              332,
+              -730,
+              613,
+              0
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 602,
+        "glyphs": [
+          {
+            "advance": 344,
+            "bounds": [
+              15,
+              -765,
+              387,
+              0
+            ]
+          },
+          {
+            "advance": 258,
+            "bounds": [
+              332,
+              -730,
+              613,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "letter-00",
+      "text": "ß",
+      "group": "distinct-letter",
+      "direction": "ltr",
+      "locale": "de",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "letter-00",
+        "advance": 631,
+        "glyphs": [
+          {
+            "advance": 631,
+            "bounds": [
+              85,
+              -765,
+              586,
+              10
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 631,
+        "glyphs": [
+          {
+            "advance": 631,
+            "bounds": [
+              85,
+              -765,
+              586,
+              10
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "letter-01",
+      "text": "ẞ",
+      "group": "distinct-letter",
+      "direction": "ltr",
+      "locale": "de",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "letter-01",
+        "advance": 709,
+        "glyphs": [
+          {
+            "advance": 709,
+            "bounds": [
+              90,
+              -724,
+              674,
+              10
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 709,
+        "glyphs": [
+          {
+            "advance": 709,
+            "bounds": [
+              90,
+              -724,
+              674,
+              10
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "letter-02",
+      "text": "ss",
+      "group": "distinct-letter",
+      "direction": "ltr",
+      "locale": "de",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "letter-02",
+        "advance": 958,
+        "glyphs": [
+          {
+            "advance": 479,
+            "bounds": [
+              51,
+              -546,
+              434,
+              10
+            ]
+          },
+          {
+            "advance": 479,
+            "bounds": [
+              530,
+              -546,
+              913,
+              10
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 958,
+        "glyphs": [
+          {
+            "advance": 479,
+            "bounds": [
+              51,
+              -546,
+              434,
+              10
+            ]
+          },
+          {
+            "advance": 479,
+            "bounds": [
+              530,
+              -546,
+              913,
+              10
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "letter-03",
+      "text": "SS",
+      "group": "distinct-letter",
+      "direction": "ltr",
+      "locale": "de",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "letter-03",
+        "advance": 1098,
+        "glyphs": [
+          {
+            "advance": 549,
+            "bounds": [
+              51,
+              -724,
+              502,
+              10
+            ]
+          },
+          {
+            "advance": 549,
+            "bounds": [
+              600,
+              -724,
+              1051,
+              10
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 1098,
+        "glyphs": [
+          {
+            "advance": 549,
+            "bounds": [
+              51,
+              -724,
+              502,
+              10
+            ]
+          },
+          {
+            "advance": 549,
+            "bounds": [
+              600,
+              -724,
+              1051,
+              10
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "letter-04",
+      "text": "Straße",
+      "group": "distinct-letter",
+      "direction": "ltr",
+      "locale": "de",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "letter-04",
+        "advance": 3059,
+        "glyphs": [
+          {
+            "advance": 549,
+            "bounds": [
+              51,
+              -724,
+              502,
+              10
+            ]
+          },
+          {
+            "advance": 361,
+            "bounds": [
+              565,
+              -659,
+              888,
+              10
+            ]
+          },
+          {
+            "advance": 393,
+            "bounds": [
+              995,
+              -546,
+              1308,
+              0
+            ]
+          },
+          {
+            "advance": 561,
+            "bounds": [
+              1349,
+              -545,
+              1783,
+              10
+            ]
+          },
+          {
+            "advance": 631,
+            "bounds": [
+              1949,
+              -765,
+              2450,
+              10
+            ]
+          },
+          {
+            "advance": 564,
+            "bounds": [
+              2550,
+              -546,
+              3008,
+              10
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 3059,
+        "glyphs": [
+          {
+            "advance": 549,
+            "bounds": [
+              51,
+              -724,
+              502,
+              10
+            ]
+          },
+          {
+            "advance": 361,
+            "bounds": [
+              565,
+              -659,
+              888,
+              10
+            ]
+          },
+          {
+            "advance": 393,
+            "bounds": [
+              995,
+              -546,
+              1308,
+              0
+            ]
+          },
+          {
+            "advance": 561,
+            "bounds": [
+              1349,
+              -545,
+              1783,
+              10
+            ]
+          },
+          {
+            "advance": 631,
+            "bounds": [
+              1949,
+              -765,
+              2450,
+              10
+            ]
+          },
+          {
+            "advance": 564,
+            "bounds": [
+              2550,
+              -546,
+              3008,
+              10
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "letter-05",
+      "text": "STRAẞE",
+      "group": "distinct-letter",
+      "direction": "ltr",
+      "locale": "de",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "letter-05",
+        "advance": 3631,
+        "glyphs": [
+          {
+            "advance": 549,
+            "bounds": [
+              51,
+              -724,
+              502,
+              10
+            ]
+          },
+          {
+            "advance": 556,
+            "bounds": [
+              559,
+              -714,
+              1094,
+              0
+            ]
+          },
+          {
+            "advance": 622,
+            "bounds": [
+              1202,
+              -714,
+              1712,
+              0
+            ]
+          },
+          {
+            "advance": 639,
+            "bounds": [
+              1727,
+              -717,
+              2365,
+              0
+            ]
+          },
+          {
+            "advance": 709,
+            "bounds": [
+              2456,
+              -724,
+              3040,
+              10
+            ]
+          },
+          {
+            "advance": 556,
+            "bounds": [
+              3172,
+              -714,
+              3571,
+              0
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 3631,
+        "glyphs": [
+          {
+            "advance": 549,
+            "bounds": [
+              51,
+              -724,
+              502,
+              10
+            ]
+          },
+          {
+            "advance": 556,
+            "bounds": [
+              559,
+              -714,
+              1094,
+              0
+            ]
+          },
+          {
+            "advance": 622,
+            "bounds": [
+              1202,
+              -714,
+              1712,
+              0
+            ]
+          },
+          {
+            "advance": 639,
+            "bounds": [
+              1727,
+              -717,
+              2365,
+              0
+            ]
+          },
+          {
+            "advance": 709,
+            "bounds": [
+              2456,
+              -724,
+              3040,
+              10
+            ]
+          },
+          {
+            "advance": 556,
+            "bounds": [
+              3172,
+              -714,
+              3571,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "letter-06",
+      "text": "STRASSE",
+      "group": "distinct-letter",
+      "direction": "ltr",
+      "locale": "de",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "letter-06",
+        "advance": 4020,
+        "glyphs": [
+          {
+            "advance": 549,
+            "bounds": [
+              51,
+              -724,
+              502,
+              10
+            ]
+          },
+          {
+            "advance": 556,
+            "bounds": [
+              559,
+              -714,
+              1094,
+              0
+            ]
+          },
+          {
+            "advance": 622,
+            "bounds": [
+              1202,
+              -714,
+              1712,
+              0
+            ]
+          },
+          {
+            "advance": 639,
+            "bounds": [
+              1727,
+              -717,
+              2365,
+              0
+            ]
+          },
+          {
+            "advance": 549,
+            "bounds": [
+              2417,
+              -724,
+              2868,
+              10
+            ]
+          },
+          {
+            "advance": 549,
+            "bounds": [
+              2966,
+              -724,
+              3417,
+              10
+            ]
+          },
+          {
+            "advance": 556,
+            "bounds": [
+              3561,
+              -714,
+              3960,
+              0
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 4020,
+        "glyphs": [
+          {
+            "advance": 549,
+            "bounds": [
+              51,
+              -724,
+              502,
+              10
+            ]
+          },
+          {
+            "advance": 556,
+            "bounds": [
+              559,
+              -714,
+              1094,
+              0
+            ]
+          },
+          {
+            "advance": 622,
+            "bounds": [
+              1202,
+              -714,
+              1712,
+              0
+            ]
+          },
+          {
+            "advance": 639,
+            "bounds": [
+              1727,
+              -717,
+              2365,
+              0
+            ]
+          },
+          {
+            "advance": 549,
+            "bounds": [
+              2417,
+              -724,
+              2868,
+              10
+            ]
+          },
+          {
+            "advance": 549,
+            "bounds": [
+              2966,
+              -724,
+              3417,
+              10
+            ]
+          },
+          {
+            "advance": 556,
+            "bounds": [
+              3561,
+              -714,
+              3960,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "letter-07",
+      "text": "Maße",
+      "group": "distinct-letter",
+      "direction": "ltr",
+      "locale": "de",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "letter-07",
+        "advance": 2663,
+        "glyphs": [
+          {
+            "advance": 907,
+            "bounds": [
+              97,
+              -714,
+              810,
+              0
+            ]
+          },
+          {
+            "advance": 561,
+            "bounds": [
+              953,
+              -545,
+              1387,
+              10
+            ]
+          },
+          {
+            "advance": 631,
+            "bounds": [
+              1553,
+              -765,
+              2054,
+              10
+            ]
+          },
+          {
+            "advance": 564,
+            "bounds": [
+              2154,
+              -546,
+              2612,
+              10
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 2663,
+        "glyphs": [
+          {
+            "advance": 907,
+            "bounds": [
+              97,
+              -714,
+              810,
+              0
+            ]
+          },
+          {
+            "advance": 561,
+            "bounds": [
+              953,
+              -545,
+              1387,
+              10
+            ]
+          },
+          {
+            "advance": 631,
+            "bounds": [
+              1553,
+              -765,
+              2054,
+              10
+            ]
+          },
+          {
+            "advance": 564,
+            "bounds": [
+              2154,
+              -546,
+              2612,
+              10
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "letter-08",
+      "text": "Masse",
+      "group": "distinct-letter",
+      "direction": "ltr",
+      "locale": "de",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "letter-08",
+        "advance": 2990,
+        "glyphs": [
+          {
+            "advance": 907,
+            "bounds": [
+              97,
+              -714,
+              810,
+              0
+            ]
+          },
+          {
+            "advance": 561,
+            "bounds": [
+              953,
+              -545,
+              1387,
+              10
+            ]
+          },
+          {
+            "advance": 479,
+            "bounds": [
+              1519,
+              -546,
+              1902,
+              10
+            ]
+          },
+          {
+            "advance": 479,
+            "bounds": [
+              1998,
+              -546,
+              2381,
+              10
+            ]
+          },
+          {
+            "advance": 564,
+            "bounds": [
+              2481,
+              -546,
+              2939,
+              10
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 2990,
+        "glyphs": [
+          {
+            "advance": 907,
+            "bounds": [
+              97,
+              -714,
+              810,
+              0
+            ]
+          },
+          {
+            "advance": 561,
+            "bounds": [
+              953,
+              -545,
+              1387,
+              10
+            ]
+          },
+          {
+            "advance": 479,
+            "bounds": [
+              1519,
+              -546,
+              1902,
+              10
+            ]
+          },
+          {
+            "advance": 479,
+            "bounds": [
+              1998,
+              -546,
+              2381,
+              10
+            ]
+          },
+          {
+            "advance": 564,
+            "bounds": [
+              2481,
+              -546,
+              2939,
+              10
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "letter-09",
+      "text": "groß",
+      "group": "distinct-letter",
+      "direction": "ltr",
+      "locale": "de",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "letter-09",
+        "advance": 2244,
+        "glyphs": [
+          {
+            "advance": 615,
+            "bounds": [
+              55,
+              -546,
+              530,
+              240
+            ]
+          },
+          {
+            "advance": 393,
+            "bounds": [
+              700,
+              -546,
+              1013,
+              0
+            ]
+          },
+          {
+            "advance": 605,
+            "bounds": [
+              1063,
+              -546,
+              1559,
+              10
+            ]
+          },
+          {
+            "advance": 631,
+            "bounds": [
+              1698,
+              -765,
+              2199,
+              10
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 2244,
+        "glyphs": [
+          {
+            "advance": 615,
+            "bounds": [
+              55,
+              -546,
+              530,
+              240
+            ]
+          },
+          {
+            "advance": 393,
+            "bounds": [
+              700,
+              -546,
+              1013,
+              0
+            ]
+          },
+          {
+            "advance": 605,
+            "bounds": [
+              1063,
+              -546,
+              1559,
+              10
+            ]
+          },
+          {
+            "advance": 631,
+            "bounds": [
+              1698,
+              -765,
+              2199,
+              10
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "letter-10",
+      "text": "GRÖẞE",
+      "group": "distinct-letter",
+      "direction": "ltr",
+      "locale": "de",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "letter-10",
+        "advance": 3396,
+        "glyphs": [
+          {
+            "advance": 728,
+            "bounds": [
+              61,
+              -724,
+              654,
+              10
+            ]
+          },
+          {
+            "advance": 622,
+            "bounds": [
+              825,
+              -714,
+              1335,
+              0
+            ]
+          },
+          {
+            "advance": 781,
+            "bounds": [
+              1411,
+              -908,
+              2070,
+              10
+            ]
+          },
+          {
+            "advance": 709,
+            "bounds": [
+              2221,
+              -724,
+              2805,
+              10
+            ]
+          },
+          {
+            "advance": 556,
+            "bounds": [
+              2937,
+              -714,
+              3336,
+              0
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 3396,
+        "glyphs": [
+          {
+            "advance": 728,
+            "bounds": [
+              61,
+              -724,
+              654,
+              10
+            ]
+          },
+          {
+            "advance": 622,
+            "bounds": [
+              825,
+              -714,
+              1335,
+              0
+            ]
+          },
+          {
+            "advance": 781,
+            "bounds": [
+              1411,
+              -908,
+              2070,
+              10
+            ]
+          },
+          {
+            "advance": 709,
+            "bounds": [
+              2221,
+              -724,
+              2805,
+              10
+            ]
+          },
+          {
+            "advance": 556,
+            "bounds": [
+              2937,
+              -714,
+              3336,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "letter-11",
+      "text": "æ",
+      "group": "distinct-letter",
+      "direction": "ltr",
+      "locale": "de",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "letter-11",
+        "advance": 864,
+        "glyphs": [
+          {
+            "advance": 864,
+            "bounds": [
+              46,
+              -546,
+              813,
+              10
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 864,
+        "glyphs": [
+          {
+            "advance": 864,
+            "bounds": [
+              46,
+              -546,
+              813,
+              10
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "letter-12",
+      "text": "Æ",
+      "group": "distinct-letter",
+      "direction": "ltr",
+      "locale": "de",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "letter-12",
+        "advance": 881,
+        "glyphs": [
+          {
+            "advance": 881,
+            "bounds": [
+              -1,
+              -714,
+              821,
+              0
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 881,
+        "glyphs": [
+          {
+            "advance": 881,
+            "bounds": [
+              -1,
+              -714,
+              821,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "letter-13",
+      "text": "œ",
+      "group": "distinct-letter",
+      "direction": "ltr",
+      "locale": "de",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "letter-13",
+        "advance": 946,
+        "glyphs": [
+          {
+            "advance": 946,
+            "bounds": [
+              54,
+              -545,
+              894,
+              10
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 946,
+        "glyphs": [
+          {
+            "advance": 946,
+            "bounds": [
+              54,
+              -545,
+              894,
+              10
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "letter-14",
+      "text": "Œ",
+      "group": "distinct-letter",
+      "direction": "ltr",
+      "locale": "de",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "letter-14",
+        "advance": 928,
+        "glyphs": [
+          {
+            "advance": 928,
+            "bounds": [
+              61,
+              -725,
+              868,
+              10
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 928,
+        "glyphs": [
+          {
+            "advance": 928,
+            "bounds": [
+              61,
+              -725,
+              868,
+              10
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "umlaut-00-NFC",
+      "text": "ä",
+      "group": "umlaut",
+      "direction": "ltr",
+      "locale": "de",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "umlaut-00-NFC",
+        "advance": 561,
+        "glyphs": [
+          {
+            "advance": 561,
+            "bounds": [
+              46,
+              -730,
+              480,
+              10
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 561,
+        "glyphs": [
+          {
+            "advance": 561,
+            "bounds": [
+              46,
+              -730,
+              480,
+              10
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "umlaut-00-NFD",
+      "text": "ä",
+      "group": "umlaut",
+      "direction": "ltr",
+      "locale": "de",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "umlaut-00-NFD",
+        "advance": 561,
+        "glyphs": [
+          {
+            "advance": 561,
+            "bounds": [
+              46,
+              -730,
+              480,
+              10
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 561,
+        "glyphs": [
+          {
+            "advance": 561,
+            "bounds": [
+              46,
+              -730,
+              480,
+              10
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "umlaut-01-NFC",
+      "text": "ö",
+      "group": "umlaut",
+      "direction": "ltr",
+      "locale": "de",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "umlaut-01-NFC",
+        "advance": 605,
+        "glyphs": [
+          {
+            "advance": 605,
+            "bounds": [
+              55,
+              -730,
+              551,
+              10
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 605,
+        "glyphs": [
+          {
+            "advance": 605,
+            "bounds": [
+              55,
+              -730,
+              551,
+              10
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "umlaut-01-NFD",
+      "text": "ö",
+      "group": "umlaut",
+      "direction": "ltr",
+      "locale": "de",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "umlaut-01-NFD",
+        "advance": 605,
+        "glyphs": [
+          {
+            "advance": 605,
+            "bounds": [
+              55,
+              -730,
+              551,
+              10
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 605,
+        "glyphs": [
+          {
+            "advance": 605,
+            "bounds": [
+              55,
+              -730,
+              551,
+              10
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "umlaut-02-NFC",
+      "text": "ü",
+      "group": "umlaut",
+      "direction": "ltr",
+      "locale": "de",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "umlaut-02-NFC",
+        "advance": 618,
+        "glyphs": [
+          {
+            "advance": 618,
+            "bounds": [
+              79,
+              -730,
+              533,
+              10
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 618,
+        "glyphs": [
+          {
+            "advance": 618,
+            "bounds": [
+              79,
+              -730,
+              533,
+              10
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "umlaut-02-NFD",
+      "text": "ü",
+      "group": "umlaut",
+      "direction": "ltr",
+      "locale": "de",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "umlaut-02-NFD",
+        "advance": 618,
+        "glyphs": [
+          {
+            "advance": 618,
+            "bounds": [
+              79,
+              -730,
+              533,
+              10
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 618,
+        "glyphs": [
+          {
+            "advance": 618,
+            "bounds": [
+              79,
+              -730,
+              533,
+              10
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "umlaut-03-NFC",
+      "text": "Ä",
+      "group": "umlaut",
+      "direction": "ltr",
+      "locale": "de",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "umlaut-03-NFC",
+        "advance": 639,
+        "glyphs": [
+          {
+            "advance": 639,
+            "bounds": [
+              0,
+              -908,
+              638,
+              0
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 639,
+        "glyphs": [
+          {
+            "advance": 639,
+            "bounds": [
+              0,
+              -908,
+              638,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "umlaut-03-NFD",
+      "text": "Ä",
+      "group": "umlaut",
+      "direction": "ltr",
+      "locale": "de",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "umlaut-03-NFD",
+        "advance": 639,
+        "glyphs": [
+          {
+            "advance": 639,
+            "bounds": [
+              0,
+              -908,
+              638,
+              0
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 639,
+        "glyphs": [
+          {
+            "advance": 639,
+            "bounds": [
+              0,
+              -908,
+              638,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "umlaut-04-NFC",
+      "text": "Ö",
+      "group": "umlaut",
+      "direction": "ltr",
+      "locale": "de",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "umlaut-04-NFC",
+        "advance": 781,
+        "glyphs": [
+          {
+            "advance": 781,
+            "bounds": [
+              61,
+              -908,
+              720,
+              10
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 781,
+        "glyphs": [
+          {
+            "advance": 781,
+            "bounds": [
+              61,
+              -908,
+              720,
+              10
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "umlaut-04-NFD",
+      "text": "Ö",
+      "group": "umlaut",
+      "direction": "ltr",
+      "locale": "de",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "umlaut-04-NFD",
+        "advance": 781,
+        "glyphs": [
+          {
+            "advance": 781,
+            "bounds": [
+              61,
+              -908,
+              720,
+              10
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 781,
+        "glyphs": [
+          {
+            "advance": 781,
+            "bounds": [
+              61,
+              -908,
+              720,
+              10
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "umlaut-05-NFC",
+      "text": "Ü",
+      "group": "umlaut",
+      "direction": "ltr",
+      "locale": "de",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "umlaut-05-NFC",
+        "advance": 731,
+        "glyphs": [
+          {
+            "advance": 731,
+            "bounds": [
+              90,
+              -908,
+              640,
+              10
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 731,
+        "glyphs": [
+          {
+            "advance": 731,
+            "bounds": [
+              90,
+              -908,
+              640,
+              10
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "umlaut-05-NFD",
+      "text": "Ü",
+      "group": "umlaut",
+      "direction": "ltr",
+      "locale": "de",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "umlaut-05-NFD",
+        "advance": 731,
+        "glyphs": [
+          {
+            "advance": 731,
+            "bounds": [
+              90,
+              -908,
+              640,
+              10
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 731,
+        "glyphs": [
+          {
+            "advance": 731,
+            "bounds": [
+              90,
+              -908,
+              640,
+              10
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "umlaut-06-NFC",
+      "text": "für",
+      "group": "umlaut",
+      "direction": "ltr",
+      "locale": "de",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "umlaut-06-NFC",
+        "advance": 1375,
+        "glyphs": [
+          {
+            "advance": 344,
+            "bounds": [
+              15,
+              -765,
+              387,
+              0
+            ]
+          },
+          {
+            "advance": 618,
+            "bounds": [
+              423,
+              -730,
+              877,
+              10
+            ]
+          },
+          {
+            "advance": 413,
+            "bounds": [
+              1047,
+              -546,
+              1360,
+              0
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 1375,
+        "glyphs": [
+          {
+            "advance": 344,
+            "bounds": [
+              15,
+              -765,
+              387,
+              0
+            ]
+          },
+          {
+            "advance": 618,
+            "bounds": [
+              423,
+              -730,
+              877,
+              10
+            ]
+          },
+          {
+            "advance": 413,
+            "bounds": [
+              1047,
+              -546,
+              1360,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "umlaut-06-NFD",
+      "text": "für",
+      "group": "umlaut",
+      "direction": "ltr",
+      "locale": "de",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "umlaut-06-NFD",
+        "advance": 1375,
+        "glyphs": [
+          {
+            "advance": 344,
+            "bounds": [
+              15,
+              -765,
+              387,
+              0
+            ]
+          },
+          {
+            "advance": 618,
+            "bounds": [
+              423,
+              -730,
+              877,
+              10
+            ]
+          },
+          {
+            "advance": 413,
+            "bounds": [
+              1047,
+              -546,
+              1360,
+              0
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 1375,
+        "glyphs": [
+          {
+            "advance": 344,
+            "bounds": [
+              15,
+              -765,
+              387,
+              0
+            ]
+          },
+          {
+            "advance": 618,
+            "bounds": [
+              423,
+              -730,
+              877,
+              10
+            ]
+          },
+          {
+            "advance": 413,
+            "bounds": [
+              1047,
+              -546,
+              1360,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "umlaut-07-NFC",
+      "text": "größer",
+      "group": "umlaut",
+      "direction": "ltr",
+      "locale": "de",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "umlaut-07-NFC",
+        "advance": 3221,
+        "glyphs": [
+          {
+            "advance": 615,
+            "bounds": [
+              55,
+              -546,
+              530,
+              240
+            ]
+          },
+          {
+            "advance": 393,
+            "bounds": [
+              700,
+              -546,
+              1013,
+              0
+            ]
+          },
+          {
+            "advance": 605,
+            "bounds": [
+              1063,
+              -730,
+              1559,
+              10
+            ]
+          },
+          {
+            "advance": 631,
+            "bounds": [
+              1698,
+              -765,
+              2199,
+              10
+            ]
+          },
+          {
+            "advance": 564,
+            "bounds": [
+              2299,
+              -546,
+              2757,
+              10
+            ]
+          },
+          {
+            "advance": 413,
+            "bounds": [
+              2893,
+              -546,
+              3206,
+              0
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 3221,
+        "glyphs": [
+          {
+            "advance": 615,
+            "bounds": [
+              55,
+              -546,
+              530,
+              240
+            ]
+          },
+          {
+            "advance": 393,
+            "bounds": [
+              700,
+              -546,
+              1013,
+              0
+            ]
+          },
+          {
+            "advance": 605,
+            "bounds": [
+              1063,
+              -730,
+              1559,
+              10
+            ]
+          },
+          {
+            "advance": 631,
+            "bounds": [
+              1698,
+              -765,
+              2199,
+              10
+            ]
+          },
+          {
+            "advance": 564,
+            "bounds": [
+              2299,
+              -546,
+              2757,
+              10
+            ]
+          },
+          {
+            "advance": 413,
+            "bounds": [
+              2893,
+              -546,
+              3206,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "umlaut-07-NFD",
+      "text": "größer",
+      "group": "umlaut",
+      "direction": "ltr",
+      "locale": "de",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "umlaut-07-NFD",
+        "advance": 3221,
+        "glyphs": [
+          {
+            "advance": 615,
+            "bounds": [
+              55,
+              -546,
+              530,
+              240
+            ]
+          },
+          {
+            "advance": 393,
+            "bounds": [
+              700,
+              -546,
+              1013,
+              0
+            ]
+          },
+          {
+            "advance": 605,
+            "bounds": [
+              1063,
+              -730,
+              1559,
+              10
+            ]
+          },
+          {
+            "advance": 631,
+            "bounds": [
+              1698,
+              -765,
+              2199,
+              10
+            ]
+          },
+          {
+            "advance": 564,
+            "bounds": [
+              2299,
+              -546,
+              2757,
+              10
+            ]
+          },
+          {
+            "advance": 413,
+            "bounds": [
+              2893,
+              -546,
+              3206,
+              0
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 3221,
+        "glyphs": [
+          {
+            "advance": 615,
+            "bounds": [
+              55,
+              -546,
+              530,
+              240
+            ]
+          },
+          {
+            "advance": 393,
+            "bounds": [
+              700,
+              -546,
+              1013,
+              0
+            ]
+          },
+          {
+            "advance": 605,
+            "bounds": [
+              1063,
+              -730,
+              1559,
+              10
+            ]
+          },
+          {
+            "advance": 631,
+            "bounds": [
+              1698,
+              -765,
+              2199,
+              10
+            ]
+          },
+          {
+            "advance": 564,
+            "bounds": [
+              2299,
+              -546,
+              2757,
+              10
+            ]
+          },
+          {
+            "advance": 413,
+            "bounds": [
+              2893,
+              -546,
+              3206,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "umlaut-08-NFC",
+      "text": "Mädchen",
+      "group": "umlaut",
+      "direction": "ltr",
+      "locale": "de",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "umlaut-08-NFC",
+        "advance": 4363,
+        "glyphs": [
+          {
+            "advance": 907,
+            "bounds": [
+              97,
+              -714,
+              810,
+              0
+            ]
+          },
+          {
+            "advance": 561,
+            "bounds": [
+              953,
+              -730,
+              1387,
+              10
+            ]
+          },
+          {
+            "advance": 615,
+            "bounds": [
+              1523,
+              -760,
+              1998,
+              10
+            ]
+          },
+          {
+            "advance": 480,
+            "bounds": [
+              2138,
+              -546,
+              2530,
+              10
+            ]
+          },
+          {
+            "advance": 618,
+            "bounds": [
+              2648,
+              -760,
+              3100,
+              0
+            ]
+          },
+          {
+            "advance": 564,
+            "bounds": [
+              3236,
+              -546,
+              3694,
+              10
+            ]
+          },
+          {
+            "advance": 618,
+            "bounds": [
+              3830,
+              -546,
+              4282,
+              0
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 4363,
+        "glyphs": [
+          {
+            "advance": 907,
+            "bounds": [
+              97,
+              -714,
+              810,
+              0
+            ]
+          },
+          {
+            "advance": 561,
+            "bounds": [
+              953,
+              -730,
+              1387,
+              10
+            ]
+          },
+          {
+            "advance": 615,
+            "bounds": [
+              1523,
+              -760,
+              1998,
+              10
+            ]
+          },
+          {
+            "advance": 480,
+            "bounds": [
+              2138,
+              -546,
+              2530,
+              10
+            ]
+          },
+          {
+            "advance": 618,
+            "bounds": [
+              2648,
+              -760,
+              3100,
+              0
+            ]
+          },
+          {
+            "advance": 564,
+            "bounds": [
+              3236,
+              -546,
+              3694,
+              10
+            ]
+          },
+          {
+            "advance": 618,
+            "bounds": [
+              3830,
+              -546,
+              4282,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "umlaut-08-NFD",
+      "text": "Mädchen",
+      "group": "umlaut",
+      "direction": "ltr",
+      "locale": "de",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "umlaut-08-NFD",
+        "advance": 4363,
+        "glyphs": [
+          {
+            "advance": 907,
+            "bounds": [
+              97,
+              -714,
+              810,
+              0
+            ]
+          },
+          {
+            "advance": 561,
+            "bounds": [
+              953,
+              -730,
+              1387,
+              10
+            ]
+          },
+          {
+            "advance": 615,
+            "bounds": [
+              1523,
+              -760,
+              1998,
+              10
+            ]
+          },
+          {
+            "advance": 480,
+            "bounds": [
+              2138,
+              -546,
+              2530,
+              10
+            ]
+          },
+          {
+            "advance": 618,
+            "bounds": [
+              2648,
+              -760,
+              3100,
+              0
+            ]
+          },
+          {
+            "advance": 564,
+            "bounds": [
+              3236,
+              -546,
+              3694,
+              10
+            ]
+          },
+          {
+            "advance": 618,
+            "bounds": [
+              3830,
+              -546,
+              4282,
+              0
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 4363,
+        "glyphs": [
+          {
+            "advance": 907,
+            "bounds": [
+              97,
+              -714,
+              810,
+              0
+            ]
+          },
+          {
+            "advance": 561,
+            "bounds": [
+              953,
+              -730,
+              1387,
+              10
+            ]
+          },
+          {
+            "advance": 615,
+            "bounds": [
+              1523,
+              -760,
+              1998,
+              10
+            ]
+          },
+          {
+            "advance": 480,
+            "bounds": [
+              2138,
+              -546,
+              2530,
+              10
+            ]
+          },
+          {
+            "advance": 618,
+            "bounds": [
+              2648,
+              -760,
+              3100,
+              0
+            ]
+          },
+          {
+            "advance": 564,
+            "bounds": [
+              3236,
+              -546,
+              3694,
+              10
+            ]
+          },
+          {
+            "advance": 618,
+            "bounds": [
+              3830,
+              -546,
+              4282,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "umlaut-09-NFC",
+      "text": "Übergröße",
+      "group": "umlaut",
+      "direction": "ltr",
+      "locale": "de",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "umlaut-09-NFC",
+        "advance": 5121,
+        "glyphs": [
+          {
+            "advance": 731,
+            "bounds": [
+              90,
+              -908,
+              640,
+              10
+            ]
+          },
+          {
+            "advance": 615,
+            "bounds": [
+              816,
+              -760,
+              1291,
+              10
+            ]
+          },
+          {
+            "advance": 564,
+            "bounds": [
+              1401,
+              -546,
+              1859,
+              10
+            ]
+          },
+          {
+            "advance": 403,
+            "bounds": [
+              1995,
+              -546,
+              2308,
+              0
+            ]
+          },
+          {
+            "advance": 615,
+            "bounds": [
+              2368,
+              -546,
+              2843,
+              240
+            ]
+          },
+          {
+            "advance": 393,
+            "bounds": [
+              3013,
+              -546,
+              3326,
+              0
+            ]
+          },
+          {
+            "advance": 605,
+            "bounds": [
+              3376,
+              -730,
+              3872,
+              10
+            ]
+          },
+          {
+            "advance": 631,
+            "bounds": [
+              4011,
+              -765,
+              4512,
+              10
+            ]
+          },
+          {
+            "advance": 564,
+            "bounds": [
+              4612,
+              -546,
+              5070,
+              10
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 5121,
+        "glyphs": [
+          {
+            "advance": 731,
+            "bounds": [
+              90,
+              -908,
+              640,
+              10
+            ]
+          },
+          {
+            "advance": 615,
+            "bounds": [
+              816,
+              -760,
+              1291,
+              10
+            ]
+          },
+          {
+            "advance": 564,
+            "bounds": [
+              1401,
+              -546,
+              1859,
+              10
+            ]
+          },
+          {
+            "advance": 403,
+            "bounds": [
+              1995,
+              -546,
+              2308,
+              0
+            ]
+          },
+          {
+            "advance": 615,
+            "bounds": [
+              2368,
+              -546,
+              2843,
+              240
+            ]
+          },
+          {
+            "advance": 393,
+            "bounds": [
+              3013,
+              -546,
+              3326,
+              0
+            ]
+          },
+          {
+            "advance": 605,
+            "bounds": [
+              3376,
+              -730,
+              3872,
+              10
+            ]
+          },
+          {
+            "advance": 631,
+            "bounds": [
+              4011,
+              -765,
+              4512,
+              10
+            ]
+          },
+          {
+            "advance": 564,
+            "bounds": [
+              4612,
+              -546,
+              5070,
+              10
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "umlaut-09-NFD",
+      "text": "Übergröße",
+      "group": "umlaut",
+      "direction": "ltr",
+      "locale": "de",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "umlaut-09-NFD",
+        "advance": 5121,
+        "glyphs": [
+          {
+            "advance": 731,
+            "bounds": [
+              90,
+              -908,
+              640,
+              10
+            ]
+          },
+          {
+            "advance": 615,
+            "bounds": [
+              816,
+              -760,
+              1291,
+              10
+            ]
+          },
+          {
+            "advance": 564,
+            "bounds": [
+              1401,
+              -546,
+              1859,
+              10
+            ]
+          },
+          {
+            "advance": 403,
+            "bounds": [
+              1995,
+              -546,
+              2308,
+              0
+            ]
+          },
+          {
+            "advance": 615,
+            "bounds": [
+              2368,
+              -546,
+              2843,
+              240
+            ]
+          },
+          {
+            "advance": 393,
+            "bounds": [
+              3013,
+              -546,
+              3326,
+              0
+            ]
+          },
+          {
+            "advance": 605,
+            "bounds": [
+              3376,
+              -730,
+              3872,
+              10
+            ]
+          },
+          {
+            "advance": 631,
+            "bounds": [
+              4011,
+              -765,
+              4512,
+              10
+            ]
+          },
+          {
+            "advance": 564,
+            "bounds": [
+              4612,
+              -546,
+              5070,
+              10
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 5121,
+        "glyphs": [
+          {
+            "advance": 731,
+            "bounds": [
+              90,
+              -908,
+              640,
+              10
+            ]
+          },
+          {
+            "advance": 615,
+            "bounds": [
+              816,
+              -760,
+              1291,
+              10
+            ]
+          },
+          {
+            "advance": 564,
+            "bounds": [
+              1401,
+              -546,
+              1859,
+              10
+            ]
+          },
+          {
+            "advance": 403,
+            "bounds": [
+              1995,
+              -546,
+              2308,
+              0
+            ]
+          },
+          {
+            "advance": 615,
+            "bounds": [
+              2368,
+              -546,
+              2843,
+              240
+            ]
+          },
+          {
+            "advance": 393,
+            "bounds": [
+              3013,
+              -546,
+              3326,
+              0
+            ]
+          },
+          {
+            "advance": 605,
+            "bounds": [
+              3376,
+              -730,
+              3872,
+              10
+            ]
+          },
+          {
+            "advance": 631,
+            "bounds": [
+              4011,
+              -765,
+              4512,
+              10
+            ]
+          },
+          {
+            "advance": 564,
+            "bounds": [
+              4612,
+              -546,
+              5070,
+              10
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "umlaut-10-NFC",
+      "text": "ÄÖÜ äöü",
+      "group": "umlaut",
+      "direction": "ltr",
+      "locale": "de",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "umlaut-10-NFC",
+        "advance": 4175,
+        "glyphs": [
+          {
+            "advance": 619,
+            "bounds": [
+              0,
+              -908,
+              638,
+              0
+            ]
+          },
+          {
+            "advance": 781,
+            "bounds": [
+              680,
+              -908,
+              1339,
+              10
+            ]
+          },
+          {
+            "advance": 731,
+            "bounds": [
+              1490,
+              -908,
+              2040,
+              10
+            ]
+          },
+          {
+            "advance": 260,
+            "bounds": null
+          },
+          {
+            "advance": 561,
+            "bounds": [
+              2437,
+              -730,
+              2871,
+              10
+            ]
+          },
+          {
+            "advance": 605,
+            "bounds": [
+              3007,
+              -730,
+              3503,
+              10
+            ]
+          },
+          {
+            "advance": 618,
+            "bounds": [
+              3636,
+              -730,
+              4090,
+              10
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 4175,
+        "glyphs": [
+          {
+            "advance": 619,
+            "bounds": [
+              0,
+              -908,
+              638,
+              0
+            ]
+          },
+          {
+            "advance": 781,
+            "bounds": [
+              680,
+              -908,
+              1339,
+              10
+            ]
+          },
+          {
+            "advance": 731,
+            "bounds": [
+              1490,
+              -908,
+              2040,
+              10
+            ]
+          },
+          {
+            "advance": 260,
+            "bounds": null
+          },
+          {
+            "advance": 561,
+            "bounds": [
+              2437,
+              -730,
+              2871,
+              10
+            ]
+          },
+          {
+            "advance": 605,
+            "bounds": [
+              3007,
+              -730,
+              3503,
+              10
+            ]
+          },
+          {
+            "advance": 618,
+            "bounds": [
+              3636,
+              -730,
+              4090,
+              10
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "umlaut-10-NFD",
+      "text": "ÄÖÜ äöü",
+      "group": "umlaut",
+      "direction": "ltr",
+      "locale": "de",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "umlaut-10-NFD",
+        "advance": 4175,
+        "glyphs": [
+          {
+            "advance": 619,
+            "bounds": [
+              0,
+              -908,
+              638,
+              0
+            ]
+          },
+          {
+            "advance": 781,
+            "bounds": [
+              680,
+              -908,
+              1339,
+              10
+            ]
+          },
+          {
+            "advance": 731,
+            "bounds": [
+              1490,
+              -908,
+              2040,
+              10
+            ]
+          },
+          {
+            "advance": 260,
+            "bounds": null
+          },
+          {
+            "advance": 561,
+            "bounds": [
+              2437,
+              -730,
+              2871,
+              10
+            ]
+          },
+          {
+            "advance": 605,
+            "bounds": [
+              3007,
+              -730,
+              3503,
+              10
+            ]
+          },
+          {
+            "advance": 618,
+            "bounds": [
+              3636,
+              -730,
+              4090,
+              10
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 4175,
+        "glyphs": [
+          {
+            "advance": 619,
+            "bounds": [
+              0,
+              -908,
+              638,
+              0
+            ]
+          },
+          {
+            "advance": 781,
+            "bounds": [
+              680,
+              -908,
+              1339,
+              10
+            ]
+          },
+          {
+            "advance": 731,
+            "bounds": [
+              1490,
+              -908,
+              2040,
+              10
+            ]
+          },
+          {
+            "advance": 260,
+            "bounds": null
+          },
+          {
+            "advance": 561,
+            "bounds": [
+              2437,
+              -730,
+              2871,
+              10
+            ]
+          },
+          {
+            "advance": 605,
+            "bounds": [
+              3007,
+              -730,
+              3503,
+              10
+            ]
+          },
+          {
+            "advance": 618,
+            "bounds": [
+              3636,
+              -730,
+              4090,
+              10
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "umlaut-11-NFC",
+      "text": "fünf",
+      "group": "umlaut",
+      "direction": "ltr",
+      "locale": "de",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "umlaut-11-NFC",
+        "advance": 1924,
+        "glyphs": [
+          {
+            "advance": 344,
+            "bounds": [
+              15,
+              -765,
+              387,
+              0
+            ]
+          },
+          {
+            "advance": 618,
+            "bounds": [
+              423,
+              -730,
+              877,
+              10
+            ]
+          },
+          {
+            "advance": 618,
+            "bounds": [
+              1047,
+              -546,
+              1499,
+              0
+            ]
+          },
+          {
+            "advance": 344,
+            "bounds": [
+              1595,
+              -765,
+              1967,
+              0
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 1924,
+        "glyphs": [
+          {
+            "advance": 344,
+            "bounds": [
+              15,
+              -765,
+              387,
+              0
+            ]
+          },
+          {
+            "advance": 618,
+            "bounds": [
+              423,
+              -730,
+              877,
+              10
+            ]
+          },
+          {
+            "advance": 618,
+            "bounds": [
+              1047,
+              -546,
+              1499,
+              0
+            ]
+          },
+          {
+            "advance": 344,
+            "bounds": [
+              1595,
+              -765,
+              1967,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "umlaut-11-NFD",
+      "text": "fünf",
+      "group": "umlaut",
+      "direction": "ltr",
+      "locale": "de",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "umlaut-11-NFD",
+        "advance": 1924,
+        "glyphs": [
+          {
+            "advance": 344,
+            "bounds": [
+              15,
+              -765,
+              387,
+              0
+            ]
+          },
+          {
+            "advance": 618,
+            "bounds": [
+              423,
+              -730,
+              877,
+              10
+            ]
+          },
+          {
+            "advance": 618,
+            "bounds": [
+              1047,
+              -546,
+              1499,
+              0
+            ]
+          },
+          {
+            "advance": 344,
+            "bounds": [
+              1595,
+              -765,
+              1967,
+              0
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 1924,
+        "glyphs": [
+          {
+            "advance": 344,
+            "bounds": [
+              15,
+              -765,
+              387,
+              0
+            ]
+          },
+          {
+            "advance": 618,
+            "bounds": [
+              423,
+              -730,
+              877,
+              10
+            ]
+          },
+          {
+            "advance": 618,
+            "bounds": [
+              1047,
+              -546,
+              1499,
+              0
+            ]
+          },
+          {
+            "advance": 344,
+            "bounds": [
+              1595,
+              -765,
+              1967,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "umlaut-12-NFC",
+      "text": "flüchtig",
+      "group": "umlaut",
+      "direction": "ltr",
+      "locale": "de",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "umlaut-12-NFC",
+        "advance": 3552,
+        "glyphs": [
+          {
+            "advance": 602,
+            "bounds": [
+              15,
+              -765,
+              517,
+              0
+            ]
+          },
+          {
+            "advance": 618,
+            "bounds": [
+              681,
+              -730,
+              1135,
+              10
+            ]
+          },
+          {
+            "advance": 480,
+            "bounds": [
+              1275,
+              -546,
+              1667,
+              10
+            ]
+          },
+          {
+            "advance": 618,
+            "bounds": [
+              1785,
+              -760,
+              2237,
+              0
+            ]
+          },
+          {
+            "advance": 361,
+            "bounds": [
+              2334,
+              -659,
+              2657,
+              10
+            ]
+          },
+          {
+            "advance": 258,
+            "bounds": [
+              2757,
+              -737,
+              2860,
+              0
+            ]
+          },
+          {
+            "advance": 615,
+            "bounds": [
+              2992,
+              -546,
+              3467,
+              240
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 3552,
+        "glyphs": [
+          {
+            "advance": 602,
+            "bounds": [
+              15,
+              -765,
+              517,
+              0
+            ]
+          },
+          {
+            "advance": 618,
+            "bounds": [
+              681,
+              -730,
+              1135,
+              10
+            ]
+          },
+          {
+            "advance": 480,
+            "bounds": [
+              1275,
+              -546,
+              1667,
+              10
+            ]
+          },
+          {
+            "advance": 618,
+            "bounds": [
+              1785,
+              -760,
+              2237,
+              0
+            ]
+          },
+          {
+            "advance": 361,
+            "bounds": [
+              2334,
+              -659,
+              2657,
+              10
+            ]
+          },
+          {
+            "advance": 258,
+            "bounds": [
+              2757,
+              -737,
+              2860,
+              0
+            ]
+          },
+          {
+            "advance": 615,
+            "bounds": [
+              2992,
+              -546,
+              3467,
+              240
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "umlaut-12-NFD",
+      "text": "flüchtig",
+      "group": "umlaut",
+      "direction": "ltr",
+      "locale": "de",
+      "matches": true,
+      "ink_union_matches": true,
+      "actual": {
+        "id": "umlaut-12-NFD",
+        "advance": 3552,
+        "glyphs": [
+          {
+            "advance": 602,
+            "bounds": [
+              15,
+              -765,
+              517,
+              0
+            ]
+          },
+          {
+            "advance": 618,
+            "bounds": [
+              681,
+              -730,
+              1135,
+              10
+            ]
+          },
+          {
+            "advance": 480,
+            "bounds": [
+              1275,
+              -546,
+              1667,
+              10
+            ]
+          },
+          {
+            "advance": 618,
+            "bounds": [
+              1785,
+              -760,
+              2237,
+              0
+            ]
+          },
+          {
+            "advance": 361,
+            "bounds": [
+              2334,
+              -659,
+              2657,
+              10
+            ]
+          },
+          {
+            "advance": 258,
+            "bounds": [
+              2757,
+              -737,
+              2860,
+              0
+            ]
+          },
+          {
+            "advance": 615,
+            "bounds": [
+              2992,
+              -546,
+              3467,
+              240
+            ]
+          }
+        ]
+      },
+      "harfbuzz": {
+        "advance": 3552,
+        "glyphs": [
+          {
+            "advance": 602,
+            "bounds": [
+              15,
+              -765,
+              517,
+              0
+            ]
+          },
+          {
+            "advance": 618,
+            "bounds": [
+              681,
+              -730,
+              1135,
+              10
+            ]
+          },
+          {
+            "advance": 480,
+            "bounds": [
+              1275,
+              -546,
+              1667,
+              10
+            ]
+          },
+          {
+            "advance": 618,
+            "bounds": [
+              1785,
+              -760,
+              2237,
+              0
+            ]
+          },
+          {
+            "advance": 361,
+            "bounds": [
+              2334,
+              -659,
+              2657,
+              10
+            ]
+          },
+          {
+            "advance": 258,
+            "bounds": [
+              2757,
+              -737,
+              2860,
+              0
+            ]
+          },
+          {
+            "advance": 615,
+            "bounds": [
+              2992,
+              -546,
+              3467,
+              240
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
