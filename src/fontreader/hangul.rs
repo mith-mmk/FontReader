@@ -96,6 +96,11 @@ impl Font {
             )
     }
 
+    pub(super) fn is_toned_old_hangul_text(text: &str) -> bool {
+        text.strip_suffix(['\u{302e}', '\u{302f}'])
+            .is_some_and(Self::is_old_hangul_text)
+    }
+
     pub(super) fn try_old_hangul_run(
         &self,
         glyphs: &[ResolvedGlyph],
@@ -106,6 +111,7 @@ impl Font {
             return None;
         }
         let mut masks = Vec::with_capacity(glyphs.len());
+        let mut ordered = Vec::with_capacity(glyphs.len());
         let mut start = 0;
         let mut old = false;
         while start < glyphs.len() {
@@ -116,10 +122,43 @@ impl Font {
                     .take_while(|g| g.simple_mkmk_cluster == Some(cluster))
                     .count();
             let group = &glyphs[start..end];
-            if !Self::is_old_hangul_text(&group.iter().map(|g| g.ch).collect::<String>()) {
+            let (jamo, tone) = match group.last() {
+                Some(g) if matches!(g.ch, '\u{302e}' | '\u{302f}') => {
+                    (&group[..group.len() - 1], Some(g))
+                }
+                _ => (group, None),
+            };
+            if !Self::is_old_hangul_text(&jamo.iter().map(|g| g.ch).collect::<String>()) {
                 return None;
             }
-            for (offset, g) in group.iter().enumerate() {
+            let spacing_tone = tone
+                .is_some_and(|g| self.get_h_metrix_with_coords(g.glyph_id, &[]).advance_width != 0);
+            if let Some(g) = tone {
+                // The source interval is kept even when its visual order changes.
+                // Variation-dependent advances need the active coordinates,
+                // which this bounded shaping stage does not receive.
+                let has_hvar = if self.current_font == 0 {
+                    self.hvar.is_some()
+                } else {
+                    self.more_fonts[self.current_font - 1].hvar.is_some()
+                };
+                if has_hvar
+                    || self.current_fvar().is_some()
+                    || self.current_gvar().is_some()
+                    || g.ch != g.shaping_ch
+                    || g.source_end != g.source_start + 1
+                    || g.source_start != jamo.last()?.source_end
+                    || g.ligature_components != 1
+                    || !self.composition_glyph_is_renderable(g.glyph_id)
+                {
+                    return None;
+                }
+                if spacing_tone {
+                    ordered.push(*g);
+                    masks.push(8);
+                }
+            }
+            for (offset, g) in jamo.iter().enumerate() {
                 let mask = jamo_mask(g.ch)?;
                 if mask != [1, 2, 4][offset]
                     || g.ch != g.shaping_ch
@@ -134,13 +173,20 @@ impl Font {
                 }
                 old |= !matches!(g.ch as u32, 0x1100..=0x1112 | 0x1161..=0x1175 | 0x11a8..=0x11c2);
                 masks.push(mask);
+                ordered.push(*g);
+            }
+            if let Some(g) = tone {
+                if !spacing_tone {
+                    ordered.push(*g);
+                    masks.push(8);
+                }
             }
             start = end;
         }
         if !old {
             return None;
         }
-        let input: Vec<_> = glyphs
+        let input: Vec<_> = ordered
             .iter()
             .enumerate()
             .map(
@@ -156,7 +202,7 @@ impl Font {
         let shaped =
             self.current_gsub()?
                 .bounded_hangul(&input, &masks, locale, orientation_tag)?;
-        let mut result = glyphs.to_vec();
+        let mut result = ordered;
         for (i, (out, g)) in result.iter_mut().zip(shaped).enumerate() {
             if g.source_index != i
                 || g.ligature_components != 1
