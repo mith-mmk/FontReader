@@ -212,6 +212,13 @@ impl CaretLayout {
             ));
         }
         let value = if self.vertical { y as f64 } else { x as f64 };
+        // Clamp before subtracting: an extreme finite input can otherwise round
+        // every distance to the same f64 value and incorrectly select byte zero.
+        let first = self.stops[0];
+        let last = self.stops[self.stops.len() - 1];
+        let a = if self.vertical { first.y } else { first.x } as f64;
+        let b = if self.vertical { last.y } else { last.x } as f64;
+        let value = value.clamp(a.min(b), a.max(b));
         let mut best = self.stops[0];
         let mut distance = f64::INFINITY;
         for &stop in &self.stops {
@@ -270,6 +277,37 @@ mod tests {
         );
         assert!(layout.hit_test(f32::NAN, 0.0).is_err());
     }
+    #[test]
+    fn extreme_finite_points_clamp_before_distance_comparison() {
+        let file = FontFile::from_buffer(FONT).unwrap();
+        let face = file.face(1).unwrap();
+        for engine in [
+            face.engine(),
+            face.engine().with_right_to_left(),
+            face.engine().with_vertical_flow(),
+        ] {
+            let shaped = engine.shape_mapped("BB").unwrap();
+            let layout = CaretLayout::new(&shaped).unwrap();
+            let (x, y) = match shaped.direction() {
+                TextDirection::LeftToRight => (f32::MAX, 0.0),
+                TextDirection::RightToLeft => (-f32::MAX, 0.0),
+                TextDirection::TopToBottom => (0.0, f32::MAX),
+            };
+            assert_eq!(
+                layout.hit_test(x, y).unwrap().text_position().byte_offset(),
+                2
+            );
+            assert_eq!(
+                layout
+                    .hit_test(-x, -y)
+                    .unwrap()
+                    .text_position()
+                    .byte_offset(),
+                0
+            );
+        }
+    }
+
     #[test]
     fn empty_and_unsupported_controls() {
         let file = FontFile::from_buffer(FONT).unwrap();
