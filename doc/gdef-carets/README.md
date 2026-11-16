@@ -100,8 +100,9 @@ GDEF failures:
   variants and HB actual draw callbacks isolate the `xMin - LSB` drawable-origin
   difference. GDEF coordinates remain unchanged.
 
-These reports preserve the comparison exclusions and propose narrow follow-up
-scope separately. They do not change production shaping or rendering code.
+These residual reports preserve the comparison exclusions and propose narrow
+follow-up scope separately. The later [bounded static bearing correction](bearing-fix-realfonts.md)
+records before/after real-font evidence without claiming wider renderer parity.
 
 ## Coordinate convention
 

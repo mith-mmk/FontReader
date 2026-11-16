@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Correct the drawable metric origin of static, simple, monochrome TrueType outlines by applying `LSB - xMin` once to the path layer. Raw outline coordinates, advances, GPOS placement and Format 1 GDEF carets remain unchanged. Composite, rendered COLR and variable outline paths are deliberately excluded pending separate origin audits. This changes positioned ink bounds for affected valid fonts, not their text advances.
+
 - Prefer validated static GDEF Format 1 and Format 3 (without adjustments) ligature carets in mapped single-run, hard-line, BiDi and mixed-vertical geometry. Preserve authored candidates through family/composite shaping.
 - Add `CaretSource` and `source()` getters. Existing exhaustive `CaretQuality` stays unchanged: internal positions retain its conservative `Approximate` value, including font-authored positions. Use the new source getter to distinguish them.
 - Correct signed Format 3 coordinates and bound ligature-caret parsing; preserve Coverage index order independently of physical table order. The private Format 3 parser now stores a signed coordinate instead of the incorrectly named unsigned point field.

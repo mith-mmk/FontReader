@@ -73,7 +73,26 @@ fn vertical_orientation_also_substitutes_tone_and_retains_authored_positioning()
 #[test]
 #[cfg(feature = "layout")]
 fn variable_face_keeps_toned_run_legacy() {
-    same(run(5, &format!("{OLD}〮")), run(0, &format!("{OLD}〮")));
+    let mut expected = run(0, &format!("{OLD}〮"));
+    // The static control now draws relative to hmtx's metric origin. Variable
+    // phantom/HVAR origins are deliberately outside that correction, so retain
+    // the known raw-origin geometry of this fixture while comparing every
+    // other glyph field, advance and ordering with the legacy fallback control.
+    assert_eq!(expected.glyphs.len(), 4);
+    for (glyph, xmin) in expected.glyphs.iter_mut().zip([10.0, 20.0, 30.0, 100.0]) {
+        for layer in &mut glyph.glyph.layers {
+            let fontcore::GlyphLayer::Path(path) = layer else {
+                panic!("expected simple path")
+            };
+            assert_eq!(path.offset_x, -xmin);
+            path.offset_x = 0.0;
+        }
+        let bounds = glyph.glyph.metrics.bounds.as_mut().unwrap();
+        assert_eq!(bounds.min_x, 0.0);
+        bounds.min_x += xmin;
+        bounds.max_x += xmin;
+    }
+    same(run(5, &format!("{OLD}〮")), expected);
 }
 #[test]
 #[cfg(feature = "layout")]

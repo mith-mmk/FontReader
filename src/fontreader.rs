@@ -3263,6 +3263,41 @@ impl Font {
         ))
     }
 
+    /// Convert a static simple glyf outline from stored design coordinates to
+    /// the hmtx metric origin. Raw outline APIs deliberately keep their original
+    /// coordinate convention. Composite USE_MY_METRICS, COLR layer origins and
+    /// variable phantom/HVAR origins require separate audits and are not shifted.
+    fn static_simple_metric_origin_x(&self, glyph_id: usize, raw: &glyf::Glyph) -> f32 {
+        if self.current_fvar().is_some() || self.current_gvar().is_some() {
+            return 0.0;
+        }
+        let hvar = if self.current_font == 0 {
+            self.hvar.as_ref()
+        } else {
+            self.more_fonts[self.current_font - 1].hvar.as_ref()
+        };
+        if hvar.is_some() {
+            return 0.0;
+        }
+        let Some(header) = raw.glyphs.get(..10) else {
+            return 0.0;
+        };
+        let contours = i16::from_be_bytes([header[0], header[1]]);
+        if contours <= 0 {
+            return 0.0;
+        }
+        let x_min = i16::from_be_bytes([header[2], header[3]]);
+        let hmtx = if self.current_font == 0 {
+            self.hmtx.as_ref()
+        } else {
+            self.more_fonts[self.current_font - 1].hmtx.as_ref()
+        };
+        let Some(hmtx) = hmtx else {
+            return 0.0;
+        };
+        (hmtx.get_metrix(glyph_id).left_side_bearing as f32) - x_min as f32
+    }
+
     fn build_outline_layers(
         &self,
         glyph_id: usize,
@@ -3297,17 +3332,16 @@ impl Font {
         }
 
         match &open_type_glyph.glyph {
-            FontData::Glyph(_) => {
+            FontData::Glyph(raw) => {
                 let glyf = self
                     .current_glyf()
                     .ok_or_else(|| Error::other("glyf is none"))?;
                 let commands = glyf.to_path_commands(glyph_id, &open_type_glyph.layout, 0.0, 0.0);
                 let commands =
                     transform_glyf_commands(&commands, &open_type_glyph.layout, scale_x, scale_y);
-                Ok(vec![GlyphLayer::Path(PathGlyphLayer::new(
-                    commands,
-                    GlyphPaint::CurrentColor,
-                ))])
+                let mut layer = PathGlyphLayer::new(commands, GlyphPaint::CurrentColor);
+                layer.offset_x = self.static_simple_metric_origin_x(glyph_id, raw) * scale_x;
+                Ok(vec![GlyphLayer::Path(layer)])
             }
             FontData::ParsedGlyph(parsed) => {
                 let commands =
@@ -5875,6 +5909,158 @@ mod authored_caret_plumbing_tests {
                 .text2glyph_run_with_carets("fifl", &options)
                 .unwrap();
             assert_eq!(out.ligature_carets, vec![None, None], "face {index}");
+        }
+    }
+}
+
+#[cfg(test)]
+mod static_simple_drawing_origin_tests {
+    use super::*;
+    #[cfg(feature = "layout")]
+    use crate::FontOptions;
+    use crate::{FontFace, FontFile};
+    const FONT: &[u8] = include_bytes!("../tests/fixtures/gdef-carets.ttc");
+    fn close(a: f32, b: f32) {
+        assert!((a - b).abs() < 0.001, "{a} != {b}");
+    }
+    #[test]
+    fn static_simple_draws_from_hmtx_origin_without_changing_raw_outline() {
+        let file = FontFile::from_buffer(FONT).unwrap();
+        let base = file.face(0).unwrap();
+        let glyph_id = 5; // B: raw xMin=20, xMax=400.
+        let raw = base.font().current_glyf().unwrap().to_path_commands(
+            glyph_id,
+            &FontLayout::Horizontal(base.font().get_horizontal_layout(glyph_id)),
+            0.0,
+            0.0,
+        );
+        for lsb in [-40, 0, 20] {
+            let mut font = base.font().clone();
+            font.hmtx.as_mut().unwrap().h_metrics[glyph_id].left_side_bearing = lsb;
+            let raw_after = font.current_glyf().unwrap().to_path_commands(
+                glyph_id,
+                &FontLayout::Horizontal(font.get_horizontal_layout(glyph_id)),
+                0.0,
+                0.0,
+            );
+            assert_eq!(format!("{raw:?}"), format!("{raw_after:?}"));
+            let face = FontFace::from_font(font);
+            let engine = face.engine().with_font_size(1000.0);
+            let run = engine.shape("B").unwrap();
+            let glyph = &run.glyphs[0];
+            let bounds = glyph.glyph.metrics.bounds.unwrap();
+            close(bounds.min_x, lsb as f32);
+            close(bounds.max_x, lsb as f32 + 380.0);
+            close(glyph.x, 0.0);
+            close(glyph.glyph.metrics.advance_x, 600.0);
+            close(glyph.glyph.metrics.bearing_x, lsb as f32);
+            let vertical = engine.clone().with_vertical_flow().shape("B").unwrap();
+            let bounds = vertical.glyphs[0].glyph.metrics.bounds.unwrap();
+            close(bounds.min_x, lsb as f32 - 300.0);
+            close(bounds.max_x, lsb as f32 + 80.0);
+            close(vertical.glyphs[0].x, 0.0);
+            close(vertical.glyphs[0].glyph.metrics.advance_y, 1000.0);
+            let sideways = engine.shape_sideways_ltr("B").unwrap();
+            let bounds = sideways.glyphs[0].glyph.metrics.bounds.unwrap();
+            close(bounds.min_y, lsb as f32);
+            close(bounds.max_y, lsb as f32 + 380.0);
+        }
+    }
+    #[cfg(feature = "layout")]
+    #[test]
+    fn format_one_caret_is_not_translated_with_ink() {
+        let file = FontFile::from_buffer(FONT).unwrap();
+        let base = file.face(0).unwrap();
+        for lsb in [-40, 0, 20] {
+            let mut font = base.font().clone();
+            font.hmtx.as_mut().unwrap().h_metrics[6].left_side_bearing = lsb;
+            let face = FontFace::from_font(font);
+            let options = FontOptions::new(&face).with_font_size(1000.0);
+            let out = face
+                .font()
+                .text2glyph_run_with_carets("fi", &options)
+                .unwrap();
+            close(
+                out.run.glyphs[0].glyph.metrics.bounds.unwrap().min_x,
+                lsb as f32,
+            );
+            assert_eq!(out.ligature_carets, vec![Some(vec![220.0])]);
+        }
+    }
+    #[cfg(feature = "layout")]
+    #[test]
+    fn scaled_stretched_gpos_placement_keeps_format_one_caret_independent_of_ink() {
+        let file = FontFile::from_buffer(FONT).unwrap();
+        let base = file.face(6).unwrap(); // fi has SinglePos (+50,+70).
+        for lsb in [0, -40] {
+            let mut font = base.font().clone();
+            let hmtx = if font.current_font == 0 {
+                font.hmtx.as_mut()
+            } else {
+                font.more_fonts[font.current_font - 1].hmtx.as_mut()
+            }
+            .unwrap();
+            hmtx.h_metrics[6].left_side_bearing = lsb;
+            let face = FontFace::from_font(font);
+            let options = FontOptions::new(&face)
+                .with_font_size(20.0)
+                .with_font_stretch(crate::FontStretch(1.5));
+            let out = face
+                .font()
+                .text2glyph_run_with_carets("fi", &options)
+                .unwrap();
+            let glyph = &out.run.glyphs[0];
+            let bounds = glyph.glyph.metrics.bounds.unwrap();
+            close(glyph.x, 1.5);
+            close(glyph.y, -1.4);
+            close(bounds.min_x + glyph.x, lsb as f32 * 0.03 + 1.5);
+            close(bounds.max_x + glyph.x, (lsb as f32 + 280.0) * 0.03 + 1.5);
+            close(bounds.min_y + glyph.y, -11.4);
+            close(bounds.max_y + glyph.y, -1.4);
+            close(glyph.glyph.metrics.advance_x, 27.0);
+            close(out.ligature_carets[0].as_ref().unwrap()[0], 8.1);
+        }
+    }
+
+    #[test]
+    fn composite_colr_and_variable_paths_are_not_shifted_by_simple_policy() {
+        let file =
+            FontFile::from_buffer(include_bytes!("../tests/fixtures/composite-gvar.ttc")).unwrap();
+        let face = file.face(0).unwrap();
+        let mut font = face.font().clone();
+        font.fvar = None;
+        font.gvar = None;
+        font.hvar = None; // static composite control
+        let gid = font.resolve_glyph_id_with_uvs('B', '\0', false).unwrap();
+        font.hmtx.as_mut().unwrap().h_metrics[gid].left_side_bearing = -123;
+        let raw = font.current_glyf().unwrap().get_glyph(gid).unwrap();
+        assert!(i16::from_be_bytes([raw.glyphs[0], raw.glyphs[1]]) < 0);
+        assert_eq!(font.static_simple_metric_origin_x(gid, raw), 0.0);
+        let face = FontFace::from_font(font);
+        let run = face.engine().shape("B").unwrap();
+        for layer in &run.glyphs[0].glyph.layers {
+            if let GlyphLayer::Path(path) = layer {
+                assert_eq!(path.offset_x, 0.0);
+            }
+        }
+        let variable = FontFile::from_buffer(FONT).unwrap().face(4).unwrap();
+        let run = variable.engine().shape("B").unwrap();
+        for layer in &run.glyphs[0].glyph.layers {
+            if let GlyphLayer::Path(path) = layer {
+                assert_eq!(path.offset_x, 0.0);
+            }
+        }
+        let colr =
+            FontFile::from_buffer(include_bytes!("../tests/fixtures/colr-vertical-origin.ttc"))
+                .unwrap()
+                .face(0)
+                .unwrap();
+        let run = colr.engine().shape("\u{3001}").unwrap();
+        assert!(run.glyphs[0].glyph.layers.len() > 1);
+        for layer in &run.glyphs[0].glyph.layers {
+            if let GlyphLayer::Path(path) = layer {
+                assert_eq!(path.offset_x, 0.0);
+            }
         }
     }
 }
