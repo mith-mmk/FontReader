@@ -99,3 +99,12 @@ identity one-input, later Single lookup, Single, Alternate, legacy Multiple,
 empty Multiple, and valid sequence liga following rejected scalar locl.
 The same lookups exercise locl and isol/init/medi/fina. Distinct outlines and
 advances detect accidental substitution. Timestamps are fixed.
+
+## Bounded Old Hangul
+`bounded-hangul.ttc` and `generate_bounded_hangul.py` are original MIT fixtures
+(fontTools 4.68.0), no third-party font input, fixed timestamps.
+19 faces: nominal, single-input contextual, shared-mask union, wrong script,
+wrong category, multi-input context, early ccmp contraction, Extension Single,
+nested flags, expansion, missing output, required feature, unsupported rvrn,
+candidate-only coverage, bad lookup index, late ccmp no-match, alternate KOR
+LangSys, top-level flags, nested context reentry. See tests/bounded_hangul.rs.

@@ -240,3 +240,53 @@ fn noncomposed_runs_cannot_enter_hangul_coverage_or_rollback_checks() {
         );
     }
 }
+
+#[test]
+fn old_hangul_preserves_source_intervals_and_disables_unproven_mark_ownership() {
+    let mut font =
+        Font::get_font_from_buffer(include_bytes!("../../tests/fixtures/bounded-hangul.ttc"))
+            .unwrap();
+    font.set_font(1).unwrap();
+    let text = "\u{1100}\u{1161}\u{11eb}\u{a960}\u{d7b0}\u{d7cb}";
+    let units = font
+        .shape_text_units(text, false, false, None, FontVariant::Normal)
+        .unwrap();
+    assert_eq!(units.len(), 6);
+    for (i, unit) in units.iter().enumerate() {
+        let ResolvedTextUnit::Glyph(g) = unit else {
+            panic!()
+        };
+        assert_eq!((g.source_start, g.source_end), (i, i + 1));
+        assert_eq!(g.ch, text.chars().nth(i).unwrap());
+        assert_eq!(g.ligature_components, 1);
+        assert_eq!(g.simple_mkmk_cluster, None);
+    }
+}
+#[test]
+fn bounded_hangul_budget_and_length_fail_without_mutating_input() {
+    use crate::opentype::extentions::gsub::GsubGlyph;
+    let mut font =
+        Font::get_font_from_buffer(include_bytes!("../../tests/fixtures/bounded-hangul.ttc"))
+            .unwrap();
+    font.set_font(1).unwrap();
+    let mut gsub = font.current_gsub().unwrap().clone();
+    let single = gsub.lookups.lookups[0].clone();
+    gsub.lookups.lookups = vec![single; 100];
+    for f in &mut gsub.features.features {
+        f.lookup_list_indices = (0..100).collect();
+    }
+    let glyph = GsubGlyph {
+        glyph_id: 1,
+        source_index: 0,
+        substituted: false,
+        mkmk_source_ambiguous: false,
+        ligature_components: 1,
+    };
+    let input = vec![glyph; 256];
+    let original = input.clone();
+    assert!(gsub.bounded_hangul(&input, &vec![1; 256], None).is_none());
+    assert_eq!(input, original);
+    assert!(gsub
+        .bounded_hangul(&vec![glyph; 257], &vec![1; 257], None)
+        .is_none());
+}

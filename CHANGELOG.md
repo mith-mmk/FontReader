@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- Add a bounded horizontal LTR Old Hangul Jamo candidate with explicit script selection and source-category masks. Unsupported contexts fall back transactionally; this is not complete Korean shaping. See [scope and verification](doc/bounded-old-hangul.md).
+
 - Reject multi-input ligatures in scalar localized and Arabic joining substitutions, including ExtensionSubstitution. Preserve valid one-input substitutions and ownership flags; this does not add Indic shaping. See [scope and regression evidence](doc/scalar-localized-substitution.md).
 
 ## 0.0.18 - 2026-11-15

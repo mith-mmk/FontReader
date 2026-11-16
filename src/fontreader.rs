@@ -1551,6 +1551,8 @@ impl Font {
         );
     }
 
+    // Keep the legacy-probe switch explicit rather than encoding it in source metadata.
+    #[allow(clippy::too_many_arguments)]
     fn flush_shaped_glyphs(
         &self,
         output: &mut Vec<ResolvedTextUnit>,
@@ -1559,9 +1561,16 @@ impl Font {
         is_right_to_left: bool,
         font_variant: crate::commands::FontVariant,
         orientation: Option<TextRunMode>,
+        allow_old_hangul: bool,
     ) {
         #[cfg(not(feature = "layout"))]
-        let _ = (locale, is_right_to_left, font_variant, orientation);
+        let _ = (
+            locale,
+            is_right_to_left,
+            font_variant,
+            orientation,
+            allow_old_hangul,
+        );
 
         if glyphs.is_empty() {
             return;
@@ -1569,6 +1578,17 @@ impl Font {
 
         #[cfg(feature = "layout")]
         if self.current_gsub().is_some() {
+            if allow_old_hangul
+                && !is_right_to_left
+                && orientation.is_none()
+                && matches!(font_variant, crate::commands::FontVariant::Normal)
+            {
+                if let Some(candidate) = self.try_old_hangul_run(glyphs, locale) {
+                    output.extend(candidate.into_iter().map(ResolvedTextUnit::Glyph));
+                    glyphs.clear();
+                    return;
+                }
+            }
             let mut ccmp_glyphs = glyphs
                 .iter()
                 .enumerate()
@@ -1638,6 +1658,7 @@ impl Font {
                         is_right_to_left,
                         font_variant,
                         orientation,
+                        allow_old_hangul,
                     );
                     glyphs.clear();
                     return;
@@ -1722,7 +1743,7 @@ impl Font {
         font_variant: crate::commands::FontVariant,
         mode: TextRunMode,
     ) -> Result<Vec<ResolvedTextUnit>, Error> {
-        self.shape_text_units_mode_with_tibetan(
+        self.shape_text_units_mode_with_bounded_scripts(
             text,
             is_vert,
             is_right_to_left,
@@ -1734,7 +1755,7 @@ impl Font {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn shape_text_units_mode_with_tibetan(
+    fn shape_text_units_mode_with_bounded_scripts(
         &self,
         text: &str,
         is_vert: bool,
@@ -1742,7 +1763,7 @@ impl Font {
         locale: Option<&str>,
         font_variant: crate::commands::FontVariant,
         mode: TextRunMode,
-        _allow_tibetan: bool,
+        _allow_bounded_script_shaping: bool,
     ) -> Result<Vec<ResolvedTextUnit>, Error> {
         #[cfg(not(feature = "layout"))]
         let _ = (is_vert, locale, is_right_to_left, font_variant);
@@ -1765,6 +1786,7 @@ impl Font {
                         is_right_to_left,
                         font_variant,
                         orientation,
+                        _allow_bounded_script_shaping,
                     );
                     output.push(ResolvedTextUnit::Newline);
                 }
@@ -1776,6 +1798,7 @@ impl Font {
                         is_right_to_left,
                         font_variant,
                         orientation,
+                        _allow_bounded_script_shaping,
                     );
                     output.push(ResolvedTextUnit::Tab);
                 }
@@ -1801,7 +1824,7 @@ impl Font {
                     }
                     let tibetan_cluster = None;
                     #[cfg(feature = "layout")]
-                    let tibetan_cluster = (_allow_tibetan
+                    let tibetan_cluster = (_allow_bounded_script_shaping
                         && Self::is_tibetan_normalization_cluster(&text))
                     .then_some(_cluster_index)
                     .or(tibetan_cluster);
@@ -1850,6 +1873,7 @@ impl Font {
             is_right_to_left,
             font_variant,
             orientation,
+            _allow_bounded_script_shaping,
         );
         Ok(output)
     }
@@ -1905,15 +1929,16 @@ impl Font {
                 };
 
                 #[cfg(feature = "layout")]
-                if Self::is_tibetan_normalization_cluster(text)
-                    && self
-                        .current_gsub()
-                        .is_some_and(|gsub| gsub.has_tibetan_stack_features(locale))
+                if Self::is_old_hangul_text(text)
+                    || (Self::is_tibetan_normalization_cluster(text)
+                        && self
+                            .current_gsub()
+                            .is_some_and(|gsub| gsub.has_tibetan_stack_features(locale)))
                 {
                     // Family probing uses one grapheme, but later same-face
                     // grouping may add an unsupported neighbor and select the
                     // legacy path. Both outputs must have complete coverage.
-                    let Ok(legacy) = self.shape_text_units_mode_with_tibetan(
+                    let Ok(legacy) = self.shape_text_units_mode_with_bounded_scripts(
                         text,
                         is_vert,
                         is_right_to_left,

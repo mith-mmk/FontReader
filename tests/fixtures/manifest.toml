@@ -345,3 +345,10 @@ source = "tests/fixtures/generate_scalar_locl.py (fontTools 4.68.0)"
 license = "MIT (project test code)"
 sha256 = "e23bd2b1a1bb89148f2ef75166565ba8f7d60fac934ef0562bf6b162e873bcbb"
 features = ["locl", "arabic-joining", "single-input-ligature", "extension-substitution"]
+
+[[fixture]]
+id = "bounded-hangul.ttc"
+source = "tests/fixtures/generate_bounded_hangul.py (fontTools 4.68.0)"
+license = "MIT (project test code)"
+sha256 = "074fb97da0f9042154ec8baf6800b55b60221f8b6056c776c4101ac7911c4ad8"
+features = ["hangul", "gsub-masks", "context", "transactional-fallback", "family"]

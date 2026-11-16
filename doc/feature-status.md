@@ -116,6 +116,12 @@ Raw scalar APIs and layout-disabled shaping stay unchanged. The algorithm
 follows [Unicode 17 section 3.12](https://www.unicode.org/versions/Unicode17.0.0/core-spec/chapter-3/#G24646).
 See [tests and limitations](testing.md#bounded-modern-hangul-composition-0018).
 
+### Bounded Old Hangul Jamo
+
+A separate conservative horizontal LTR candidate supports exact archaic/extended
+L V [T] graphemes using masked jmo features. See [scope and limitations](bounded-old-hangul.md).
+This does not change the modern-composition scope above or provide general Korean shaping.
+
 ### Basic Tibetan vowel anchors
 
 With `layout`, a bounded GPOS fallback handles an adjacent, unligated Tibetan
@@ -390,7 +396,7 @@ raw glyph/SVG APIs are unchanged. TrueType ignores VORG as required by OpenType.
 - Pair positioning now skips GDEF mark glyphs when searching previous/next spacing glyphs for kerning
 - `GPOS mark-to-base` (Type 4 Format 1) is now parsed and used during shaping when a `mark` feature lookup is available
 - `GPOS mark-to-mark` (Type 6 Format 1) is now parsed and used during shaping when an `mkmk` feature lookup is available
-- When neither `GPOS mark-to-base` nor `mark-to-mark` anchors are available, shaping still falls back to the existing GDEF-based mark attachment heuristic
+- The historical GDEF-based mark attachment heuristic remains only for fonts without GPOS. With GPOS present, absent anchors retain cursor/authored placement rather than synthesizing that heuristic.
 - Attach / caret / mark-set data is still not fully integrated into higher-level layout
 
 ## Notes

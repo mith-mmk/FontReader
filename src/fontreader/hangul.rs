@@ -72,3 +72,101 @@ impl Font {
 #[cfg(test)]
 #[path = "hangul_tests.rs"]
 mod tests;
+
+#[cfg(feature = "layout")]
+fn jamo_mask(ch: char) -> Option<u8> {
+    match ch as u32 {
+        0x1100..=0x115e | 0xa960..=0xa97c => Some(1),
+        0x1161..=0x11a7 | 0xd7b0..=0xd7c6 => Some(2),
+        0x11a8..=0x11ff | 0xd7cb..=0xd7fb => Some(4),
+        _ => None,
+    }
+}
+
+#[cfg(feature = "layout")]
+impl Font {
+    pub(super) fn is_old_hangul_text(text: &str) -> bool {
+        let chars: Vec<_> = text.chars().collect();
+        matches!(chars.len(), 2 | 3)
+            && jamo_mask(chars[0]) == Some(1)
+            && jamo_mask(chars[1]) == Some(2)
+            && (chars.len() == 2 || jamo_mask(chars[2]) == Some(4))
+            && chars.iter().any(
+                |ch| !matches!(*ch as u32, 0x1100..=0x1112 | 0x1161..=0x1175 | 0x11a8..=0x11c2),
+            )
+    }
+
+    pub(super) fn try_old_hangul_run(
+        &self,
+        glyphs: &[ResolvedGlyph],
+        locale: Option<&str>,
+    ) -> Option<Vec<ResolvedGlyph>> {
+        if glyphs.is_empty() || glyphs.len() > 256 {
+            return None;
+        }
+        let mut masks = Vec::with_capacity(glyphs.len());
+        let mut start = 0;
+        let mut old = false;
+        while start < glyphs.len() {
+            let cluster = glyphs[start].simple_mkmk_cluster?;
+            let end = start
+                + glyphs[start..]
+                    .iter()
+                    .take_while(|g| g.simple_mkmk_cluster == Some(cluster))
+                    .count();
+            let group = &glyphs[start..end];
+            if !Self::is_old_hangul_text(&group.iter().map(|g| g.ch).collect::<String>()) {
+                return None;
+            }
+            for (offset, g) in group.iter().enumerate() {
+                let mask = jamo_mask(g.ch)?;
+                if mask != [1, 2, 4][offset]
+                    || g.ch != g.shaping_ch
+                    || g.source_end != g.source_start + 1
+                    || g.ligature_components != 1
+                    || !self.composition_glyph_is_renderable(g.glyph_id)
+                {
+                    return None;
+                }
+                if start + offset > 0 && glyphs[start + offset - 1].source_end != g.source_start {
+                    return None;
+                }
+                old |= !matches!(g.ch as u32, 0x1100..=0x1112 | 0x1161..=0x1175 | 0x11a8..=0x11c2);
+                masks.push(mask);
+            }
+            start = end;
+        }
+        if !old {
+            return None;
+        }
+        let input: Vec<_> = glyphs
+            .iter()
+            .enumerate()
+            .map(
+                |(source_index, g)| crate::opentype::extentions::gsub::GsubGlyph {
+                    glyph_id: g.glyph_id,
+                    source_index,
+                    substituted: false,
+                    mkmk_source_ambiguous: false,
+                    ligature_components: 1,
+                },
+            )
+            .collect();
+        let shaped = self
+            .current_gsub()?
+            .bounded_hangul(&input, &masks, locale)?;
+        let mut result = glyphs.to_vec();
+        for (i, (out, g)) in result.iter_mut().zip(shaped).enumerate() {
+            if g.source_index != i
+                || g.ligature_components != 1
+                || !self.composition_glyph_is_renderable(g.glyph_id)
+            {
+                return None;
+            }
+            out.glyph_id = g.glyph_id;
+            // One-to-one source ownership is proven, but mark-class preservation is not.
+            out.simple_mkmk_cluster = None;
+        }
+        Some(result)
+    }
+}
