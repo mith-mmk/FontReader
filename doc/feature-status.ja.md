@@ -1,5 +1,10 @@
 # 機能実装メモ
 
+## 0.0.19 の opt-in layout 追加
+
+新しい API は[元文字対応](mapped-shaping.md)、[明示改行](hard-line-layout.md)、[限定 BiDi／混在縦書き](bidi-and-mixed-vertical.md)を参照してください。以下の旧 shaping 経路の制約は、新経路が明示的に扱う範囲以外では維持されます。元範囲は保守的な grapheme envelope です。GDEF caret は未実装で、合字内部は近似です。上位 layout の family fallback・自動折返し・cross-run joining は未対応で、Unicode／全スクリプト完全対応ではありません。
+
+
 このファイルは、以前 `README.ja.md` に置いていた実装メモ寄りの内容を移したものです。
 README は公開APIと実行例を優先し、細かい対応状況はここにまとめます。
 
