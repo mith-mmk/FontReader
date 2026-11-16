@@ -8,6 +8,7 @@ impl Gsub {
         input: &[GsubGlyph],
         masks: &[u8],
         locale: Option<&str>,
+        orientation_tag: Option<[u8; 4]>,
     ) -> Option<Vec<GsubGlyph>> {
         if self.feature_variations.is_some() {
             return None;
@@ -41,8 +42,27 @@ impl Gsub {
         if system.language_system.required_feature_index != 0xffff {
             return None;
         }
+        // Preserve Standard's global vrt2 preference, but never borrow an
+        // orientation lookup from a different Script/LangSys. Missing selected
+        // orientation support keeps this complete run on the legacy path.
+        if let Some(tag) = orientation_tag {
+            if ![*b"vert", *b"vrt2"].contains(&tag)
+                || !system.language_system.feature_indexes.iter().any(|index| {
+                    self.features
+                        .features
+                        .get(*index as usize)
+                        .is_some_and(|feature| {
+                            feature.feature_tag.to_be_bytes() == tag
+                                && !feature.lookup_list_indices.is_empty()
+                        })
+                })
+            {
+                return None;
+            }
+        }
         let mut selected = vec![0u8; self.lookups.lookups.len()];
         let mut has_jmo = false;
+        let mut horizontal_only = vec![false; selected.len()];
         for fi in &system.language_system.feature_indexes {
             let feature = self.features.features.get(*fi as usize)?;
             if [
@@ -67,7 +87,8 @@ impl Gsub {
                     4
                 }
                 tag if [*b"locl", *b"ccmp", *b"rlig", *b"rclt", *b"clig", *b"liga"]
-                    .contains(&tag) =>
+                    .contains(&tag)
+                    || orientation_tag == Some(tag) =>
                 {
                     7
                 }
@@ -75,6 +96,11 @@ impl Gsub {
                 _ => continue,
             };
             for li in &feature.lookup_list_indices {
+                if orientation_tag.is_some()
+                    && [*b"liga", *b"clig", *b"rclt"].contains(&feature.feature_tag.to_be_bytes())
+                {
+                    *horizontal_only.get_mut(*li as usize)? = true;
+                }
                 *selected.get_mut(*li as usize)? |= mask;
             }
         }
@@ -83,8 +109,29 @@ impl Gsub {
         }
         let mut result = input.to_vec();
         let mut budget = 16384usize;
-        for (lookup, mask) in self.lookups.lookups.iter().zip(selected) {
+        for ((lookup, mask), horizontal_only) in self
+            .lookups
+            .lookups
+            .iter()
+            .zip(selected)
+            .zip(horizontal_only)
+        {
             if mask == 0 {
+                continue;
+            }
+            if horizontal_only {
+                // These are horizontal defaults in HarfBuzz. At this exact
+                // LookupList position prove no-match without modifying the
+                // candidate. Shared or unsupported applicable forms fall back.
+                let mut probe = result.clone();
+                for i in 0..probe.len() {
+                    if self
+                        .hangul_lookup(lookup, &mut probe, i, &mut budget, false)
+                        .ok()?
+                    {
+                        return None;
+                    }
+                }
                 continue;
             }
             for (i, source_mask) in masks.iter().enumerate() {

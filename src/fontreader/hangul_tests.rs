@@ -284,9 +284,40 @@ fn bounded_hangul_budget_and_length_fail_without_mutating_input() {
     };
     let input = vec![glyph; 256];
     let original = input.clone();
-    assert!(gsub.bounded_hangul(&input, &vec![1; 256], None).is_none());
+    assert!(gsub
+        .bounded_hangul(&input, &vec![1; 256], None, None)
+        .is_none());
     assert_eq!(input, original);
     assert!(gsub
-        .bounded_hangul(&vec![glyph; 257], &vec![1; 257], None)
+        .bounded_hangul(&vec![glyph; 257], &vec![1; 257], None, None)
         .is_none());
+}
+
+#[test]
+fn bounded_vertical_hangul_retains_source_spans_and_raw_mapping() {
+    let mut font = Font::get_font_from_buffer(include_bytes!(
+        "../../tests/fixtures/bounded-vertical-hangul.ttc"
+    ))
+    .unwrap();
+    font.set_font(2).unwrap();
+    let text = "\u{1100}\u{1161}\u{11eb}";
+    let units = font
+        .shape_text_units(text, true, false, None, FontVariant::Normal)
+        .unwrap();
+    let ids = [7, 5, 6];
+    for (i, unit) in units.iter().enumerate() {
+        let ResolvedTextUnit::Glyph(g) = unit else {
+            panic!()
+        };
+        assert_eq!(g.glyph_id, ids[i]);
+        assert_eq!((g.source_start, g.source_end), (i, i + 1));
+        assert_eq!(g.ch, text.chars().nth(i).unwrap());
+        assert_eq!(g.simple_mkmk_cluster, None);
+        assert_eq!(g.ligature_components, 1);
+    }
+    assert_eq!(
+        font.resolve_glyph_id_with_uvs('\u{1100}', '\0', true)
+            .unwrap(),
+        1
+    );
 }
