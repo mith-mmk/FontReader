@@ -43,6 +43,8 @@ pub mod fontengine;
 pub mod fontface;
 pub mod fontfile;
 pub mod limits;
+pub mod lines;
+pub use lines::{HardLine, HardLineLayout, LineCaretPosition};
 pub mod mapped;
 pub use mapped::{GlyphSource, ShapedText};
 #[cfg(feature = "svg-fonts")]
