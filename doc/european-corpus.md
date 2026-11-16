@@ -73,3 +73,40 @@ Six Python harness tests pass. Rust all-features: 557 passed / 1 ignored;
 no-default-features: 247 passed. Independent read-only review found no blocker;
 the spacing summary was corrected to include the 81-unit cases. These are local
 checks on Rust 1.100.0, not a claim of CI/MSRV completion.
+
+## Fallback and cursor responsibilities (follow-up)
+
+`FontFamily` (`src/fontface.rs`) owns family fallback and whole-cluster face
+selection. `CompositeFont` (`src/compositefont.rs`) owns explicitly ordered,
+rule-local fallback. A single-face `FontEngine` does not discover another font.
+The caller must provide the faces; this library does not discover system fonts
+or choose an operating-system fallback family.
+
+The public `GlyphRun`/`PositionedGlyph` types (`src/commands.rs`) expose glyphs,
+positions and metrics, but no source-cluster mapping, editor caret stops,
+hit-testing or ligature-internal caret API. The library owns the shaping pen
+position and following-glyph advances. Editor caret/navigation/selection policy
+belongs to the consumer and cannot be verified by treating glyph indices as
+Unicode indices. `measure(prefix)` is not a general caret solution: cutting a
+string can change ligatures, kerning and combining context. Internal source
+spans do not make a public caret mapping available.
+
+Five self-contained tests in `tests/european_fallback.rs` use an original MIT
+three-face fixture (generator/hash in the fixture manifest). They cover:
+
+- Whole-cluster family fallback for all six Umlauts in NFC/NFD and ß/ẞ.
+- An incomplete primary plus mark-only fallback must not split the base/mark
+  cluster across faces; the documented first-face missing-glyph path remains.
+- Composite primary → fallback → primary spans retain the following pen origin.
+- NFC/NFD repeated Umlauts preserve pen advances despite scalar-count changes.
+- A synthetic `fi` ligature uses its shaped advance for following glyphs, with
+  explicit layout-disabled control behavior.
+
+These are fontcore-owned contracts, not real-font fallback/GUI or consumer caret
+validation. No consumer repository or caret implementation was changed, no
+arbitrary liga/dlig switch was added, and no new production API is assumed.
+
+Follow-up validation: the five new tests pass with default and no-default
+features. The complete all-feature suite passes 562 tests (one ignored).
+Strict all-target/all-feature Clippy, formatting and fixture byte-identical
+regeneration pass on Rust 1.100.0. No PR/CI run is claimed for this branch.
