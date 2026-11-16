@@ -197,6 +197,23 @@ impl<'a> FontEngine<'a> {
         self.text2glyph_run(text)
     }
 
+    /// Shapes with original UTF-8 source ownership, without changing the legacy run.
+    /// This uses one selected face and an explicit direction, not paragraph BiDi.
+    pub fn shape_mapped(&self, text: &str) -> Result<crate::ShapedText, Error> {
+        let options = self.options();
+        let (run, ranges) = self.face.font().text2glyph_run_mapped(text, &options)?;
+        let sources = ranges
+            .into_iter()
+            .map(|range| crate::GlyphSource::new(range, 0, 0))
+            .collect();
+        Ok(crate::ShapedText::new(
+            text,
+            run,
+            sources,
+            options.text_direction,
+        ))
+    }
+
     /// Shapes one horizontal LTR line, then rotates it 90 degrees clockwise.
     ///
     /// This per-call override ignores the engine's current direction without

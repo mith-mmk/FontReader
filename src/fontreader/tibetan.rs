@@ -171,6 +171,8 @@ impl Font {
             .iter()
             .enumerate()
             .map(|(source_index, glyph)| GsubGlyph {
+                byte_start: glyph.byte_start,
+                byte_end: glyph.byte_end,
                 glyph_id: glyph.glyph_id,
                 source_index,
                 substituted: false,
@@ -253,6 +255,8 @@ impl Font {
                 return None;
             }
             result.push(ResolvedGlyph {
+                byte_start: sources.iter().map(|g| g.byte_start).min().unwrap(),
+                byte_end: sources.iter().map(|g| g.byte_end).max().unwrap(),
                 kana_residual_mark: false,
                 simple_mkmk_cluster: None,
                 tibetan_upper_anchor: None,

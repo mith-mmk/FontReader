@@ -53,6 +53,8 @@ impl Font {
             return None;
         }
         Some(ResolvedGlyph {
+            byte_start: 0,
+            byte_end: 0,
             kana_residual_mark: false,
             simple_mkmk_cluster: None,
             tibetan_upper_anchor: None,
@@ -191,6 +193,8 @@ impl Font {
             .enumerate()
             .map(
                 |(source_index, g)| crate::opentype::extentions::gsub::GsubGlyph {
+                    byte_start: g.byte_start,
+                    byte_end: g.byte_end,
                     glyph_id: g.glyph_id,
                     source_index,
                     substituted: false,

@@ -40,6 +40,8 @@ impl Font {
             return None;
         }
         Some(ResolvedGlyph {
+            byte_start: 0,
+            byte_end: 0,
             kana_residual_mark: false,
             simple_mkmk_cluster: None,
             tibetan_upper_anchor: None,

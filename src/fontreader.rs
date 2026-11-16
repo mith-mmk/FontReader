@@ -240,6 +240,9 @@ pub(crate) enum ParsedTextUnit {
 
 #[derive(Debug, Clone, Copy)]
 struct ResolvedGlyph {
+    // Original UTF-8 envelope, independent of run-local shaping ownership.
+    byte_start: usize,
+    byte_end: usize,
     // Public source character remains from the original text.
     ch: char,
     // Internal scalar used for shaping classification, never source reporting.
@@ -1484,28 +1487,38 @@ impl Font {
     }
 
     fn parse_text_units(text: &str) -> Vec<ParsedTextUnit> {
+        Self::parse_text_units_mapped(text)
+            .into_iter()
+            .map(|(unit, _)| unit)
+            .collect()
+    }
+
+    fn parse_text_units_mapped(text: &str) -> Vec<(ParsedTextUnit, std::ops::Range<usize>)> {
+        let mut offset = 0;
         crate::unicode::graphemes::extended_graphemes(text)
-            .filter_map(|grapheme| match grapheme {
-                // Layout controls are an adapter policy, separate from UAX #29.
-                "\r" => None,
-                "\n" | "\r\n" => Some(ParsedTextUnit::Newline),
-                "\t" => Some(ParsedTextUnit::Tab),
-                _ => {
-                    // Keep the existing orphan-selector policy, but do not drop
-                    // other marks that share the selector's leading grapheme.
-                    let text = grapheme.trim_start_matches(Self::is_variation_selector);
-                    let mut chars = text.chars();
-                    let ch = chars.next()?;
-                    let variation_selector = chars
-                        .next()
-                        .filter(|ch| Self::is_variation_selector(*ch))
-                        .unwrap_or('\0');
-                    Some(ParsedTextUnit::Glyph {
-                        text: text.to_owned(),
-                        ch,
-                        variation_selector,
-                    })
-                }
+            .filter_map(|grapheme| {
+                let range = offset..offset + grapheme.len();
+                offset = range.end;
+                let unit = match grapheme {
+                    "\r" => return None,
+                    "\n" | "\r\n" => ParsedTextUnit::Newline,
+                    "\t" => ParsedTextUnit::Tab,
+                    _ => {
+                        let text = grapheme.trim_start_matches(Self::is_variation_selector);
+                        let mut chars = text.chars();
+                        let ch = chars.next()?;
+                        let variation_selector = chars
+                            .next()
+                            .filter(|ch| Self::is_variation_selector(*ch))
+                            .unwrap_or('\0');
+                        ParsedTextUnit::Glyph {
+                            text: text.to_owned(),
+                            ch,
+                            variation_selector,
+                        }
+                    }
+                };
+                Some((unit, range))
             })
             .collect()
     }
@@ -1598,6 +1611,8 @@ impl Font {
                 .enumerate()
                 .map(
                     |(source_index, glyph)| crate::opentype::extentions::gsub::GsubGlyph {
+                        byte_start: glyph.byte_start,
+                        byte_end: glyph.byte_end,
                         glyph_id: glyph.glyph_id,
                         source_index,
                         substituted: false,
@@ -1694,6 +1709,8 @@ impl Font {
                 .into_iter()
                 .zip(residual_marks)
                 .map(|(item, kana_residual_mark)| ResolvedGlyph {
+                    byte_start: item.byte_start,
+                    byte_end: item.byte_end,
                     simple_mkmk_cluster: (!item.mkmk_source_ambiguous
                         && source_output_counts[item.source_index] == 1
                         && item.ligature_components == 1)
@@ -1780,7 +1797,9 @@ impl Font {
         let mut output = Vec::new();
         let mut pending_glyphs = Vec::new();
 
-        for (_cluster_index, unit) in Self::parse_text_units(text).into_iter().enumerate() {
+        for (_cluster_index, (unit, byte_range)) in
+            Self::parse_text_units_mapped(text).into_iter().enumerate()
+        {
             match unit {
                 ParsedTextUnit::Newline => {
                     self.flush_shaped_glyphs(
@@ -1809,7 +1828,7 @@ impl Font {
                 ParsedTextUnit::Glyph { text, .. } => {
                     let prefer_color = Self::text_prefers_color_glyph(&text);
                     #[cfg(feature = "layout")]
-                    if let Some(glyph) = self
+                    if let Some(mut glyph) = self
                         .composed_modern_hangul_glyph(
                             &text,
                             pending_glyphs.last().map_or(0, |g| g.source_end),
@@ -1823,15 +1842,21 @@ impl Font {
                     {
                         // Before nominal cmap: a composed-only face can render
                         // NFD even when none of its original scalars are mapped.
+                        glyph.byte_start = byte_range.start;
+                        glyph.byte_end = byte_range.end;
                         pending_glyphs.push(glyph);
                         continue;
                     }
                     #[cfg(feature = "layout")]
                     if !is_right_to_left && !is_vert && mode == TextRunMode::Standard {
-                        if let Some(glyphs) = self.composed_latin_glyphs(
+                        if let Some(mut glyphs) = self.composed_latin_glyphs(
                             &text,
                             pending_glyphs.last().map_or(0, |g| g.source_end),
                         ) {
+                            for glyph in &mut glyphs {
+                                glyph.byte_start = byte_range.start;
+                                glyph.byte_end = byte_range.end;
+                            }
                             pending_glyphs.extend(glyphs);
                             continue;
                         }
@@ -1857,6 +1882,8 @@ impl Font {
                         #[cfg(feature = "layout")]
                         let source_start = pending_glyphs.last().map_or(0, |g| g.source_end);
                         pending_glyphs.push(ResolvedGlyph {
+                            byte_start: byte_range.start,
+                            byte_end: byte_range.end,
                             ch,
                             #[cfg(feature = "layout")]
                             shaping_ch: ch,
@@ -2526,6 +2553,24 @@ impl Font {
         options: &crate::commands::FontOptions<'_>,
         mode: TextRunMode,
     ) -> Result<GlyphRun, Error> {
+        Ok(self.text2glyph_run_impl_mapped(text, options, mode)?.0)
+    }
+
+    /// Shapes with conservative original UTF-8 grapheme envelopes per output glyph.
+    pub(crate) fn text2glyph_run_mapped(
+        &self,
+        text: &str,
+        options: &crate::commands::FontOptions<'_>,
+    ) -> Result<(GlyphRun, Vec<std::ops::Range<usize>>), Error> {
+        self.text2glyph_run_impl_mapped(text, options, TextRunMode::Standard)
+    }
+
+    fn text2glyph_run_impl_mapped(
+        &self,
+        text: &str,
+        options: &crate::commands::FontOptions<'_>,
+        mode: TextRunMode,
+    ) -> Result<(GlyphRun, Vec<std::ops::Range<usize>>), Error> {
         let _ = self.current_head()?;
 
         if !options.font_size.is_finite() || options.font_size <= 0.0 {
@@ -2555,6 +2600,7 @@ impl Font {
         }
 
         let mut glyphs: Vec<PositionedGlyph> = Vec::new();
+        let mut source_ranges = Vec::new();
         let mut layer_origins = Vec::new();
         let mut cursor_x = 0.0f32;
         let mut cursor_y = 0.0f32;
@@ -2864,6 +2910,7 @@ impl Font {
                         layers,
                     };
                     glyphs.push(PositionedGlyph::new(glyph, origin_x, origin_y));
+                    source_ranges.push(resolved.byte_start..resolved.byte_end);
                     unit_glyph_indices[index] = Some(glyphs.len() - 1);
                     if is_right_to_left && !is_vertical {
                         cursor_x -= metrics.advance_x;
@@ -2875,7 +2922,7 @@ impl Font {
             }
         }
 
-        Ok(GlyphRun::new(glyphs))
+        Ok((GlyphRun::new(glyphs), source_ranges))
     }
 
     fn monochrome_vertical_origin_offset(
@@ -5419,3 +5466,6 @@ mod unanchored_legacy_tests {
         }
     }
 }
+
+#[cfg(test)]
+mod mapped_tests;

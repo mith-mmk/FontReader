@@ -56,6 +56,8 @@ fn original_scalar_grapheme_and_normalized_ligature_components_remain_distinct()
 fn reordered_candidate_moves_original_ownership_with_each_scalar() {
     let font = font();
     let make = |ch, index| ResolvedGlyph {
+        byte_start: 0,
+        byte_end: 0,
         kana_residual_mark: false,
         simple_mkmk_cluster: None,
         tibetan_upper_anchor: None,
@@ -92,6 +94,8 @@ fn reordered_candidate_moves_original_ownership_with_each_scalar() {
 fn long_unsupported_combining_sequence_is_rejected_before_sorting() {
     let font = font();
     let mut input = vec![ResolvedGlyph {
+        byte_start: 0,
+        byte_end: 0,
         kana_residual_mark: false,
         simple_mkmk_cluster: None,
         tibetan_upper_anchor: None,

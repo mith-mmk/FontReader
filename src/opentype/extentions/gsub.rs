@@ -28,6 +28,8 @@ mod hangul;
 /// Metadata carried through every sequence substitution, before GPOS.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct GsubGlyph {
+    pub(crate) byte_start: usize,
+    pub(crate) byte_end: usize,
     pub(crate) glyph_id: usize,
     pub(crate) source_index: usize,
     // A sequence substitution may depend on normalized context, not only its owner.
@@ -819,6 +821,16 @@ impl Gsub {
                         {
                             state.next_index = index + 1;
                             let replacement = GsubGlyph {
+                                byte_start: glyphs[index..end]
+                                    .iter()
+                                    .map(|g| g.byte_start)
+                                    .min()
+                                    .unwrap(),
+                                byte_end: glyphs[index..end]
+                                    .iter()
+                                    .map(|g| g.byte_end)
+                                    .max()
+                                    .unwrap(),
                                 glyph_id: record.ligature_glyph as usize,
                                 substituted: true,
                                 mkmk_source_ambiguous: true,
@@ -1421,6 +1433,8 @@ impl Gsub {
         glyphs
             .iter()
             .map(|&(glyph_id, source_index)| GsubGlyph {
+                byte_start: 0,
+                byte_end: 0,
                 glyph_id,
                 source_index,
                 substituted: false,
@@ -2051,6 +2065,40 @@ mod scalar_feature_tests {
     use super::GsubGlyph;
 
     #[test]
+    fn mapped_sources_survive_ligature_expansion_and_deletion() {
+        let font = crate::fontreader::Font::get_font_from_buffer(include_bytes!(
+            "../../../tests/fixtures/scalar-locl.ttc"
+        ))
+        .unwrap();
+        let make = |glyph_id, source_index, byte_start, byte_end| GsubGlyph {
+            glyph_id,
+            source_index,
+            byte_start,
+            byte_end,
+            substituted: false,
+            mkmk_source_ambiguous: false,
+            ligature_components: 1,
+        };
+        for extension in 0..2 {
+            let gsub = font.more_fonts[extension * 10 + 9].gsub.as_ref().unwrap();
+            // Existing components may already represent multiple input scalars.
+            let mut input = vec![make(1, 0, 3, 8), make(2, 1, 8, 14)];
+            gsub.apply_feature_glyphs(&mut input, Some("san"), &[*b"liga"]);
+            assert_eq!(input.len(), 1);
+            assert_eq!((input[0].byte_start, input[0].byte_end), (3, 14));
+            let gsub = font.more_fonts[extension * 10 + 7].gsub.as_ref().unwrap();
+            let mut input = vec![make(1, 0, 3, 14)];
+            gsub.apply_feature_glyphs(&mut input, Some("san"), &[*b"locl"]);
+            assert_eq!(input.len(), 2);
+            assert!(input.iter().all(|g| (g.byte_start, g.byte_end) == (3, 14)));
+            let gsub = font.more_fonts[extension * 10 + 8].gsub.as_ref().unwrap();
+            let mut input = vec![make(1, 0, 3, 14)];
+            gsub.apply_feature_glyphs(&mut input, Some("san"), &[*b"locl"]);
+            assert!(input.is_empty());
+        }
+    }
+
+    #[test]
     fn scalar_features_require_complete_ligature_input() {
         let font = crate::fontreader::Font::get_font_from_buffer(include_bytes!(
             "../../../tests/fixtures/scalar-locl.ttc"
@@ -2085,6 +2133,8 @@ mod scalar_feature_tests {
                 }
                 assert_eq!(gsub.lookup_locale(1, "san"), replacement.unwrap_or(1));
                 let original = GsubGlyph {
+                    byte_start: 0,
+                    byte_end: 0,
                     glyph_id: 1,
                     source_index: 7,
                     substituted: false,
