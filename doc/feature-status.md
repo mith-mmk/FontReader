@@ -967,3 +967,11 @@ References: [Unicode data](https://www.unicode.org/Public/17.0.0/ucd/extracted/D
 GPOS types 4/5/6 and ExtensionPos now apply GDEF filtering to the current input,
 with explicit target-search, missing-class and synthetic-fallback limits.
 See [scope](mark-input-filtering.md) and [regression commands](testing.md#bounded-mark-input-filtering).
+
+### Bounded Old Hangul Standard vertical stage
+
+Exact old/extended L V [T] runs may additionally use Standard top-to-bottom
+shaping when the selected hang Script/LangSys contains the globally selected
+vert/vrt2 feature. Mixed/sideways/RTL/tone runs remain excluded. This does not
+force Jamo vertical advance to zero: existing vmtx/VORG and authored GPOS vert
+SinglePos still control placement. See [scope and proof](bounded-vertical-hangul.md).

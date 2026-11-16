@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Extend bounded Old Hangul to Standard top-to-bottom runs only when the chosen vertical GSUB feature belongs to the selected hang Script/LangSys. Preserve authored vertical metrics/GPOS and transactional fallback; see [scope](doc/bounded-vertical-hangul.md).
+
 ### Fixed
 
 - Add a bounded horizontal LTR Old Hangul Jamo candidate with explicit script selection and source-category masks. Unsupported contexts fall back transactionally; this is not complete Korean shaping. See [scope and verification](doc/bounded-old-hangul.md).

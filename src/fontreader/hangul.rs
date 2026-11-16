@@ -100,6 +100,7 @@ impl Font {
         &self,
         glyphs: &[ResolvedGlyph],
         locale: Option<&str>,
+        orientation_tag: Option<[u8; 4]>,
     ) -> Option<Vec<ResolvedGlyph>> {
         if glyphs.is_empty() || glyphs.len() > 256 {
             return None;
@@ -152,9 +153,9 @@ impl Font {
                 },
             )
             .collect();
-        let shaped = self
-            .current_gsub()?
-            .bounded_hangul(&input, &masks, locale)?;
+        let shaped =
+            self.current_gsub()?
+                .bounded_hangul(&input, &masks, locale, orientation_tag)?;
         let mut result = glyphs.to_vec();
         for (i, (out, g)) in result.iter_mut().zip(shaped).enumerate() {
             if g.source_index != i

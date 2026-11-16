@@ -1580,10 +1580,12 @@ impl Font {
         if self.current_gsub().is_some() {
             if allow_old_hangul
                 && !is_right_to_left
-                && orientation.is_none()
+                && matches!(orientation, None | Some(TextRunMode::Standard))
                 && matches!(font_variant, crate::commands::FontVariant::Normal)
             {
-                if let Some(candidate) = self.try_old_hangul_run(glyphs, locale) {
+                let orientation_tag =
+                    orientation.map(|_| self.current_gsub().unwrap().selected_vertical_tag(false));
+                if let Some(candidate) = self.try_old_hangul_run(glyphs, locale, orientation_tag) {
                     output.extend(candidate.into_iter().map(ResolvedTextUnit::Glyph));
                     glyphs.clear();
                     return;

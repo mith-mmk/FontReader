@@ -352,3 +352,10 @@ source = "tests/fixtures/generate_bounded_hangul.py (fontTools 4.68.0)"
 license = "MIT (project test code)"
 sha256 = "074fb97da0f9042154ec8baf6800b55b60221f8b6056c776c4101ac7911c4ad8"
 features = ["hangul", "gsub-masks", "context", "transactional-fallback", "family"]
+
+[[fixture]]
+id = "bounded-vertical-hangul.ttc"
+source = "tests/fixtures/generate_bounded_vertical_hangul.py + generate_bounded_hangul.py (fontTools 4.68.0)"
+license = "MIT (project test code)"
+sha256 = "cc53a3ec9baa3d793065fa5f912e206fc4642be70c95051a03845d8584860529"
+features = ["hangul", "vertical", "gsub", "gpos", "locale", "fallback", "layout"]

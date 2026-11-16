@@ -108,3 +108,12 @@ wrong category, multi-input context, early ccmp contraction, Extension Single,
 nested flags, expansion, missing output, required feature, unsupported rvrn,
 candidate-only coverage, bad lookup index, late ccmp no-match, alternate KOR
 LangSys, top-level flags, nested context reentry. See tests/bounded_hangul.rs.
+
+## Bounded vertical Hangul
+
+`generate_bounded_vertical_hangul.py` reuses the original MIT outlines/build helper
+from `generate_bounded_hangul.py` and generates 17 small TTC faces. Cases cover
+vert/vrt2 selection, source-mask union and lookup order, foreign Script/LangSys
+rejection, once-only GPOS vert SinglePos, unchanged nominal vmtx without GPOS,
+missing/unsupported output, family double coverage, and no-match/match/identity/
+contextual no-op/shared horizontal-only feature proofs. No external font outlines.

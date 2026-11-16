@@ -1,6 +1,7 @@
 # Bounded Old Hangul Jamo shaping
 
-This change depends on the scalar localized-substitution fix (PR57). It is not
+This original horizontal stage depends on the scalar localized-substitution fix (PR57).
+The later [bounded Standard vertical stage](bounded-vertical-hangul.md) has additional admission guards. It is not
 complete Korean shaping, language support, or browser parity.
 
 With layout, Standard horizontal LTR and Normal variant, a same-face run may use
