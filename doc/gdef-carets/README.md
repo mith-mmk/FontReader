@@ -89,6 +89,20 @@ changes an incomparable row into a match. `fontcore_internal_stop_sources`
 and `fontcore_authored_adopted` record whether the final layout actually used
 font-authored positions rather than merely exposing candidates.
 
+## Residual investigations
+
+The remaining discrepancies were investigated independently rather than labelled
+GDEF failures:
+
+- [RTL glyph-count diagnosis](rtl-residuals.md): 105 controlled assertions isolate
+  script-native direction reconciliation before GSUB, not `liga`/`rtlm` toggles.
+- [Static TrueType bearing diagnosis](bearing-residuals.md): four controlled font
+  variants and HB actual draw callbacks isolate the `xMin - LSB` drawable-origin
+  difference. GDEF coordinates remain unchanged.
+
+These reports preserve the comparison exclusions and propose narrow follow-up
+scope separately. They do not change production shaping or rendering code.
+
 ## Coordinate convention
 
 At design-unit scale, with advance `a`, GPOS placement `p`, and raw caret
