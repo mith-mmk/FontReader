@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Prefer validated static GDEF Format 1 and Format 3 (without adjustments) ligature carets in mapped single-run, hard-line, BiDi and mixed-vertical geometry. Preserve authored candidates through family/composite shaping.
+- Add `CaretSource` and `source()` getters. Existing exhaustive `CaretQuality` stays unchanged: internal positions retain its conservative `Approximate` value, including font-authored positions. Use the new source getter to distinguish them.
+- Correct signed Format 3 coordinates and bound ligature-caret parsing; preserve Coverage index order independently of physical table order. The private Format 3 parser now stores a signed coordinate instead of the incorrectly named unsigned point field.
+- Unsupported contour-point, Device/VariationIndex, variable-face and ambiguous glyph ownership cases retain explicit equal-advance approximation. This does not add wrapping, selection rectangles, cross-run joining or vertical paragraph BiDi.
+
 ## 0.0.19 - 2026-11-16
 
 ### Added

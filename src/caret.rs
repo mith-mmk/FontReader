@@ -1,7 +1,8 @@
 //! Bounded advance-based caret geometry for one explicitly directed line.
 //!
 //! This module does not perform paragraph BiDi, line breaking, mixed vertical
-//! orientation, or GDEF ligature-caret lookup. Coordinates are relative to the
+//! orientation, or raw GDEF parsing. Supported font caret candidates are consumed
+//! from mapped shaping metadata. Coordinates are relative to the
 //! run's initial pen `(0, 0)`, not ink bounds or positioned mark origins.
 //! Composite baseline shifts are deliberately ignored: returned points remain
 //! on the common initial pen baseline, not the shifted glyph baseline. No caret
@@ -38,11 +39,24 @@ impl TextPosition {
     }
 }
 
-/// Whether a position follows a shaped advance or divides a multi-grapheme
-/// ownership group. Approximate positions are not font-authored ligature carets.
+/// Legacy conservative classification: group boundaries versus internal stops.
+/// Internal stops retain `Approximate` for compatibility even when GDEF provides
+/// their position. Use [`CaretPosition::source`] to distinguish authored carets
+/// from interpolation; this enum intentionally gains no new variants.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CaretQuality {
     AdvanceBoundary,
+    Approximate,
+}
+
+/// Provenance of a caret coordinate, independent of the legacy quality flag.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CaretSource {
+    /// A shaped group/advance boundary.
+    Advance,
+    /// A validated font-authored GDEF ligature caret.
+    FontAuthored,
+    /// Equal subdivision because authored caret data could not be used.
     Approximate,
 }
 
@@ -52,6 +66,7 @@ pub struct CaretPosition {
     x: f32,
     y: f32,
     quality: CaretQuality,
+    source: CaretSource,
 }
 impl CaretPosition {
     pub fn text_position(self) -> TextPosition {
@@ -65,6 +80,10 @@ impl CaretPosition {
     }
     pub fn quality(self) -> CaretQuality {
         self.quality
+    }
+    /// Authoritative provenance; `quality()` remains a conservative legacy flag.
+    pub fn source(self) -> CaretSource {
+        self.source
     }
 }
 
@@ -105,8 +124,14 @@ impl CaretLayout {
         };
         // Groups are contiguous source envelopes. Overlapping glyph ownership
         // is merged before distributing advances; no stop is added inside an EGC.
-        let mut groups: Vec<(std::ops::Range<usize>, f32)> = Vec::new();
-        for (glyph, source) in shaped.glyph_run().glyphs.iter().zip(shaped.glyph_sources()) {
+        let mut groups: Vec<(std::ops::Range<usize>, f32, Option<usize>)> = Vec::new();
+        for (glyph_index, (glyph, source)) in shaped
+            .glyph_run()
+            .glyphs
+            .iter()
+            .zip(shaped.glyph_sources())
+            .enumerate()
+        {
             let m = &glyph.glyph.metrics;
             let (advance, cross) = if vertical {
                 (m.advance_y, m.advance_x)
@@ -120,7 +145,7 @@ impl CaretLayout {
             if range.is_empty() {
                 return Err(unsupported("empty glyph source ownership"));
             }
-            if let Some((last, width)) = groups.last_mut() {
+            if let Some((last, width, owner)) = groups.last_mut() {
                 if range.start < last.start {
                     return Err(unsupported(
                         "reordered source ownership needs a visual layout layer",
@@ -129,13 +154,14 @@ impl CaretLayout {
                 if range.start < last.end {
                     last.end = last.end.max(range.end);
                     *width += advance;
+                    *owner = None; // Multiple glyphs make authored component ownership ambiguous.
                     if !width.is_finite() {
                         return Err(unsupported("caret advance overflow"));
                     }
                     continue;
                 }
             }
-            groups.push((range, advance));
+            groups.push((range, advance, Some(glyph_index)));
         }
         let mut boundaries = vec![0];
         boundaries.extend(shaped.grapheme_ranges().iter().map(|g| g.end));
@@ -144,10 +170,11 @@ impl CaretLayout {
             x: 0.0,
             y: 0.0,
             quality: CaretQuality::AdvanceBoundary,
+            source: CaretSource::Advance,
         }];
         let mut source_cursor = 0;
         let mut pen = 0.0;
-        for (range, advance) in groups {
+        for (range, advance, owner) in groups {
             let start_index = boundaries.binary_search(&range.start);
             let end_index = boundaries.binary_search(&range.end);
             let (Ok(start_index), Ok(end_index)) = (start_index, end_index) else {
@@ -160,8 +187,19 @@ impl CaretLayout {
             }
             let inside = &boundaries[start_index + 1..=end_index];
             let count = inside.len();
+            let authored = owner.and_then(|index| authored_carets(shaped, index, count, advance));
             for (i, &byte) in inside.iter().enumerate() {
-                let inline = sign * (pen + advance * ((i + 1) as f32 / count as f32));
+                let (distance, source) = if i + 1 == count {
+                    (advance, CaretSource::Advance)
+                } else if let Some(authored) = authored {
+                    (authored[i], CaretSource::FontAuthored)
+                } else {
+                    (
+                        advance * ((i + 1) as f32 / count as f32),
+                        CaretSource::Approximate,
+                    )
+                };
+                let inline = sign * (pen + distance);
                 if !inline.is_finite() {
                     return Err(unsupported("caret advance overflow"));
                 }
@@ -169,6 +207,7 @@ impl CaretLayout {
                     position: TextPosition::new(byte, CaretAffinity::Downstream),
                     x: if vertical { 0.0 } else { inline },
                     y: if vertical { inline } else { 0.0 },
+                    source,
                     quality: if i + 1 == count {
                         CaretQuality::AdvanceBoundary
                     } else {
@@ -239,6 +278,35 @@ impl CaretLayout {
         }
         Ok(best)
     }
+}
+
+/// A single owning glyph must provide exactly one strictly interior, increasing
+/// candidate per internal visible-grapheme boundary. Do not sort, clamp or infer
+/// missing components: those cases intentionally use explicit approximation.
+pub(crate) fn authored_carets(
+    shaped: &ShapedText,
+    glyph_index: usize,
+    count: usize,
+    advance: f32,
+) -> Option<&[f32]> {
+    if count < 2 || !advance.is_finite() || advance <= 0.0 {
+        return None;
+    }
+    let values = shaped
+        .glyph_ligature_carets()
+        .get(glyph_index)?
+        .as_deref()?;
+    if values.len() != count - 1 {
+        return None;
+    }
+    let mut previous = 0.0;
+    for &value in values {
+        if !value.is_finite() || value <= previous || value >= advance {
+            return None;
+        }
+        previous = value;
+    }
+    Some(values)
 }
 
 #[cfg(test)]
@@ -532,6 +600,148 @@ mod tests {
                 CaretLayout::new(&shaped).unwrap_err().kind(),
                 ErrorKind::Unsupported
             );
+        }
+    }
+    fn authored_sample(text: &str, candidates: Vec<f32>, direction: TextDirection) -> ShapedText {
+        let file = FontFile::from_buffer(FONT).unwrap();
+        let face = file.face(1).unwrap();
+        let mut run = face.engine().shape("B").unwrap();
+        run.glyphs[0].glyph.metrics.advance_x = if direction == TextDirection::TopToBottom {
+            0.0
+        } else {
+            800.0
+        };
+        run.glyphs[0].glyph.metrics.advance_y = if direction == TextDirection::TopToBottom {
+            800.0
+        } else {
+            0.0
+        };
+        ShapedText::new(
+            text,
+            run,
+            vec![GlyphSource::new(0..text.len(), 0, 0)],
+            direction,
+        )
+        .with_ligature_carets(vec![Some(candidates)])
+    }
+    #[test]
+    fn authored_carets_prefer_nonuniform_coordinates_without_changing_legacy_quality() {
+        for direction in [
+            TextDirection::LeftToRight,
+            TextDirection::RightToLeft,
+            TextDirection::TopToBottom,
+        ] {
+            let shaped = authored_sample("ffi", vec![200.0, 600.0], direction);
+            let layout = CaretLayout::new(&shaped).unwrap();
+            for (offset, distance) in [(1, 200.0), (2, 600.0)] {
+                let caret = layout
+                    .caret_positions(TextPosition::new(offset, CaretAffinity::Downstream))
+                    .unwrap()[0];
+                assert_eq!(caret.source(), CaretSource::FontAuthored);
+                assert_eq!(caret.quality(), CaretQuality::Approximate);
+                assert_eq!(
+                    (caret.x(), caret.y()),
+                    match direction {
+                        TextDirection::LeftToRight => (distance, 0.0),
+                        TextDirection::RightToLeft => (-distance, 0.0),
+                        TextDirection::TopToBottom => (0.0, distance),
+                    }
+                );
+            }
+            assert_eq!(
+                layout
+                    .caret_positions(TextPosition::new(3, CaretAffinity::Downstream))
+                    .unwrap()[0]
+                    .source(),
+                CaretSource::Advance
+            );
+        }
+    }
+    #[test]
+    fn invalid_or_ambiguous_authored_candidates_fall_back_explicitly() {
+        for values in [
+            vec![],
+            vec![100.0],
+            vec![100.0, 200.0, 300.0],
+            vec![0.0, 600.0],
+            vec![200.0, 800.0],
+            vec![200.0, 200.0],
+            vec![600.0, 200.0],
+            vec![f32::NAN, 600.0],
+            vec![200.0, f32::INFINITY],
+            vec![-1.0, 600.0],
+        ] {
+            let shaped = authored_sample("ffi", values, TextDirection::LeftToRight);
+            let layout = CaretLayout::new(&shaped).unwrap();
+            let caret = layout
+                .caret_positions(TextPosition::new(1, CaretAffinity::Downstream))
+                .unwrap()[0];
+            assert_eq!(caret.source(), CaretSource::Approximate);
+            assert_eq!(caret.x(), 800.0 * (1.0 / 3.0));
+        }
+        let shaped = authored_sample("fi", vec![200.0], TextDirection::LeftToRight);
+        let mut run = shaped.glyph_run().clone();
+        run.glyphs.push(run.glyphs[0].clone());
+        let ambiguous = ShapedText::new(
+            "fi",
+            run,
+            vec![GlyphSource::new(0..2, 0, 0), GlyphSource::new(0..2, 0, 0)],
+            TextDirection::LeftToRight,
+        )
+        .with_ligature_carets(vec![Some(vec![200.0]), None]);
+        let caret = CaretLayout::new(&ambiguous)
+            .unwrap()
+            .caret_positions(TextPosition::new(1, CaretAffinity::Downstream))
+            .unwrap()[0];
+        assert_eq!(caret.source(), CaretSource::Approximate);
+        assert_eq!(caret.x(), 800.0);
+    }
+    #[cfg(feature = "layout")]
+    #[test]
+    fn gdef_fixture_is_preferred_and_unsupported_records_fall_back() {
+        let file =
+            FontFile::from_buffer(include_bytes!("../tests/fixtures/gdef-carets.ttc")).unwrap();
+        let face = file.face(0).unwrap();
+        for (direction, expected) in [
+            (TextDirection::LeftToRight, 220.0),
+            (TextDirection::RightToLeft, -680.0),
+            (TextDirection::TopToBottom, 530.0),
+        ] {
+            let engine = face.engine().with_options(
+                face.engine()
+                    .options()
+                    .with_font_size(1000.0)
+                    .with_text_direction(direction),
+            );
+            let mapped = engine.shape_mapped("fi").unwrap();
+            let caret = CaretLayout::new(&mapped)
+                .unwrap()
+                .caret_positions(TextPosition::new(1, CaretAffinity::Downstream))
+                .unwrap()[0];
+            assert_eq!(caret.source(), CaretSource::FontAuthored);
+            assert_eq!(
+                if direction == TextDirection::TopToBottom {
+                    caret.y()
+                } else {
+                    caret.x()
+                },
+                expected
+            );
+            assert_eq!(caret.quality(), CaretQuality::Approximate);
+        }
+        for index in 1..6 {
+            let face = file.face(index).unwrap();
+            let mapped = face
+                .engine()
+                .with_font_size(1000.0)
+                .shape_mapped("fi")
+                .unwrap();
+            let caret = CaretLayout::new(&mapped)
+                .unwrap()
+                .caret_positions(TextPosition::new(1, CaretAffinity::Downstream))
+                .unwrap()[0];
+            assert_eq!(caret.source(), CaretSource::Approximate, "face {index}");
+            assert_eq!(caret.x(), 450.0, "face {index}");
         }
     }
 }

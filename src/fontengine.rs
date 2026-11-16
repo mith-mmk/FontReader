@@ -201,17 +201,19 @@ impl<'a> FontEngine<'a> {
     /// This uses one selected face and an explicit direction, not paragraph BiDi.
     pub fn shape_mapped(&self, text: &str) -> Result<crate::ShapedText, Error> {
         let options = self.options();
-        let (run, ranges) = self.face.font().text2glyph_run_mapped(text, &options)?;
-        let sources = ranges
+        let output = self
+            .face
+            .font()
+            .text2glyph_run_with_carets(text, &options)?;
+        let sources = output
+            .ranges
             .into_iter()
             .map(|range| crate::GlyphSource::new(range, 0, 0))
             .collect();
-        Ok(crate::ShapedText::new(
-            text,
-            run,
-            sources,
-            options.text_direction,
-        ))
+        Ok(
+            crate::ShapedText::new(text, output.run, sources, options.text_direction)
+                .with_ligature_carets(output.ligature_carets),
+        )
     }
 
     pub(crate) fn shape_bidi_run_mapped(
@@ -220,15 +222,17 @@ impl<'a> FontEngine<'a> {
         direction: TextDirection,
     ) -> Result<crate::ShapedText, Error> {
         let options = self.options().with_text_direction(direction);
-        let (run, ranges) = self
+        let output = self
             .face
             .font()
-            .text2glyph_run_bidi_mapped(text, &options)?;
-        let sources = ranges
+            .text2glyph_run_bidi_with_carets(text, &options)?;
+        let sources = output
+            .ranges
             .into_iter()
             .map(|range| crate::GlyphSource::new(range, 0, 0))
             .collect();
-        Ok(crate::ShapedText::new(text, run, sources, direction))
+        Ok(crate::ShapedText::new(text, output.run, sources, direction)
+            .with_ligature_carets(output.ligature_carets))
     }
 
     /// Shapes one horizontal LTR line, then rotates it 90 degrees clockwise.
@@ -370,11 +374,13 @@ impl<'a> FontEngine<'a> {
             groups.push((text, false));
         }
         for (group_index, (group, sideways)) in groups.into_iter().enumerate() {
-            let (local_run, ranges) = if sideways {
-                font.text2glyph_run_sideways_ltr_mapped(group, &options)?
+            let output = if sideways {
+                font.text2glyph_run_sideways_ltr_with_carets(group, &options)?
             } else {
-                font.text2glyph_run_mixed_upright_mapped(group, &options)?
+                font.text2glyph_run_mixed_upright_with_carets(group, &options)?
             };
+            let local_run = output.run;
+            let ranges = output.ranges;
             let shift_x = if sideways {
                 local_run
                     .glyphs
@@ -405,7 +411,8 @@ impl<'a> FontEngine<'a> {
                 } else {
                     TextDirection::TopToBottom
                 },
-            );
+            )
+            .with_ligature_carets(output.ligature_carets);
             let mut run = if sideways {
                 rotate_sideways_ltr(local_run)?
             } else {

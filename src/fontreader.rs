@@ -240,6 +240,20 @@ pub(crate) enum ParsedTextUnit {
     Tab,
 }
 
+/// Internal mapped result; caret distances are measured positively from each
+/// glyph's logical pen, before whole-run rotation/translation.
+#[derive(Debug)]
+pub(crate) struct MappedGlyphOutput {
+    pub(crate) run: GlyphRun,
+    pub(crate) ranges: Vec<std::ops::Range<usize>>,
+    pub(crate) ligature_carets: Vec<Option<Vec<f32>>>,
+}
+impl MappedGlyphOutput {
+    fn into_tuple(self) -> (GlyphRun, Vec<std::ops::Range<usize>>) {
+        (self.run, self.ranges)
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 struct ResolvedGlyph {
     // Original UTF-8 envelope, independent of run-local shaping ownership.
@@ -2612,6 +2626,7 @@ impl Font {
         self.text2glyph_run_impl(text, &options, TextRunMode::MixedUpright)
     }
 
+    #[allow(dead_code)] // Retained tuple adapter for internal compatibility/tests.
     pub(crate) fn text2glyph_run_sideways_ltr_mapped(
         &self,
         text: &str,
@@ -2623,6 +2638,7 @@ impl Font {
         self.text2glyph_run_impl_mapped(text, &options, TextRunMode::SidewaysLtr)
     }
 
+    #[allow(dead_code)] // Retained tuple adapter for internal compatibility/tests.
     pub(crate) fn text2glyph_run_mixed_upright_mapped(
         &self,
         text: &str,
@@ -2644,12 +2660,43 @@ impl Font {
     }
 
     /// Shapes with conservative original UTF-8 grapheme envelopes per output glyph.
+    #[allow(dead_code)] // Retained tuple adapter for internal compatibility/tests.
     pub(crate) fn text2glyph_run_mapped(
         &self,
         text: &str,
         options: &crate::commands::FontOptions<'_>,
     ) -> Result<(GlyphRun, Vec<std::ops::Range<usize>>), Error> {
         self.text2glyph_run_impl_mapped(text, options, TextRunMode::Standard)
+    }
+
+    pub(crate) fn text2glyph_run_with_carets(
+        &self,
+        text: &str,
+        options: &crate::commands::FontOptions<'_>,
+    ) -> Result<MappedGlyphOutput, Error> {
+        self.text2glyph_run_layout_with_carets(text, options, TextRunMode::Standard, false)
+    }
+
+    pub(crate) fn text2glyph_run_sideways_ltr_with_carets(
+        &self,
+        text: &str,
+        options: &crate::commands::FontOptions<'_>,
+    ) -> Result<MappedGlyphOutput, Error> {
+        let options = options
+            .clone()
+            .with_text_direction(crate::TextDirection::LeftToRight);
+        self.text2glyph_run_layout_with_carets(text, &options, TextRunMode::SidewaysLtr, false)
+    }
+
+    pub(crate) fn text2glyph_run_mixed_upright_with_carets(
+        &self,
+        text: &str,
+        options: &crate::commands::FontOptions<'_>,
+    ) -> Result<MappedGlyphOutput, Error> {
+        let options = options
+            .clone()
+            .with_text_direction(crate::TextDirection::TopToBottom);
+        self.text2glyph_run_layout_with_carets(text, &options, TextRunMode::MixedUpright, false)
     }
 
     fn text2glyph_run_impl_mapped(
@@ -2663,11 +2710,22 @@ impl Font {
 
     /// Shapes an upstream-resolved horizontal BiDi level run in logical order.
     /// Mirroring changes only the shaping scalar, never the source byte envelope.
+    #[allow(dead_code)] // Retained tuple adapter for internal compatibility/tests.
     pub(crate) fn text2glyph_run_bidi_mapped(
         &self,
         text: &str,
         options: &crate::commands::FontOptions<'_>,
     ) -> Result<(GlyphRun, Vec<std::ops::Range<usize>>), Error> {
+        Ok(self
+            .text2glyph_run_bidi_with_carets(text, options)?
+            .into_tuple())
+    }
+
+    pub(crate) fn text2glyph_run_bidi_with_carets(
+        &self,
+        text: &str,
+        options: &crate::commands::FontOptions<'_>,
+    ) -> Result<MappedGlyphOutput, Error> {
         if options.text_direction.is_vertical()
             || text.chars().any(|ch| {
                 matches!(
@@ -2690,7 +2748,7 @@ impl Font {
                 "BiDi run shaping requires one horizontal line without overrides or tabs",
             ));
         }
-        self.text2glyph_run_layout_mapped(text, options, TextRunMode::Standard, true)
+        self.text2glyph_run_layout_with_carets(text, options, TextRunMode::Standard, true)
     }
 
     fn text2glyph_run_layout_mapped(
@@ -2700,6 +2758,18 @@ impl Font {
         mode: TextRunMode,
         bidi_run: bool,
     ) -> Result<(GlyphRun, Vec<std::ops::Range<usize>>), Error> {
+        Ok(self
+            .text2glyph_run_layout_with_carets(text, options, mode, bidi_run)?
+            .into_tuple())
+    }
+
+    fn text2glyph_run_layout_with_carets(
+        &self,
+        text: &str,
+        options: &crate::commands::FontOptions<'_>,
+        mode: TextRunMode,
+        bidi_run: bool,
+    ) -> Result<MappedGlyphOutput, Error> {
         let _ = self.current_head()?;
 
         if !options.font_size.is_finite() || options.font_size <= 0.0 {
@@ -2730,6 +2800,7 @@ impl Font {
 
         let mut glyphs: Vec<PositionedGlyph> = Vec::new();
         let mut source_ranges = Vec::new();
+        let mut ligature_carets = Vec::new();
         let mut layer_origins = Vec::new();
         let mut cursor_x = 0.0f32;
         let mut cursor_y = 0.0f32;
@@ -3014,7 +3085,7 @@ impl Font {
                     #[cfg(feature = "svg-fonts")]
                     let vertical_outline = vertical_outline
                         && !(can_use_svg && (resolved.prefer_color || !can_use_outline));
-                    let layer_origin = if vertical_outline {
+                    let layer_origin_result = if vertical_outline {
                         // Mark anchors use horizontal font coordinates. Attached
                         // marks must share the base's vertical-origin translation.
                         attach_glyph_index
@@ -3027,10 +3098,10 @@ impl Font {
                                     scale_y,
                                 )
                             })
-                            .unwrap_or((0.0, 0.0))
                     } else {
-                        (0.0, 0.0)
+                        None
                     };
+                    let layer_origin = layer_origin_result.unwrap_or((0.0, 0.0));
                     if vertical_outline {
                         translate_glyph_layers(&mut layers, layer_origin.0, layer_origin.1);
                     }
@@ -3041,6 +3112,59 @@ impl Font {
                         metrics,
                         layers,
                     };
+                    #[cfg(feature = "layout")]
+                    let authored_carets = if self.current_fvar().is_none()
+                        && !uses_mark_attachment
+                        && !zero_nominal_advance
+                        && glyph
+                            .layers
+                            .iter()
+                            .all(|layer| matches!(layer, GlyphLayer::Path(_)))
+                        && (!is_vertical || layer_origin_result.is_some())
+                    {
+                        self.current_gdef()
+                            .and_then(|gdef| gdef.ligature_carets(glyph_id as u16))
+                            .and_then(|values| {
+                                let mut distances = Vec::with_capacity(values.len());
+                                let mut previous_coordinate = None;
+                                for value in values {
+                                    let coordinate = value.design_coordinate().ok()?;
+                                    if previous_coordinate
+                                        .is_some_and(|previous| coordinate <= previous)
+                                    {
+                                        return None;
+                                    }
+                                    previous_coordinate = Some(coordinate);
+                                    let coordinate = coordinate as f32;
+                                    let distance = if is_vertical {
+                                        adjustment.placement_y + layer_origin.1
+                                            - coordinate * scale_y
+                                    } else if is_right_to_left {
+                                        metrics.advance_x
+                                            - adjustment.placement_x
+                                            - coordinate * scale_x
+                                    } else {
+                                        adjustment.placement_x + coordinate * scale_x
+                                    };
+                                    if !distance.is_finite() {
+                                        return None;
+                                    }
+                                    distances.push(distance);
+                                }
+                                // GDEF coordinates must already be strictly ordered.
+                                // Only direction conversion reverses their logical order;
+                                // never repair malformed font data by sorting it.
+                                if is_vertical || is_right_to_left {
+                                    distances.reverse();
+                                }
+                                Some(distances)
+                            })
+                    } else {
+                        None
+                    };
+                    #[cfg(not(feature = "layout"))]
+                    let authored_carets = None;
+                    ligature_carets.push(authored_carets);
                     glyphs.push(PositionedGlyph::new(glyph, origin_x, origin_y));
                     source_ranges.push(resolved.byte_start..resolved.byte_end);
                     unit_glyph_indices[index] = Some(glyphs.len() - 1);
@@ -3054,7 +3178,11 @@ impl Font {
             }
         }
 
-        Ok((GlyphRun::new(glyphs), source_ranges))
+        Ok(MappedGlyphOutput {
+            run: GlyphRun::new(glyphs),
+            ranges: source_ranges,
+            ligature_carets,
+        })
     }
 
     fn monochrome_vertical_origin_offset(
@@ -5602,3 +5730,151 @@ mod unanchored_legacy_tests {
 
 #[cfg(test)]
 mod mapped_tests;
+
+#[cfg(all(test, feature = "layout"))]
+mod authored_caret_plumbing_tests {
+    use crate::{FontFile, FontOptions, FontStretch, TextDirection};
+    const FONT: &[u8] = include_bytes!("../tests/fixtures/gdef-carets.ttc");
+    fn close(actual: f32, expected: f32) {
+        assert!((actual - expected).abs() < 0.001, "{actual} != {expected}");
+    }
+    #[test]
+    fn authored_coordinates_follow_scaled_pen_and_direction() {
+        let file = FontFile::from_buffer(FONT).unwrap();
+        let face = file.face(0).unwrap();
+        for (direction, expected) in [
+            (TextDirection::LeftToRight, [220.0, 730.0]),
+            (TextDirection::RightToLeft, [680.0, 370.0]),
+            (TextDirection::TopToBottom, [530.0, 20.0]),
+        ] {
+            let options = FontOptions::new(&face)
+                .with_font_size(1000.0)
+                .with_text_direction(direction);
+            let out = face
+                .font()
+                .text2glyph_run_with_carets("fifl", &options)
+                .unwrap();
+            assert_eq!(out.ranges, vec![0..2, 2..4]);
+            assert_eq!(out.ligature_carets.len(), 2);
+            for (actual, expected) in out.ligature_carets.iter().zip(expected) {
+                close(actual.as_ref().unwrap()[0], expected);
+            }
+            let legacy = face.font().text2glyph_run("fifl", &options).unwrap();
+            assert_eq!(format!("{:?}", out.run), format!("{legacy:?}"));
+        }
+        let options = FontOptions::new(&face)
+            .with_font_size(20.0)
+            .with_font_stretch(FontStretch(2.0));
+        let out = face
+            .font()
+            .text2glyph_run_with_carets("fi", &options)
+            .unwrap();
+        close(out.ligature_carets[0].as_ref().unwrap()[0], 8.8);
+    }
+    #[test]
+    fn gpos_placement_is_included_once_in_pen_relative_caret_distances() {
+        let file = FontFile::from_buffer(FONT).unwrap();
+        assert_eq!(file.face_count(), 10);
+        let face = file.face(6).unwrap();
+        for (direction, expected, origins) in [
+            (
+                TextDirection::LeftToRight,
+                [270.0, 700.0],
+                [(50.0, -70.0), (870.0, 20.0)],
+            ),
+            (
+                TextDirection::RightToLeft,
+                [630.0, 400.0],
+                [(-850.0, -70.0), (-2030.0, 20.0)],
+            ),
+            (
+                TextDirection::TopToBottom,
+                [460.0, 40.0],
+                [(50.0, -70.0), (-30.0, 1020.0)],
+            ),
+        ] {
+            let options = FontOptions::new(&face)
+                .with_font_size(1000.0)
+                .with_text_direction(direction);
+            let out = face
+                .font()
+                .text2glyph_run_with_carets("fifl", &options)
+                .unwrap();
+            assert_eq!(out.ranges, vec![0..2, 2..4]);
+            for ((glyph, caret), (expected, origin)) in out
+                .run
+                .glyphs
+                .iter()
+                .zip(&out.ligature_carets)
+                .zip(expected.into_iter().zip(origins))
+            {
+                close(caret.as_ref().unwrap()[0], expected);
+                close(glyph.x, origin.0);
+                close(glyph.y, origin.1);
+            }
+            let mapped = face
+                .engine()
+                .with_options(options.clone())
+                .shape_mapped("fifl")
+                .unwrap();
+            assert_eq!(mapped.glyph_ligature_carets(), out.ligature_carets);
+            let legacy = face.font().text2glyph_run("fifl", &options).unwrap();
+            assert_eq!(format!("{:?}", out.run), format!("{legacy:?}"));
+        }
+    }
+
+    #[test]
+    fn malformed_multi_caret_order_is_not_normalized_into_authorship() {
+        let file = FontFile::from_buffer(FONT).unwrap();
+        for index in [7, 8, 9] {
+            let face = file.face(index).unwrap();
+            for (direction, expected) in [
+                (TextDirection::LeftToRight, vec![200.0, 500.0]),
+                (TextDirection::RightToLeft, vec![700.0, 1000.0]),
+                (TextDirection::TopToBottom, vec![250.0, 550.0]),
+            ] {
+                let options = FontOptions::new(&face)
+                    .with_font_size(1000.0)
+                    .with_text_direction(direction);
+                let out = face
+                    .font()
+                    .text2glyph_run_with_carets("ffi", &options)
+                    .unwrap();
+                assert_eq!(out.run.glyphs.len(), 1, "face {index}");
+                assert_eq!(
+                    out.ligature_carets[0],
+                    if index == 7 { Some(expected) } else { None },
+                    "face {index} {direction:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn signed_format_three_is_preserved_for_downstream_validation() {
+        let file = FontFile::from_buffer(FONT).unwrap();
+        let face = file.face(2).unwrap();
+        let options = FontOptions::new(&face).with_font_size(1000.0);
+        let out = face
+            .font()
+            .text2glyph_run_with_carets("fifl", &options)
+            .unwrap();
+        assert_eq!(
+            out.ligature_carets,
+            vec![Some(vec![-90.0]), Some(vec![-160.0])]
+        );
+    }
+    #[test]
+    fn unresolved_points_devices_and_variable_faces_do_not_claim_authorship() {
+        let file = FontFile::from_buffer(FONT).unwrap();
+        for index in [1, 3, 4, 5] {
+            let face = file.face(index).unwrap();
+            let options = FontOptions::new(&face).with_font_size(20.0);
+            let out = face
+                .font()
+                .text2glyph_run_with_carets("fifl", &options)
+                .unwrap();
+            assert_eq!(out.ligature_carets, vec![None, None], "face {index}");
+        }
+    }
+}

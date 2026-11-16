@@ -2,7 +2,7 @@
 
 use crate::opentype::layouts::*;
 use bin_rs::reader::BinaryReader;
-use std::io::SeekFrom;
+use std::io::{Error, ErrorKind, SeekFrom};
 
 #[derive(Debug, Clone)]
 pub(crate) struct Gdef {
@@ -32,6 +32,8 @@ impl Gdef {
         offset: u64,
         length: usize,
     ) -> Result<Self, std::io::Error> {
+        let bounds = CaretBounds::new(offset, length)?;
+        bounds.span(offset, 12)?;
         reader.seek(SeekFrom::Start(offset))?;
         let major_versionn = reader.read_u16_be()?;
         let minor_version = reader.read_u16_be()?;
@@ -40,11 +42,13 @@ impl Gdef {
         let _lig_caret_list_offset = reader.read_u16_be()?;
         let _mark_attach_class_def_offset = reader.read_u16_be()?;
         let _mark_glyph_sets_def_offset = if minor_version >= 2 {
+            bounds.span(offset, 14)?;
             reader.read_u16_be()? as u32
         } else {
             0
         };
         let _item_var_store_offset = if minor_version >= 3 {
+            bounds.span(offset, 18)?;
             reader.read_u32_be()?
         } else {
             0
@@ -66,8 +70,16 @@ impl Gdef {
         };
 
         let lig_caret_list = if _lig_caret_list_offset != 0 {
-            let lig_caret_list =
-                LigatureCaretList::new(reader, offset + _lig_caret_list_offset as u64)?;
+            let header_size = if minor_version >= 3 {
+                18
+            } else if minor_version >= 2 {
+                14
+            } else {
+                12
+            };
+            let list_offset =
+                bounds.relative(offset, _lig_caret_list_offset as u64, header_size, 4)?;
+            let lig_caret_list = LigatureCaretList::new(reader, list_offset, bounds)?;
             Some(lig_caret_list)
         } else {
             None
@@ -157,6 +169,13 @@ impl Gdef {
         Some(&attach_list.attach_point.get(index)?.point_indices)
     }
 
+    /// Carets are returned in the font's Coverage / CaretValue index order.
+    pub(crate) fn ligature_carets(&self, glyph_id: u16) -> Option<&[CaretValue]> {
+        let list = self.lig_caret_list.as_ref()?;
+        let index = list.coverage.contains(glyph_id as usize)?;
+        Some(&list.lig_glyph.get(index)?.caret_value)
+    }
+
     pub(crate) fn has_attach_points(&self, glyph_id: u16) -> bool {
         self.attach_point_indices(glyph_id)
             .map(|points| !points.is_empty())
@@ -238,20 +257,34 @@ pub(crate) struct LigatureCaretList {
 }
 
 impl LigatureCaretList {
-    fn new<R: BinaryReader>(reader: &mut R, offset: u64) -> Result<Self, std::io::Error> {
+    fn new<R: BinaryReader>(
+        reader: &mut R,
+        offset: u64,
+        bounds: CaretBounds,
+    ) -> Result<Self, Error> {
+        bounds.span(offset, 4)?;
         reader.seek(SeekFrom::Start(offset))?;
-        let coverage_offset = reader.read_u16_be()?;
-        let lig_glyph_count = reader.read_u16_be()?;
-        let mut lig_glyph_offsets = Vec::with_capacity(lig_glyph_count as usize);
-        for _ in 0..lig_glyph_count {
-            lig_glyph_offsets.push(reader.read_u16_be()?);
+        let coverage_offset = reader.read_u16_be()? as u64;
+        let count = reader.read_u16_be()? as usize;
+        let header_size = 4 + 2 * count;
+        bounds.span(offset, header_size)?;
+        let mut offsets = Vec::with_capacity(count);
+        for _ in 0..count {
+            let relative = reader.read_u16_be()? as u64;
+            offsets.push(bounds.relative(offset, relative, header_size, 2)?);
         }
-        let mut lig_glyph = Vec::with_capacity(lig_glyph_count as usize);
-        for lig_glyph_offset in lig_glyph_offsets {
-            let offset = lig_glyph_offset as u64 + offset;
-            lig_glyph.push(LigatureGlyph::new(reader, offset)?);
+        let coverage_offset = bounds.relative(offset, coverage_offset, header_size, 4)?;
+        let coverage = bounded_caret_coverage(reader, coverage_offset, count, bounds)?;
+        // Shared offset references must not amplify a tiny table into unbounded
+        // allocations. Count work and stored Device words across all references.
+        let mut budget = ((bounds.end - bounds.start) as usize)
+            .saturating_mul(8)
+            .min(1_000_000);
+        let mut lig_glyph = Vec::with_capacity(count);
+        for offset in offsets {
+            // Do not sort physical offsets: array order is Coverage index order.
+            lig_glyph.push(LigatureGlyph::new(reader, offset, bounds, &mut budget)?);
         }
-        let coverage = Coverage::new(reader, offset + coverage_offset as u64)?;
         Ok(Self {
             coverage,
             lig_glyph,
@@ -274,51 +307,51 @@ pub(crate) struct LigatureGlyph {
 }
 
 impl LigatureGlyph {
-    fn new<R: BinaryReader>(reader: &mut R, offset: u64) -> Result<Self, std::io::Error> {
+    fn new<R: BinaryReader>(
+        reader: &mut R,
+        offset: u64,
+        bounds: CaretBounds,
+        budget: &mut usize,
+    ) -> Result<Self, Error> {
+        bounds.span(offset, 2)?;
         reader.seek(SeekFrom::Start(offset))?;
-        let caret_count = reader.read_u16_be()?;
-        let mut caret_value_offsets = Vec::with_capacity(caret_count as usize);
-        for _ in 0..caret_count {
-            caret_value_offsets.push(reader.read_u16_be()?);
+        let count = reader.read_u16_be()? as usize;
+        spend_caret_budget(budget, count + 1)?;
+        let header_size = 2 + 2 * count;
+        bounds.span(offset, header_size)?;
+        let mut offsets = Vec::with_capacity(count);
+        for _ in 0..count {
+            let relative = reader.read_u16_be()? as u64;
+            offsets.push(bounds.relative(offset, relative, header_size, 4)?);
         }
-
-        let mut caret_value = Vec::with_capacity(caret_count as usize);
-        for caret_value_offset in caret_value_offsets {
-            let offset = caret_value_offset as u64 + offset;
+        let mut caret_value = Vec::with_capacity(count);
+        for offset in offsets {
             reader.seek(SeekFrom::Start(offset))?;
             let format = reader.read_u16_be()?;
-            match format {
-                1 => {
-                    let coordinate = reader.read_i16_be()?;
-                    caret_value.push(CaretValue::Format1(CaretValueFormat1 { coordinate }));
-                }
-                2 => {
-                    let caret_value_point = reader.read_u16_be()?;
-                    caret_value.push(CaretValue::Format2(CaretValueFormat2 { caret_value_point }));
-                }
+            caret_value.push(match format {
+                1 => CaretValue::Format1(CaretValueFormat1 {
+                    coordinate: reader.read_i16_be()?,
+                }),
+                2 => CaretValue::Format2(CaretValueFormat2 {
+                    caret_value_point: reader.read_u16_be()?,
+                }),
                 3 => {
-                    let caret_value_point = reader.read_u16_be()?;
-                    let device_table_offset = reader.read_u16_be()?;
-                    let device_table = if device_table_offset == 0 {
+                    bounds.span(offset, 6)?;
+                    let coordinate = reader.read_i16_be()?;
+                    let relative = reader.read_u16_be()? as u64;
+                    let device_table = if relative == 0 {
                         None
                     } else {
-                        Some(DeviceTable::new(
-                            reader,
-                            offset + device_table_offset as u64,
-                        )?)
+                        let device_offset = bounds.relative(offset, relative, 6, 6)?;
+                        Some(bounded_caret_device(reader, device_offset, bounds, budget)?)
                     };
-                    caret_value.push(CaretValue::Format3(CaretValueFormat3 {
-                        caret_value_point,
+                    CaretValue::Format3(CaretValueFormat3 {
+                        coordinate,
                         device_table,
-                    }));
+                    })
                 }
-                _ => {
-                    return Err(std::io::Error::new(
-                        std::io::ErrorKind::InvalidData,
-                        "Invalid caret value format",
-                    ));
-                }
-            }
+                _ => return Err(caret_error("invalid GDEF caret value format")),
+            });
         }
         Ok(Self { caret_value })
     }
@@ -343,8 +376,176 @@ pub(crate) struct CaretValueFormat2 {
 
 #[derive(Debug, Clone)]
 pub(crate) struct CaretValueFormat3 {
-    pub(crate) caret_value_point: u16,
+    pub(crate) coordinate: i16,
     pub(crate) device_table: Option<DeviceTable>,
+}
+
+/// Explicitly unresolved semantics; callers must not substitute zero deltas.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum UnsupportedCaret {
+    ContourPoint,
+    DeviceAdjustment,
+    VariationAdjustment,
+}
+
+impl CaretValue {
+    pub(crate) fn design_coordinate(&self) -> Result<i16, UnsupportedCaret> {
+        match self {
+            Self::Format1(value) => Ok(value.coordinate),
+            Self::Format2(_) => Err(UnsupportedCaret::ContourPoint),
+            Self::Format3(value) => match &value.device_table {
+                None => Ok(value.coordinate),
+                Some(device) if device.is_variation_index() => {
+                    Err(UnsupportedCaret::VariationAdjustment)
+                }
+                Some(_) => Err(UnsupportedCaret::DeviceAdjustment),
+            },
+        }
+    }
+}
+
+fn caret_error(message: &'static str) -> Error {
+    Error::new(ErrorKind::InvalidData, message)
+}
+
+#[derive(Clone, Copy)]
+struct CaretBounds {
+    start: u64,
+    end: u64,
+}
+impl CaretBounds {
+    fn new(start: u64, length: usize) -> Result<Self, Error> {
+        let end = start
+            .checked_add(u64::try_from(length).map_err(|_| caret_error("GDEF length overflow"))?)
+            .ok_or_else(|| caret_error("GDEF length overflow"))?;
+        Ok(Self { start, end })
+    }
+    fn span(self, offset: u64, length: usize) -> Result<(), Error> {
+        if offset < self.start
+            || offset
+                .checked_add(length as u64)
+                .is_none_or(|end| end > self.end)
+        {
+            return Err(caret_error("GDEF caret read outside declared table"));
+        }
+        Ok(())
+    }
+    fn relative(
+        self,
+        base: u64,
+        relative: u64,
+        minimum: usize,
+        length: usize,
+    ) -> Result<u64, Error> {
+        if relative < minimum as u64 {
+            return Err(caret_error("invalid GDEF caret relative offset"));
+        }
+        let offset = base
+            .checked_add(relative)
+            .ok_or_else(|| caret_error("GDEF caret offset overflow"))?;
+        self.span(offset, length)?;
+        Ok(offset)
+    }
+}
+
+fn spend_caret_budget(budget: &mut usize, amount: usize) -> Result<(), Error> {
+    *budget = budget
+        .checked_sub(amount)
+        .ok_or_else(|| caret_error("GDEF caret allocation budget exceeded"))?;
+    Ok(())
+}
+
+fn bounded_caret_coverage<R: BinaryReader>(
+    reader: &mut R,
+    offset: u64,
+    expected: usize,
+    bounds: CaretBounds,
+) -> Result<Coverage, Error> {
+    bounds.span(offset, 4)?;
+    reader.seek(SeekFrom::Start(offset))?;
+    let format = reader.read_u16_be()?;
+    let count = reader.read_u16_be()? as usize;
+    let mut previous = None;
+    match format {
+        1 => {
+            if count != expected {
+                return Err(caret_error("GDEF caret Coverage count mismatch"));
+            }
+            bounds.span(offset, 4 + 2 * count)?;
+            for _ in 0..count {
+                let glyph = reader.read_u16_be()?;
+                if previous.is_some_and(|last| glyph <= last) {
+                    return Err(caret_error("unordered GDEF caret Coverage"));
+                }
+                previous = Some(glyph);
+            }
+        }
+        2 => {
+            bounds.span(offset, 4 + 6 * count)?;
+            let mut covered = 0usize;
+            for _ in 0..count {
+                let start = reader.read_u16_be()?;
+                let end = reader.read_u16_be()?;
+                let index = reader.read_u16_be()? as usize;
+                if start > end || previous.is_some_and(|last| start <= last) || index != covered {
+                    return Err(caret_error("invalid GDEF caret Coverage range"));
+                }
+                covered += (end - start) as usize + 1;
+                if covered > expected {
+                    return Err(caret_error("GDEF caret Coverage count mismatch"));
+                }
+                previous = Some(end);
+            }
+            if covered != expected {
+                return Err(caret_error("GDEF caret Coverage count mismatch"));
+            }
+        }
+        _ => return Err(caret_error("invalid GDEF caret Coverage format")),
+    }
+    Coverage::new(reader, offset)
+}
+
+fn bounded_caret_device<R: BinaryReader>(
+    reader: &mut R,
+    offset: u64,
+    bounds: CaretBounds,
+    budget: &mut usize,
+) -> Result<DeviceTable, Error> {
+    bounds.span(offset, 6)?;
+    reader.seek(SeekFrom::Start(offset))?;
+    let start_size = reader.read_u16_be()?;
+    let end_size = reader.read_u16_be()?;
+    let delta_format = reader.read_u16_be()?;
+    let (word_count, variation_index) = match delta_format {
+        1..=3 => {
+            if start_size > end_size {
+                return Err(caret_error("invalid GDEF caret Device size range"));
+            }
+            let count = (end_size - start_size) as usize + 1;
+            ((count * (1usize << delta_format)).div_ceil(16), None)
+        }
+        0x8000 => (
+            0,
+            Some(crate::opentype::layouts::device::VariationIndex {
+                delta_set_outer_index: start_size,
+                delta_set_inner_index: end_size,
+            }),
+        ),
+        _ => return Err(caret_error("invalid GDEF caret Device delta format")),
+    };
+    bounds.span(offset, 6 + 2 * word_count)?;
+    spend_caret_budget(budget, word_count + 1)?;
+    let mut delta_value = Vec::with_capacity(word_count);
+    for _ in 0..word_count {
+        delta_value.push(reader.read_u16_be()?);
+    }
+    Ok(DeviceTable {
+        start_size,
+        end_size,
+        delta_format,
+        delta_value,
+        variation_index,
+    })
 }
 
 pub(crate) struct VariationStore {}
@@ -427,5 +628,242 @@ impl std::fmt::Display for LigatureCaretList {
 impl std::fmt::Display for MarkGlyphSetsDef {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&self.dump_text())
+    }
+}
+
+#[cfg(test)]
+mod caret_tests {
+    use super::*;
+    use bin_rs::reader::BytesReader;
+
+    fn bytes(words: &[u16]) -> Vec<u8> {
+        words.iter().flat_map(|v| v.to_be_bytes()).collect()
+    }
+    fn two_ligatures() -> Vec<u8> {
+        // Coverage 10,20; physical records 20,10. Never sort the offsets.
+        bytes(&[
+            1, 0, 0, 0, 12, 0, 8, 2, 24, 16, 1, 2, 10, 20, 1, 4, 1, 730, 1, 4, 1, 220,
+        ])
+    }
+    fn one_caret(record: &[u16]) -> Vec<u8> {
+        let mut words = vec![1, 0, 0, 0, 12, 0, 6, 1, 12, 1, 1, 10, 1, 4];
+        words.extend(record);
+        bytes(&words)
+    }
+    fn parse(data: &[u8]) -> Result<Gdef, Error> {
+        Gdef::new(&mut BytesReader::new(data), 0, data.len())
+    }
+    fn set(data: &mut [u8], offset: usize, value: u16) {
+        data[offset..offset + 2].copy_from_slice(&value.to_be_bytes());
+    }
+
+    #[test]
+    fn caret_coverage_order_is_not_physical_order() {
+        let data = two_ligatures();
+        let gdef = parse(&data).unwrap();
+        assert_eq!(
+            gdef.ligature_carets(10).unwrap()[0].design_coordinate(),
+            Ok(220)
+        );
+        assert_eq!(
+            gdef.ligature_carets(20).unwrap()[0].design_coordinate(),
+            Ok(730)
+        );
+        assert!(gdef.ligature_carets(11).is_none());
+        // The CaretValue array itself also follows logical index order.
+        let data = bytes(&[
+            1, 0, 0, 0, 12, 0, 6, 1, 12, 1, 1, 10, 2, 10, 6, 1, 700, 1, 200,
+        ]);
+        let parsed = parse(&data).unwrap();
+        assert_eq!(
+            parsed
+                .ligature_carets(10)
+                .unwrap()
+                .iter()
+                .map(CaretValue::design_coordinate)
+                .collect::<Vec<_>>(),
+            vec![Ok(200), Ok(700)]
+        );
+        let data = two_ligatures();
+        // A nonzero enclosing table origin preserves relative offsets.
+        let mut container = vec![0x55; 17];
+        container.extend(&data);
+        let parsed = Gdef::new(&mut BytesReader::new(&container), 17, data.len()).unwrap();
+        assert_eq!(
+            parsed.ligature_carets(10).unwrap()[0].design_coordinate(),
+            Ok(220)
+        );
+    }
+
+    #[test]
+    fn caret_signed_format3_point_index_and_adjustments_are_distinct() {
+        for coordinate in [i16::MIN, -90, 0, i16::MAX] {
+            let simple = parse(&one_caret(&[1, coordinate as u16])).unwrap();
+            assert_eq!(
+                simple.ligature_carets(10).unwrap()[0].design_coordinate(),
+                Ok(coordinate)
+            );
+            let data = one_caret(&[3, coordinate as u16, 0]);
+            let gdef = parse(&data).unwrap();
+            assert_eq!(
+                gdef.ligature_carets(10).unwrap()[0].design_coordinate(),
+                Ok(coordinate)
+            );
+        }
+        let data = one_caret(&[2, 65535]);
+        let gdef = parse(&data).unwrap();
+        let value = &gdef.ligature_carets(10).unwrap()[0];
+        assert_eq!(
+            value.design_coordinate(),
+            Err(UnsupportedCaret::ContourPoint)
+        );
+        let CaretValue::Format2(point) = value else {
+            panic!()
+        };
+        assert_eq!(point.caret_value_point, 65535);
+        for format in 1..=3 {
+            let data = one_caret(&[3, -90i16 as u16, 6, 20, 20, format, 0x4000]);
+            let gdef = parse(&data).unwrap();
+            let value = &gdef.ligature_carets(10).unwrap()[0];
+            assert_eq!(
+                value.design_coordinate(),
+                Err(UnsupportedCaret::DeviceAdjustment)
+            );
+            let CaretValue::Format3(caret) = value else {
+                panic!()
+            };
+            assert_eq!(caret.coordinate, -90);
+            let device = caret.device_table.as_ref().unwrap();
+            assert_eq!(
+                (device.start_size, device.end_size, device.delta_format),
+                (20, 20, format)
+            );
+            assert_eq!(device.delta_value, [0x4000]);
+        }
+        let data = one_caret(&[3, -90i16 as u16, 6, 1, 7, 0x8000]);
+        let gdef = parse(&data).unwrap();
+        let value = &gdef.ligature_carets(10).unwrap()[0];
+        assert_eq!(
+            value.design_coordinate(),
+            Err(UnsupportedCaret::VariationAdjustment)
+        );
+        let CaretValue::Format3(caret) = value else {
+            panic!()
+        };
+        let index = caret
+            .device_table
+            .as_ref()
+            .unwrap()
+            .variation_index
+            .unwrap();
+        assert_eq!(
+            (index.delta_set_outer_index, index.delta_set_inner_index),
+            (1, 7)
+        );
+    }
+
+    #[test]
+    fn caret_bad_offsets_counts_formats_and_declared_bounds_are_rejected() {
+        for (offset, value) in [
+            (8, 1),
+            (8, 65535),
+            (12, 0),
+            (12, 65535),
+            (14, 65535),
+            (16, 0),
+            (16, 65535),
+            (22, 1),
+            (24, 20),
+            (28, 65535),
+            (30, 0),
+            (30, 65535),
+            (32, 4),
+        ] {
+            let mut data = two_ligatures();
+            set(&mut data, offset, value);
+            assert!(parse(&data).is_err(), "offset {offset} value {value}");
+        }
+        let data = two_ligatures();
+        for length in 0..data.len() {
+            // Even if the reader has trailing accessible bytes, length is binding.
+            assert!(
+                Gdef::new(&mut BytesReader::new(&data), 0, length).is_err(),
+                "length {length}"
+            );
+        }
+        assert!(Gdef::new(&mut BytesReader::new(&[]), u64::MAX, 1).is_err());
+        for record in [
+            &[3, 0, 2][..],
+            &[3, 0, 6, 21, 20, 1, 0],
+            &[3, 0, 6, 20, 20, 4, 0],
+            &[3, 0, 6, 20, 100, 3, 0],
+            &[3, 0, 65535],
+            &[3, 0, 6, 20, 20, 0x8000][..2],
+        ] {
+            assert!(parse(&one_caret(record)).is_err(), "record {record:?}");
+        }
+    }
+
+    #[test]
+    fn caret_coverage_ranges_require_sorted_contiguous_indices() {
+        let data = bytes(&[
+            1, 0, 0, 0, 12, 0, 8, 2, 26, 18, 2, 1, 10, 11, 0, 1, 4, 1, 730, 1, 4, 1, 220,
+        ]);
+        let gdef = parse(&data).unwrap();
+        assert_eq!(
+            gdef.ligature_carets(10).unwrap()[0].design_coordinate(),
+            Ok(220)
+        );
+        assert_eq!(
+            gdef.ligature_carets(11).unwrap()[0].design_coordinate(),
+            Ok(730)
+        );
+        for (offset, value) in [(22, 65535), (24, 12), (26, 9), (26, 12), (28, 1)] {
+            let mut malformed = data.clone();
+            set(&mut malformed, offset, value);
+            assert!(parse(&malformed).is_err(), "offset {offset} value {value}");
+        }
+    }
+
+    #[test]
+    fn caret_fixture_preserves_coordinates_indices_and_unsupported_adjustments() {
+        let font = crate::fontreader::Font::get_font_from_buffer(include_bytes!(
+            "../../../tests/fixtures/gdef-carets.ttc"
+        ))
+        .unwrap();
+        for face in 0..6 {
+            let selected = if face == 0 {
+                &font
+            } else {
+                &font.more_fonts[face - 1]
+            };
+            let gdef = selected.gdef.as_ref().unwrap();
+            for (glyph, which) in [(6, 0), (7, 1)] {
+                let carets = gdef.ligature_carets(glyph).unwrap();
+                assert_eq!(carets.len(), 1);
+                let expected = match face {
+                    0 => Ok([220, 730][which]),
+                    1 => Err(UnsupportedCaret::ContourPoint),
+                    2 => Ok([-90, -160][which]),
+                    3 => Err(UnsupportedCaret::DeviceAdjustment),
+                    _ => Err(UnsupportedCaret::VariationAdjustment),
+                };
+                assert_eq!(
+                    carets[0].design_coordinate(),
+                    expected,
+                    "face {face} glyph {glyph}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn caret_alias_amplification_has_a_shared_allocation_budget() {
+        let bounds = CaretBounds::new(0, 8).unwrap();
+        let data = bytes(&[1, 4, 1, 220]);
+        let mut reader = BytesReader::new(&data);
+        let mut budget = 2;
+        assert!(LigatureGlyph::new(&mut reader, 0, bounds, &mut budget).is_ok());
+        assert!(LigatureGlyph::new(&mut reader, 0, bounds, &mut budget).is_err());
     }
 }

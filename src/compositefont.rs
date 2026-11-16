@@ -6,6 +6,12 @@ use crate::fontreader::ParsedTextUnit;
 use crate::{FontFace, FontOptions, FontStretch, FontVariant, FontVariationSetting, GlyphRun};
 use std::io::{Error, ErrorKind};
 
+struct CompositeLayoutResult {
+    run: GlyphRun,
+    sources: Vec<crate::mapped::GlyphSource>,
+    ligature_carets: Vec<Option<Vec<f32>>>,
+}
+
 /// An inclusive range of Unicode scalar values (not UTF-8 bytes).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UnicodeRange {
@@ -255,7 +261,7 @@ impl<'a> CompositeFont<'a> {
     /// no partial result. Normal size/stretch validation also applies to empty
     /// text. Both x and y advances carry into subsequent face spans.
     pub fn shape_ltr(&self, text: &str) -> Result<GlyphRun, Error> {
-        Ok(self.shape_ltr_impl(text, false)?.0)
+        Ok(self.shape_ltr_impl(text, false)?.run)
     }
 
     /// Shapes one LTR line with original UTF-8 source and face/span provenance.
@@ -264,20 +270,17 @@ impl<'a> CompositeFont<'a> {
     /// by each rule's face list. Repeated borrowed faces share that index.
     /// These indices are local to this composition, not stable font identifiers.
     pub fn shape_mapped_ltr(&self, text: &str) -> Result<crate::mapped::ShapedText, Error> {
-        let (run, sources) = self.shape_ltr_impl(text, true)?;
+        let result = self.shape_ltr_impl(text, true)?;
         Ok(crate::mapped::ShapedText::new(
             text,
-            run,
-            sources,
+            result.run,
+            result.sources,
             crate::TextDirection::LeftToRight,
-        ))
+        )
+        .with_ligature_carets(result.ligature_carets))
     }
 
-    fn shape_ltr_impl(
-        &self,
-        text: &str,
-        mapped: bool,
-    ) -> Result<(GlyphRun, Vec<crate::mapped::GlyphSource>), Error> {
+    fn shape_ltr_impl(&self, text: &str, mapped: bool) -> Result<CompositeLayoutResult, Error> {
         validate_single_line(text, "composite LTR")?;
         // Reuse normal option validation, including for empty text.
         let mut output = self.default_faces[0]
@@ -347,7 +350,11 @@ impl<'a> CompositeFont<'a> {
         if adjusted {
             validate_adjusted_run(&output)?;
         }
-        Ok((output, provenance.sources))
+        Ok(CompositeLayoutResult {
+            run: output,
+            sources: provenance.sources,
+            ligature_carets: provenance.ligature_carets,
+        })
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -369,18 +376,21 @@ impl<'a> CompositeFont<'a> {
         }
         let options = self.options.clone().with_font_size(size);
         let mut run = if mapped {
-            let (run, ranges) = selection
+            let mapped_output = selection
                 .face
                 .font()
-                .text2glyph_run_mapped(text, &options)?;
+                .text2glyph_run_with_carets(text, &options)?;
             let face_index = self
                 .default_faces
                 .iter()
                 .chain(self.rules.iter().flat_map(|rule| rule.faces.iter()))
                 .position(|face| std::ptr::eq(*face, selection.face))
                 .expect("selected face belongs to the composition");
-            provenance.finish(ranges, face_index);
-            run
+            provenance
+                .ligature_carets
+                .extend(mapped_output.ligature_carets);
+            provenance.finish(mapped_output.ranges, face_index);
+            mapped_output.run
         } else {
             selection.face.engine().with_options(options).shape(text)?
         };
