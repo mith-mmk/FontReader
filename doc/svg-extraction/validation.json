@@ -48,5 +48,26 @@
     "wasm": "passed",
     "docs": "passed",
     "compatibility": "same legacy run fields and document; explicit typed companion transform"
+  },
+  "noto_metadata_followup": {
+    "all_features": {
+      "passed": 689,
+      "failed": 0,
+      "ignored": 4
+    },
+    "no_default": {
+      "passed": 327,
+      "failed": 0,
+      "ignored": 3
+    },
+    "clippy": "passed",
+    "pinned_noto_extraction": {
+      "accepted": 18,
+      "rejected": [
+        "emoji_u1f436.svg",
+        "emoji_u1f680.svg"
+      ],
+      "reason": "DOCTYPE/entity declarations remain unsupported"
+    }
   }
 }

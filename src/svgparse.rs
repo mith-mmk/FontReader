@@ -422,6 +422,17 @@ fn flatten_node(
         scale_x,
         scale_y,
     );
+    for (key, resolved) in [("clip-path", &local_clip_path), ("mask", &local_mask_path)] {
+        let explicit = style
+            .as_ref()
+            .and_then(|style| style.get(key))
+            .or_else(|| element.attrs.get(key));
+        if explicit.is_some_and(|value| !value.trim().eq_ignore_ascii_case("none"))
+            && resolved.is_none()
+        {
+            return Err(());
+        }
+    }
     let next_state = RenderState {
         transform: state.transform.multiply(parse_transform(
             style
@@ -1258,7 +1269,7 @@ fn resolve_clip_path(
     }
     let reference = parse_url_reference(value)?;
     let element = defs.get(reference)?;
-    parse_clip_path_spec(element, defs, scale_x, scale_y).or_else(|| inherited.cloned())
+    parse_clip_path_spec(element, defs, scale_x, scale_y)
 }
 
 fn resolve_mask_path(
@@ -1278,7 +1289,7 @@ fn resolve_mask_path(
     }
     let reference = parse_url_reference(value)?;
     let element = defs.get(reference)?;
-    parse_mask_spec(element, defs, scale_x, scale_y).or_else(|| inherited.cloned())
+    parse_mask_spec(element, defs, scale_x, scale_y)
 }
 
 fn parse_clip_path_spec(
@@ -1307,7 +1318,8 @@ fn parse_clip_path_spec(
             scale_x,
             scale_y,
             &mut commands,
-        );
+        )
+        .ok()?;
     }
     if commands.is_empty() {
         None
@@ -1343,7 +1355,8 @@ fn parse_mask_spec(
             scale_x,
             scale_y,
             &mut commands,
-        );
+        )
+        .ok()?;
     }
     if commands.is_empty() {
         None
@@ -1359,9 +1372,9 @@ fn collect_clip_commands(
     scale_x: f32,
     scale_y: f32,
     out: &mut Vec<Command>,
-) {
+) -> Result<(), ()> {
     let SvgNode::Element(element) = node else {
-        return;
+        return Ok(());
     };
     let style = element.attrs.get("style").map(|value| parse_style(value));
     let next_transform = transform.multiply(parse_transform(
@@ -1376,7 +1389,7 @@ fn collect_clip_commands(
     match element.name.as_str() {
         "g" | "svg" | "symbol" | "clippath" => {
             for child in &element.children {
-                collect_clip_commands(child, defs, next_transform, scale_x, scale_y, out);
+                collect_clip_commands(child, defs, next_transform, scale_x, scale_y, out)?;
             }
         }
         "use" => {
@@ -1386,10 +1399,10 @@ fn collect_clip_commands(
                 .or_else(|| element.attrs.get("xlink:href"))
                 .and_then(|value| value.strip_prefix('#'))
             else {
-                return;
+                return Err(());
             };
             let Some(referenced) = defs.get(reference) else {
-                return;
+                return Err(());
             };
             let translate = Transform2D::translate(
                 parse_attr_f32(&element.attrs, "x").unwrap_or(0.0) * scale_x,
@@ -1402,7 +1415,7 @@ fn collect_clip_commands(
                 scale_x,
                 scale_y,
                 out,
-            );
+            )?;
         }
         "path" | "rect" | "circle" | "ellipse" | "line" | "polyline" | "polygon" => {
             let commands = match element.name.as_str() {
@@ -1418,12 +1431,11 @@ fn collect_clip_commands(
                 "polygon" => poly_points_to_commands(&element.attrs, true, scale_x, scale_y),
                 _ => None,
             };
-            if let Some(commands) = commands {
-                out.extend(transform_commands(&commands, next_transform));
-            }
+            out.extend(transform_commands(&commands.ok_or(())?, next_transform));
         }
-        _ => {}
+        _ => return Err(()),
     }
+    Ok(())
 }
 
 fn parse_hex_color(hex: &str) -> Option<u32> {
@@ -2382,6 +2394,26 @@ mod tests {
             matches!(layers[0].commands.last(), Some(Command::CubicBezier(_, _, (x, y))) if (*x - 20.0).abs() < 0.01 && (*y - 20.0).abs() < 0.01),
             "expected relative arc to end at the translated target"
         );
+    }
+
+    #[test]
+    fn unresolved_or_partial_clip_never_disappears_silently() {
+        let shape = "<rect width='10' height='10' clip-path='url(#clip)'/>";
+        let valid = "<rect width='5' height='5'/>";
+        let bad = "<path d='M0 0C1 2'/>";
+        assert!(!svg_to_path_layers(
+            &format!("<svg><defs><clipPath id='clip'>{valid}</clipPath></defs>{shape}</svg>"),
+            1.0,
+            1.0
+        )
+        .is_empty());
+        // Existing subset does not index clip definitions outside defs.
+        for document in [
+            format!("<svg><clipPath id='clip'>{valid}</clipPath>{shape}</svg>"),
+            format!("<svg><defs><clipPath id='clip'>{valid}{bad}</clipPath></defs>{shape}</svg>"),
+        ] {
+            assert!(svg_to_path_layers(&document, 1.0, 1.0).is_empty());
+        }
     }
 
     #[test]

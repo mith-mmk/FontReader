@@ -17,7 +17,7 @@ references, cycles, and excessive reference expansion are rejected.
 The result is a complete `<svg>` document. OpenType's initial viewport uses
 `head.unitsPerEm`, **not the glyph advance**. Root width/height defaults and
 percentages resolve against that em square; root overflow is forced visible as
-required by OpenType. Root numeric width/height and viewBox are retained; physical
+required by OpenType. Root numeric/px width/height and viewBox are retained; other physical
 CSS length units are not yet supported. Nested SVG viewports are retained.
 
 Source: https://learn.microsoft.com/en-us/typography/opentype/spec/svg
@@ -130,3 +130,34 @@ Regression tests compare full legacy runs (including documents/fields) against
 the new companion for LTR/RTL/vertical and nonuniform stretch, exercise invalid
 indices/options, layer offsets, and verify that forged SVG data attributes or
 legacy layout-box values cannot alter the typed transform.
+
+## Narrow Illustrator metadata normalization
+
+The fixed 20-asset Noto probe exposed `enable-background` on exported roots and
+containers. It only establishes a filter background buffer; this extractor
+rejects filter elements and filter properties throughout the source document.
+It now validates only `accumulate`, `new`, or `new x y width height` with finite
+coordinates/non-negative dimensions, then removes this inert property from
+attributes or inline style. Other declarations are retained and validated as
+before. Malformed/URL/CSS-escaped values remain rejected. This is not permission
+to remove arbitrary unsupported CSS or filter semantics.
+
+Root viewport dimensions additionally accept `px` (SVG user units), besides
+numbers and percentages. Root x/y, xml:space, and version were already handled.
+DTD, internal/custom/external entities and unknown namespaces remain rejected.
+
+The pinned 20 Noto source assets (revision
+`99701e07d3d1fe1bdbcdb14964547f0fd592966f`) now extract 18/20; dog U+1F436 and
+rocket U+1F680 still reject their Illustrator DTD/entity declarations. This is
+an extraction result, not a claim that the renderer passes all 18 images.
+An opt-in `external_noto_artwork_extraction_corpus` test reads
+`FONTCORE_NOTO_SVG_CORPUS` without network access and verifies that exact result.
+The tiny unmodified rainbow fixture provides a regular regression independently
+of the external corpus.
+
+The tulip probe also exposed a legacy path-subset hole: clip definitions outside
+`defs` were not indexed, and the unresolved clip was silently dropped. Explicit
+unresolved clip/mask references, and a failed geometry child inside a clip, now
+propagate failure to the entire path conversion. The complete raw SVG is retained
+instead. Existing simple clips successfully resolved inside defs keep their Path
+route, including CompositeFont's clip/gradient regression coverage.

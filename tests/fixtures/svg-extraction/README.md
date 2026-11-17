@@ -19,3 +19,9 @@ those derivatives retain the same attribution and licenses. Twemoji's font em is
 2048; the Noto asset's artboard is 128. For paintcore previews, use the respective
 viewports `0 -1700 2048 2048` and `0 0 128 128`; the Twemoji SVG root intentionally
 has overflow visible because its drawing extends above the font baseline.
+
+- `noto-emoji_u1f308.svg`: unmodified Google Noto Emoji rainbow artwork from
+  https://github.com/googlefonts/noto-emoji/blob/99701e07d3d1fe1bdbcdb14964547f0fd592966f/2D/svg/emoji_u1f308.svg .
+  Copyright Google Inc., Apache-2.0, same `NOTO-LICENSE` as the grinning face.
+  SHA256 `23a80becfb38d89ebf3ab8aa57136dce162bc74daac358668694e07499101fba`.
+  This standalone asset exercises Illustrator's inert enable-background export metadata.

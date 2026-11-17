@@ -356,6 +356,46 @@ fn validate(nodes: &[Node], i: usize) -> Option<Vec<String>> {
     Some(refs)
 }
 
+// enable-background only establishes a filter background buffer. This subset
+// rejects every filter element/property, so the supported grammar is inert.
+// Validate narrowly before removing it; do not discard arbitrary CSS/metadata.
+fn background_buffer(value: &str) -> Option<()> {
+    let words: Vec<_> = value.split_ascii_whitespace().collect();
+    if words == ["accumulate"] || words == ["new"] {
+        return Some(());
+    }
+    if words.len() != 5 || words[0] != "new" {
+        return None;
+    }
+    let values: Option<Vec<f64>> = words[1..].iter().map(|s| s.parse::<f64>().ok()).collect();
+    let values = values?;
+    (values.iter().all(|n| n.is_finite()) && values[2] >= 0.0 && values[3] >= 0.0).then_some(())
+}
+
+fn normalize_export_metadata(attrs: &mut Vec<(String, String)>) -> Option<()> {
+    for (name, value) in attrs.iter_mut() {
+        if name == "enable-background" {
+            background_buffer(value)?;
+        }
+        if name == "style" {
+            let mut kept = Vec::new();
+            for declaration in value.split(';').filter(|s| !s.trim().is_empty()) {
+                let (property, item) = declaration.split_once(':')?;
+                if property.trim() == "enable-background" {
+                    background_buffer(item)?;
+                } else {
+                    kept.push(declaration);
+                }
+            }
+            *value = kept.join(";");
+        }
+    }
+    attrs.retain(|(name, value)| {
+        name != "enable-background" && !(name == "style" && value.is_empty())
+    });
+    Some(())
+}
+
 fn parse(document: &str) -> Option<Vec<Node>> {
     let document = document.strip_prefix('\u{feff}').unwrap_or(document);
     let mut nodes: Vec<Node> = Vec::new();
@@ -402,7 +442,8 @@ fn parse(document: &str) -> Option<Vec<Node>> {
             } else {
                 raw
             };
-            let (name, attrs) = attributes(raw)?;
+            let (name, mut attrs) = attributes(raw)?;
+            normalize_export_metadata(&mut attrs)?;
             if nodes.len() >= MAX_NODES
                 || stack.len() >= MAX_DEPTH
                 || (stack.is_empty() && !nodes.is_empty())
@@ -538,7 +579,13 @@ pub(super) fn extract_with_units(document: &str, gid: u16, units_per_em: u16) ->
                 if let Some(percent) = value.trim().strip_suffix('%') {
                     percent.trim().parse::<f64>().ok()? * units_per_em as f64 / 100.0
                 } else {
-                    value.trim().parse::<f64>().ok()?
+                    value
+                        .trim()
+                        .strip_suffix("px")
+                        .unwrap_or(value.trim())
+                        .trim()
+                        .parse::<f64>()
+                        .ok()?
                 }
             }
         };
@@ -703,6 +750,78 @@ mod tests {
         assert!(twemoji.contains("width=\"2048\""));
         assert!(twemoji.contains("overflow=\"visible\""));
         assert!(extract_with_units(TWEMOJI, 6, 2048).is_none());
+    }
+
+    #[test]
+    fn illustrator_inert_background_metadata_and_pixel_viewport() {
+        let source = "<svg version='1.1' x='0px' y='0px' width='128px' height='128px' xml:space='preserve' style='enable-background:new 0 0 128 128;fill:#123456'><g enable-background='new'><path id='glyph1' d='M0 0L1 1'/></g></svg>";
+        let out = extract_with_units(source, 1, 128).unwrap();
+        assert!(!out.contains("enable-background"));
+        assert!(out.contains("fill:#123456"));
+        assert!(out.contains("width=\"128\""));
+        assert!(out.contains("xml:space=\"preserve\""));
+        for value in [
+            "new url(https://evil.test)",
+            "new 0 0 NaN 128",
+            "new 0 0 -1 128",
+            "new 0 0 128",
+            "new;fill:red",
+            "new 0 0 128 128 !important",
+        ] {
+            assert!(extract(&format!("<svg enable-background='{value}'/>"), 1).is_none());
+        }
+        assert!(extract(
+            "<svg style='enable-background:new;filter:url(#f)'><filter id='f'/></svg>",
+            1
+        )
+        .is_none());
+        assert!(extract(
+            "<!DOCTYPE svg [<!ENTITY ns 'http://www.w3.org/2000/svg'>]><svg xmlns='&ns;'/>",
+            1
+        )
+        .is_none());
+        assert!(extract("<svg width='128pt'/>", 1).is_none());
+    }
+
+    #[test]
+    fn real_illustrator_noto_document_extracts_without_background_metadata() {
+        let source = include_str!("../../../tests/fixtures/svg-extraction/noto-emoji_u1f308.svg");
+        let out = extract_with_units(source, 5, 128).unwrap();
+        assert!(out.contains("#FF5117"));
+        assert!(!out.contains("enable-background"));
+        assert_eq!(
+            out.matches("<path").count(),
+            source.matches("<path").count()
+        );
+    }
+
+    #[test]
+    #[ignore = "requires FONTCORE_NOTO_SVG_CORPUS directory of pinned source assets"]
+    fn external_noto_artwork_extraction_corpus() {
+        let directory =
+            std::path::PathBuf::from(std::env::var("FONTCORE_NOTO_SVG_CORPUS").unwrap());
+        let mut passed = Vec::new();
+        let mut rejected = Vec::new();
+        for entry in std::fs::read_dir(directory).unwrap() {
+            let path = entry.unwrap().path();
+            if path.extension().is_none_or(|s| s != "svg") {
+                continue;
+            }
+            let source = std::fs::read_to_string(&path).unwrap();
+            if extract_with_units(&source, 5, 128).is_some() {
+                passed.push(path.file_name().unwrap().to_string_lossy().into_owned());
+            } else {
+                rejected.push(path.file_name().unwrap().to_string_lossy().into_owned());
+            }
+        }
+        rejected.sort();
+        eprintln!(
+            "Noto extraction: {} accepted; rejected {:?}",
+            passed.len(),
+            rejected
+        );
+        assert_eq!(passed.len(), 18);
+        assert_eq!(rejected, ["emoji_u1f436.svg", "emoji_u1f680.svg"]);
     }
 
     #[test]
