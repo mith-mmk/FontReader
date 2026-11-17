@@ -380,3 +380,17 @@ source = "tests/fixtures/generate_bidi_layout.py (fontTools 4.61.1)"
 license = "MIT (original synthetic outlines)"
 sha256 = "89b4791d6f45dad0185a2b19f5deec695090c5a8cf6ab21604635f21e28e34f8"
 features = ["bidi", "mirroring", "source-ownership", "formatting-controls", "ligature", "arabic-joining", "zero-advance-mark"]
+
+[[fixture]]
+id = "gdef-carets.ttc"
+source = "tests/fixtures/generate_gdef_carets.py (fontTools 4.61.1)"
+license = "MIT (original synthetic outlines)"
+sha256 = "313d2439d4ffefffb38ea5e006d7202785d2154eab7d164ec9e45e199c371c1c"
+features = ["GDEF", "ligature-carets", "coverage-order", "contour-point", "device", "variation-index", "invalid-variation-index", "GPOS", "single-placement", "invalid-caret-order", "duplicate-caret"]
+
+[[fixture]]
+id = "gdef-composite-carets.ttc"
+source = "tests/fixtures/generate_gdef_composite_carets.py (fontTools 4.61.1)"
+license = "MIT (original synthetic outlines)"
+sha256 = "6bb3c957feae6a1fe75dd40b9d25487236130b7bfb2f56e44c0d802a6878e825"
+features = ["GDEF", "composite", "XY-translation", "point-caret", "nested", "unsupported-metrics", "unsupported-transform", "point-attachment", "work-budget"]

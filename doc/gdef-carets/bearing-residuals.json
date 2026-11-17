@@ -1,0 +1,815 @@
+{
+  "harfbuzz_version": "10.2.0",
+  "fixture_sha256": "313d2439d4ffefffb38ea5e006d7202785d2154eab7d164ec9e45e199c371c1c",
+  "scope": "face0 static simple rectangular outlines; unhinted OT backend; draw control bounds exact for these rectangles only",
+  "rows": [
+    {
+      "variant": "original",
+      "direction": "ltr",
+      "hb_features": "default",
+      "font_sha256": "4277869addae5258eb8d3bbf39f59cabf7471dabd21c6954d63ef543472681d3",
+      "head_flags": 1,
+      "xmin": 20,
+      "xmax": 300,
+      "lsb": 0,
+      "hb_draw_glyph_unpositioned_y_up_bounds": [
+        0.0,
+        0.0,
+        280.0,
+        500.0
+      ],
+      "hb_positioned_draw_y_down_bounds": [
+        0.0,
+        -500.0,
+        280.0,
+        -0.0
+      ],
+      "harfbuzz": {
+        "glyph_id": 6,
+        "cluster": 0,
+        "source": [
+          0,
+          2
+        ],
+        "advance_xy": [
+          900,
+          0
+        ],
+        "x_offset": 0,
+        "y_offset": 0,
+        "pen_xy": [
+          0,
+          0
+        ],
+        "bounds": [
+          0,
+          -500,
+          280,
+          0
+        ],
+        "vertical_origin": [
+          450,
+          750
+        ]
+      },
+      "hb_gdef_coordinates": [
+        220
+      ],
+      "fontcore": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              2
+            ],
+            "x": 0,
+            "y": 0,
+            "advance_xy": [
+              900,
+              0
+            ],
+            "candidates": [
+              220.0
+            ],
+            "bounds": [
+              20,
+              -500,
+              300,
+              0
+            ]
+          }
+        ],
+        "stops": [
+          {
+            "byte": 0,
+            "x": 0,
+            "y": 0,
+            "quality": "AdvanceBoundary",
+            "source": "Advance"
+          },
+          {
+            "byte": 1,
+            "x": 220,
+            "y": 0,
+            "quality": "Approximate",
+            "source": "FontAuthored"
+          },
+          {
+            "byte": 2,
+            "x": 900,
+            "y": 0,
+            "quality": "AdvanceBoundary",
+            "source": "Advance"
+          }
+        ]
+      }
+    },
+    {
+      "variant": "original",
+      "direction": "ttb",
+      "hb_features": "liga=1",
+      "font_sha256": "4277869addae5258eb8d3bbf39f59cabf7471dabd21c6954d63ef543472681d3",
+      "head_flags": 1,
+      "xmin": 20,
+      "xmax": 300,
+      "lsb": 0,
+      "hb_draw_glyph_unpositioned_y_up_bounds": [
+        0.0,
+        0.0,
+        280.0,
+        500.0
+      ],
+      "hb_positioned_draw_y_down_bounds": [
+        -450.0,
+        250.0,
+        -170.0,
+        750.0
+      ],
+      "harfbuzz": {
+        "glyph_id": 6,
+        "cluster": 0,
+        "source": [
+          0,
+          2
+        ],
+        "advance_xy": [
+          0,
+          1000
+        ],
+        "x_offset": -450,
+        "y_offset": -750,
+        "pen_xy": [
+          0,
+          0
+        ],
+        "bounds": [
+          -450,
+          250,
+          -170,
+          750
+        ],
+        "vertical_origin": [
+          450,
+          750
+        ]
+      },
+      "hb_gdef_coordinates": [
+        220
+      ],
+      "fontcore": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              2
+            ],
+            "x": 0,
+            "y": 0,
+            "advance_xy": [
+              0,
+              1000
+            ],
+            "candidates": [
+              530.0
+            ],
+            "bounds": [
+              -430,
+              250,
+              -150,
+              750
+            ]
+          }
+        ],
+        "stops": [
+          {
+            "byte": 0,
+            "x": 0,
+            "y": 0,
+            "quality": "AdvanceBoundary",
+            "source": "Advance"
+          },
+          {
+            "byte": 1,
+            "x": 0,
+            "y": 530,
+            "quality": "Approximate",
+            "source": "FontAuthored"
+          },
+          {
+            "byte": 2,
+            "x": 0,
+            "y": 1000,
+            "quality": "AdvanceBoundary",
+            "source": "Advance"
+          }
+        ]
+      }
+    },
+    {
+      "variant": "lsb_equals_xmin",
+      "direction": "ltr",
+      "hb_features": "default",
+      "font_sha256": "d5560245b13131add8558e137bf233e90e6e87f431bcae681ff0ceba71f84602",
+      "head_flags": 3,
+      "xmin": 20,
+      "xmax": 300,
+      "lsb": 20,
+      "hb_draw_glyph_unpositioned_y_up_bounds": [
+        20.0,
+        0.0,
+        300.0,
+        500.0
+      ],
+      "hb_positioned_draw_y_down_bounds": [
+        20.0,
+        -500.0,
+        300.0,
+        -0.0
+      ],
+      "harfbuzz": {
+        "glyph_id": 6,
+        "cluster": 0,
+        "source": [
+          0,
+          2
+        ],
+        "advance_xy": [
+          900,
+          0
+        ],
+        "x_offset": 0,
+        "y_offset": 0,
+        "pen_xy": [
+          0,
+          0
+        ],
+        "bounds": [
+          20,
+          -500,
+          300,
+          0
+        ],
+        "vertical_origin": [
+          450,
+          750
+        ]
+      },
+      "hb_gdef_coordinates": [
+        220
+      ],
+      "fontcore": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              2
+            ],
+            "x": 0,
+            "y": 0,
+            "advance_xy": [
+              900,
+              0
+            ],
+            "candidates": [
+              220.0
+            ],
+            "bounds": [
+              20,
+              -500,
+              300,
+              0
+            ]
+          }
+        ],
+        "stops": [
+          {
+            "byte": 0,
+            "x": 0,
+            "y": 0,
+            "quality": "AdvanceBoundary",
+            "source": "Advance"
+          },
+          {
+            "byte": 1,
+            "x": 220,
+            "y": 0,
+            "quality": "Approximate",
+            "source": "FontAuthored"
+          },
+          {
+            "byte": 2,
+            "x": 900,
+            "y": 0,
+            "quality": "AdvanceBoundary",
+            "source": "Advance"
+          }
+        ]
+      }
+    },
+    {
+      "variant": "lsb_equals_xmin",
+      "direction": "ttb",
+      "hb_features": "liga=1",
+      "font_sha256": "d5560245b13131add8558e137bf233e90e6e87f431bcae681ff0ceba71f84602",
+      "head_flags": 3,
+      "xmin": 20,
+      "xmax": 300,
+      "lsb": 20,
+      "hb_draw_glyph_unpositioned_y_up_bounds": [
+        20.0,
+        0.0,
+        300.0,
+        500.0
+      ],
+      "hb_positioned_draw_y_down_bounds": [
+        -430.0,
+        250.0,
+        -150.0,
+        750.0
+      ],
+      "harfbuzz": {
+        "glyph_id": 6,
+        "cluster": 0,
+        "source": [
+          0,
+          2
+        ],
+        "advance_xy": [
+          0,
+          1000
+        ],
+        "x_offset": -450,
+        "y_offset": -750,
+        "pen_xy": [
+          0,
+          0
+        ],
+        "bounds": [
+          -430,
+          250,
+          -150,
+          750
+        ],
+        "vertical_origin": [
+          450,
+          750
+        ]
+      },
+      "hb_gdef_coordinates": [
+        220
+      ],
+      "fontcore": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              2
+            ],
+            "x": 0,
+            "y": 0,
+            "advance_xy": [
+              0,
+              1000
+            ],
+            "candidates": [
+              530.0
+            ],
+            "bounds": [
+              -430,
+              250,
+              -150,
+              750
+            ]
+          }
+        ],
+        "stops": [
+          {
+            "byte": 0,
+            "x": 0,
+            "y": 0,
+            "quality": "AdvanceBoundary",
+            "source": "Advance"
+          },
+          {
+            "byte": 1,
+            "x": 0,
+            "y": 530,
+            "quality": "Approximate",
+            "source": "FontAuthored"
+          },
+          {
+            "byte": 2,
+            "x": 0,
+            "y": 1000,
+            "quality": "AdvanceBoundary",
+            "source": "Advance"
+          }
+        ]
+      }
+    },
+    {
+      "variant": "outline_xmin_zero",
+      "direction": "ltr",
+      "hb_features": "default",
+      "font_sha256": "a5ba42181f9cfb8bfbbfa031240c6803391dc94d6f68a9dca9e0a1043ace247f",
+      "head_flags": 3,
+      "xmin": 0,
+      "xmax": 280,
+      "lsb": 0,
+      "hb_draw_glyph_unpositioned_y_up_bounds": [
+        0.0,
+        0.0,
+        280.0,
+        500.0
+      ],
+      "hb_positioned_draw_y_down_bounds": [
+        0.0,
+        -500.0,
+        280.0,
+        -0.0
+      ],
+      "harfbuzz": {
+        "glyph_id": 6,
+        "cluster": 0,
+        "source": [
+          0,
+          2
+        ],
+        "advance_xy": [
+          900,
+          0
+        ],
+        "x_offset": 0,
+        "y_offset": 0,
+        "pen_xy": [
+          0,
+          0
+        ],
+        "bounds": [
+          0,
+          -500,
+          280,
+          0
+        ],
+        "vertical_origin": [
+          450,
+          750
+        ]
+      },
+      "hb_gdef_coordinates": [
+        220
+      ],
+      "fontcore": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              2
+            ],
+            "x": 0,
+            "y": 0,
+            "advance_xy": [
+              900,
+              0
+            ],
+            "candidates": [
+              220.0
+            ],
+            "bounds": [
+              0,
+              -500,
+              280,
+              0
+            ]
+          }
+        ],
+        "stops": [
+          {
+            "byte": 0,
+            "x": 0,
+            "y": 0,
+            "quality": "AdvanceBoundary",
+            "source": "Advance"
+          },
+          {
+            "byte": 1,
+            "x": 220,
+            "y": 0,
+            "quality": "Approximate",
+            "source": "FontAuthored"
+          },
+          {
+            "byte": 2,
+            "x": 900,
+            "y": 0,
+            "quality": "AdvanceBoundary",
+            "source": "Advance"
+          }
+        ]
+      }
+    },
+    {
+      "variant": "outline_xmin_zero",
+      "direction": "ttb",
+      "hb_features": "liga=1",
+      "font_sha256": "a5ba42181f9cfb8bfbbfa031240c6803391dc94d6f68a9dca9e0a1043ace247f",
+      "head_flags": 3,
+      "xmin": 0,
+      "xmax": 280,
+      "lsb": 0,
+      "hb_draw_glyph_unpositioned_y_up_bounds": [
+        0.0,
+        0.0,
+        280.0,
+        500.0
+      ],
+      "hb_positioned_draw_y_down_bounds": [
+        -450.0,
+        250.0,
+        -170.0,
+        750.0
+      ],
+      "harfbuzz": {
+        "glyph_id": 6,
+        "cluster": 0,
+        "source": [
+          0,
+          2
+        ],
+        "advance_xy": [
+          0,
+          1000
+        ],
+        "x_offset": -450,
+        "y_offset": -750,
+        "pen_xy": [
+          0,
+          0
+        ],
+        "bounds": [
+          -450,
+          250,
+          -170,
+          750
+        ],
+        "vertical_origin": [
+          450,
+          750
+        ]
+      },
+      "hb_gdef_coordinates": [
+        220
+      ],
+      "fontcore": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              2
+            ],
+            "x": 0,
+            "y": 0,
+            "advance_xy": [
+              0,
+              1000
+            ],
+            "candidates": [
+              530.0
+            ],
+            "bounds": [
+              -450,
+              250,
+              -170,
+              750
+            ]
+          }
+        ],
+        "stops": [
+          {
+            "byte": 0,
+            "x": 0,
+            "y": 0,
+            "quality": "AdvanceBoundary",
+            "source": "Advance"
+          },
+          {
+            "byte": 1,
+            "x": 0,
+            "y": 530,
+            "quality": "Approximate",
+            "source": "FontAuthored"
+          },
+          {
+            "byte": 2,
+            "x": 0,
+            "y": 1000,
+            "quality": "AdvanceBoundary",
+            "source": "Advance"
+          }
+        ]
+      }
+    },
+    {
+      "variant": "lsb_minus40",
+      "direction": "ltr",
+      "hb_features": "default",
+      "font_sha256": "ecdce8e94a1465bbe92604dedab06e23a41acbb42f2e57ef7d2396206610c013",
+      "head_flags": 1,
+      "xmin": 20,
+      "xmax": 300,
+      "lsb": -40,
+      "hb_draw_glyph_unpositioned_y_up_bounds": [
+        -40.0,
+        0.0,
+        240.0,
+        500.0
+      ],
+      "hb_positioned_draw_y_down_bounds": [
+        -40.0,
+        -500.0,
+        240.0,
+        -0.0
+      ],
+      "harfbuzz": {
+        "glyph_id": 6,
+        "cluster": 0,
+        "source": [
+          0,
+          2
+        ],
+        "advance_xy": [
+          900,
+          0
+        ],
+        "x_offset": 0,
+        "y_offset": 0,
+        "pen_xy": [
+          0,
+          0
+        ],
+        "bounds": [
+          -40,
+          -500,
+          240,
+          0
+        ],
+        "vertical_origin": [
+          450,
+          750
+        ]
+      },
+      "hb_gdef_coordinates": [
+        220
+      ],
+      "fontcore": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              2
+            ],
+            "x": 0,
+            "y": 0,
+            "advance_xy": [
+              900,
+              0
+            ],
+            "candidates": [
+              220.0
+            ],
+            "bounds": [
+              20,
+              -500,
+              300,
+              0
+            ]
+          }
+        ],
+        "stops": [
+          {
+            "byte": 0,
+            "x": 0,
+            "y": 0,
+            "quality": "AdvanceBoundary",
+            "source": "Advance"
+          },
+          {
+            "byte": 1,
+            "x": 220,
+            "y": 0,
+            "quality": "Approximate",
+            "source": "FontAuthored"
+          },
+          {
+            "byte": 2,
+            "x": 900,
+            "y": 0,
+            "quality": "AdvanceBoundary",
+            "source": "Advance"
+          }
+        ]
+      }
+    },
+    {
+      "variant": "lsb_minus40",
+      "direction": "ttb",
+      "hb_features": "liga=1",
+      "font_sha256": "ecdce8e94a1465bbe92604dedab06e23a41acbb42f2e57ef7d2396206610c013",
+      "head_flags": 1,
+      "xmin": 20,
+      "xmax": 300,
+      "lsb": -40,
+      "hb_draw_glyph_unpositioned_y_up_bounds": [
+        -40.0,
+        0.0,
+        240.0,
+        500.0
+      ],
+      "hb_positioned_draw_y_down_bounds": [
+        -490.0,
+        250.0,
+        -210.0,
+        750.0
+      ],
+      "harfbuzz": {
+        "glyph_id": 6,
+        "cluster": 0,
+        "source": [
+          0,
+          2
+        ],
+        "advance_xy": [
+          0,
+          1000
+        ],
+        "x_offset": -450,
+        "y_offset": -750,
+        "pen_xy": [
+          0,
+          0
+        ],
+        "bounds": [
+          -490,
+          250,
+          -210,
+          750
+        ],
+        "vertical_origin": [
+          450,
+          750
+        ]
+      },
+      "hb_gdef_coordinates": [
+        220
+      ],
+      "fontcore": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              2
+            ],
+            "x": 0,
+            "y": 0,
+            "advance_xy": [
+              0,
+              1000
+            ],
+            "candidates": [
+              530.0
+            ],
+            "bounds": [
+              -430,
+              250,
+              -150,
+              750
+            ]
+          }
+        ],
+        "stops": [
+          {
+            "byte": 0,
+            "x": 0,
+            "y": 0,
+            "quality": "AdvanceBoundary",
+            "source": "Advance"
+          },
+          {
+            "byte": 1,
+            "x": 0,
+            "y": 530,
+            "quality": "Approximate",
+            "source": "FontAuthored"
+          },
+          {
+            "byte": 2,
+            "x": 0,
+            "y": 1000,
+            "quality": "AdvanceBoundary",
+            "source": "Advance"
+          }
+        ]
+      }
+    }
+  ]
+}

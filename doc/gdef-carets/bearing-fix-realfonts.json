@@ -1,0 +1,3057 @@
+{
+  "harfbuzz_version": "10.2.0",
+  "fonttools_version": "4.61.1",
+  "before_probe_sha256": "35bef101940e069671425d5dc81b217c254970aab55f90048b9eb91ba46978e1",
+  "after_probe_sha256": "924f3b70a18173193ce4b3fd836e3d19cb3ce0fcfd6f4e400e968cdeab55eec7",
+  "evaluator": "fontTools BoundsPen, true quadratic/cubic extrema on both actual drawable paths; y-down; 0.51 design-unit tolerance",
+  "before_revision": "d98f6583c44a5946adab50dae786e9e4f4b00d22",
+  "after_revision": "working tree static simple glyf metric-origin correction",
+  "rows": [
+    {
+      "font": "NotoSans-Regular.ttf",
+      "sha256": "89c3c497f618fdaa0b2d1e98fef93582f28c71debd2c4a8cdf41f190ced2909d",
+      "text": "A",
+      "codepoints": [
+        "U+0041"
+      ],
+      "direction": "ltr",
+      "harfbuzz": [
+        {
+          "glyph_id": 36,
+          "cluster": 0,
+          "source": [
+            0,
+            1
+          ],
+          "advance_xy": [
+            639,
+            0
+          ],
+          "x_offset": 0,
+          "y_offset": 0,
+          "pen_xy": [
+            0,
+            0
+          ],
+          "bounds": [
+            0,
+            -717,
+            638,
+            0
+          ],
+          "vertical_origin": [
+            319,
+            1039
+          ],
+          "actual_bounds": [
+            0.0,
+            -717.0,
+            638.0,
+            0.0
+          ],
+          "name": "A",
+          "xmin": 0,
+          "lsb": 0,
+          "contours": 2
+        }
+      ],
+      "before": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              1
+            ],
+            "advance": [
+              639,
+              0
+            ],
+            "actual_bounds": [
+              0,
+              -717,
+              638,
+              0
+            ]
+          }
+        ]
+      },
+      "after": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              1
+            ],
+            "advance": [
+              639,
+              0
+            ],
+            "actual_bounds": [
+              0,
+              -717,
+              638,
+              0
+            ]
+          }
+        ]
+      },
+      "glyph_identity_verified": false,
+      "before_bounds_delta": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "before_classification": "necessary_geometry_agrees_identity_unverified",
+      "after_bounds_delta": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "after_classification": "necessary_geometry_agrees_identity_unverified"
+    },
+    {
+      "font": "NotoSans-Regular.ttf",
+      "sha256": "89c3c497f618fdaa0b2d1e98fef93582f28c71debd2c4a8cdf41f190ced2909d",
+      "text": "A",
+      "codepoints": [
+        "U+0041"
+      ],
+      "direction": "ttb",
+      "harfbuzz": [
+        {
+          "glyph_id": 36,
+          "cluster": 0,
+          "source": [
+            0,
+            1
+          ],
+          "advance_xy": [
+            0,
+            1362
+          ],
+          "x_offset": -319,
+          "y_offset": -1039,
+          "pen_xy": [
+            0,
+            0
+          ],
+          "bounds": [
+            -319,
+            322,
+            319,
+            1039
+          ],
+          "vertical_origin": [
+            319,
+            1039
+          ],
+          "actual_bounds": [
+            -319.0,
+            322.0,
+            319.0,
+            1039.0
+          ],
+          "name": "A",
+          "xmin": 0,
+          "lsb": 0,
+          "contours": 2
+        }
+      ],
+      "before": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              1
+            ],
+            "advance": [
+              0,
+              1362
+            ],
+            "actual_bounds": [
+              -319.5,
+              322.5,
+              318.5,
+              1039.5
+            ]
+          }
+        ]
+      },
+      "after": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              1
+            ],
+            "advance": [
+              0,
+              1362
+            ],
+            "actual_bounds": [
+              -319.5,
+              322.5,
+              318.5,
+              1039.5
+            ]
+          }
+        ]
+      },
+      "glyph_identity_verified": false,
+      "before_bounds_delta": [
+        [
+          -0.5,
+          0.5,
+          -0.5,
+          0.5
+        ]
+      ],
+      "before_classification": "necessary_geometry_agrees_identity_unverified",
+      "after_bounds_delta": [
+        [
+          -0.5,
+          0.5,
+          -0.5,
+          0.5
+        ]
+      ],
+      "after_classification": "necessary_geometry_agrees_identity_unverified"
+    },
+    {
+      "font": "NotoSans-Regular.ttf",
+      "sha256": "89c3c497f618fdaa0b2d1e98fef93582f28c71debd2c4a8cdf41f190ced2909d",
+      "text": "Å",
+      "codepoints": [
+        "U+00C5"
+      ],
+      "direction": "ltr",
+      "harfbuzz": [
+        {
+          "glyph_id": 135,
+          "cluster": 0,
+          "source": [
+            0,
+            2
+          ],
+          "advance_xy": [
+            639,
+            0
+          ],
+          "x_offset": 0,
+          "y_offset": 0,
+          "pen_xy": [
+            0,
+            0
+          ],
+          "bounds": [
+            0,
+            -878,
+            638,
+            0
+          ],
+          "vertical_origin": [
+            319,
+            1120
+          ],
+          "actual_bounds": [
+            0.0,
+            -878.0,
+            638.0,
+            0.0
+          ],
+          "name": "Aring",
+          "xmin": 0,
+          "lsb": 0,
+          "contours": -1
+        }
+      ],
+      "before": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              2
+            ],
+            "advance": [
+              639,
+              0
+            ],
+            "actual_bounds": [
+              0,
+              -878,
+              638,
+              0
+            ]
+          }
+        ]
+      },
+      "after": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              2
+            ],
+            "advance": [
+              639,
+              0
+            ],
+            "actual_bounds": [
+              0,
+              -878,
+              638,
+              0
+            ]
+          }
+        ]
+      },
+      "glyph_identity_verified": false,
+      "before_bounds_delta": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "before_classification": "necessary_geometry_agrees_identity_unverified",
+      "after_bounds_delta": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "after_classification": "necessary_geometry_agrees_identity_unverified"
+    },
+    {
+      "font": "NotoSans-Regular.ttf",
+      "sha256": "89c3c497f618fdaa0b2d1e98fef93582f28c71debd2c4a8cdf41f190ced2909d",
+      "text": "Å",
+      "codepoints": [
+        "U+00C5"
+      ],
+      "direction": "ttb",
+      "harfbuzz": [
+        {
+          "glyph_id": 135,
+          "cluster": 0,
+          "source": [
+            0,
+            2
+          ],
+          "advance_xy": [
+            0,
+            1362
+          ],
+          "x_offset": -319,
+          "y_offset": -1120,
+          "pen_xy": [
+            0,
+            0
+          ],
+          "bounds": [
+            -319,
+            242,
+            319,
+            1120
+          ],
+          "vertical_origin": [
+            319,
+            1120
+          ],
+          "actual_bounds": [
+            -319.0,
+            242.0,
+            319.0,
+            1120.0
+          ],
+          "name": "Aring",
+          "xmin": 0,
+          "lsb": 0,
+          "contours": -1
+        }
+      ],
+      "before": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              2
+            ],
+            "advance": [
+              0,
+              1362
+            ],
+            "actual_bounds": [
+              -319.5,
+              242,
+              318.5,
+              1120
+            ]
+          }
+        ]
+      },
+      "after": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              2
+            ],
+            "advance": [
+              0,
+              1362
+            ],
+            "actual_bounds": [
+              -319.5,
+              242,
+              318.5,
+              1120
+            ]
+          }
+        ]
+      },
+      "glyph_identity_verified": false,
+      "before_bounds_delta": [
+        [
+          -0.5,
+          0.0,
+          -0.5,
+          0.0
+        ]
+      ],
+      "before_classification": "necessary_geometry_agrees_identity_unverified",
+      "after_bounds_delta": [
+        [
+          -0.5,
+          0.0,
+          -0.5,
+          0.0
+        ]
+      ],
+      "after_classification": "necessary_geometry_agrees_identity_unverified"
+    },
+    {
+      "font": "NotoSans-Regular.ttf",
+      "sha256": "89c3c497f618fdaa0b2d1e98fef93582f28c71debd2c4a8cdf41f190ced2909d",
+      "text": "fi",
+      "codepoints": [
+        "U+0066",
+        "U+0069"
+      ],
+      "direction": "ltr",
+      "harfbuzz": [
+        {
+          "glyph_id": 1967,
+          "cluster": 0,
+          "source": [
+            0,
+            2
+          ],
+          "advance_xy": [
+            602,
+            0
+          ],
+          "x_offset": 0,
+          "y_offset": 0,
+          "pen_xy": [
+            0,
+            0
+          ],
+          "bounds": [
+            15,
+            -765,
+            525,
+            0
+          ],
+          "vertical_origin": [
+            301,
+            1063
+          ],
+          "actual_bounds": [
+            15.0,
+            -765.0,
+            525.0,
+            0.0
+          ],
+          "name": "fi",
+          "xmin": 15,
+          "lsb": 15,
+          "contours": -1
+        }
+      ],
+      "before": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              2
+            ],
+            "advance": [
+              602,
+              0
+            ],
+            "actual_bounds": [
+              15,
+              -765,
+              525,
+              0
+            ]
+          }
+        ]
+      },
+      "after": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              2
+            ],
+            "advance": [
+              602,
+              0
+            ],
+            "actual_bounds": [
+              15,
+              -765,
+              525,
+              0
+            ]
+          }
+        ]
+      },
+      "glyph_identity_verified": false,
+      "before_bounds_delta": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "before_classification": "necessary_geometry_agrees_identity_unverified",
+      "after_bounds_delta": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "after_classification": "necessary_geometry_agrees_identity_unverified"
+    },
+    {
+      "font": "NotoSans-Regular.ttf",
+      "sha256": "89c3c497f618fdaa0b2d1e98fef93582f28c71debd2c4a8cdf41f190ced2909d",
+      "text": "fi",
+      "codepoints": [
+        "U+0066",
+        "U+0069"
+      ],
+      "direction": "ttb",
+      "harfbuzz": [
+        {
+          "glyph_id": 73,
+          "cluster": 0,
+          "source": [
+            0,
+            1
+          ],
+          "advance_xy": [
+            0,
+            1362
+          ],
+          "x_offset": -172,
+          "y_offset": -1063,
+          "pen_xy": [
+            0,
+            0
+          ],
+          "bounds": [
+            -157,
+            298,
+            215,
+            1063
+          ],
+          "vertical_origin": [
+            172,
+            1063
+          ],
+          "actual_bounds": [
+            -157.0,
+            298.0,
+            215.0,
+            1063.0
+          ],
+          "name": "f",
+          "xmin": 15,
+          "lsb": 15,
+          "contours": 1
+        },
+        {
+          "glyph_id": 76,
+          "cluster": 1,
+          "source": [
+            1,
+            2
+          ],
+          "advance_xy": [
+            0,
+            1362
+          ],
+          "x_offset": -129,
+          "y_offset": -1049,
+          "pen_xy": [
+            0,
+            1362
+          ],
+          "bounds": [
+            -51,
+            1674,
+            52,
+            2411
+          ],
+          "vertical_origin": [
+            129,
+            1049
+          ],
+          "actual_bounds": [
+            -51.0,
+            1674.0,
+            52.0,
+            2411.0
+          ],
+          "name": "i",
+          "xmin": 78,
+          "lsb": 78,
+          "contours": 2
+        }
+      ],
+      "before": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              2
+            ],
+            "advance": [
+              0,
+              1362
+            ],
+            "actual_bounds": [
+              -286,
+              298.5,
+              224,
+              1063.5
+            ]
+          }
+        ]
+      },
+      "after": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              2
+            ],
+            "advance": [
+              0,
+              1362
+            ],
+            "actual_bounds": [
+              -286,
+              298.5,
+              224,
+              1063.5
+            ]
+          }
+        ]
+      },
+      "glyph_identity_verified": false,
+      "before_classification": "shaping_not_comparable",
+      "after_classification": "shaping_not_comparable"
+    },
+    {
+      "font": "NotoSerif-Regular.ttf",
+      "sha256": "9d7583b7dc9e812afd32a14280c5cac3160012efe50c8d08938f4fea266ff67f",
+      "text": "A",
+      "codepoints": [
+        "U+0041"
+      ],
+      "direction": "ltr",
+      "harfbuzz": [
+        {
+          "glyph_id": 36,
+          "cluster": 0,
+          "source": [
+            0,
+            1
+          ],
+          "advance_xy": [
+            705,
+            0
+          ],
+          "x_offset": 0,
+          "y_offset": 0,
+          "pen_xy": [
+            0,
+            0
+          ],
+          "bounds": [
+            0,
+            -714,
+            705,
+            0
+          ],
+          "vertical_origin": [
+            352,
+            1038
+          ],
+          "actual_bounds": [
+            0.0,
+            -714.0,
+            705.0,
+            0.0
+          ],
+          "name": "A",
+          "xmin": 0,
+          "lsb": 0,
+          "contours": 2
+        }
+      ],
+      "before": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              1
+            ],
+            "advance": [
+              705,
+              0
+            ],
+            "actual_bounds": [
+              0,
+              -714,
+              705,
+              0
+            ]
+          }
+        ]
+      },
+      "after": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              1
+            ],
+            "advance": [
+              705,
+              0
+            ],
+            "actual_bounds": [
+              0,
+              -714,
+              705,
+              0
+            ]
+          }
+        ]
+      },
+      "glyph_identity_verified": false,
+      "before_bounds_delta": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "before_classification": "necessary_geometry_agrees_identity_unverified",
+      "after_bounds_delta": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "after_classification": "necessary_geometry_agrees_identity_unverified"
+    },
+    {
+      "font": "NotoSerif-Regular.ttf",
+      "sha256": "9d7583b7dc9e812afd32a14280c5cac3160012efe50c8d08938f4fea266ff67f",
+      "text": "A",
+      "codepoints": [
+        "U+0041"
+      ],
+      "direction": "ttb",
+      "harfbuzz": [
+        {
+          "glyph_id": 36,
+          "cluster": 0,
+          "source": [
+            0,
+            1
+          ],
+          "advance_xy": [
+            0,
+            1362
+          ],
+          "x_offset": -352,
+          "y_offset": -1038,
+          "pen_xy": [
+            0,
+            0
+          ],
+          "bounds": [
+            -352,
+            324,
+            353,
+            1038
+          ],
+          "vertical_origin": [
+            352,
+            1038
+          ],
+          "actual_bounds": [
+            -352.0,
+            324.0,
+            353.0,
+            1038.0
+          ],
+          "name": "A",
+          "xmin": 0,
+          "lsb": 0,
+          "contours": 2
+        }
+      ],
+      "before": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              1
+            ],
+            "advance": [
+              0,
+              1362
+            ],
+            "actual_bounds": [
+              -352.5,
+              324,
+              352.5,
+              1038
+            ]
+          }
+        ]
+      },
+      "after": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              1
+            ],
+            "advance": [
+              0,
+              1362
+            ],
+            "actual_bounds": [
+              -352.5,
+              324,
+              352.5,
+              1038
+            ]
+          }
+        ]
+      },
+      "glyph_identity_verified": false,
+      "before_bounds_delta": [
+        [
+          -0.5,
+          0.0,
+          -0.5,
+          0.0
+        ]
+      ],
+      "before_classification": "necessary_geometry_agrees_identity_unverified",
+      "after_bounds_delta": [
+        [
+          -0.5,
+          0.0,
+          -0.5,
+          0.0
+        ]
+      ],
+      "after_classification": "necessary_geometry_agrees_identity_unverified"
+    },
+    {
+      "font": "NotoSerif-Regular.ttf",
+      "sha256": "9d7583b7dc9e812afd32a14280c5cac3160012efe50c8d08938f4fea266ff67f",
+      "text": "Å",
+      "codepoints": [
+        "U+00C5"
+      ],
+      "direction": "ltr",
+      "harfbuzz": [
+        {
+          "glyph_id": 135,
+          "cluster": 0,
+          "source": [
+            0,
+            2
+          ],
+          "advance_xy": [
+            705,
+            0
+          ],
+          "x_offset": 0,
+          "y_offset": 0,
+          "pen_xy": [
+            0,
+            0
+          ],
+          "bounds": [
+            0,
+            -883,
+            705,
+            0
+          ],
+          "vertical_origin": [
+            352,
+            1122
+          ],
+          "actual_bounds": [
+            0.0,
+            -883.0,
+            705.0,
+            0.0
+          ],
+          "name": "Aring",
+          "xmin": 0,
+          "lsb": 0,
+          "contours": 3
+        }
+      ],
+      "before": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              2
+            ],
+            "advance": [
+              705,
+              0
+            ],
+            "actual_bounds": [
+              0,
+              -883,
+              705,
+              0
+            ]
+          }
+        ]
+      },
+      "after": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              2
+            ],
+            "advance": [
+              705,
+              0
+            ],
+            "actual_bounds": [
+              0,
+              -883,
+              705,
+              0
+            ]
+          }
+        ]
+      },
+      "glyph_identity_verified": false,
+      "before_bounds_delta": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "before_classification": "necessary_geometry_agrees_identity_unverified",
+      "after_bounds_delta": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "after_classification": "necessary_geometry_agrees_identity_unverified"
+    },
+    {
+      "font": "NotoSerif-Regular.ttf",
+      "sha256": "9d7583b7dc9e812afd32a14280c5cac3160012efe50c8d08938f4fea266ff67f",
+      "text": "Å",
+      "codepoints": [
+        "U+00C5"
+      ],
+      "direction": "ttb",
+      "harfbuzz": [
+        {
+          "glyph_id": 135,
+          "cluster": 0,
+          "source": [
+            0,
+            2
+          ],
+          "advance_xy": [
+            0,
+            1362
+          ],
+          "x_offset": -352,
+          "y_offset": -1122,
+          "pen_xy": [
+            0,
+            0
+          ],
+          "bounds": [
+            -352,
+            239,
+            353,
+            1122
+          ],
+          "vertical_origin": [
+            352,
+            1122
+          ],
+          "actual_bounds": [
+            -352.0,
+            239.0,
+            353.0,
+            1122.0
+          ],
+          "name": "Aring",
+          "xmin": 0,
+          "lsb": 0,
+          "contours": 3
+        }
+      ],
+      "before": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              2
+            ],
+            "advance": [
+              0,
+              1362
+            ],
+            "actual_bounds": [
+              -352.5,
+              239.5,
+              352.5,
+              1122.5
+            ]
+          }
+        ]
+      },
+      "after": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              2
+            ],
+            "advance": [
+              0,
+              1362
+            ],
+            "actual_bounds": [
+              -352.5,
+              239.5,
+              352.5,
+              1122.5
+            ]
+          }
+        ]
+      },
+      "glyph_identity_verified": false,
+      "before_bounds_delta": [
+        [
+          -0.5,
+          0.5,
+          -0.5,
+          0.5
+        ]
+      ],
+      "before_classification": "necessary_geometry_agrees_identity_unverified",
+      "after_bounds_delta": [
+        [
+          -0.5,
+          0.5,
+          -0.5,
+          0.5
+        ]
+      ],
+      "after_classification": "necessary_geometry_agrees_identity_unverified"
+    },
+    {
+      "font": "NotoSerif-Regular.ttf",
+      "sha256": "9d7583b7dc9e812afd32a14280c5cac3160012efe50c8d08938f4fea266ff67f",
+      "text": "fi",
+      "codepoints": [
+        "U+0066",
+        "U+0069"
+      ],
+      "direction": "ltr",
+      "harfbuzz": [
+        {
+          "glyph_id": 2134,
+          "cluster": 0,
+          "source": [
+            0,
+            2
+          ],
+          "advance_xy": [
+            663,
+            0
+          ],
+          "x_offset": 0,
+          "y_offset": 0,
+          "pen_xy": [
+            0,
+            0
+          ],
+          "bounds": [
+            27,
+            -775,
+            650,
+            0
+          ],
+          "vertical_origin": [
+            331,
+            1068
+          ],
+          "actual_bounds": [
+            27.0,
+            -775.0,
+            650.0,
+            0.0
+          ],
+          "name": "fi",
+          "xmin": 27,
+          "lsb": 27,
+          "contours": 1
+        }
+      ],
+      "before": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              2
+            ],
+            "advance": [
+              663,
+              0
+            ],
+            "actual_bounds": [
+              27,
+              -775,
+              650,
+              0
+            ]
+          }
+        ]
+      },
+      "after": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              2
+            ],
+            "advance": [
+              663,
+              0
+            ],
+            "actual_bounds": [
+              27,
+              -775,
+              650,
+              0
+            ]
+          }
+        ]
+      },
+      "glyph_identity_verified": false,
+      "before_bounds_delta": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "before_classification": "necessary_geometry_agrees_identity_unverified",
+      "after_bounds_delta": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "after_classification": "necessary_geometry_agrees_identity_unverified"
+    },
+    {
+      "font": "NotoSerif-Regular.ttf",
+      "sha256": "9d7583b7dc9e812afd32a14280c5cac3160012efe50c8d08938f4fea266ff67f",
+      "text": "fi",
+      "codepoints": [
+        "U+0066",
+        "U+0069"
+      ],
+      "direction": "ttb",
+      "harfbuzz": [
+        {
+          "glyph_id": 73,
+          "cluster": 0,
+          "source": [
+            0,
+            1
+          ],
+          "advance_xy": [
+            0,
+            1362
+          ],
+          "x_offset": -184,
+          "y_offset": -1066,
+          "pen_xy": [
+            0,
+            0
+          ],
+          "bounds": [
+            -157,
+            296,
+            255,
+            1066
+          ],
+          "vertical_origin": [
+            184,
+            1066
+          ],
+          "actual_bounds": [
+            -157.0,
+            296.0,
+            255.0,
+            1066.0
+          ],
+          "name": "f",
+          "xmin": 27,
+          "lsb": 27,
+          "contours": 1
+        },
+        {
+          "glyph_id": 76,
+          "cluster": 1,
+          "source": [
+            1,
+            2
+          ],
+          "advance_xy": [
+            0,
+            1362
+          ],
+          "x_offset": -160,
+          "y_offset": -1061,
+          "pen_xy": [
+            0,
+            1362
+          ],
+          "bounds": [
+            -137,
+            1663,
+            147,
+            2423
+          ],
+          "vertical_origin": [
+            160,
+            1061
+          ],
+          "actual_bounds": [
+            -137.0,
+            1663.0,
+            147.0,
+            2423.0
+          ],
+          "name": "i",
+          "xmin": 23,
+          "lsb": 23,
+          "contours": 2
+        }
+      ],
+      "before": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              2
+            ],
+            "advance": [
+              0,
+              1362
+            ],
+            "actual_bounds": [
+              -304.5,
+              293.5,
+              318.5,
+              1068.5
+            ]
+          }
+        ]
+      },
+      "after": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              2
+            ],
+            "advance": [
+              0,
+              1362
+            ],
+            "actual_bounds": [
+              -304.5,
+              293.5,
+              318.5,
+              1068.5
+            ]
+          }
+        ]
+      },
+      "glyph_identity_verified": false,
+      "before_classification": "shaping_not_comparable",
+      "after_classification": "shaping_not_comparable"
+    },
+    {
+      "font": "DejaVuSans.ttf",
+      "sha256": "57f73e11f51999432bf7ab22ce55b6f945d5eca1bf824404cfa9ec2e3718c84e",
+      "text": "A",
+      "codepoints": [
+        "U+0041"
+      ],
+      "direction": "ltr",
+      "harfbuzz": [
+        {
+          "glyph_id": 36,
+          "cluster": 0,
+          "source": [
+            0,
+            1
+          ],
+          "advance_xy": [
+            1401,
+            0
+          ],
+          "x_offset": 0,
+          "y_offset": 0,
+          "pen_xy": [
+            0,
+            0
+          ],
+          "bounds": [
+            16,
+            -1493,
+            1384,
+            0
+          ],
+          "vertical_origin": [
+            700,
+            1938
+          ],
+          "actual_bounds": [
+            16.0,
+            -1493.0,
+            1384.0,
+            0.0
+          ],
+          "name": "A",
+          "xmin": 16,
+          "lsb": 16,
+          "contours": 2
+        }
+      ],
+      "before": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              1
+            ],
+            "advance": [
+              1401,
+              0
+            ],
+            "actual_bounds": [
+              16,
+              -1493,
+              1384,
+              0
+            ]
+          }
+        ]
+      },
+      "after": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              1
+            ],
+            "advance": [
+              1401,
+              0
+            ],
+            "actual_bounds": [
+              16,
+              -1493,
+              1384,
+              0
+            ]
+          }
+        ]
+      },
+      "glyph_identity_verified": false,
+      "before_bounds_delta": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "before_classification": "necessary_geometry_agrees_identity_unverified",
+      "after_bounds_delta": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "after_classification": "necessary_geometry_agrees_identity_unverified"
+    },
+    {
+      "font": "DejaVuSans.ttf",
+      "sha256": "57f73e11f51999432bf7ab22ce55b6f945d5eca1bf824404cfa9ec2e3718c84e",
+      "text": "A",
+      "codepoints": [
+        "U+0041"
+      ],
+      "direction": "ttb",
+      "harfbuzz": [
+        {
+          "glyph_id": 36,
+          "cluster": 0,
+          "source": [
+            0,
+            1
+          ],
+          "advance_xy": [
+            0,
+            2384
+          ],
+          "x_offset": -700,
+          "y_offset": -1938,
+          "pen_xy": [
+            0,
+            0
+          ],
+          "bounds": [
+            -684,
+            445,
+            684,
+            1938
+          ],
+          "vertical_origin": [
+            700,
+            1938
+          ],
+          "actual_bounds": [
+            -684.0,
+            445.0,
+            684.0,
+            1938.0
+          ],
+          "name": "A",
+          "xmin": 16,
+          "lsb": 16,
+          "contours": 2
+        }
+      ],
+      "before": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              1
+            ],
+            "advance": [
+              0,
+              2384
+            ],
+            "actual_bounds": [
+              -684.5,
+              445.5,
+              683.5,
+              1938.5
+            ]
+          }
+        ]
+      },
+      "after": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              1
+            ],
+            "advance": [
+              0,
+              2384
+            ],
+            "actual_bounds": [
+              -684.5,
+              445.5,
+              683.5,
+              1938.5
+            ]
+          }
+        ]
+      },
+      "glyph_identity_verified": false,
+      "before_bounds_delta": [
+        [
+          -0.5,
+          0.5,
+          -0.5,
+          0.5
+        ]
+      ],
+      "before_classification": "necessary_geometry_agrees_identity_unverified",
+      "after_bounds_delta": [
+        [
+          -0.5,
+          0.5,
+          -0.5,
+          0.5
+        ]
+      ],
+      "after_classification": "necessary_geometry_agrees_identity_unverified"
+    },
+    {
+      "font": "DejaVuSans.ttf",
+      "sha256": "57f73e11f51999432bf7ab22ce55b6f945d5eca1bf824404cfa9ec2e3718c84e",
+      "text": "Å",
+      "codepoints": [
+        "U+00C5"
+      ],
+      "direction": "ltr",
+      "harfbuzz": [
+        {
+          "glyph_id": 135,
+          "cluster": 0,
+          "source": [
+            0,
+            2
+          ],
+          "advance_xy": [
+            1401,
+            0
+          ],
+          "x_offset": 0,
+          "y_offset": 0,
+          "pen_xy": [
+            0,
+            0
+          ],
+          "bounds": [
+            16,
+            -1901,
+            1384,
+            0
+          ],
+          "vertical_origin": [
+            700,
+            2142
+          ],
+          "actual_bounds": [
+            16.0,
+            -1901.0,
+            1384.0,
+            0.0
+          ],
+          "name": "Aring",
+          "xmin": 16,
+          "lsb": 16,
+          "contours": 3
+        }
+      ],
+      "before": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              2
+            ],
+            "advance": [
+              1401,
+              0
+            ],
+            "actual_bounds": [
+              16,
+              -1901,
+              1384,
+              0
+            ]
+          }
+        ]
+      },
+      "after": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              2
+            ],
+            "advance": [
+              1401,
+              0
+            ],
+            "actual_bounds": [
+              16,
+              -1901,
+              1384,
+              0
+            ]
+          }
+        ]
+      },
+      "glyph_identity_verified": false,
+      "before_bounds_delta": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "before_classification": "necessary_geometry_agrees_identity_unverified",
+      "after_bounds_delta": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "after_classification": "necessary_geometry_agrees_identity_unverified"
+    },
+    {
+      "font": "DejaVuSans.ttf",
+      "sha256": "57f73e11f51999432bf7ab22ce55b6f945d5eca1bf824404cfa9ec2e3718c84e",
+      "text": "Å",
+      "codepoints": [
+        "U+00C5"
+      ],
+      "direction": "ttb",
+      "harfbuzz": [
+        {
+          "glyph_id": 135,
+          "cluster": 0,
+          "source": [
+            0,
+            2
+          ],
+          "advance_xy": [
+            0,
+            2384
+          ],
+          "x_offset": -700,
+          "y_offset": -2142,
+          "pen_xy": [
+            0,
+            0
+          ],
+          "bounds": [
+            -684,
+            241,
+            684,
+            2142
+          ],
+          "vertical_origin": [
+            700,
+            2142
+          ],
+          "actual_bounds": [
+            -684.0,
+            241.0,
+            684.0,
+            2142.0
+          ],
+          "name": "Aring",
+          "xmin": 16,
+          "lsb": 16,
+          "contours": 3
+        }
+      ],
+      "before": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              2
+            ],
+            "advance": [
+              0,
+              2384
+            ],
+            "actual_bounds": [
+              -684.5,
+              241.5,
+              683.5,
+              2142.5
+            ]
+          }
+        ]
+      },
+      "after": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              2
+            ],
+            "advance": [
+              0,
+              2384
+            ],
+            "actual_bounds": [
+              -684.5,
+              241.5,
+              683.5,
+              2142.5
+            ]
+          }
+        ]
+      },
+      "glyph_identity_verified": false,
+      "before_bounds_delta": [
+        [
+          -0.5,
+          0.5,
+          -0.5,
+          0.5
+        ]
+      ],
+      "before_classification": "necessary_geometry_agrees_identity_unverified",
+      "after_bounds_delta": [
+        [
+          -0.5,
+          0.5,
+          -0.5,
+          0.5
+        ]
+      ],
+      "after_classification": "necessary_geometry_agrees_identity_unverified"
+    },
+    {
+      "font": "DejaVuSans.ttf",
+      "sha256": "57f73e11f51999432bf7ab22ce55b6f945d5eca1bf824404cfa9ec2e3718c84e",
+      "text": "fi",
+      "codepoints": [
+        "U+0066",
+        "U+0069"
+      ],
+      "direction": "ltr",
+      "harfbuzz": [
+        {
+          "glyph_id": 5042,
+          "cluster": 0,
+          "source": [
+            0,
+            2
+          ],
+          "advance_xy": [
+            1290,
+            0
+          ],
+          "x_offset": 0,
+          "y_offset": 0,
+          "pen_xy": [
+            0,
+            0
+          ],
+          "bounds": [
+            47,
+            -1556,
+            1098,
+            0
+          ],
+          "vertical_origin": [
+            645,
+            1970
+          ],
+          "actual_bounds": [
+            47.0,
+            -1556.0,
+            1098.0,
+            0.0
+          ],
+          "name": "fi",
+          "xmin": 47,
+          "lsb": 47,
+          "contours": 2
+        }
+      ],
+      "before": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              2
+            ],
+            "advance": [
+              1290,
+              0
+            ],
+            "actual_bounds": [
+              47,
+              -1556,
+              1098,
+              0
+            ]
+          }
+        ]
+      },
+      "after": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              2
+            ],
+            "advance": [
+              1290,
+              0
+            ],
+            "actual_bounds": [
+              47,
+              -1556,
+              1098,
+              0
+            ]
+          }
+        ]
+      },
+      "glyph_identity_verified": false,
+      "before_bounds_delta": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "before_classification": "necessary_geometry_agrees_identity_unverified",
+      "after_bounds_delta": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "after_classification": "necessary_geometry_agrees_identity_unverified"
+    },
+    {
+      "font": "DejaVuSans.ttf",
+      "sha256": "57f73e11f51999432bf7ab22ce55b6f945d5eca1bf824404cfa9ec2e3718c84e",
+      "text": "fi",
+      "codepoints": [
+        "U+0066",
+        "U+0069"
+      ],
+      "direction": "ttb",
+      "harfbuzz": [
+        {
+          "glyph_id": 73,
+          "cluster": 0,
+          "source": [
+            0,
+            1
+          ],
+          "advance_xy": [
+            0,
+            2384
+          ],
+          "x_offset": -360,
+          "y_offset": -1970,
+          "pen_xy": [
+            0,
+            0
+          ],
+          "bounds": [
+            -313,
+            414,
+            400,
+            1970
+          ],
+          "vertical_origin": [
+            360,
+            1970
+          ],
+          "actual_bounds": [
+            -313.0,
+            414.0,
+            400.0,
+            1970.0
+          ],
+          "name": "f",
+          "xmin": 47,
+          "lsb": 47,
+          "contours": 1
+        },
+        {
+          "glyph_id": 76,
+          "cluster": 1,
+          "source": [
+            1,
+            2
+          ],
+          "advance_xy": [
+            0,
+            2384
+          ],
+          "x_offset": -284,
+          "y_offset": -1970,
+          "pen_xy": [
+            0,
+            2384
+          ],
+          "bounds": [
+            -91,
+            2798,
+            93,
+            4354
+          ],
+          "vertical_origin": [
+            284,
+            1970
+          ],
+          "actual_bounds": [
+            -91.0,
+            2798.0,
+            93.0,
+            4354.0
+          ],
+          "name": "i",
+          "xmin": 193,
+          "lsb": 193,
+          "contours": 2
+        }
+      ],
+      "before": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              2
+            ],
+            "advance": [
+              0,
+              2384
+            ],
+            "actual_bounds": [
+              -598,
+              414,
+              453,
+              1970
+            ]
+          }
+        ]
+      },
+      "after": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              2
+            ],
+            "advance": [
+              0,
+              2384
+            ],
+            "actual_bounds": [
+              -598,
+              414,
+              453,
+              1970
+            ]
+          }
+        ]
+      },
+      "glyph_identity_verified": false,
+      "before_classification": "shaping_not_comparable",
+      "after_classification": "shaping_not_comparable"
+    },
+    {
+      "font": "DejaVuSans.ttf",
+      "sha256": "57f73e11f51999432bf7ab22ce55b6f945d5eca1bf824404cfa9ec2e3718c84e",
+      "text": "ັ",
+      "codepoints": [
+        "U+0EB1"
+      ],
+      "direction": "ltr",
+      "harfbuzz": [
+        {
+          "glyph_id": 1600,
+          "cluster": 0,
+          "source": [
+            0,
+            3
+          ],
+          "advance_xy": [
+            0,
+            0
+          ],
+          "x_offset": 0,
+          "y_offset": 0,
+          "pen_xy": [
+            0,
+            0
+          ],
+          "bounds": [
+            -1185,
+            -1803,
+            -87,
+            -1308
+          ],
+          "vertical_origin": [
+            0,
+            2747
+          ],
+          "actual_bounds": [
+            -1183.010152284264,
+            -1803.0,
+            -87.9940828402367,
+            -1308.0
+          ],
+          "name": "uni0EB1",
+          "xmin": -1186,
+          "lsb": -1185,
+          "contours": 2
+        }
+      ],
+      "before": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              3
+            ],
+            "advance": [
+              0,
+              0
+            ],
+            "actual_bounds": [
+              -1184.010101010101,
+              -1803,
+              -88.9940828402367,
+              -1308
+            ]
+          }
+        ]
+      },
+      "after": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              3
+            ],
+            "advance": [
+              0,
+              0
+            ],
+            "actual_bounds": [
+              -1183.010101010101,
+              -1803,
+              -87.9940828402367,
+              -1308
+            ]
+          }
+        ]
+      },
+      "glyph_identity_verified": false,
+      "before_bounds_delta": [
+        [
+          -0.99994872583693,
+          0.0,
+          -1.0,
+          0.0
+        ]
+      ],
+      "before_classification": "positioned_path_bounds_differ",
+      "after_bounds_delta": [
+        [
+          5.127416307004751e-05,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "after_classification": "necessary_geometry_agrees_identity_unverified"
+    },
+    {
+      "font": "DejaVuSans.ttf",
+      "sha256": "57f73e11f51999432bf7ab22ce55b6f945d5eca1bf824404cfa9ec2e3718c84e",
+      "text": "ັ",
+      "codepoints": [
+        "U+0EB1"
+      ],
+      "direction": "ttb",
+      "harfbuzz": [
+        {
+          "glyph_id": 1600,
+          "cluster": 0,
+          "source": [
+            0,
+            3
+          ],
+          "advance_xy": [
+            0,
+            0
+          ],
+          "x_offset": 0,
+          "y_offset": -2747,
+          "pen_xy": [
+            0,
+            0
+          ],
+          "bounds": [
+            -1185,
+            944,
+            -87,
+            1439
+          ],
+          "vertical_origin": [
+            0,
+            2747
+          ],
+          "actual_bounds": [
+            -1183.010152284264,
+            944.0,
+            -87.9940828402367,
+            1439.0
+          ],
+          "name": "uni0EB1",
+          "xmin": -1186,
+          "lsb": -1185,
+          "contours": 2
+        }
+      ],
+      "before": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              3
+            ],
+            "advance": [
+              0,
+              0
+            ],
+            "actual_bounds": [
+              -1184.010101010101,
+              944.5,
+              -88.9940828402367,
+              1439.5
+            ]
+          }
+        ]
+      },
+      "after": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              3
+            ],
+            "advance": [
+              0,
+              0
+            ],
+            "actual_bounds": [
+              -1183.010101010101,
+              944.5,
+              -87.9940828402367,
+              1439.5
+            ]
+          }
+        ]
+      },
+      "glyph_identity_verified": false,
+      "before_bounds_delta": [
+        [
+          -0.99994872583693,
+          0.5,
+          -1.0,
+          0.5
+        ]
+      ],
+      "before_classification": "positioned_path_bounds_differ",
+      "after_bounds_delta": [
+        [
+          5.127416307004751e-05,
+          0.5,
+          0.0,
+          0.5
+        ]
+      ],
+      "after_classification": "necessary_geometry_agrees_identity_unverified"
+    },
+    {
+      "font": "DejaVuSans.ttf",
+      "sha256": "57f73e11f51999432bf7ab22ce55b6f945d5eca1bf824404cfa9ec2e3718c84e",
+      "text": "⃐",
+      "codepoints": [
+        "U+20D0"
+      ],
+      "direction": "ltr",
+      "harfbuzz": [
+        {
+          "glyph_id": 2962,
+          "cluster": 0,
+          "source": [
+            0,
+            3
+          ],
+          "advance_xy": [
+            0,
+            0
+          ],
+          "x_offset": 0,
+          "y_offset": 0,
+          "pen_xy": [
+            0,
+            0
+          ],
+          "bounds": [
+            -1005,
+            -1556,
+            -52,
+            -1301
+          ],
+          "vertical_origin": [
+            0,
+            2620
+          ],
+          "actual_bounds": [
+            -1005.0,
+            -1556.0,
+            -52.0,
+            -1301.0
+          ],
+          "name": "uni20D0",
+          "xmin": -1006,
+          "lsb": -1005,
+          "contours": 1
+        }
+      ],
+      "before": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              3
+            ],
+            "advance": [
+              0,
+              0
+            ],
+            "actual_bounds": [
+              -1006,
+              -1556,
+              -53,
+              -1301
+            ]
+          }
+        ]
+      },
+      "after": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              3
+            ],
+            "advance": [
+              0,
+              0
+            ],
+            "actual_bounds": [
+              -1005,
+              -1556,
+              -52,
+              -1301
+            ]
+          }
+        ]
+      },
+      "glyph_identity_verified": false,
+      "before_bounds_delta": [
+        [
+          -1.0,
+          0.0,
+          -1.0,
+          0.0
+        ]
+      ],
+      "before_classification": "positioned_path_bounds_differ",
+      "after_bounds_delta": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "after_classification": "necessary_geometry_agrees_identity_unverified"
+    },
+    {
+      "font": "DejaVuSans.ttf",
+      "sha256": "57f73e11f51999432bf7ab22ce55b6f945d5eca1bf824404cfa9ec2e3718c84e",
+      "text": "⃐",
+      "codepoints": [
+        "U+20D0"
+      ],
+      "direction": "ttb",
+      "harfbuzz": [
+        {
+          "glyph_id": 2962,
+          "cluster": 0,
+          "source": [
+            0,
+            3
+          ],
+          "advance_xy": [
+            0,
+            0
+          ],
+          "x_offset": 0,
+          "y_offset": -2620,
+          "pen_xy": [
+            0,
+            0
+          ],
+          "bounds": [
+            -1005,
+            1064,
+            -52,
+            1319
+          ],
+          "vertical_origin": [
+            0,
+            2620
+          ],
+          "actual_bounds": [
+            -1005.0,
+            1064.0,
+            -52.0,
+            1319.0
+          ],
+          "name": "uni20D0",
+          "xmin": -1006,
+          "lsb": -1005,
+          "contours": 1
+        }
+      ],
+      "before": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              3
+            ],
+            "advance": [
+              0,
+              0
+            ],
+            "actual_bounds": [
+              -1006,
+              1064.5,
+              -53,
+              1319.5
+            ]
+          }
+        ]
+      },
+      "after": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              3
+            ],
+            "advance": [
+              0,
+              0
+            ],
+            "actual_bounds": [
+              -1005,
+              1064.5,
+              -52,
+              1319.5
+            ]
+          }
+        ]
+      },
+      "glyph_identity_verified": false,
+      "before_bounds_delta": [
+        [
+          -1.0,
+          0.5,
+          -1.0,
+          0.5
+        ]
+      ],
+      "before_classification": "positioned_path_bounds_differ",
+      "after_bounds_delta": [
+        [
+          0.0,
+          0.5,
+          0.0,
+          0.5
+        ]
+      ],
+      "after_classification": "necessary_geometry_agrees_identity_unverified"
+    },
+    {
+      "font": "DejaVuSans.ttf",
+      "sha256": "57f73e11f51999432bf7ab22ce55b6f945d5eca1bf824404cfa9ec2e3718c84e",
+      "text": "␢",
+      "codepoints": [
+        "U+2422"
+      ],
+      "direction": "ltr",
+      "harfbuzz": [
+        {
+          "glyph_id": 3532,
+          "cluster": 0,
+          "source": [
+            0,
+            3
+          ],
+          "advance_xy": [
+            1300,
+            0
+          ],
+          "x_offset": 0,
+          "y_offset": 0,
+          "pen_xy": [
+            0,
+            0
+          ],
+          "bounds": [
+            -125,
+            -1556,
+            1189,
+            29
+          ],
+          "vertical_origin": [
+            650,
+            1955
+          ],
+          "actual_bounds": [
+            -125.0,
+            -1556.0,
+            1189.0,
+            29.0
+          ],
+          "name": "uni2422",
+          "xmin": -126,
+          "lsb": -125,
+          "contours": 2
+        }
+      ],
+      "before": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              3
+            ],
+            "advance": [
+              1300,
+              0
+            ],
+            "actual_bounds": [
+              -126,
+              -1556,
+              1188,
+              29
+            ]
+          }
+        ]
+      },
+      "after": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              3
+            ],
+            "advance": [
+              1300,
+              0
+            ],
+            "actual_bounds": [
+              -125,
+              -1556,
+              1189,
+              29
+            ]
+          }
+        ]
+      },
+      "glyph_identity_verified": false,
+      "before_bounds_delta": [
+        [
+          -1.0,
+          0.0,
+          -1.0,
+          0.0
+        ]
+      ],
+      "before_classification": "positioned_path_bounds_differ",
+      "after_bounds_delta": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "after_classification": "necessary_geometry_agrees_identity_unverified"
+    },
+    {
+      "font": "DejaVuSans.ttf",
+      "sha256": "57f73e11f51999432bf7ab22ce55b6f945d5eca1bf824404cfa9ec2e3718c84e",
+      "text": "␢",
+      "codepoints": [
+        "U+2422"
+      ],
+      "direction": "ttb",
+      "harfbuzz": [
+        {
+          "glyph_id": 3532,
+          "cluster": 0,
+          "source": [
+            0,
+            3
+          ],
+          "advance_xy": [
+            0,
+            2384
+          ],
+          "x_offset": -650,
+          "y_offset": -1955,
+          "pen_xy": [
+            0,
+            0
+          ],
+          "bounds": [
+            -775,
+            399,
+            539,
+            1984
+          ],
+          "vertical_origin": [
+            650,
+            1955
+          ],
+          "actual_bounds": [
+            -775.0,
+            399.0,
+            539.0,
+            1984.0
+          ],
+          "name": "uni2422",
+          "xmin": -126,
+          "lsb": -125,
+          "contours": 2
+        }
+      ],
+      "before": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              3
+            ],
+            "advance": [
+              0,
+              2384
+            ],
+            "actual_bounds": [
+              -776,
+              399.5,
+              538,
+              1984.5
+            ]
+          }
+        ]
+      },
+      "after": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              3
+            ],
+            "advance": [
+              0,
+              2384
+            ],
+            "actual_bounds": [
+              -775,
+              399.5,
+              539,
+              1984.5
+            ]
+          }
+        ]
+      },
+      "glyph_identity_verified": false,
+      "before_bounds_delta": [
+        [
+          -1.0,
+          0.5,
+          -1.0,
+          0.5
+        ]
+      ],
+      "before_classification": "positioned_path_bounds_differ",
+      "after_bounds_delta": [
+        [
+          0.0,
+          0.5,
+          0.0,
+          0.5
+        ]
+      ],
+      "after_classification": "necessary_geometry_agrees_identity_unverified"
+    },
+    {
+      "font": "DejaVuSans.ttf",
+      "sha256": "57f73e11f51999432bf7ab22ce55b6f945d5eca1bf824404cfa9ec2e3718c84e",
+      "text": "x⃐",
+      "codepoints": [
+        "U+0078",
+        "U+20D0"
+      ],
+      "direction": "ltr",
+      "harfbuzz": [
+        {
+          "glyph_id": 91,
+          "cluster": 0,
+          "source": [
+            0,
+            4
+          ],
+          "advance_xy": [
+            1212,
+            0
+          ],
+          "x_offset": 0,
+          "y_offset": 0,
+          "pen_xy": [
+            0,
+            0
+          ],
+          "bounds": [
+            59,
+            -1120,
+            1145,
+            0
+          ],
+          "vertical_origin": [
+            606,
+            1752
+          ],
+          "actual_bounds": [
+            59.0,
+            -1120.0,
+            1145.0,
+            0.0
+          ],
+          "name": "x",
+          "xmin": 59,
+          "lsb": 59,
+          "contours": 1
+        },
+        {
+          "glyph_id": 2962,
+          "cluster": 0,
+          "source": [
+            0,
+            4
+          ],
+          "advance_xy": [
+            0,
+            0
+          ],
+          "x_offset": -90,
+          "y_offset": 0,
+          "pen_xy": [
+            1212,
+            0
+          ],
+          "bounds": [
+            117,
+            -1556,
+            1070,
+            -1301
+          ],
+          "vertical_origin": [
+            0,
+            2620
+          ],
+          "actual_bounds": [
+            117.0,
+            -1556.0,
+            1070.0,
+            -1301.0
+          ],
+          "name": "uni20D0",
+          "xmin": -1006,
+          "lsb": -1005,
+          "contours": 1
+        }
+      ],
+      "before": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              4
+            ],
+            "advance": [
+              1212,
+              0
+            ],
+            "actual_bounds": [
+              59,
+              -1120,
+              1145,
+              0
+            ]
+          },
+          {
+            "source": [
+              0,
+              4
+            ],
+            "advance": [
+              0,
+              0
+            ],
+            "actual_bounds": [
+              116,
+              -1556,
+              1069,
+              -1301
+            ]
+          }
+        ]
+      },
+      "after": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              4
+            ],
+            "advance": [
+              1212,
+              0
+            ],
+            "actual_bounds": [
+              59,
+              -1120,
+              1145,
+              0
+            ]
+          },
+          {
+            "source": [
+              0,
+              4
+            ],
+            "advance": [
+              0,
+              0
+            ],
+            "actual_bounds": [
+              117,
+              -1556,
+              1070,
+              -1301
+            ]
+          }
+        ]
+      },
+      "glyph_identity_verified": false,
+      "before_bounds_delta": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          -1.0,
+          0.0,
+          -1.0,
+          0.0
+        ]
+      ],
+      "before_classification": "positioned_path_bounds_differ",
+      "after_bounds_delta": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "after_classification": "necessary_geometry_agrees_identity_unverified"
+    },
+    {
+      "font": "DejaVuSans.ttf",
+      "sha256": "57f73e11f51999432bf7ab22ce55b6f945d5eca1bf824404cfa9ec2e3718c84e",
+      "text": "x⃐",
+      "codepoints": [
+        "U+0078",
+        "U+20D0"
+      ],
+      "direction": "ttb",
+      "harfbuzz": [
+        {
+          "glyph_id": 91,
+          "cluster": 0,
+          "source": [
+            0,
+            4
+          ],
+          "advance_xy": [
+            0,
+            2384
+          ],
+          "x_offset": -606,
+          "y_offset": -1752,
+          "pen_xy": [
+            0,
+            0
+          ],
+          "bounds": [
+            -547,
+            632,
+            539,
+            1752
+          ],
+          "vertical_origin": [
+            606,
+            1752
+          ],
+          "actual_bounds": [
+            -547.0,
+            632.0,
+            539.0,
+            1752.0
+          ],
+          "name": "x",
+          "xmin": 59,
+          "lsb": 59,
+          "contours": 1
+        },
+        {
+          "glyph_id": 2962,
+          "cluster": 0,
+          "source": [
+            0,
+            4
+          ],
+          "advance_xy": [
+            0,
+            0
+          ],
+          "x_offset": 516,
+          "y_offset": 632,
+          "pen_xy": [
+            0,
+            2384
+          ],
+          "bounds": [
+            -489,
+            196,
+            464,
+            451
+          ],
+          "vertical_origin": [
+            0,
+            2620
+          ],
+          "actual_bounds": [
+            -489.0,
+            196.0,
+            464.0,
+            451.0
+          ],
+          "name": "uni20D0",
+          "xmin": -1006,
+          "lsb": -1005,
+          "contours": 1
+        }
+      ],
+      "before": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              4
+            ],
+            "advance": [
+              0,
+              2384
+            ],
+            "actual_bounds": [
+              -547,
+              632,
+              539,
+              1752
+            ]
+          },
+          {
+            "source": [
+              0,
+              4
+            ],
+            "advance": [
+              0,
+              0
+            ],
+            "actual_bounds": [
+              -490,
+              196,
+              463,
+              451
+            ]
+          }
+        ]
+      },
+      "after": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              4
+            ],
+            "advance": [
+              0,
+              2384
+            ],
+            "actual_bounds": [
+              -547,
+              632,
+              539,
+              1752
+            ]
+          },
+          {
+            "source": [
+              0,
+              4
+            ],
+            "advance": [
+              0,
+              0
+            ],
+            "actual_bounds": [
+              -489,
+              196,
+              464,
+              451
+            ]
+          }
+        ]
+      },
+      "glyph_identity_verified": false,
+      "before_bounds_delta": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          -1.0,
+          0.0,
+          -1.0,
+          0.0
+        ]
+      ],
+      "before_classification": "positioned_path_bounds_differ",
+      "after_bounds_delta": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "after_classification": "necessary_geometry_agrees_identity_unverified"
+    }
+  ]
+}

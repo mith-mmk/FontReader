@@ -272,6 +272,7 @@ struct PendingFontFace {
 struct FamilyLayoutResult {
     run: GlyphRun,
     sources: Vec<crate::mapped::GlyphSource>,
+    ligature_carets: Vec<Option<Vec<f32>>>,
     max_line_width: f32,
 }
 
@@ -546,12 +547,10 @@ impl FontFamily {
         }
         let direction = options.text_direction;
         let result = self.layout_text_with_fallback_impl(text, options, true)?;
-        Ok(crate::mapped::ShapedText::new(
-            text,
-            result.run,
-            result.sources,
-            direction,
-        ))
+        Ok(
+            crate::mapped::ShapedText::new(text, result.run, result.sources, direction)
+                .with_ligature_carets(result.ligature_carets),
+        )
     }
 
     /// Alias for [`FontFamily::text2glyph_run`].
@@ -781,6 +780,7 @@ impl FontFamily {
         Ok(FamilyLayoutResult {
             run: GlyphRun::new(glyphs),
             sources: provenance.sources,
+            ligature_carets: provenance.ligature_carets,
             max_line_width,
         })
     }
@@ -810,11 +810,12 @@ impl FontFamily {
         segment_options.font = Some(FontRef::Loaded(face));
 
         let mut segment_run = if provenance.enabled {
-            let (run, ranges) = face
+            let mapped = face
                 .font()
-                .text2glyph_run_mapped(pending_segment, &segment_options)?;
-            provenance.finish(ranges, face_index);
-            run
+                .text2glyph_run_with_carets(pending_segment, &segment_options)?;
+            provenance.ligature_carets.extend(mapped.ligature_carets);
+            provenance.finish(mapped.ranges, face_index);
+            mapped.run
         } else {
             face.text2glyph_run(pending_segment, segment_options)?
         };
@@ -1286,6 +1287,7 @@ pub(crate) struct SegmentProvenance {
     enabled: bool,
     bytes: Vec<std::ops::Range<usize>>,
     pub(crate) sources: Vec<crate::mapped::GlyphSource>,
+    pub(crate) ligature_carets: Vec<Option<Vec<f32>>>,
     run_index: usize,
 }
 
@@ -1295,6 +1297,7 @@ impl SegmentProvenance {
             enabled,
             bytes: Vec::new(),
             sources: Vec::new(),
+            ligature_carets: Vec::new(),
             run_index: 0,
         }
     }

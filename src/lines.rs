@@ -48,6 +48,7 @@ pub struct LineCaretPosition {
     x: f32,
     y: f32,
     quality: CaretQuality,
+    source: crate::CaretSource,
     line_index: usize,
 }
 impl LineCaretPosition {
@@ -62,6 +63,10 @@ impl LineCaretPosition {
     }
     pub fn quality(self) -> CaretQuality {
         self.quality
+    }
+    /// Detailed origin of the caret position; unlike legacy quality, distinguishes GDEF.
+    pub fn source(self) -> crate::CaretSource {
+        self.source
     }
     pub fn line_index(self) -> usize {
         self.line_index
@@ -261,6 +266,7 @@ impl HardLineLayout {
             x,
             y,
             quality: caret.quality(),
+            source: caret.source(),
             line_index: index,
         })
     }

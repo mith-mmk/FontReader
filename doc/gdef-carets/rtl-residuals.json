@@ -1,0 +1,4052 @@
+{
+  "schema": 1,
+  "harfbuzz_version": "10.2.0",
+  "fontcore_commit": "ffee56db12cd51c1c672e5a10a0a9c91e4ae5696",
+  "probe_sha256": "64ab03b4d19519eba8ff89064dc7fd7f9ae0afe3ba319e69e55103250467eb88",
+  "fonts": [
+    {
+      "path": "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
+      "sha256": "89c3c497f618fdaa0b2d1e98fef93582f28c71debd2c4a8cdf41f190ced2909d",
+      "gsub_features": [
+        "aalt",
+        "c2sc",
+        "case",
+        "ccmp",
+        "dnom",
+        "frac",
+        "liga",
+        "lnum",
+        "locl",
+        "numr",
+        "onum",
+        "ordn",
+        "pnum",
+        "rtlm",
+        "salt",
+        "smcp",
+        "ss03",
+        "ss04",
+        "subs",
+        "sups",
+        "tnum",
+        "zero"
+      ]
+    },
+    {
+      "path": "/usr/share/fonts/truetype/noto/NotoSerif-Regular.ttf",
+      "sha256": "9d7583b7dc9e812afd32a14280c5cac3160012efe50c8d08938f4fea266ff67f",
+      "gsub_features": [
+        "aalt",
+        "c2sc",
+        "case",
+        "ccmp",
+        "dnom",
+        "frac",
+        "liga",
+        "lnum",
+        "locl",
+        "mgrk",
+        "numr",
+        "onum",
+        "ordn",
+        "pnum",
+        "rtlm",
+        "smcp",
+        "ss03",
+        "subs",
+        "sups",
+        "tnum",
+        "zero"
+      ]
+    },
+    {
+      "path": "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+      "sha256": "57f73e11f51999432bf7ab22ce55b6f945d5eca1bf824404cfa9ec2e3718c84e",
+      "gsub_features": [
+        " RQD",
+        "aalt",
+        "case",
+        "ccmp",
+        "dlig",
+        "fina",
+        "hlig",
+        "init",
+        "liga",
+        "locl",
+        "medi",
+        "rlig",
+        "salt"
+      ]
+    }
+  ],
+  "assertion_count": 105,
+  "assertions_passed": 105,
+  "rows": [
+    {
+      "font": "NotoSans-Regular.ttf",
+      "text": "fi",
+      "variants": {
+        "ltr": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            1967
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "fi",
+          "direction": "ltr",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "fi"
+          ]
+        },
+        "rtl_guess": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            76,
+            73
+          ],
+          "clusters": [
+            1,
+            0
+          ],
+          "text": "fi",
+          "direction": "rtl",
+          "requested_script": "guess",
+          "features": {},
+          "glyph_names": [
+            "i",
+            "f"
+          ]
+        },
+        "rtl_latn": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            76,
+            73
+          ],
+          "clusters": [
+            1,
+            0
+          ],
+          "text": "fi",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "i",
+            "f"
+          ]
+        },
+        "rtl_liga_off": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            76,
+            73
+          ],
+          "clusters": [
+            1,
+            0
+          ],
+          "text": "fi",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "liga": 0
+          },
+          "glyph_names": [
+            "i",
+            "f"
+          ]
+        },
+        "rtl_liga_on": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            76,
+            73
+          ],
+          "clusters": [
+            1,
+            0
+          ],
+          "text": "fi",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "liga": 1
+          },
+          "glyph_names": [
+            "i",
+            "f"
+          ]
+        },
+        "rtl_rtlm_off": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            76,
+            73
+          ],
+          "clusters": [
+            1,
+            0
+          ],
+          "text": "fi",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "rtlm": 0
+          },
+          "glyph_names": [
+            "i",
+            "f"
+          ]
+        },
+        "rtl_rtlm_on": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            76,
+            73
+          ],
+          "clusters": [
+            1,
+            0
+          ],
+          "text": "fi",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "rtlm": 1
+          },
+          "glyph_names": [
+            "i",
+            "f"
+          ]
+        },
+        "rtl_reversed_input": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            1967
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "if",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "fi"
+          ]
+        },
+        "ltr_reversed_input": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            76,
+            73
+          ],
+          "clusters": [
+            0,
+            1
+          ],
+          "text": "if",
+          "direction": "ltr",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "i",
+            "f"
+          ]
+        },
+        "rtl_arab_script_control": {
+          "script": "Arab",
+          "language": "en",
+          "glyph_ids": [
+            1967
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "fi",
+          "direction": "rtl",
+          "requested_script": "Arab",
+          "features": {},
+          "glyph_names": [
+            "fi"
+          ]
+        }
+      },
+      "assertions": {
+        "guess_is_latn": true,
+        "explicit_latn_unchanged": true,
+        "liga_on_unchanged": true,
+        "rtlm_off_unchanged": true,
+        "rtlm_on_unchanged": true,
+        "rtl_equals_ltr_reversed_input": true,
+        "reversed_input_rtl_equals_ltr": true
+      },
+      "fontcore_rtl": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              2
+            ],
+            "x": -602,
+            "y": 0,
+            "advance_xy": [
+              602,
+              0
+            ],
+            "candidates": [
+              301.0
+            ],
+            "bounds": [
+              -587,
+              -765,
+              -77,
+              0
+            ]
+          }
+        ],
+        "stops": [
+          {
+            "byte": 0,
+            "x": 0,
+            "y": 0,
+            "quality": "AdvanceBoundary",
+            "source": "Advance"
+          },
+          {
+            "byte": 1,
+            "x": -301,
+            "y": 0,
+            "quality": "Approximate",
+            "source": "FontAuthored"
+          },
+          {
+            "byte": 2,
+            "x": -602,
+            "y": 0,
+            "quality": "AdvanceBoundary",
+            "source": "Advance"
+          }
+        ]
+      },
+      "fontcore_glyph_identity_verified": false
+    },
+    {
+      "font": "NotoSans-Regular.ttf",
+      "text": "fl",
+      "variants": {
+        "ltr": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            1968
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "fl",
+          "direction": "ltr",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "fl"
+          ]
+        },
+        "rtl_guess": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            79,
+            73
+          ],
+          "clusters": [
+            1,
+            0
+          ],
+          "text": "fl",
+          "direction": "rtl",
+          "requested_script": "guess",
+          "features": {},
+          "glyph_names": [
+            "l",
+            "f"
+          ]
+        },
+        "rtl_latn": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            79,
+            73
+          ],
+          "clusters": [
+            1,
+            0
+          ],
+          "text": "fl",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "l",
+            "f"
+          ]
+        },
+        "rtl_liga_off": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            79,
+            73
+          ],
+          "clusters": [
+            1,
+            0
+          ],
+          "text": "fl",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "liga": 0
+          },
+          "glyph_names": [
+            "l",
+            "f"
+          ]
+        },
+        "rtl_liga_on": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            79,
+            73
+          ],
+          "clusters": [
+            1,
+            0
+          ],
+          "text": "fl",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "liga": 1
+          },
+          "glyph_names": [
+            "l",
+            "f"
+          ]
+        },
+        "rtl_rtlm_off": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            79,
+            73
+          ],
+          "clusters": [
+            1,
+            0
+          ],
+          "text": "fl",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "rtlm": 0
+          },
+          "glyph_names": [
+            "l",
+            "f"
+          ]
+        },
+        "rtl_rtlm_on": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            79,
+            73
+          ],
+          "clusters": [
+            1,
+            0
+          ],
+          "text": "fl",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "rtlm": 1
+          },
+          "glyph_names": [
+            "l",
+            "f"
+          ]
+        },
+        "rtl_reversed_input": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            1968
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "lf",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "fl"
+          ]
+        },
+        "ltr_reversed_input": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            79,
+            73
+          ],
+          "clusters": [
+            0,
+            1
+          ],
+          "text": "lf",
+          "direction": "ltr",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "l",
+            "f"
+          ]
+        },
+        "rtl_arab_script_control": {
+          "script": "Arab",
+          "language": "en",
+          "glyph_ids": [
+            1968
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "fl",
+          "direction": "rtl",
+          "requested_script": "Arab",
+          "features": {},
+          "glyph_names": [
+            "fl"
+          ]
+        }
+      },
+      "assertions": {
+        "guess_is_latn": true,
+        "explicit_latn_unchanged": true,
+        "liga_on_unchanged": true,
+        "rtlm_off_unchanged": true,
+        "rtlm_on_unchanged": true,
+        "rtl_equals_ltr_reversed_input": true,
+        "reversed_input_rtl_equals_ltr": true
+      },
+      "fontcore_rtl": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              2
+            ],
+            "x": -602,
+            "y": 0,
+            "advance_xy": [
+              602,
+              0
+            ],
+            "candidates": [
+              301.0
+            ],
+            "bounds": [
+              -587,
+              -765,
+              -85,
+              0
+            ]
+          }
+        ],
+        "stops": [
+          {
+            "byte": 0,
+            "x": 0,
+            "y": 0,
+            "quality": "AdvanceBoundary",
+            "source": "Advance"
+          },
+          {
+            "byte": 1,
+            "x": -301,
+            "y": 0,
+            "quality": "Approximate",
+            "source": "FontAuthored"
+          },
+          {
+            "byte": 2,
+            "x": -602,
+            "y": 0,
+            "quality": "AdvanceBoundary",
+            "source": "Advance"
+          }
+        ]
+      },
+      "fontcore_glyph_identity_verified": false
+    },
+    {
+      "font": "NotoSans-Regular.ttf",
+      "text": "ff",
+      "variants": {
+        "ltr": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            1966
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "ff",
+          "direction": "ltr",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "f_f"
+          ]
+        },
+        "rtl_guess": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            1966
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "ff",
+          "direction": "rtl",
+          "requested_script": "guess",
+          "features": {},
+          "glyph_names": [
+            "f_f"
+          ]
+        },
+        "rtl_latn": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            1966
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "ff",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "f_f"
+          ]
+        },
+        "rtl_liga_off": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            73,
+            73
+          ],
+          "clusters": [
+            1,
+            0
+          ],
+          "text": "ff",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "liga": 0
+          },
+          "glyph_names": [
+            "f",
+            "f"
+          ]
+        },
+        "rtl_liga_on": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            1966
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "ff",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "liga": 1
+          },
+          "glyph_names": [
+            "f_f"
+          ]
+        },
+        "rtl_rtlm_off": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            1966
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "ff",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "rtlm": 0
+          },
+          "glyph_names": [
+            "f_f"
+          ]
+        },
+        "rtl_rtlm_on": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            1966
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "ff",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "rtlm": 1
+          },
+          "glyph_names": [
+            "f_f"
+          ]
+        },
+        "rtl_reversed_input": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            1966
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "ff",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "f_f"
+          ]
+        },
+        "ltr_reversed_input": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            1966
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "ff",
+          "direction": "ltr",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "f_f"
+          ]
+        },
+        "rtl_arab_script_control": {
+          "script": "Arab",
+          "language": "en",
+          "glyph_ids": [
+            1966
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "ff",
+          "direction": "rtl",
+          "requested_script": "Arab",
+          "features": {},
+          "glyph_names": [
+            "f_f"
+          ]
+        }
+      },
+      "assertions": {
+        "guess_is_latn": true,
+        "explicit_latn_unchanged": true,
+        "liga_on_unchanged": true,
+        "rtlm_off_unchanged": true,
+        "rtlm_on_unchanged": true,
+        "rtl_equals_ltr_reversed_input": true,
+        "reversed_input_rtl_equals_ltr": true
+      },
+      "fontcore_rtl": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              2
+            ],
+            "x": -688,
+            "y": 0,
+            "advance_xy": [
+              688,
+              0
+            ],
+            "candidates": [
+              387.0
+            ],
+            "bounds": [
+              -673,
+              -765,
+              43,
+              0
+            ]
+          }
+        ],
+        "stops": [
+          {
+            "byte": 0,
+            "x": 0,
+            "y": 0,
+            "quality": "AdvanceBoundary",
+            "source": "Advance"
+          },
+          {
+            "byte": 1,
+            "x": -387,
+            "y": 0,
+            "quality": "Approximate",
+            "source": "FontAuthored"
+          },
+          {
+            "byte": 2,
+            "x": -688,
+            "y": 0,
+            "quality": "AdvanceBoundary",
+            "source": "Advance"
+          }
+        ]
+      },
+      "fontcore_glyph_identity_verified": false
+    },
+    {
+      "font": "NotoSans-Regular.ttf",
+      "text": "ffi",
+      "variants": {
+        "ltr": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            1969
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "ffi",
+          "direction": "ltr",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "f_f_i"
+          ]
+        },
+        "rtl_guess": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            76,
+            1966
+          ],
+          "clusters": [
+            2,
+            0
+          ],
+          "text": "ffi",
+          "direction": "rtl",
+          "requested_script": "guess",
+          "features": {},
+          "glyph_names": [
+            "i",
+            "f_f"
+          ]
+        },
+        "rtl_latn": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            76,
+            1966
+          ],
+          "clusters": [
+            2,
+            0
+          ],
+          "text": "ffi",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "i",
+            "f_f"
+          ]
+        },
+        "rtl_liga_off": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            76,
+            73,
+            73
+          ],
+          "clusters": [
+            2,
+            1,
+            0
+          ],
+          "text": "ffi",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "liga": 0
+          },
+          "glyph_names": [
+            "i",
+            "f",
+            "f"
+          ]
+        },
+        "rtl_liga_on": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            76,
+            1966
+          ],
+          "clusters": [
+            2,
+            0
+          ],
+          "text": "ffi",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "liga": 1
+          },
+          "glyph_names": [
+            "i",
+            "f_f"
+          ]
+        },
+        "rtl_rtlm_off": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            76,
+            1966
+          ],
+          "clusters": [
+            2,
+            0
+          ],
+          "text": "ffi",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "rtlm": 0
+          },
+          "glyph_names": [
+            "i",
+            "f_f"
+          ]
+        },
+        "rtl_rtlm_on": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            76,
+            1966
+          ],
+          "clusters": [
+            2,
+            0
+          ],
+          "text": "ffi",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "rtlm": 1
+          },
+          "glyph_names": [
+            "i",
+            "f_f"
+          ]
+        },
+        "rtl_reversed_input": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            1969
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "iff",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "f_f_i"
+          ]
+        },
+        "ltr_reversed_input": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            76,
+            1966
+          ],
+          "clusters": [
+            0,
+            1
+          ],
+          "text": "iff",
+          "direction": "ltr",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "i",
+            "f_f"
+          ]
+        },
+        "rtl_arab_script_control": {
+          "script": "Arab",
+          "language": "en",
+          "glyph_ids": [
+            1969
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "ffi",
+          "direction": "rtl",
+          "requested_script": "Arab",
+          "features": {},
+          "glyph_names": [
+            "f_f_i"
+          ]
+        }
+      },
+      "assertions": {
+        "guess_is_latn": true,
+        "explicit_latn_unchanged": true,
+        "liga_on_unchanged": true,
+        "rtlm_off_unchanged": true,
+        "rtlm_on_unchanged": true,
+        "rtl_equals_ltr_reversed_input": true,
+        "reversed_input_rtl_equals_ltr": true
+      },
+      "fontcore_rtl": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              3
+            ],
+            "x": -946,
+            "y": 0,
+            "advance_xy": [
+              946,
+              0
+            ],
+            "candidates": [
+              315.0,
+              631.0
+            ],
+            "bounds": [
+              -931,
+              -765,
+              -77,
+              0
+            ]
+          }
+        ],
+        "stops": [
+          {
+            "byte": 0,
+            "x": 0,
+            "y": 0,
+            "quality": "AdvanceBoundary",
+            "source": "Advance"
+          },
+          {
+            "byte": 1,
+            "x": -315,
+            "y": 0,
+            "quality": "Approximate",
+            "source": "FontAuthored"
+          },
+          {
+            "byte": 2,
+            "x": -631,
+            "y": 0,
+            "quality": "Approximate",
+            "source": "FontAuthored"
+          },
+          {
+            "byte": 3,
+            "x": -946,
+            "y": 0,
+            "quality": "AdvanceBoundary",
+            "source": "Advance"
+          }
+        ]
+      },
+      "fontcore_glyph_identity_verified": false
+    },
+    {
+      "font": "NotoSans-Regular.ttf",
+      "text": "ffl",
+      "variants": {
+        "ltr": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            1970
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "ffl",
+          "direction": "ltr",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "f_f_l"
+          ]
+        },
+        "rtl_guess": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            79,
+            1966
+          ],
+          "clusters": [
+            2,
+            0
+          ],
+          "text": "ffl",
+          "direction": "rtl",
+          "requested_script": "guess",
+          "features": {},
+          "glyph_names": [
+            "l",
+            "f_f"
+          ]
+        },
+        "rtl_latn": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            79,
+            1966
+          ],
+          "clusters": [
+            2,
+            0
+          ],
+          "text": "ffl",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "l",
+            "f_f"
+          ]
+        },
+        "rtl_liga_off": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            79,
+            73,
+            73
+          ],
+          "clusters": [
+            2,
+            1,
+            0
+          ],
+          "text": "ffl",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "liga": 0
+          },
+          "glyph_names": [
+            "l",
+            "f",
+            "f"
+          ]
+        },
+        "rtl_liga_on": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            79,
+            1966
+          ],
+          "clusters": [
+            2,
+            0
+          ],
+          "text": "ffl",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "liga": 1
+          },
+          "glyph_names": [
+            "l",
+            "f_f"
+          ]
+        },
+        "rtl_rtlm_off": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            79,
+            1966
+          ],
+          "clusters": [
+            2,
+            0
+          ],
+          "text": "ffl",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "rtlm": 0
+          },
+          "glyph_names": [
+            "l",
+            "f_f"
+          ]
+        },
+        "rtl_rtlm_on": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            79,
+            1966
+          ],
+          "clusters": [
+            2,
+            0
+          ],
+          "text": "ffl",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "rtlm": 1
+          },
+          "glyph_names": [
+            "l",
+            "f_f"
+          ]
+        },
+        "rtl_reversed_input": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            1970
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "lff",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "f_f_l"
+          ]
+        },
+        "ltr_reversed_input": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            79,
+            1966
+          ],
+          "clusters": [
+            0,
+            1
+          ],
+          "text": "lff",
+          "direction": "ltr",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "l",
+            "f_f"
+          ]
+        },
+        "rtl_arab_script_control": {
+          "script": "Arab",
+          "language": "en",
+          "glyph_ids": [
+            1970
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "ffl",
+          "direction": "rtl",
+          "requested_script": "Arab",
+          "features": {},
+          "glyph_names": [
+            "f_f_l"
+          ]
+        }
+      },
+      "assertions": {
+        "guess_is_latn": true,
+        "explicit_latn_unchanged": true,
+        "liga_on_unchanged": true,
+        "rtlm_off_unchanged": true,
+        "rtlm_on_unchanged": true,
+        "rtl_equals_ltr_reversed_input": true,
+        "reversed_input_rtl_equals_ltr": true
+      },
+      "fontcore_rtl": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              3
+            ],
+            "x": -946,
+            "y": 0,
+            "advance_xy": [
+              946,
+              0
+            ],
+            "candidates": [
+              315.0,
+              631.0
+            ],
+            "bounds": [
+              -931,
+              -765,
+              -85,
+              0
+            ]
+          }
+        ],
+        "stops": [
+          {
+            "byte": 0,
+            "x": 0,
+            "y": 0,
+            "quality": "AdvanceBoundary",
+            "source": "Advance"
+          },
+          {
+            "byte": 1,
+            "x": -315,
+            "y": 0,
+            "quality": "Approximate",
+            "source": "FontAuthored"
+          },
+          {
+            "byte": 2,
+            "x": -631,
+            "y": 0,
+            "quality": "Approximate",
+            "source": "FontAuthored"
+          },
+          {
+            "byte": 3,
+            "x": -946,
+            "y": 0,
+            "quality": "AdvanceBoundary",
+            "source": "Advance"
+          }
+        ]
+      },
+      "fontcore_glyph_identity_verified": false
+    },
+    {
+      "font": "NotoSerif-Regular.ttf",
+      "text": "fi",
+      "variants": {
+        "ltr": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            2134
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "fi",
+          "direction": "ltr",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "fi"
+          ]
+        },
+        "rtl_guess": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            76,
+            73
+          ],
+          "clusters": [
+            1,
+            0
+          ],
+          "text": "fi",
+          "direction": "rtl",
+          "requested_script": "guess",
+          "features": {},
+          "glyph_names": [
+            "i",
+            "f"
+          ]
+        },
+        "rtl_latn": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            76,
+            73
+          ],
+          "clusters": [
+            1,
+            0
+          ],
+          "text": "fi",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "i",
+            "f"
+          ]
+        },
+        "rtl_liga_off": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            76,
+            73
+          ],
+          "clusters": [
+            1,
+            0
+          ],
+          "text": "fi",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "liga": 0
+          },
+          "glyph_names": [
+            "i",
+            "f"
+          ]
+        },
+        "rtl_liga_on": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            76,
+            73
+          ],
+          "clusters": [
+            1,
+            0
+          ],
+          "text": "fi",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "liga": 1
+          },
+          "glyph_names": [
+            "i",
+            "f"
+          ]
+        },
+        "rtl_rtlm_off": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            76,
+            73
+          ],
+          "clusters": [
+            1,
+            0
+          ],
+          "text": "fi",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "rtlm": 0
+          },
+          "glyph_names": [
+            "i",
+            "f"
+          ]
+        },
+        "rtl_rtlm_on": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            76,
+            73
+          ],
+          "clusters": [
+            1,
+            0
+          ],
+          "text": "fi",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "rtlm": 1
+          },
+          "glyph_names": [
+            "i",
+            "f"
+          ]
+        },
+        "rtl_reversed_input": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            2134
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "if",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "fi"
+          ]
+        },
+        "ltr_reversed_input": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            76,
+            73
+          ],
+          "clusters": [
+            0,
+            1
+          ],
+          "text": "if",
+          "direction": "ltr",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "i",
+            "f"
+          ]
+        },
+        "rtl_arab_script_control": {
+          "script": "Arab",
+          "language": "en",
+          "glyph_ids": [
+            2134
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "fi",
+          "direction": "rtl",
+          "requested_script": "Arab",
+          "features": {},
+          "glyph_names": [
+            "fi"
+          ]
+        }
+      },
+      "assertions": {
+        "guess_is_latn": true,
+        "explicit_latn_unchanged": true,
+        "liga_on_unchanged": true,
+        "rtlm_off_unchanged": true,
+        "rtlm_on_unchanged": true,
+        "rtl_equals_ltr_reversed_input": true,
+        "reversed_input_rtl_equals_ltr": true
+      },
+      "fontcore_rtl": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              2
+            ],
+            "x": -663,
+            "y": 0,
+            "advance_xy": [
+              663,
+              0
+            ],
+            "candidates": [
+              331.0
+            ],
+            "bounds": [
+              -636,
+              -775,
+              -13,
+              0
+            ]
+          }
+        ],
+        "stops": [
+          {
+            "byte": 0,
+            "x": 0,
+            "y": 0,
+            "quality": "AdvanceBoundary",
+            "source": "Advance"
+          },
+          {
+            "byte": 1,
+            "x": -331,
+            "y": 0,
+            "quality": "Approximate",
+            "source": "FontAuthored"
+          },
+          {
+            "byte": 2,
+            "x": -663,
+            "y": 0,
+            "quality": "AdvanceBoundary",
+            "source": "Advance"
+          }
+        ]
+      },
+      "fontcore_glyph_identity_verified": false
+    },
+    {
+      "font": "NotoSerif-Regular.ttf",
+      "text": "fl",
+      "variants": {
+        "ltr": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            2135
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "fl",
+          "direction": "ltr",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "fl"
+          ]
+        },
+        "rtl_guess": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            79,
+            73
+          ],
+          "clusters": [
+            1,
+            0
+          ],
+          "text": "fl",
+          "direction": "rtl",
+          "requested_script": "guess",
+          "features": {},
+          "glyph_names": [
+            "l",
+            "f"
+          ]
+        },
+        "rtl_latn": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            79,
+            73
+          ],
+          "clusters": [
+            1,
+            0
+          ],
+          "text": "fl",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "l",
+            "f"
+          ]
+        },
+        "rtl_liga_off": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            79,
+            73
+          ],
+          "clusters": [
+            1,
+            0
+          ],
+          "text": "fl",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "liga": 0
+          },
+          "glyph_names": [
+            "l",
+            "f"
+          ]
+        },
+        "rtl_liga_on": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            79,
+            73
+          ],
+          "clusters": [
+            1,
+            0
+          ],
+          "text": "fl",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "liga": 1
+          },
+          "glyph_names": [
+            "l",
+            "f"
+          ]
+        },
+        "rtl_rtlm_off": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            79,
+            73
+          ],
+          "clusters": [
+            1,
+            0
+          ],
+          "text": "fl",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "rtlm": 0
+          },
+          "glyph_names": [
+            "l",
+            "f"
+          ]
+        },
+        "rtl_rtlm_on": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            79,
+            73
+          ],
+          "clusters": [
+            1,
+            0
+          ],
+          "text": "fl",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "rtlm": 1
+          },
+          "glyph_names": [
+            "l",
+            "f"
+          ]
+        },
+        "rtl_reversed_input": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            2135
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "lf",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "fl"
+          ]
+        },
+        "ltr_reversed_input": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            79,
+            73
+          ],
+          "clusters": [
+            0,
+            1
+          ],
+          "text": "lf",
+          "direction": "ltr",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "l",
+            "f"
+          ]
+        },
+        "rtl_arab_script_control": {
+          "script": "Arab",
+          "language": "en",
+          "glyph_ids": [
+            2135
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "fl",
+          "direction": "rtl",
+          "requested_script": "Arab",
+          "features": {},
+          "glyph_names": [
+            "fl"
+          ]
+        }
+      },
+      "assertions": {
+        "guess_is_latn": true,
+        "explicit_latn_unchanged": true,
+        "liga_on_unchanged": true,
+        "rtlm_off_unchanged": true,
+        "rtlm_on_unchanged": true,
+        "rtl_equals_ltr_reversed_input": true,
+        "reversed_input_rtl_equals_ltr": true
+      },
+      "fontcore_rtl": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              2
+            ],
+            "x": -662,
+            "y": 0,
+            "advance_xy": [
+              662,
+              0
+            ],
+            "candidates": [
+              325.0
+            ],
+            "bounds": [
+              -635,
+              -770,
+              -13,
+              0
+            ]
+          }
+        ],
+        "stops": [
+          {
+            "byte": 0,
+            "x": 0,
+            "y": 0,
+            "quality": "AdvanceBoundary",
+            "source": "Advance"
+          },
+          {
+            "byte": 1,
+            "x": -325,
+            "y": 0,
+            "quality": "Approximate",
+            "source": "FontAuthored"
+          },
+          {
+            "byte": 2,
+            "x": -662,
+            "y": 0,
+            "quality": "AdvanceBoundary",
+            "source": "Advance"
+          }
+        ]
+      },
+      "fontcore_glyph_identity_verified": false
+    },
+    {
+      "font": "NotoSerif-Regular.ttf",
+      "text": "ff",
+      "variants": {
+        "ltr": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            2131
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "ff",
+          "direction": "ltr",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "f_f"
+          ]
+        },
+        "rtl_guess": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            2131
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "ff",
+          "direction": "rtl",
+          "requested_script": "guess",
+          "features": {},
+          "glyph_names": [
+            "f_f"
+          ]
+        },
+        "rtl_latn": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            2131
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "ff",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "f_f"
+          ]
+        },
+        "rtl_liga_off": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            73,
+            73
+          ],
+          "clusters": [
+            1,
+            0
+          ],
+          "text": "ff",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "liga": 0
+          },
+          "glyph_names": [
+            "f",
+            "f"
+          ]
+        },
+        "rtl_liga_on": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            2131
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "ff",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "liga": 1
+          },
+          "glyph_names": [
+            "f_f"
+          ]
+        },
+        "rtl_rtlm_off": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            2131
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "ff",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "rtlm": 0
+          },
+          "glyph_names": [
+            "f_f"
+          ]
+        },
+        "rtl_rtlm_on": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            2131
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "ff",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "rtlm": 1
+          },
+          "glyph_names": [
+            "f_f"
+          ]
+        },
+        "rtl_reversed_input": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            2131
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "ff",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "f_f"
+          ]
+        },
+        "ltr_reversed_input": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            2131
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "ff",
+          "direction": "ltr",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "f_f"
+          ]
+        },
+        "rtl_arab_script_control": {
+          "script": "Arab",
+          "language": "en",
+          "glyph_ids": [
+            2131
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "ff",
+          "direction": "rtl",
+          "requested_script": "Arab",
+          "features": {},
+          "glyph_names": [
+            "f_f"
+          ]
+        }
+      },
+      "assertions": {
+        "guess_is_latn": true,
+        "explicit_latn_unchanged": true,
+        "liga_on_unchanged": true,
+        "rtlm_off_unchanged": true,
+        "rtlm_on_unchanged": true,
+        "rtl_equals_ltr_reversed_input": true,
+        "reversed_input_rtl_equals_ltr": true
+      },
+      "fontcore_rtl": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              2
+            ],
+            "x": -708,
+            "y": 0,
+            "advance_xy": [
+              708,
+              0
+            ],
+            "candidates": [
+              366.0
+            ],
+            "bounds": [
+              -681,
+              -770,
+              70,
+              0
+            ]
+          }
+        ],
+        "stops": [
+          {
+            "byte": 0,
+            "x": 0,
+            "y": 0,
+            "quality": "AdvanceBoundary",
+            "source": "Advance"
+          },
+          {
+            "byte": 1,
+            "x": -366,
+            "y": 0,
+            "quality": "Approximate",
+            "source": "FontAuthored"
+          },
+          {
+            "byte": 2,
+            "x": -708,
+            "y": 0,
+            "quality": "AdvanceBoundary",
+            "source": "Advance"
+          }
+        ]
+      },
+      "fontcore_glyph_identity_verified": false
+    },
+    {
+      "font": "NotoSerif-Regular.ttf",
+      "text": "ffi",
+      "variants": {
+        "ltr": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            2132
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "ffi",
+          "direction": "ltr",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "f_f_i"
+          ]
+        },
+        "rtl_guess": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            76,
+            2131
+          ],
+          "clusters": [
+            2,
+            0
+          ],
+          "text": "ffi",
+          "direction": "rtl",
+          "requested_script": "guess",
+          "features": {},
+          "glyph_names": [
+            "i",
+            "f_f"
+          ]
+        },
+        "rtl_latn": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            76,
+            2131
+          ],
+          "clusters": [
+            2,
+            0
+          ],
+          "text": "ffi",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "i",
+            "f_f"
+          ]
+        },
+        "rtl_liga_off": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            76,
+            73,
+            73
+          ],
+          "clusters": [
+            2,
+            1,
+            0
+          ],
+          "text": "ffi",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "liga": 0
+          },
+          "glyph_names": [
+            "i",
+            "f",
+            "f"
+          ]
+        },
+        "rtl_liga_on": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            76,
+            2131
+          ],
+          "clusters": [
+            2,
+            0
+          ],
+          "text": "ffi",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "liga": 1
+          },
+          "glyph_names": [
+            "i",
+            "f_f"
+          ]
+        },
+        "rtl_rtlm_off": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            76,
+            2131
+          ],
+          "clusters": [
+            2,
+            0
+          ],
+          "text": "ffi",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "rtlm": 0
+          },
+          "glyph_names": [
+            "i",
+            "f_f"
+          ]
+        },
+        "rtl_rtlm_on": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            76,
+            2131
+          ],
+          "clusters": [
+            2,
+            0
+          ],
+          "text": "ffi",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "rtlm": 1
+          },
+          "glyph_names": [
+            "i",
+            "f_f"
+          ]
+        },
+        "rtl_reversed_input": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            2132
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "iff",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "f_f_i"
+          ]
+        },
+        "ltr_reversed_input": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            76,
+            2131
+          ],
+          "clusters": [
+            0,
+            1
+          ],
+          "text": "iff",
+          "direction": "ltr",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "i",
+            "f_f"
+          ]
+        },
+        "rtl_arab_script_control": {
+          "script": "Arab",
+          "language": "en",
+          "glyph_ids": [
+            2132
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "ffi",
+          "direction": "rtl",
+          "requested_script": "Arab",
+          "features": {},
+          "glyph_names": [
+            "f_f_i"
+          ]
+        }
+      },
+      "assertions": {
+        "guess_is_latn": true,
+        "explicit_latn_unchanged": true,
+        "liga_on_unchanged": true,
+        "rtlm_off_unchanged": true,
+        "rtlm_on_unchanged": true,
+        "rtl_equals_ltr_reversed_input": true,
+        "reversed_input_rtl_equals_ltr": true
+      },
+      "fontcore_rtl": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              3
+            ],
+            "x": -1002,
+            "y": 0,
+            "advance_xy": [
+              1002,
+              0
+            ],
+            "candidates": [
+              334.0,
+              668.0
+            ],
+            "bounds": [
+              -975,
+              -775,
+              -13,
+              0
+            ]
+          }
+        ],
+        "stops": [
+          {
+            "byte": 0,
+            "x": 0,
+            "y": 0,
+            "quality": "AdvanceBoundary",
+            "source": "Advance"
+          },
+          {
+            "byte": 1,
+            "x": -334,
+            "y": 0,
+            "quality": "Approximate",
+            "source": "FontAuthored"
+          },
+          {
+            "byte": 2,
+            "x": -668,
+            "y": 0,
+            "quality": "Approximate",
+            "source": "FontAuthored"
+          },
+          {
+            "byte": 3,
+            "x": -1002,
+            "y": 0,
+            "quality": "AdvanceBoundary",
+            "source": "Advance"
+          }
+        ]
+      },
+      "fontcore_glyph_identity_verified": false
+    },
+    {
+      "font": "NotoSerif-Regular.ttf",
+      "text": "ffl",
+      "variants": {
+        "ltr": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            2133
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "ffl",
+          "direction": "ltr",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "f_f_l"
+          ]
+        },
+        "rtl_guess": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            79,
+            2131
+          ],
+          "clusters": [
+            2,
+            0
+          ],
+          "text": "ffl",
+          "direction": "rtl",
+          "requested_script": "guess",
+          "features": {},
+          "glyph_names": [
+            "l",
+            "f_f"
+          ]
+        },
+        "rtl_latn": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            79,
+            2131
+          ],
+          "clusters": [
+            2,
+            0
+          ],
+          "text": "ffl",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "l",
+            "f_f"
+          ]
+        },
+        "rtl_liga_off": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            79,
+            73,
+            73
+          ],
+          "clusters": [
+            2,
+            1,
+            0
+          ],
+          "text": "ffl",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "liga": 0
+          },
+          "glyph_names": [
+            "l",
+            "f",
+            "f"
+          ]
+        },
+        "rtl_liga_on": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            79,
+            2131
+          ],
+          "clusters": [
+            2,
+            0
+          ],
+          "text": "ffl",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "liga": 1
+          },
+          "glyph_names": [
+            "l",
+            "f_f"
+          ]
+        },
+        "rtl_rtlm_off": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            79,
+            2131
+          ],
+          "clusters": [
+            2,
+            0
+          ],
+          "text": "ffl",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "rtlm": 0
+          },
+          "glyph_names": [
+            "l",
+            "f_f"
+          ]
+        },
+        "rtl_rtlm_on": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            79,
+            2131
+          ],
+          "clusters": [
+            2,
+            0
+          ],
+          "text": "ffl",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "rtlm": 1
+          },
+          "glyph_names": [
+            "l",
+            "f_f"
+          ]
+        },
+        "rtl_reversed_input": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            2133
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "lff",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "f_f_l"
+          ]
+        },
+        "ltr_reversed_input": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            79,
+            2131
+          ],
+          "clusters": [
+            0,
+            1
+          ],
+          "text": "lff",
+          "direction": "ltr",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "l",
+            "f_f"
+          ]
+        },
+        "rtl_arab_script_control": {
+          "script": "Arab",
+          "language": "en",
+          "glyph_ids": [
+            2133
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "ffl",
+          "direction": "rtl",
+          "requested_script": "Arab",
+          "features": {},
+          "glyph_names": [
+            "f_f_l"
+          ]
+        }
+      },
+      "assertions": {
+        "guess_is_latn": true,
+        "explicit_latn_unchanged": true,
+        "liga_on_unchanged": true,
+        "rtlm_off_unchanged": true,
+        "rtlm_on_unchanged": true,
+        "rtl_equals_ltr_reversed_input": true,
+        "reversed_input_rtl_equals_ltr": true
+      },
+      "fontcore_rtl": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              3
+            ],
+            "x": -1001,
+            "y": 0,
+            "advance_xy": [
+              1001,
+              0
+            ],
+            "candidates": [
+              334.0,
+              667.0
+            ],
+            "bounds": [
+              -974,
+              -770,
+              -13,
+              0
+            ]
+          }
+        ],
+        "stops": [
+          {
+            "byte": 0,
+            "x": 0,
+            "y": 0,
+            "quality": "AdvanceBoundary",
+            "source": "Advance"
+          },
+          {
+            "byte": 1,
+            "x": -334,
+            "y": 0,
+            "quality": "Approximate",
+            "source": "FontAuthored"
+          },
+          {
+            "byte": 2,
+            "x": -667,
+            "y": 0,
+            "quality": "Approximate",
+            "source": "FontAuthored"
+          },
+          {
+            "byte": 3,
+            "x": -1001,
+            "y": 0,
+            "quality": "AdvanceBoundary",
+            "source": "Advance"
+          }
+        ]
+      },
+      "fontcore_glyph_identity_verified": false
+    },
+    {
+      "font": "DejaVuSans.ttf",
+      "text": "fi",
+      "variants": {
+        "ltr": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            5042
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "fi",
+          "direction": "ltr",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "fi"
+          ]
+        },
+        "rtl_guess": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            76,
+            73
+          ],
+          "clusters": [
+            1,
+            0
+          ],
+          "text": "fi",
+          "direction": "rtl",
+          "requested_script": "guess",
+          "features": {},
+          "glyph_names": [
+            "i",
+            "f"
+          ]
+        },
+        "rtl_latn": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            76,
+            73
+          ],
+          "clusters": [
+            1,
+            0
+          ],
+          "text": "fi",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "i",
+            "f"
+          ]
+        },
+        "rtl_liga_off": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            76,
+            73
+          ],
+          "clusters": [
+            1,
+            0
+          ],
+          "text": "fi",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "liga": 0
+          },
+          "glyph_names": [
+            "i",
+            "f"
+          ]
+        },
+        "rtl_liga_on": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            76,
+            73
+          ],
+          "clusters": [
+            1,
+            0
+          ],
+          "text": "fi",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "liga": 1
+          },
+          "glyph_names": [
+            "i",
+            "f"
+          ]
+        },
+        "rtl_rtlm_off": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            76,
+            73
+          ],
+          "clusters": [
+            1,
+            0
+          ],
+          "text": "fi",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "rtlm": 0
+          },
+          "glyph_names": [
+            "i",
+            "f"
+          ]
+        },
+        "rtl_rtlm_on": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            76,
+            73
+          ],
+          "clusters": [
+            1,
+            0
+          ],
+          "text": "fi",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "rtlm": 1
+          },
+          "glyph_names": [
+            "i",
+            "f"
+          ]
+        },
+        "rtl_reversed_input": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            5042
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "if",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "fi"
+          ]
+        },
+        "ltr_reversed_input": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            76,
+            73
+          ],
+          "clusters": [
+            0,
+            1
+          ],
+          "text": "if",
+          "direction": "ltr",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "i",
+            "f"
+          ]
+        },
+        "rtl_arab_script_control": {
+          "script": "Arab",
+          "language": "en",
+          "glyph_ids": [
+            76,
+            73
+          ],
+          "clusters": [
+            1,
+            0
+          ],
+          "text": "fi",
+          "direction": "rtl",
+          "requested_script": "Arab",
+          "features": {},
+          "glyph_names": [
+            "i",
+            "f"
+          ]
+        }
+      },
+      "assertions": {
+        "guess_is_latn": true,
+        "explicit_latn_unchanged": true,
+        "liga_on_unchanged": true,
+        "rtlm_off_unchanged": true,
+        "rtlm_on_unchanged": true,
+        "rtl_equals_ltr_reversed_input": true,
+        "reversed_input_rtl_equals_ltr": true
+      },
+      "fontcore_rtl": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              2
+            ],
+            "x": -1290,
+            "y": 0,
+            "advance_xy": [
+              1290,
+              0
+            ],
+            "candidates": null,
+            "bounds": [
+              -1243,
+              -1556,
+              -192,
+              0
+            ]
+          }
+        ],
+        "stops": [
+          {
+            "byte": 0,
+            "x": 0,
+            "y": 0,
+            "quality": "AdvanceBoundary",
+            "source": "Advance"
+          },
+          {
+            "byte": 1,
+            "x": -645,
+            "y": 0,
+            "quality": "Approximate",
+            "source": "Approximate"
+          },
+          {
+            "byte": 2,
+            "x": -1290,
+            "y": 0,
+            "quality": "AdvanceBoundary",
+            "source": "Advance"
+          }
+        ]
+      },
+      "fontcore_glyph_identity_verified": false
+    },
+    {
+      "font": "DejaVuSans.ttf",
+      "text": "fl",
+      "variants": {
+        "ltr": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            5043
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "fl",
+          "direction": "ltr",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "fl"
+          ]
+        },
+        "rtl_guess": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            79,
+            73
+          ],
+          "clusters": [
+            1,
+            0
+          ],
+          "text": "fl",
+          "direction": "rtl",
+          "requested_script": "guess",
+          "features": {},
+          "glyph_names": [
+            "l",
+            "f"
+          ]
+        },
+        "rtl_latn": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            79,
+            73
+          ],
+          "clusters": [
+            1,
+            0
+          ],
+          "text": "fl",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "l",
+            "f"
+          ]
+        },
+        "rtl_liga_off": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            79,
+            73
+          ],
+          "clusters": [
+            1,
+            0
+          ],
+          "text": "fl",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "liga": 0
+          },
+          "glyph_names": [
+            "l",
+            "f"
+          ]
+        },
+        "rtl_liga_on": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            79,
+            73
+          ],
+          "clusters": [
+            1,
+            0
+          ],
+          "text": "fl",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "liga": 1
+          },
+          "glyph_names": [
+            "l",
+            "f"
+          ]
+        },
+        "rtl_rtlm_off": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            79,
+            73
+          ],
+          "clusters": [
+            1,
+            0
+          ],
+          "text": "fl",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "rtlm": 0
+          },
+          "glyph_names": [
+            "l",
+            "f"
+          ]
+        },
+        "rtl_rtlm_on": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            79,
+            73
+          ],
+          "clusters": [
+            1,
+            0
+          ],
+          "text": "fl",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "rtlm": 1
+          },
+          "glyph_names": [
+            "l",
+            "f"
+          ]
+        },
+        "rtl_reversed_input": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            5043
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "lf",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "fl"
+          ]
+        },
+        "ltr_reversed_input": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            79,
+            73
+          ],
+          "clusters": [
+            0,
+            1
+          ],
+          "text": "lf",
+          "direction": "ltr",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "l",
+            "f"
+          ]
+        },
+        "rtl_arab_script_control": {
+          "script": "Arab",
+          "language": "en",
+          "glyph_ids": [
+            79,
+            73
+          ],
+          "clusters": [
+            1,
+            0
+          ],
+          "text": "fl",
+          "direction": "rtl",
+          "requested_script": "Arab",
+          "features": {},
+          "glyph_names": [
+            "l",
+            "f"
+          ]
+        }
+      },
+      "assertions": {
+        "guess_is_latn": true,
+        "explicit_latn_unchanged": true,
+        "liga_on_unchanged": true,
+        "rtlm_off_unchanged": true,
+        "rtlm_on_unchanged": true,
+        "rtl_equals_ltr_reversed_input": true,
+        "reversed_input_rtl_equals_ltr": true
+      },
+      "fontcore_rtl": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              2
+            ],
+            "x": -1290,
+            "y": 0,
+            "advance_xy": [
+              1290,
+              0
+            ],
+            "candidates": null,
+            "bounds": [
+              -1243,
+              -1556,
+              -192,
+              0
+            ]
+          }
+        ],
+        "stops": [
+          {
+            "byte": 0,
+            "x": 0,
+            "y": 0,
+            "quality": "AdvanceBoundary",
+            "source": "Advance"
+          },
+          {
+            "byte": 1,
+            "x": -645,
+            "y": 0,
+            "quality": "Approximate",
+            "source": "Approximate"
+          },
+          {
+            "byte": 2,
+            "x": -1290,
+            "y": 0,
+            "quality": "AdvanceBoundary",
+            "source": "Advance"
+          }
+        ]
+      },
+      "fontcore_glyph_identity_verified": false
+    },
+    {
+      "font": "DejaVuSans.ttf",
+      "text": "ff",
+      "variants": {
+        "ltr": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            5041
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "ff",
+          "direction": "ltr",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "uniFB00"
+          ]
+        },
+        "rtl_guess": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            5041
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "ff",
+          "direction": "rtl",
+          "requested_script": "guess",
+          "features": {},
+          "glyph_names": [
+            "uniFB00"
+          ]
+        },
+        "rtl_latn": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            5041
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "ff",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "uniFB00"
+          ]
+        },
+        "rtl_liga_off": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            73,
+            73
+          ],
+          "clusters": [
+            1,
+            0
+          ],
+          "text": "ff",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "liga": 0
+          },
+          "glyph_names": [
+            "f",
+            "f"
+          ]
+        },
+        "rtl_liga_on": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            5041
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "ff",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "liga": 1
+          },
+          "glyph_names": [
+            "uniFB00"
+          ]
+        },
+        "rtl_rtlm_off": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            5041
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "ff",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "rtlm": 0
+          },
+          "glyph_names": [
+            "uniFB00"
+          ]
+        },
+        "rtl_rtlm_on": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            5041
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "ff",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "rtlm": 1
+          },
+          "glyph_names": [
+            "uniFB00"
+          ]
+        },
+        "rtl_reversed_input": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            5041
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "ff",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "uniFB00"
+          ]
+        },
+        "ltr_reversed_input": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            5041
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "ff",
+          "direction": "ltr",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "uniFB00"
+          ]
+        },
+        "rtl_arab_script_control": {
+          "script": "Arab",
+          "language": "en",
+          "glyph_ids": [
+            73,
+            73
+          ],
+          "clusters": [
+            1,
+            0
+          ],
+          "text": "ff",
+          "direction": "rtl",
+          "requested_script": "Arab",
+          "features": {},
+          "glyph_names": [
+            "f",
+            "f"
+          ]
+        }
+      },
+      "assertions": {
+        "guess_is_latn": true,
+        "explicit_latn_unchanged": true,
+        "liga_on_unchanged": true,
+        "rtlm_off_unchanged": true,
+        "rtlm_on_unchanged": true,
+        "rtl_equals_ltr_reversed_input": true,
+        "reversed_input_rtl_equals_ltr": true
+      },
+      "fontcore_rtl": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              2
+            ],
+            "x": -1411,
+            "y": 0,
+            "advance_xy": [
+              1411,
+              0
+            ],
+            "candidates": null,
+            "bounds": [
+              -1364,
+              -1556,
+              39,
+              0
+            ]
+          }
+        ],
+        "stops": [
+          {
+            "byte": 0,
+            "x": 0,
+            "y": 0,
+            "quality": "AdvanceBoundary",
+            "source": "Advance"
+          },
+          {
+            "byte": 1,
+            "x": -705.5,
+            "y": 0,
+            "quality": "Approximate",
+            "source": "Approximate"
+          },
+          {
+            "byte": 2,
+            "x": -1411,
+            "y": 0,
+            "quality": "AdvanceBoundary",
+            "source": "Advance"
+          }
+        ]
+      },
+      "fontcore_glyph_identity_verified": false
+    },
+    {
+      "font": "DejaVuSans.ttf",
+      "text": "ffi",
+      "variants": {
+        "ltr": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            5044
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "ffi",
+          "direction": "ltr",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "uniFB03"
+          ]
+        },
+        "rtl_guess": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            76,
+            5041
+          ],
+          "clusters": [
+            2,
+            0
+          ],
+          "text": "ffi",
+          "direction": "rtl",
+          "requested_script": "guess",
+          "features": {},
+          "glyph_names": [
+            "i",
+            "uniFB00"
+          ]
+        },
+        "rtl_latn": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            76,
+            5041
+          ],
+          "clusters": [
+            2,
+            0
+          ],
+          "text": "ffi",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "i",
+            "uniFB00"
+          ]
+        },
+        "rtl_liga_off": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            76,
+            73,
+            73
+          ],
+          "clusters": [
+            2,
+            1,
+            0
+          ],
+          "text": "ffi",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "liga": 0
+          },
+          "glyph_names": [
+            "i",
+            "f",
+            "f"
+          ]
+        },
+        "rtl_liga_on": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            76,
+            5041
+          ],
+          "clusters": [
+            2,
+            0
+          ],
+          "text": "ffi",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "liga": 1
+          },
+          "glyph_names": [
+            "i",
+            "uniFB00"
+          ]
+        },
+        "rtl_rtlm_off": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            76,
+            5041
+          ],
+          "clusters": [
+            2,
+            0
+          ],
+          "text": "ffi",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "rtlm": 0
+          },
+          "glyph_names": [
+            "i",
+            "uniFB00"
+          ]
+        },
+        "rtl_rtlm_on": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            76,
+            5041
+          ],
+          "clusters": [
+            2,
+            0
+          ],
+          "text": "ffi",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "rtlm": 1
+          },
+          "glyph_names": [
+            "i",
+            "uniFB00"
+          ]
+        },
+        "rtl_reversed_input": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            5044
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "iff",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "uniFB03"
+          ]
+        },
+        "ltr_reversed_input": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            76,
+            5041
+          ],
+          "clusters": [
+            0,
+            1
+          ],
+          "text": "iff",
+          "direction": "ltr",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "i",
+            "uniFB00"
+          ]
+        },
+        "rtl_arab_script_control": {
+          "script": "Arab",
+          "language": "en",
+          "glyph_ids": [
+            76,
+            73,
+            73
+          ],
+          "clusters": [
+            2,
+            1,
+            0
+          ],
+          "text": "ffi",
+          "direction": "rtl",
+          "requested_script": "Arab",
+          "features": {},
+          "glyph_names": [
+            "i",
+            "f",
+            "f"
+          ]
+        }
+      },
+      "assertions": {
+        "guess_is_latn": true,
+        "explicit_latn_unchanged": true,
+        "liga_on_unchanged": true,
+        "rtlm_off_unchanged": true,
+        "rtlm_on_unchanged": true,
+        "rtl_equals_ltr_reversed_input": true,
+        "reversed_input_rtl_equals_ltr": true
+      },
+      "fontcore_rtl": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              3
+            ],
+            "x": -1980,
+            "y": 0,
+            "advance_xy": [
+              1980,
+              0
+            ],
+            "candidates": null,
+            "bounds": [
+              -1933,
+              -1556,
+              -192,
+              0
+            ]
+          }
+        ],
+        "stops": [
+          {
+            "byte": 0,
+            "x": 0,
+            "y": 0,
+            "quality": "AdvanceBoundary",
+            "source": "Advance"
+          },
+          {
+            "byte": 1,
+            "x": -660,
+            "y": 0,
+            "quality": "Approximate",
+            "source": "Approximate"
+          },
+          {
+            "byte": 2,
+            "x": -1320,
+            "y": 0,
+            "quality": "Approximate",
+            "source": "Approximate"
+          },
+          {
+            "byte": 3,
+            "x": -1980,
+            "y": 0,
+            "quality": "AdvanceBoundary",
+            "source": "Advance"
+          }
+        ]
+      },
+      "fontcore_glyph_identity_verified": false
+    },
+    {
+      "font": "DejaVuSans.ttf",
+      "text": "ffl",
+      "variants": {
+        "ltr": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            5045
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "ffl",
+          "direction": "ltr",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "uniFB04"
+          ]
+        },
+        "rtl_guess": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            79,
+            5041
+          ],
+          "clusters": [
+            2,
+            0
+          ],
+          "text": "ffl",
+          "direction": "rtl",
+          "requested_script": "guess",
+          "features": {},
+          "glyph_names": [
+            "l",
+            "uniFB00"
+          ]
+        },
+        "rtl_latn": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            79,
+            5041
+          ],
+          "clusters": [
+            2,
+            0
+          ],
+          "text": "ffl",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "l",
+            "uniFB00"
+          ]
+        },
+        "rtl_liga_off": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            79,
+            73,
+            73
+          ],
+          "clusters": [
+            2,
+            1,
+            0
+          ],
+          "text": "ffl",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "liga": 0
+          },
+          "glyph_names": [
+            "l",
+            "f",
+            "f"
+          ]
+        },
+        "rtl_liga_on": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            79,
+            5041
+          ],
+          "clusters": [
+            2,
+            0
+          ],
+          "text": "ffl",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "liga": 1
+          },
+          "glyph_names": [
+            "l",
+            "uniFB00"
+          ]
+        },
+        "rtl_rtlm_off": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            79,
+            5041
+          ],
+          "clusters": [
+            2,
+            0
+          ],
+          "text": "ffl",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "rtlm": 0
+          },
+          "glyph_names": [
+            "l",
+            "uniFB00"
+          ]
+        },
+        "rtl_rtlm_on": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            79,
+            5041
+          ],
+          "clusters": [
+            2,
+            0
+          ],
+          "text": "ffl",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {
+            "rtlm": 1
+          },
+          "glyph_names": [
+            "l",
+            "uniFB00"
+          ]
+        },
+        "rtl_reversed_input": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            5045
+          ],
+          "clusters": [
+            0
+          ],
+          "text": "lff",
+          "direction": "rtl",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "uniFB04"
+          ]
+        },
+        "ltr_reversed_input": {
+          "script": "Latn",
+          "language": "en",
+          "glyph_ids": [
+            79,
+            5041
+          ],
+          "clusters": [
+            0,
+            1
+          ],
+          "text": "lff",
+          "direction": "ltr",
+          "requested_script": "Latn",
+          "features": {},
+          "glyph_names": [
+            "l",
+            "uniFB00"
+          ]
+        },
+        "rtl_arab_script_control": {
+          "script": "Arab",
+          "language": "en",
+          "glyph_ids": [
+            79,
+            73,
+            73
+          ],
+          "clusters": [
+            2,
+            1,
+            0
+          ],
+          "text": "ffl",
+          "direction": "rtl",
+          "requested_script": "Arab",
+          "features": {},
+          "glyph_names": [
+            "l",
+            "f",
+            "f"
+          ]
+        }
+      },
+      "assertions": {
+        "guess_is_latn": true,
+        "explicit_latn_unchanged": true,
+        "liga_on_unchanged": true,
+        "rtlm_off_unchanged": true,
+        "rtlm_on_unchanged": true,
+        "rtl_equals_ltr_reversed_input": true,
+        "reversed_input_rtl_equals_ltr": true
+      },
+      "fontcore_rtl": {
+        "glyphs": [
+          {
+            "source": [
+              0,
+              3
+            ],
+            "x": -1980,
+            "y": 0,
+            "advance_xy": [
+              1980,
+              0
+            ],
+            "candidates": null,
+            "bounds": [
+              -1933,
+              -1556,
+              -192,
+              0
+            ]
+          }
+        ],
+        "stops": [
+          {
+            "byte": 0,
+            "x": 0,
+            "y": 0,
+            "quality": "AdvanceBoundary",
+            "source": "Advance"
+          },
+          {
+            "byte": 1,
+            "x": -660,
+            "y": 0,
+            "quality": "Approximate",
+            "source": "Approximate"
+          },
+          {
+            "byte": 2,
+            "x": -1320,
+            "y": 0,
+            "quality": "Approximate",
+            "source": "Approximate"
+          },
+          {
+            "byte": 3,
+            "x": -1980,
+            "y": 0,
+            "quality": "AdvanceBoundary",
+            "source": "Advance"
+          }
+        ]
+      },
+      "fontcore_glyph_identity_verified": false
+    }
+  ]
+}

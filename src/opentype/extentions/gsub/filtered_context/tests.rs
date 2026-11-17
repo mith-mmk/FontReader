@@ -31,6 +31,7 @@ fn gdef() -> Gdef {
             coverages: vec![coverage(&[2, 6])],
         }),
         item_var_store_offset: None,
+        caret_variation_store: None,
     }
 }
 fn lookup(kind: u16, flags: u16, subtables: Vec<Subtable>) -> Lookup {

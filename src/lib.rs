@@ -41,7 +41,9 @@ pub use bidi_layout::{
 };
 pub mod caret;
 pub mod commands;
-pub use caret::{CaretAffinity, CaretLayout, CaretPosition, CaretQuality, TextPosition};
+pub use caret::{
+    CaretAffinity, CaretLayout, CaretPosition, CaretQuality, CaretSource, TextPosition,
+};
 pub mod compositefont;
 pub mod fontengine;
 pub mod fontface;

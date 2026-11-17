@@ -65,7 +65,8 @@ logical position can have different visual x coordinates at a direction change.
 `caret_positions(TextPosition)` selects upstream/downstream affinity. Formatting
 controls keep zero-width source stops; a control swallowed inside a ligature
 ownership envelope does not get a share of its advance. Ligature-internal stops
-remain explicitly approximate. `hit_test` selects nearest baseline then inline
+prefer validated static GDEF candidates and otherwise remain explicitly approximate;
+`source()` reports the distinction while legacy `quality()` remains conservative. `hit_test` selects nearest baseline then inline
 stop, with deterministic logical-byte/affinity ties and finite-extreme clamping.
 
 LF/CRLF are hard paragraph boundaries; empty/trailing lines are retained. There

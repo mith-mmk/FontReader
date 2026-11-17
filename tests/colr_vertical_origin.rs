@@ -180,10 +180,26 @@ fn colr_metadata_does_not_translate_unrenderable_color_fallback() {
             panic!("expected fallback path")
         };
         assert_eq!(path.paint, GlyphPaint::CurrentColor);
-        assert_eq!((path.offset_x, path.offset_y), (0.0, 0.0));
+        // This is a monochrome simple glyf fallback, not a rendered COLR
+        // layer. hmtx LSB=0 and stored xMin=50 require a -5 metric-origin
+        // correction at size 100. COLR's vertical-origin translation must
+        // still NOT be applied: Y remains zero, and X is only the -5 shift.
+        assert_eq!((path.offset_x, path.offset_y), (-5.0, 0.0));
+        let horizontal = face
+            .engine()
+            .with_font_size(100.0)
+            .shape("\u{3001}")
+            .unwrap();
+        let GlyphLayer::Path(horizontal_path) = &horizontal.glyphs[0].glyph.layers[0] else {
+            panic!("expected horizontal fallback path")
+        };
+        assert_eq!(
+            (path.offset_x, path.offset_y),
+            (horizontal_path.offset_x, horizontal_path.offset_y)
+        );
         assert_eq!(
             run.glyphs[0].glyph.metrics.bounds,
-            Some(bounds(5.0, -70.0, 45.0, 0.0))
+            Some(bounds(0.0, -70.0, 40.0, 0.0))
         );
     }
 }

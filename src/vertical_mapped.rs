@@ -57,6 +57,7 @@ pub struct VerticalCaretPosition {
     x: f32,
     y: f32,
     quality: CaretQuality,
+    source: crate::CaretSource,
     group_index: usize,
 }
 impl VerticalCaretPosition {
@@ -71,6 +72,10 @@ impl VerticalCaretPosition {
     }
     pub fn quality(self) -> CaretQuality {
         self.quality
+    }
+    /// Detailed origin of the caret position; unlike legacy quality, distinguishes GDEF.
+    pub fn source(self) -> crate::CaretSource {
+        self.source
     }
     pub fn group_index(self) -> usize {
         self.group_index
@@ -231,6 +236,7 @@ impl VerticalMappedLayout {
             x,
             y,
             quality: caret.quality(),
+            source: caret.source(),
             group_index: index,
         })
     }

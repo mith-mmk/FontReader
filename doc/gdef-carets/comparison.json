@@ -1,0 +1,6746 @@
+{
+  "schema": 1,
+  "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+  "fonttools": "4.61.1",
+  "fontcore_commit": "54877bca89e14384823f6282395ca23232ab7629",
+  "production_tree_dirty": false,
+  "probe_sha256": "c889892294ea8faaa30747d6a65e62f8a36f2cd7d6c238dda540d7bc98997a86",
+  "fontcore_features": "default (cff, layout)",
+  "fontcore_ppem": "not exposed; Device adjustment is unsupported",
+  "reference_backend": "HarfBuzz OT font funcs; not a rasterizer/hinted contour backend",
+  "scope": "Horizontal GDEF diagnostics; no pixel, GUI, paragraph BiDi or vertical conformance claim",
+  "fonts": [
+    {
+      "font": "NotoSans-Regular.ttf",
+      "sha256": "89c3c497f618fdaa0b2d1e98fef93582f28c71debd2c4a8cdf41f190ced2909d",
+      "face": 0,
+      "upem": 1000,
+      "fontcore_size": 1362,
+      "harfbuzz_ppem": 0,
+      "weight": null,
+      "harfbuzz_version": "10.2.0",
+      "rows": [
+        {
+          "text": "fi",
+          "direction": "ltr",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": 0,
+                "y": 0,
+                "advance": 602,
+                "candidates": [
+                  301.0
+                ]
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": 301,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "FontAuthored"
+              },
+              {
+                "byte": 2,
+                "x": 602,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 1967,
+              "cluster": 0,
+              "advance": 602,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": true,
+          "reference_glyph": {
+            "id": 1967,
+            "name": "fi"
+          },
+          "gdef": [
+            {
+              "format": 1,
+              "coordinate": 301
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            301
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            301
+          ],
+          "comparison": "candidate_query_match"
+        },
+        {
+          "text": "fi",
+          "direction": "rtl",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": -602,
+                "y": 0,
+                "advance": 602,
+                "candidates": [
+                  301.0
+                ]
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": -301,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "FontAuthored"
+              },
+              {
+                "byte": 2,
+                "x": -602,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 76,
+              "cluster": 1,
+              "advance": 258,
+              "x_offset": 0,
+              "y_offset": 0
+            },
+            {
+              "glyph_id": 73,
+              "cluster": 0,
+              "advance": 344,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": false,
+          "reference_glyph": {
+            "id": 1967,
+            "name": "fi"
+          },
+          "gdef": [
+            {
+              "format": 1,
+              "coordinate": 301
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            301
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            301
+          ],
+          "comparison": "candidate_query_match"
+        },
+        {
+          "text": "fl",
+          "direction": "ltr",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": 0,
+                "y": 0,
+                "advance": 602,
+                "candidates": [
+                  301.0
+                ]
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": 301,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "FontAuthored"
+              },
+              {
+                "byte": 2,
+                "x": 602,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 1968,
+              "cluster": 0,
+              "advance": 602,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": true,
+          "reference_glyph": {
+            "id": 1968,
+            "name": "fl"
+          },
+          "gdef": [
+            {
+              "format": 1,
+              "coordinate": 301
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            301
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            301
+          ],
+          "comparison": "candidate_query_match"
+        },
+        {
+          "text": "fl",
+          "direction": "rtl",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": -602,
+                "y": 0,
+                "advance": 602,
+                "candidates": [
+                  301.0
+                ]
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": -301,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "FontAuthored"
+              },
+              {
+                "byte": 2,
+                "x": -602,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 79,
+              "cluster": 1,
+              "advance": 258,
+              "x_offset": 0,
+              "y_offset": 0
+            },
+            {
+              "glyph_id": 73,
+              "cluster": 0,
+              "advance": 344,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": false,
+          "reference_glyph": {
+            "id": 1968,
+            "name": "fl"
+          },
+          "gdef": [
+            {
+              "format": 1,
+              "coordinate": 301
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            301
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            301
+          ],
+          "comparison": "candidate_query_match"
+        },
+        {
+          "text": "ff",
+          "direction": "ltr",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": 0,
+                "y": 0,
+                "advance": 688,
+                "candidates": [
+                  301.0
+                ]
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": 301,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "FontAuthored"
+              },
+              {
+                "byte": 2,
+                "x": 688,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 1966,
+              "cluster": 0,
+              "advance": 688,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": true,
+          "reference_glyph": {
+            "id": 1966,
+            "name": "f_f"
+          },
+          "gdef": [
+            {
+              "format": 1,
+              "coordinate": 301
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            301
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            301
+          ],
+          "comparison": "candidate_query_match"
+        },
+        {
+          "text": "ff",
+          "direction": "rtl",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": -688,
+                "y": 0,
+                "advance": 688,
+                "candidates": [
+                  387.0
+                ]
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": -387,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "FontAuthored"
+              },
+              {
+                "byte": 2,
+                "x": -688,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 1966,
+              "cluster": 0,
+              "advance": 688,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": true,
+          "reference_glyph": {
+            "id": 1966,
+            "name": "f_f"
+          },
+          "gdef": [
+            {
+              "format": 1,
+              "coordinate": 301
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            301
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            387
+          ],
+          "comparison": "candidate_query_match"
+        },
+        {
+          "text": "ffi",
+          "direction": "ltr",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  3
+                ],
+                "x": 0,
+                "y": 0,
+                "advance": 946,
+                "candidates": [
+                  315.0,
+                  631.0
+                ]
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": 315,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "FontAuthored"
+              },
+              {
+                "byte": 2,
+                "x": 631,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "FontAuthored"
+              },
+              {
+                "byte": 3,
+                "x": 946,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 1969,
+              "cluster": 0,
+              "advance": 946,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": true,
+          "reference_glyph": {
+            "id": 1969,
+            "name": "f_f_i"
+          },
+          "gdef": [
+            {
+              "format": 1,
+              "coordinate": 315
+            },
+            {
+              "format": 1,
+              "coordinate": 631
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            315,
+            631
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            315,
+            631
+          ],
+          "comparison": "candidate_query_match"
+        },
+        {
+          "text": "ffi",
+          "direction": "rtl",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  3
+                ],
+                "x": -946,
+                "y": 0,
+                "advance": 946,
+                "candidates": [
+                  315.0,
+                  631.0
+                ]
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": -315,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "FontAuthored"
+              },
+              {
+                "byte": 2,
+                "x": -631,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "FontAuthored"
+              },
+              {
+                "byte": 3,
+                "x": -946,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 76,
+              "cluster": 2,
+              "advance": 258,
+              "x_offset": 0,
+              "y_offset": 0
+            },
+            {
+              "glyph_id": 1966,
+              "cluster": 0,
+              "advance": 688,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": false,
+          "reference_glyph": {
+            "id": 1969,
+            "name": "f_f_i"
+          },
+          "gdef": [
+            {
+              "format": 1,
+              "coordinate": 315
+            },
+            {
+              "format": 1,
+              "coordinate": 631
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            315,
+            631
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            315,
+            631
+          ],
+          "comparison": "candidate_query_match"
+        },
+        {
+          "text": "ffl",
+          "direction": "ltr",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  3
+                ],
+                "x": 0,
+                "y": 0,
+                "advance": 946,
+                "candidates": [
+                  315.0,
+                  631.0
+                ]
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": 315,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "FontAuthored"
+              },
+              {
+                "byte": 2,
+                "x": 631,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "FontAuthored"
+              },
+              {
+                "byte": 3,
+                "x": 946,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 1970,
+              "cluster": 0,
+              "advance": 946,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": true,
+          "reference_glyph": {
+            "id": 1970,
+            "name": "f_f_l"
+          },
+          "gdef": [
+            {
+              "format": 1,
+              "coordinate": 315
+            },
+            {
+              "format": 1,
+              "coordinate": 631
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            315,
+            631
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            315,
+            631
+          ],
+          "comparison": "candidate_query_match"
+        },
+        {
+          "text": "ffl",
+          "direction": "rtl",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  3
+                ],
+                "x": -946,
+                "y": 0,
+                "advance": 946,
+                "candidates": [
+                  315.0,
+                  631.0
+                ]
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": -315,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "FontAuthored"
+              },
+              {
+                "byte": 2,
+                "x": -631,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "FontAuthored"
+              },
+              {
+                "byte": 3,
+                "x": -946,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 79,
+              "cluster": 2,
+              "advance": 258,
+              "x_offset": 0,
+              "y_offset": 0
+            },
+            {
+              "glyph_id": 1966,
+              "cluster": 0,
+              "advance": 688,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": false,
+          "reference_glyph": {
+            "id": 1970,
+            "name": "f_f_l"
+          },
+          "gdef": [
+            {
+              "format": 1,
+              "coordinate": 315
+            },
+            {
+              "format": 1,
+              "coordinate": 631
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            315,
+            631
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            315,
+            631
+          ],
+          "comparison": "candidate_query_match"
+        }
+      ]
+    },
+    {
+      "font": "NotoSerif-Regular.ttf",
+      "sha256": "9d7583b7dc9e812afd32a14280c5cac3160012efe50c8d08938f4fea266ff67f",
+      "face": 0,
+      "upem": 1000,
+      "fontcore_size": 1362,
+      "harfbuzz_ppem": 0,
+      "weight": null,
+      "harfbuzz_version": "10.2.0",
+      "rows": [
+        {
+          "text": "fi",
+          "direction": "ltr",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": 0,
+                "y": 0,
+                "advance": 663,
+                "candidates": [
+                  332.0
+                ]
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": 332,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "FontAuthored"
+              },
+              {
+                "byte": 2,
+                "x": 663,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 2134,
+              "cluster": 0,
+              "advance": 663,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": true,
+          "reference_glyph": {
+            "id": 2134,
+            "name": "fi"
+          },
+          "gdef": [
+            {
+              "format": 1,
+              "coordinate": 332
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            332
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            332
+          ],
+          "comparison": "candidate_query_match"
+        },
+        {
+          "text": "fi",
+          "direction": "rtl",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": -663,
+                "y": 0,
+                "advance": 663,
+                "candidates": [
+                  331.0
+                ]
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": -331,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "FontAuthored"
+              },
+              {
+                "byte": 2,
+                "x": -663,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 76,
+              "cluster": 1,
+              "advance": 320,
+              "x_offset": 0,
+              "y_offset": 0
+            },
+            {
+              "glyph_id": 73,
+              "cluster": 0,
+              "advance": 369,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": false,
+          "reference_glyph": {
+            "id": 2134,
+            "name": "fi"
+          },
+          "gdef": [
+            {
+              "format": 1,
+              "coordinate": 332
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            332
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            331
+          ],
+          "comparison": "candidate_query_match"
+        },
+        {
+          "text": "fl",
+          "direction": "ltr",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": 0,
+                "y": 0,
+                "advance": 662,
+                "candidates": [
+                  337.0
+                ]
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": 337,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "FontAuthored"
+              },
+              {
+                "byte": 2,
+                "x": 662,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 2135,
+              "cluster": 0,
+              "advance": 662,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": true,
+          "reference_glyph": {
+            "id": 2135,
+            "name": "fl"
+          },
+          "gdef": [
+            {
+              "format": 1,
+              "coordinate": 337
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            337
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            337
+          ],
+          "comparison": "candidate_query_match"
+        },
+        {
+          "text": "fl",
+          "direction": "rtl",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": -662,
+                "y": 0,
+                "advance": 662,
+                "candidates": [
+                  325.0
+                ]
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": -325,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "FontAuthored"
+              },
+              {
+                "byte": 2,
+                "x": -662,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 79,
+              "cluster": 1,
+              "advance": 310,
+              "x_offset": 0,
+              "y_offset": 0
+            },
+            {
+              "glyph_id": 73,
+              "cluster": 0,
+              "advance": 369,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": false,
+          "reference_glyph": {
+            "id": 2135,
+            "name": "fl"
+          },
+          "gdef": [
+            {
+              "format": 1,
+              "coordinate": 337
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            337
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            325
+          ],
+          "comparison": "candidate_query_match"
+        },
+        {
+          "text": "ff",
+          "direction": "ltr",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": 0,
+                "y": 0,
+                "advance": 708,
+                "candidates": [
+                  342.0
+                ]
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": 342,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "FontAuthored"
+              },
+              {
+                "byte": 2,
+                "x": 708,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 2131,
+              "cluster": 0,
+              "advance": 708,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": true,
+          "reference_glyph": {
+            "id": 2131,
+            "name": "f_f"
+          },
+          "gdef": [
+            {
+              "format": 1,
+              "coordinate": 342
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            342
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            342
+          ],
+          "comparison": "candidate_query_match"
+        },
+        {
+          "text": "ff",
+          "direction": "rtl",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": -708,
+                "y": 0,
+                "advance": 708,
+                "candidates": [
+                  366.0
+                ]
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": -366,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "FontAuthored"
+              },
+              {
+                "byte": 2,
+                "x": -708,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 2131,
+              "cluster": 0,
+              "advance": 708,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": true,
+          "reference_glyph": {
+            "id": 2131,
+            "name": "f_f"
+          },
+          "gdef": [
+            {
+              "format": 1,
+              "coordinate": 342
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            342
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            366
+          ],
+          "comparison": "candidate_query_match"
+        },
+        {
+          "text": "ffi",
+          "direction": "ltr",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  3
+                ],
+                "x": 0,
+                "y": 0,
+                "advance": 1002,
+                "candidates": [
+                  334.0,
+                  668.0
+                ]
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": 334,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "FontAuthored"
+              },
+              {
+                "byte": 2,
+                "x": 668,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "FontAuthored"
+              },
+              {
+                "byte": 3,
+                "x": 1002,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 2132,
+              "cluster": 0,
+              "advance": 1002,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": true,
+          "reference_glyph": {
+            "id": 2132,
+            "name": "f_f_i"
+          },
+          "gdef": [
+            {
+              "format": 1,
+              "coordinate": 334
+            },
+            {
+              "format": 1,
+              "coordinate": 668
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            334,
+            668
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            334,
+            668
+          ],
+          "comparison": "candidate_query_match"
+        },
+        {
+          "text": "ffi",
+          "direction": "rtl",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  3
+                ],
+                "x": -1002,
+                "y": 0,
+                "advance": 1002,
+                "candidates": [
+                  334.0,
+                  668.0
+                ]
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": -334,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "FontAuthored"
+              },
+              {
+                "byte": 2,
+                "x": -668,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "FontAuthored"
+              },
+              {
+                "byte": 3,
+                "x": -1002,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 76,
+              "cluster": 2,
+              "advance": 320,
+              "x_offset": 0,
+              "y_offset": 0
+            },
+            {
+              "glyph_id": 2131,
+              "cluster": 0,
+              "advance": 708,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": false,
+          "reference_glyph": {
+            "id": 2132,
+            "name": "f_f_i"
+          },
+          "gdef": [
+            {
+              "format": 1,
+              "coordinate": 334
+            },
+            {
+              "format": 1,
+              "coordinate": 668
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            334,
+            668
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            334,
+            668
+          ],
+          "comparison": "candidate_query_match"
+        },
+        {
+          "text": "ffl",
+          "direction": "ltr",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  3
+                ],
+                "x": 0,
+                "y": 0,
+                "advance": 1001,
+                "candidates": [
+                  334.0,
+                  667.0
+                ]
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": 334,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "FontAuthored"
+              },
+              {
+                "byte": 2,
+                "x": 667,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "FontAuthored"
+              },
+              {
+                "byte": 3,
+                "x": 1001,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 2133,
+              "cluster": 0,
+              "advance": 1001,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": true,
+          "reference_glyph": {
+            "id": 2133,
+            "name": "f_f_l"
+          },
+          "gdef": [
+            {
+              "format": 1,
+              "coordinate": 334
+            },
+            {
+              "format": 1,
+              "coordinate": 667
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            334,
+            667
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            334,
+            667
+          ],
+          "comparison": "candidate_query_match"
+        },
+        {
+          "text": "ffl",
+          "direction": "rtl",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  3
+                ],
+                "x": -1001,
+                "y": 0,
+                "advance": 1001,
+                "candidates": [
+                  334.0,
+                  667.0
+                ]
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": -334,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "FontAuthored"
+              },
+              {
+                "byte": 2,
+                "x": -667,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "FontAuthored"
+              },
+              {
+                "byte": 3,
+                "x": -1001,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 79,
+              "cluster": 2,
+              "advance": 310,
+              "x_offset": 0,
+              "y_offset": 0
+            },
+            {
+              "glyph_id": 2131,
+              "cluster": 0,
+              "advance": 708,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": false,
+          "reference_glyph": {
+            "id": 2133,
+            "name": "f_f_l"
+          },
+          "gdef": [
+            {
+              "format": 1,
+              "coordinate": 334
+            },
+            {
+              "format": 1,
+              "coordinate": 667
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            334,
+            667
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            334,
+            667
+          ],
+          "comparison": "candidate_query_match"
+        }
+      ]
+    },
+    {
+      "font": "DejaVuSans.ttf",
+      "sha256": "57f73e11f51999432bf7ab22ce55b6f945d5eca1bf824404cfa9ec2e3718c84e",
+      "face": 0,
+      "upem": 2048,
+      "fontcore_size": 2384,
+      "harfbuzz_ppem": 0,
+      "weight": null,
+      "harfbuzz_version": "10.2.0",
+      "rows": [
+        {
+          "text": "fi",
+          "direction": "ltr",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": 0,
+                "y": 0,
+                "advance": 1290,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": 645,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": 1290,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 5042,
+              "cluster": 0,
+              "advance": 1290,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": true,
+          "reference_glyph": {
+            "id": 5042,
+            "name": "fi"
+          },
+          "gdef": [],
+          "harfbuzz_caret_coordinates": [],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [],
+          "comparison": "fallback_or_absent"
+        },
+        {
+          "text": "fi",
+          "direction": "rtl",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": -1290,
+                "y": 0,
+                "advance": 1290,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": -645,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": -1290,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 76,
+              "cluster": 1,
+              "advance": 569,
+              "x_offset": 0,
+              "y_offset": 0
+            },
+            {
+              "glyph_id": 73,
+              "cluster": 0,
+              "advance": 721,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": false,
+          "reference_glyph": {
+            "id": 5042,
+            "name": "fi"
+          },
+          "gdef": [],
+          "harfbuzz_caret_coordinates": [],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [],
+          "comparison": "fallback_or_absent"
+        },
+        {
+          "text": "fl",
+          "direction": "ltr",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": 0,
+                "y": 0,
+                "advance": 1290,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": 645,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": 1290,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 5043,
+              "cluster": 0,
+              "advance": 1290,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": true,
+          "reference_glyph": {
+            "id": 5043,
+            "name": "fl"
+          },
+          "gdef": [],
+          "harfbuzz_caret_coordinates": [],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [],
+          "comparison": "fallback_or_absent"
+        },
+        {
+          "text": "fl",
+          "direction": "rtl",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": -1290,
+                "y": 0,
+                "advance": 1290,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": -645,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": -1290,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 79,
+              "cluster": 1,
+              "advance": 569,
+              "x_offset": 0,
+              "y_offset": 0
+            },
+            {
+              "glyph_id": 73,
+              "cluster": 0,
+              "advance": 721,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": false,
+          "reference_glyph": {
+            "id": 5043,
+            "name": "fl"
+          },
+          "gdef": [],
+          "harfbuzz_caret_coordinates": [],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [],
+          "comparison": "fallback_or_absent"
+        },
+        {
+          "text": "ff",
+          "direction": "ltr",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": 0,
+                "y": 0,
+                "advance": 1411,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": 705.5,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": 1411,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 5041,
+              "cluster": 0,
+              "advance": 1411,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": true,
+          "reference_glyph": {
+            "id": 5041,
+            "name": "uniFB00"
+          },
+          "gdef": [],
+          "harfbuzz_caret_coordinates": [],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [],
+          "comparison": "fallback_or_absent"
+        },
+        {
+          "text": "ff",
+          "direction": "rtl",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": -1411,
+                "y": 0,
+                "advance": 1411,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": -705.5,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": -1411,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 5041,
+              "cluster": 0,
+              "advance": 1411,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": true,
+          "reference_glyph": {
+            "id": 5041,
+            "name": "uniFB00"
+          },
+          "gdef": [],
+          "harfbuzz_caret_coordinates": [],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [],
+          "comparison": "fallback_or_absent"
+        },
+        {
+          "text": "ffi",
+          "direction": "ltr",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  3
+                ],
+                "x": 0,
+                "y": 0,
+                "advance": 1980,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": 660,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": 1320,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 3,
+                "x": 1980,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 5044,
+              "cluster": 0,
+              "advance": 1980,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": true,
+          "reference_glyph": {
+            "id": 5044,
+            "name": "uniFB03"
+          },
+          "gdef": [],
+          "harfbuzz_caret_coordinates": [],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [],
+          "comparison": "fallback_or_absent"
+        },
+        {
+          "text": "ffi",
+          "direction": "rtl",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  3
+                ],
+                "x": -1980,
+                "y": 0,
+                "advance": 1980,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": -660,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": -1320,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 3,
+                "x": -1980,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 76,
+              "cluster": 2,
+              "advance": 569,
+              "x_offset": 0,
+              "y_offset": 0
+            },
+            {
+              "glyph_id": 5041,
+              "cluster": 0,
+              "advance": 1411,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": false,
+          "reference_glyph": {
+            "id": 5044,
+            "name": "uniFB03"
+          },
+          "gdef": [],
+          "harfbuzz_caret_coordinates": [],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [],
+          "comparison": "fallback_or_absent"
+        },
+        {
+          "text": "ffl",
+          "direction": "ltr",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  3
+                ],
+                "x": 0,
+                "y": 0,
+                "advance": 1980,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": 660,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": 1320,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 3,
+                "x": 1980,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 5045,
+              "cluster": 0,
+              "advance": 1980,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": true,
+          "reference_glyph": {
+            "id": 5045,
+            "name": "uniFB04"
+          },
+          "gdef": [],
+          "harfbuzz_caret_coordinates": [],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [],
+          "comparison": "fallback_or_absent"
+        },
+        {
+          "text": "ffl",
+          "direction": "rtl",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  3
+                ],
+                "x": -1980,
+                "y": 0,
+                "advance": 1980,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": -660,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": -1320,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 3,
+                "x": -1980,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 79,
+              "cluster": 2,
+              "advance": 569,
+              "x_offset": 0,
+              "y_offset": 0
+            },
+            {
+              "glyph_id": 5041,
+              "cluster": 0,
+              "advance": 1411,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": false,
+          "reference_glyph": {
+            "id": 5045,
+            "name": "uniFB04"
+          },
+          "gdef": [],
+          "harfbuzz_caret_coordinates": [],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [],
+          "comparison": "fallback_or_absent"
+        }
+      ]
+    },
+    {
+      "font": "gdef-carets.ttc",
+      "sha256": "313d2439d4ffefffb38ea5e006d7202785d2154eab7d164ec9e45e199c371c1c",
+      "face": 0,
+      "upem": 1000,
+      "fontcore_size": 1000,
+      "harfbuzz_ppem": 0,
+      "weight": null,
+      "harfbuzz_version": "10.2.0",
+      "rows": [
+        {
+          "text": "fi",
+          "direction": "ltr",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": 0,
+                "y": 0,
+                "advance": 900,
+                "candidates": [
+                  220.0
+                ]
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": 220,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "FontAuthored"
+              },
+              {
+                "byte": 2,
+                "x": 900,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 6,
+              "cluster": 0,
+              "advance": 900,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": true,
+          "reference_glyph": {
+            "id": 6,
+            "name": "fi"
+          },
+          "gdef": [
+            {
+              "format": 1,
+              "coordinate": 220
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            220
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            220
+          ],
+          "comparison": "candidate_query_match"
+        },
+        {
+          "text": "fi",
+          "direction": "rtl",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": -900,
+                "y": 0,
+                "advance": 900,
+                "candidates": [
+                  680.0
+                ]
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": -680,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "FontAuthored"
+              },
+              {
+                "byte": 2,
+                "x": -900,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 3,
+              "cluster": 1,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            },
+            {
+              "glyph_id": 2,
+              "cluster": 0,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": false,
+          "reference_glyph": {
+            "id": 6,
+            "name": "fi"
+          },
+          "gdef": [
+            {
+              "format": 1,
+              "coordinate": 220
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            220
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            680
+          ],
+          "comparison": "candidate_query_match"
+        },
+        {
+          "text": "fl",
+          "direction": "ltr",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": 0,
+                "y": 0,
+                "advance": 1100,
+                "candidates": [
+                  730.0
+                ]
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": 730,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "FontAuthored"
+              },
+              {
+                "byte": 2,
+                "x": 1100,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 7,
+              "cluster": 0,
+              "advance": 1100,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": true,
+          "reference_glyph": {
+            "id": 7,
+            "name": "fl"
+          },
+          "gdef": [
+            {
+              "format": 1,
+              "coordinate": 730
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            730
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            730
+          ],
+          "comparison": "candidate_query_match"
+        },
+        {
+          "text": "fl",
+          "direction": "rtl",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": -1100,
+                "y": 0,
+                "advance": 1100,
+                "candidates": [
+                  370.0
+                ]
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": -370,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "FontAuthored"
+              },
+              {
+                "byte": 2,
+                "x": -1100,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 4,
+              "cluster": 1,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            },
+            {
+              "glyph_id": 2,
+              "cluster": 0,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": false,
+          "reference_glyph": {
+            "id": 7,
+            "name": "fl"
+          },
+          "gdef": [
+            {
+              "format": 1,
+              "coordinate": 730
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            730
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            370
+          ],
+          "comparison": "candidate_query_match"
+        }
+      ]
+    },
+    {
+      "font": "gdef-carets.ttc",
+      "sha256": "313d2439d4ffefffb38ea5e006d7202785d2154eab7d164ec9e45e199c371c1c",
+      "face": 1,
+      "upem": 1000,
+      "fontcore_size": 1000,
+      "harfbuzz_ppem": 0,
+      "weight": null,
+      "harfbuzz_version": "10.2.0",
+      "rows": [
+        {
+          "text": "fi",
+          "direction": "ltr",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": 0,
+                "y": 0,
+                "advance": 900,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": 450,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": 900,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 6,
+              "cluster": 0,
+              "advance": 900,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": true,
+          "reference_glyph": {
+            "id": 6,
+            "name": "fi"
+          },
+          "gdef": [
+            {
+              "format": 2,
+              "point_index": 1,
+              "unhinted_contour_point": [
+                300,
+                0
+              ],
+              "harfbuzz_contour_callback_supported": false
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            0
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            0
+          ],
+          "comparison": "fallback_or_absent"
+        },
+        {
+          "text": "fi",
+          "direction": "rtl",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": -900,
+                "y": 0,
+                "advance": 900,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": -450,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": -900,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 3,
+              "cluster": 1,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            },
+            {
+              "glyph_id": 2,
+              "cluster": 0,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": false,
+          "reference_glyph": {
+            "id": 6,
+            "name": "fi"
+          },
+          "gdef": [
+            {
+              "format": 2,
+              "point_index": 1,
+              "unhinted_contour_point": [
+                300,
+                0
+              ],
+              "harfbuzz_contour_callback_supported": false
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            0
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            900
+          ],
+          "comparison": "fallback_or_absent"
+        },
+        {
+          "text": "fl",
+          "direction": "ltr",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": 0,
+                "y": 0,
+                "advance": 1100,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": 550,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": 1100,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 7,
+              "cluster": 0,
+              "advance": 1100,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": true,
+          "reference_glyph": {
+            "id": 7,
+            "name": "fl"
+          },
+          "gdef": [
+            {
+              "format": 2,
+              "point_index": 2,
+              "unhinted_contour_point": [
+                850,
+                500
+              ],
+              "harfbuzz_contour_callback_supported": false
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            0
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            0
+          ],
+          "comparison": "fallback_or_absent"
+        },
+        {
+          "text": "fl",
+          "direction": "rtl",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": -1100,
+                "y": 0,
+                "advance": 1100,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": -550,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": -1100,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 4,
+              "cluster": 1,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            },
+            {
+              "glyph_id": 2,
+              "cluster": 0,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": false,
+          "reference_glyph": {
+            "id": 7,
+            "name": "fl"
+          },
+          "gdef": [
+            {
+              "format": 2,
+              "point_index": 2,
+              "unhinted_contour_point": [
+                850,
+                500
+              ],
+              "harfbuzz_contour_callback_supported": false
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            0
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            1100
+          ],
+          "comparison": "fallback_or_absent"
+        }
+      ]
+    },
+    {
+      "font": "gdef-carets.ttc",
+      "sha256": "313d2439d4ffefffb38ea5e006d7202785d2154eab7d164ec9e45e199c371c1c",
+      "face": 2,
+      "upem": 1000,
+      "fontcore_size": 1000,
+      "harfbuzz_ppem": 0,
+      "weight": null,
+      "harfbuzz_version": "10.2.0",
+      "rows": [
+        {
+          "text": "fi",
+          "direction": "ltr",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": 0,
+                "y": 0,
+                "advance": 900,
+                "candidates": [
+                  -90.0
+                ]
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": 450,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": 900,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 6,
+              "cluster": 0,
+              "advance": 900,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": true,
+          "reference_glyph": {
+            "id": 6,
+            "name": "fi"
+          },
+          "gdef": [
+            {
+              "format": 3,
+              "coordinate": -90
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            -90
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            -90
+          ],
+          "comparison": "candidate_query_match"
+        },
+        {
+          "text": "fi",
+          "direction": "rtl",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": -900,
+                "y": 0,
+                "advance": 900,
+                "candidates": [
+                  990.0
+                ]
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": -450,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": -900,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 3,
+              "cluster": 1,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            },
+            {
+              "glyph_id": 2,
+              "cluster": 0,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": false,
+          "reference_glyph": {
+            "id": 6,
+            "name": "fi"
+          },
+          "gdef": [
+            {
+              "format": 3,
+              "coordinate": -90
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            -90
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            990
+          ],
+          "comparison": "candidate_query_match"
+        },
+        {
+          "text": "fl",
+          "direction": "ltr",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": 0,
+                "y": 0,
+                "advance": 1100,
+                "candidates": [
+                  -160.0
+                ]
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": 550,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": 1100,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 7,
+              "cluster": 0,
+              "advance": 1100,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": true,
+          "reference_glyph": {
+            "id": 7,
+            "name": "fl"
+          },
+          "gdef": [
+            {
+              "format": 3,
+              "coordinate": -160
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            -160
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            -160
+          ],
+          "comparison": "candidate_query_match"
+        },
+        {
+          "text": "fl",
+          "direction": "rtl",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": -1100,
+                "y": 0,
+                "advance": 1100,
+                "candidates": [
+                  1260.0
+                ]
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": -550,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": -1100,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 4,
+              "cluster": 1,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            },
+            {
+              "glyph_id": 2,
+              "cluster": 0,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": false,
+          "reference_glyph": {
+            "id": 7,
+            "name": "fl"
+          },
+          "gdef": [
+            {
+              "format": 3,
+              "coordinate": -160
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            -160
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            1260
+          ],
+          "comparison": "candidate_query_match"
+        }
+      ]
+    },
+    {
+      "font": "gdef-carets.ttc",
+      "sha256": "313d2439d4ffefffb38ea5e006d7202785d2154eab7d164ec9e45e199c371c1c",
+      "face": 3,
+      "upem": 1000,
+      "fontcore_size": 1000,
+      "harfbuzz_ppem": 0,
+      "weight": null,
+      "harfbuzz_version": "10.2.0",
+      "rows": [
+        {
+          "text": "fi",
+          "direction": "ltr",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": 0,
+                "y": 0,
+                "advance": 900,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": 450,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": 900,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 6,
+              "cluster": 0,
+              "advance": 900,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": true,
+          "reference_glyph": {
+            "id": 6,
+            "name": "fi"
+          },
+          "gdef": [
+            {
+              "format": 3,
+              "coordinate": 220,
+              "adjustment": {
+                "format": 2,
+                "start_or_outer": 20,
+                "end_or_inner": 20,
+                "deltas": [
+                  1
+                ]
+              }
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            220
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            220
+          ],
+          "comparison": "fallback_or_absent"
+        },
+        {
+          "text": "fi",
+          "direction": "rtl",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": -900,
+                "y": 0,
+                "advance": 900,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": -450,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": -900,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 3,
+              "cluster": 1,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            },
+            {
+              "glyph_id": 2,
+              "cluster": 0,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": false,
+          "reference_glyph": {
+            "id": 6,
+            "name": "fi"
+          },
+          "gdef": [
+            {
+              "format": 3,
+              "coordinate": 220,
+              "adjustment": {
+                "format": 2,
+                "start_or_outer": 20,
+                "end_or_inner": 20,
+                "deltas": [
+                  1
+                ]
+              }
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            220
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            680
+          ],
+          "comparison": "fallback_or_absent"
+        },
+        {
+          "text": "fl",
+          "direction": "ltr",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": 0,
+                "y": 0,
+                "advance": 1100,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": 550,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": 1100,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 7,
+              "cluster": 0,
+              "advance": 1100,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": true,
+          "reference_glyph": {
+            "id": 7,
+            "name": "fl"
+          },
+          "gdef": [
+            {
+              "format": 3,
+              "coordinate": 730,
+              "adjustment": {
+                "format": 2,
+                "start_or_outer": 20,
+                "end_or_inner": 20,
+                "deltas": [
+                  2
+                ]
+              }
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            730
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            730
+          ],
+          "comparison": "fallback_or_absent"
+        },
+        {
+          "text": "fl",
+          "direction": "rtl",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": -1100,
+                "y": 0,
+                "advance": 1100,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": -550,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": -1100,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 4,
+              "cluster": 1,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            },
+            {
+              "glyph_id": 2,
+              "cluster": 0,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": false,
+          "reference_glyph": {
+            "id": 7,
+            "name": "fl"
+          },
+          "gdef": [
+            {
+              "format": 3,
+              "coordinate": 730,
+              "adjustment": {
+                "format": 2,
+                "start_or_outer": 20,
+                "end_or_inner": 20,
+                "deltas": [
+                  2
+                ]
+              }
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            730
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            370
+          ],
+          "comparison": "fallback_or_absent"
+        }
+      ]
+    },
+    {
+      "font": "gdef-carets.ttc",
+      "sha256": "313d2439d4ffefffb38ea5e006d7202785d2154eab7d164ec9e45e199c371c1c",
+      "face": 3,
+      "upem": 1000,
+      "fontcore_size": 1000,
+      "harfbuzz_ppem": 20,
+      "weight": null,
+      "harfbuzz_version": "10.2.0",
+      "rows": [
+        {
+          "text": "fi",
+          "direction": "ltr",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": 0,
+                "y": 0,
+                "advance": 900,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": 450,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": 900,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 6,
+              "cluster": 0,
+              "advance": 900,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": true,
+          "reference_glyph": {
+            "id": 6,
+            "name": "fi"
+          },
+          "gdef": [
+            {
+              "format": 3,
+              "coordinate": 220,
+              "adjustment": {
+                "format": 2,
+                "start_or_outer": 20,
+                "end_or_inner": 20,
+                "deltas": [
+                  1
+                ]
+              }
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            270
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            270
+          ],
+          "comparison": "fallback_or_absent"
+        },
+        {
+          "text": "fi",
+          "direction": "rtl",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": -900,
+                "y": 0,
+                "advance": 900,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": -450,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": -900,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 3,
+              "cluster": 1,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            },
+            {
+              "glyph_id": 2,
+              "cluster": 0,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": false,
+          "reference_glyph": {
+            "id": 6,
+            "name": "fi"
+          },
+          "gdef": [
+            {
+              "format": 3,
+              "coordinate": 220,
+              "adjustment": {
+                "format": 2,
+                "start_or_outer": 20,
+                "end_or_inner": 20,
+                "deltas": [
+                  1
+                ]
+              }
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            270
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            630
+          ],
+          "comparison": "fallback_or_absent"
+        },
+        {
+          "text": "fl",
+          "direction": "ltr",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": 0,
+                "y": 0,
+                "advance": 1100,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": 550,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": 1100,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 7,
+              "cluster": 0,
+              "advance": 1100,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": true,
+          "reference_glyph": {
+            "id": 7,
+            "name": "fl"
+          },
+          "gdef": [
+            {
+              "format": 3,
+              "coordinate": 730,
+              "adjustment": {
+                "format": 2,
+                "start_or_outer": 20,
+                "end_or_inner": 20,
+                "deltas": [
+                  2
+                ]
+              }
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            830
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            830
+          ],
+          "comparison": "fallback_or_absent"
+        },
+        {
+          "text": "fl",
+          "direction": "rtl",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": -1100,
+                "y": 0,
+                "advance": 1100,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": -550,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": -1100,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 4,
+              "cluster": 1,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            },
+            {
+              "glyph_id": 2,
+              "cluster": 0,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": false,
+          "reference_glyph": {
+            "id": 7,
+            "name": "fl"
+          },
+          "gdef": [
+            {
+              "format": 3,
+              "coordinate": 730,
+              "adjustment": {
+                "format": 2,
+                "start_or_outer": 20,
+                "end_or_inner": 20,
+                "deltas": [
+                  2
+                ]
+              }
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            830
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            270
+          ],
+          "comparison": "fallback_or_absent"
+        }
+      ]
+    },
+    {
+      "font": "gdef-carets.ttc",
+      "sha256": "313d2439d4ffefffb38ea5e006d7202785d2154eab7d164ec9e45e199c371c1c",
+      "face": 4,
+      "upem": 1000,
+      "fontcore_size": 1000,
+      "harfbuzz_ppem": 0,
+      "weight": null,
+      "harfbuzz_version": "10.2.0",
+      "rows": [
+        {
+          "text": "fi",
+          "direction": "ltr",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": 0,
+                "y": 0,
+                "advance": 900,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": 450,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": 900,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 6,
+              "cluster": 0,
+              "advance": 900,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": true,
+          "reference_glyph": {
+            "id": 6,
+            "name": "fi"
+          },
+          "gdef": [
+            {
+              "format": 3,
+              "coordinate": 220,
+              "adjustment": {
+                "format": 32768,
+                "start_or_outer": 0,
+                "end_or_inner": 0,
+                "deltas": null
+              }
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            220
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            220
+          ],
+          "comparison": "fallback_or_absent"
+        },
+        {
+          "text": "fi",
+          "direction": "rtl",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": -900,
+                "y": 0,
+                "advance": 900,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": -450,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": -900,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 3,
+              "cluster": 1,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            },
+            {
+              "glyph_id": 2,
+              "cluster": 0,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": false,
+          "reference_glyph": {
+            "id": 6,
+            "name": "fi"
+          },
+          "gdef": [
+            {
+              "format": 3,
+              "coordinate": 220,
+              "adjustment": {
+                "format": 32768,
+                "start_or_outer": 0,
+                "end_or_inner": 0,
+                "deltas": null
+              }
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            220
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            680
+          ],
+          "comparison": "fallback_or_absent"
+        },
+        {
+          "text": "fl",
+          "direction": "ltr",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": 0,
+                "y": 0,
+                "advance": 1100,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": 550,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": 1100,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 7,
+              "cluster": 0,
+              "advance": 1100,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": true,
+          "reference_glyph": {
+            "id": 7,
+            "name": "fl"
+          },
+          "gdef": [
+            {
+              "format": 3,
+              "coordinate": 730,
+              "adjustment": {
+                "format": 32768,
+                "start_or_outer": 0,
+                "end_or_inner": 0,
+                "deltas": null
+              }
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            730
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            730
+          ],
+          "comparison": "fallback_or_absent"
+        },
+        {
+          "text": "fl",
+          "direction": "rtl",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": -1100,
+                "y": 0,
+                "advance": 1100,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": -550,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": -1100,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 4,
+              "cluster": 1,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            },
+            {
+              "glyph_id": 2,
+              "cluster": 0,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": false,
+          "reference_glyph": {
+            "id": 7,
+            "name": "fl"
+          },
+          "gdef": [
+            {
+              "format": 3,
+              "coordinate": 730,
+              "adjustment": {
+                "format": 32768,
+                "start_or_outer": 0,
+                "end_or_inner": 0,
+                "deltas": null
+              }
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            730
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            370
+          ],
+          "comparison": "fallback_or_absent"
+        }
+      ]
+    },
+    {
+      "font": "gdef-carets.ttc",
+      "sha256": "313d2439d4ffefffb38ea5e006d7202785d2154eab7d164ec9e45e199c371c1c",
+      "face": 4,
+      "upem": 1000,
+      "fontcore_size": 1000,
+      "harfbuzz_ppem": 0,
+      "weight": 650,
+      "harfbuzz_version": "10.2.0",
+      "rows": [
+        {
+          "text": "fi",
+          "direction": "ltr",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": 0,
+                "y": 0,
+                "advance": 900,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": 450,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": 900,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 6,
+              "cluster": 0,
+              "advance": 900,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": true,
+          "reference_glyph": {
+            "id": 6,
+            "name": "fi"
+          },
+          "gdef": [
+            {
+              "format": 3,
+              "coordinate": 220,
+              "adjustment": {
+                "format": 32768,
+                "start_or_outer": 0,
+                "end_or_inner": 0,
+                "deltas": null
+              }
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            245
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            245
+          ],
+          "comparison": "fallback_or_absent"
+        },
+        {
+          "text": "fi",
+          "direction": "rtl",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": -900,
+                "y": 0,
+                "advance": 900,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": -450,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": -900,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 3,
+              "cluster": 1,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            },
+            {
+              "glyph_id": 2,
+              "cluster": 0,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": false,
+          "reference_glyph": {
+            "id": 6,
+            "name": "fi"
+          },
+          "gdef": [
+            {
+              "format": 3,
+              "coordinate": 220,
+              "adjustment": {
+                "format": 32768,
+                "start_or_outer": 0,
+                "end_or_inner": 0,
+                "deltas": null
+              }
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            245
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            655
+          ],
+          "comparison": "fallback_or_absent"
+        },
+        {
+          "text": "fl",
+          "direction": "ltr",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": 0,
+                "y": 0,
+                "advance": 1100,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": 550,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": 1100,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 7,
+              "cluster": 0,
+              "advance": 1100,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": true,
+          "reference_glyph": {
+            "id": 7,
+            "name": "fl"
+          },
+          "gdef": [
+            {
+              "format": 3,
+              "coordinate": 730,
+              "adjustment": {
+                "format": 32768,
+                "start_or_outer": 0,
+                "end_or_inner": 0,
+                "deltas": null
+              }
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            755
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            755
+          ],
+          "comparison": "fallback_or_absent"
+        },
+        {
+          "text": "fl",
+          "direction": "rtl",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": -1100,
+                "y": 0,
+                "advance": 1100,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": -550,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": -1100,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 4,
+              "cluster": 1,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            },
+            {
+              "glyph_id": 2,
+              "cluster": 0,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": false,
+          "reference_glyph": {
+            "id": 7,
+            "name": "fl"
+          },
+          "gdef": [
+            {
+              "format": 3,
+              "coordinate": 730,
+              "adjustment": {
+                "format": 32768,
+                "start_or_outer": 0,
+                "end_or_inner": 0,
+                "deltas": null
+              }
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            755
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            345
+          ],
+          "comparison": "fallback_or_absent"
+        }
+      ]
+    },
+    {
+      "font": "gdef-carets.ttc",
+      "sha256": "313d2439d4ffefffb38ea5e006d7202785d2154eab7d164ec9e45e199c371c1c",
+      "face": 4,
+      "upem": 1000,
+      "fontcore_size": 1000,
+      "harfbuzz_ppem": 0,
+      "weight": 900,
+      "harfbuzz_version": "10.2.0",
+      "rows": [
+        {
+          "text": "fi",
+          "direction": "ltr",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": 0,
+                "y": 0,
+                "advance": 900,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": 450,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": 900,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 6,
+              "cluster": 0,
+              "advance": 900,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": true,
+          "reference_glyph": {
+            "id": 6,
+            "name": "fi"
+          },
+          "gdef": [
+            {
+              "format": 3,
+              "coordinate": 220,
+              "adjustment": {
+                "format": 32768,
+                "start_or_outer": 0,
+                "end_or_inner": 0,
+                "deltas": null
+              }
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            320
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            320
+          ],
+          "comparison": "fallback_or_absent"
+        },
+        {
+          "text": "fi",
+          "direction": "rtl",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": -900,
+                "y": 0,
+                "advance": 900,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": -450,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": -900,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 3,
+              "cluster": 1,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            },
+            {
+              "glyph_id": 2,
+              "cluster": 0,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": false,
+          "reference_glyph": {
+            "id": 6,
+            "name": "fi"
+          },
+          "gdef": [
+            {
+              "format": 3,
+              "coordinate": 220,
+              "adjustment": {
+                "format": 32768,
+                "start_or_outer": 0,
+                "end_or_inner": 0,
+                "deltas": null
+              }
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            320
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            580
+          ],
+          "comparison": "fallback_or_absent"
+        },
+        {
+          "text": "fl",
+          "direction": "ltr",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": 0,
+                "y": 0,
+                "advance": 1100,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": 550,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": 1100,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 7,
+              "cluster": 0,
+              "advance": 1100,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": true,
+          "reference_glyph": {
+            "id": 7,
+            "name": "fl"
+          },
+          "gdef": [
+            {
+              "format": 3,
+              "coordinate": 730,
+              "adjustment": {
+                "format": 32768,
+                "start_or_outer": 0,
+                "end_or_inner": 0,
+                "deltas": null
+              }
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            830
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            830
+          ],
+          "comparison": "fallback_or_absent"
+        },
+        {
+          "text": "fl",
+          "direction": "rtl",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": -1100,
+                "y": 0,
+                "advance": 1100,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": -550,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": -1100,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 4,
+              "cluster": 1,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            },
+            {
+              "glyph_id": 2,
+              "cluster": 0,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": false,
+          "reference_glyph": {
+            "id": 7,
+            "name": "fl"
+          },
+          "gdef": [
+            {
+              "format": 3,
+              "coordinate": 730,
+              "adjustment": {
+                "format": 32768,
+                "start_or_outer": 0,
+                "end_or_inner": 0,
+                "deltas": null
+              }
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            830
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            270
+          ],
+          "comparison": "fallback_or_absent"
+        }
+      ]
+    },
+    {
+      "font": "gdef-carets.ttc",
+      "sha256": "313d2439d4ffefffb38ea5e006d7202785d2154eab7d164ec9e45e199c371c1c",
+      "face": 5,
+      "upem": 1000,
+      "fontcore_size": 1000,
+      "harfbuzz_ppem": 0,
+      "weight": null,
+      "harfbuzz_version": "10.2.0",
+      "rows": [
+        {
+          "text": "fi",
+          "direction": "ltr",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": 0,
+                "y": 0,
+                "advance": 900,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": 450,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": 900,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 6,
+              "cluster": 0,
+              "advance": 900,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": true,
+          "reference_glyph": {
+            "id": 6,
+            "name": "fi"
+          },
+          "gdef": [
+            {
+              "format": 3,
+              "coordinate": 220,
+              "adjustment": {
+                "format": 32768,
+                "start_or_outer": 0,
+                "end_or_inner": 7,
+                "deltas": null
+              }
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            220
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            220
+          ],
+          "comparison": "fallback_or_absent"
+        },
+        {
+          "text": "fi",
+          "direction": "rtl",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": -900,
+                "y": 0,
+                "advance": 900,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": -450,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": -900,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 3,
+              "cluster": 1,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            },
+            {
+              "glyph_id": 2,
+              "cluster": 0,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": false,
+          "reference_glyph": {
+            "id": 6,
+            "name": "fi"
+          },
+          "gdef": [
+            {
+              "format": 3,
+              "coordinate": 220,
+              "adjustment": {
+                "format": 32768,
+                "start_or_outer": 0,
+                "end_or_inner": 7,
+                "deltas": null
+              }
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            220
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            680
+          ],
+          "comparison": "fallback_or_absent"
+        },
+        {
+          "text": "fl",
+          "direction": "ltr",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": 0,
+                "y": 0,
+                "advance": 1100,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": 550,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": 1100,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 7,
+              "cluster": 0,
+              "advance": 1100,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": true,
+          "reference_glyph": {
+            "id": 7,
+            "name": "fl"
+          },
+          "gdef": [
+            {
+              "format": 3,
+              "coordinate": 730,
+              "adjustment": {
+                "format": 32768,
+                "start_or_outer": 0,
+                "end_or_inner": 7,
+                "deltas": null
+              }
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            730
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            730
+          ],
+          "comparison": "fallback_or_absent"
+        },
+        {
+          "text": "fl",
+          "direction": "rtl",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": -1100,
+                "y": 0,
+                "advance": 1100,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": -550,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": -1100,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 4,
+              "cluster": 1,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            },
+            {
+              "glyph_id": 2,
+              "cluster": 0,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": false,
+          "reference_glyph": {
+            "id": 7,
+            "name": "fl"
+          },
+          "gdef": [
+            {
+              "format": 3,
+              "coordinate": 730,
+              "adjustment": {
+                "format": 32768,
+                "start_or_outer": 0,
+                "end_or_inner": 7,
+                "deltas": null
+              }
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            730
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            370
+          ],
+          "comparison": "fallback_or_absent"
+        }
+      ]
+    },
+    {
+      "font": "gdef-carets.ttc",
+      "sha256": "313d2439d4ffefffb38ea5e006d7202785d2154eab7d164ec9e45e199c371c1c",
+      "face": 5,
+      "upem": 1000,
+      "fontcore_size": 1000,
+      "harfbuzz_ppem": 0,
+      "weight": 650,
+      "harfbuzz_version": "10.2.0",
+      "rows": [
+        {
+          "text": "fi",
+          "direction": "ltr",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": 0,
+                "y": 0,
+                "advance": 900,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": 450,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": 900,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 6,
+              "cluster": 0,
+              "advance": 900,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": true,
+          "reference_glyph": {
+            "id": 6,
+            "name": "fi"
+          },
+          "gdef": [
+            {
+              "format": 3,
+              "coordinate": 220,
+              "adjustment": {
+                "format": 32768,
+                "start_or_outer": 0,
+                "end_or_inner": 7,
+                "deltas": null
+              }
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            220
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            220
+          ],
+          "comparison": "fallback_or_absent"
+        },
+        {
+          "text": "fi",
+          "direction": "rtl",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": -900,
+                "y": 0,
+                "advance": 900,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": -450,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": -900,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 3,
+              "cluster": 1,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            },
+            {
+              "glyph_id": 2,
+              "cluster": 0,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": false,
+          "reference_glyph": {
+            "id": 6,
+            "name": "fi"
+          },
+          "gdef": [
+            {
+              "format": 3,
+              "coordinate": 220,
+              "adjustment": {
+                "format": 32768,
+                "start_or_outer": 0,
+                "end_or_inner": 7,
+                "deltas": null
+              }
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            220
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            680
+          ],
+          "comparison": "fallback_or_absent"
+        },
+        {
+          "text": "fl",
+          "direction": "ltr",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": 0,
+                "y": 0,
+                "advance": 1100,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": 550,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": 1100,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 7,
+              "cluster": 0,
+              "advance": 1100,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": true,
+          "reference_glyph": {
+            "id": 7,
+            "name": "fl"
+          },
+          "gdef": [
+            {
+              "format": 3,
+              "coordinate": 730,
+              "adjustment": {
+                "format": 32768,
+                "start_or_outer": 0,
+                "end_or_inner": 7,
+                "deltas": null
+              }
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            730
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            730
+          ],
+          "comparison": "fallback_or_absent"
+        },
+        {
+          "text": "fl",
+          "direction": "rtl",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": -1100,
+                "y": 0,
+                "advance": 1100,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": -550,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": -1100,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 4,
+              "cluster": 1,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            },
+            {
+              "glyph_id": 2,
+              "cluster": 0,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": false,
+          "reference_glyph": {
+            "id": 7,
+            "name": "fl"
+          },
+          "gdef": [
+            {
+              "format": 3,
+              "coordinate": 730,
+              "adjustment": {
+                "format": 32768,
+                "start_or_outer": 0,
+                "end_or_inner": 7,
+                "deltas": null
+              }
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            730
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            370
+          ],
+          "comparison": "fallback_or_absent"
+        }
+      ]
+    },
+    {
+      "font": "gdef-carets.ttc",
+      "sha256": "313d2439d4ffefffb38ea5e006d7202785d2154eab7d164ec9e45e199c371c1c",
+      "face": 5,
+      "upem": 1000,
+      "fontcore_size": 1000,
+      "harfbuzz_ppem": 0,
+      "weight": 900,
+      "harfbuzz_version": "10.2.0",
+      "rows": [
+        {
+          "text": "fi",
+          "direction": "ltr",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": 0,
+                "y": 0,
+                "advance": 900,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": 450,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": 900,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 6,
+              "cluster": 0,
+              "advance": 900,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": true,
+          "reference_glyph": {
+            "id": 6,
+            "name": "fi"
+          },
+          "gdef": [
+            {
+              "format": 3,
+              "coordinate": 220,
+              "adjustment": {
+                "format": 32768,
+                "start_or_outer": 0,
+                "end_or_inner": 7,
+                "deltas": null
+              }
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            220
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            220
+          ],
+          "comparison": "fallback_or_absent"
+        },
+        {
+          "text": "fi",
+          "direction": "rtl",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": -900,
+                "y": 0,
+                "advance": 900,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": -450,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": -900,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 3,
+              "cluster": 1,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            },
+            {
+              "glyph_id": 2,
+              "cluster": 0,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": false,
+          "reference_glyph": {
+            "id": 6,
+            "name": "fi"
+          },
+          "gdef": [
+            {
+              "format": 3,
+              "coordinate": 220,
+              "adjustment": {
+                "format": 32768,
+                "start_or_outer": 0,
+                "end_or_inner": 7,
+                "deltas": null
+              }
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            220
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            680
+          ],
+          "comparison": "fallback_or_absent"
+        },
+        {
+          "text": "fl",
+          "direction": "ltr",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": 0,
+                "y": 0,
+                "advance": 1100,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": 550,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": 1100,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 7,
+              "cluster": 0,
+              "advance": 1100,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": true,
+          "reference_glyph": {
+            "id": 7,
+            "name": "fl"
+          },
+          "gdef": [
+            {
+              "format": 3,
+              "coordinate": 730,
+              "adjustment": {
+                "format": 32768,
+                "start_or_outer": 0,
+                "end_or_inner": 7,
+                "deltas": null
+              }
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            730
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            730
+          ],
+          "comparison": "fallback_or_absent"
+        },
+        {
+          "text": "fl",
+          "direction": "rtl",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": -1100,
+                "y": 0,
+                "advance": 1100,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": -550,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": -1100,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 4,
+              "cluster": 1,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            },
+            {
+              "glyph_id": 2,
+              "cluster": 0,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": false,
+          "reference_glyph": {
+            "id": 7,
+            "name": "fl"
+          },
+          "gdef": [
+            {
+              "format": 3,
+              "coordinate": 730,
+              "adjustment": {
+                "format": 32768,
+                "start_or_outer": 0,
+                "end_or_inner": 7,
+                "deltas": null
+              }
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            730
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            370
+          ],
+          "comparison": "fallback_or_absent"
+        }
+      ]
+    },
+    {
+      "font": "gdef-carets.ttc",
+      "sha256": "313d2439d4ffefffb38ea5e006d7202785d2154eab7d164ec9e45e199c371c1c",
+      "face": 6,
+      "upem": 1000,
+      "fontcore_size": 1000,
+      "harfbuzz_ppem": 0,
+      "weight": null,
+      "harfbuzz_version": "10.2.0",
+      "rows": [
+        {
+          "text": "fi",
+          "direction": "ltr",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": 50,
+                "y": -70,
+                "advance": 900,
+                "candidates": [
+                  270.0
+                ]
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": 270,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "FontAuthored"
+              },
+              {
+                "byte": 2,
+                "x": 900,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 6,
+              "cluster": 0,
+              "advance": 900,
+              "x_offset": 50,
+              "y_offset": 70
+            }
+          ],
+          "same_reference_glyph_selection": true,
+          "reference_glyph": {
+            "id": 6,
+            "name": "fi"
+          },
+          "gdef": [
+            {
+              "format": 1,
+              "coordinate": 220
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            220
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            270
+          ],
+          "comparison": "candidate_query_match"
+        },
+        {
+          "text": "fi",
+          "direction": "rtl",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": -850,
+                "y": -70,
+                "advance": 900,
+                "candidates": [
+                  630.0
+                ]
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": -630,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "FontAuthored"
+              },
+              {
+                "byte": 2,
+                "x": -900,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 3,
+              "cluster": 1,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            },
+            {
+              "glyph_id": 2,
+              "cluster": 0,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": false,
+          "reference_glyph": {
+            "id": 6,
+            "name": "fi"
+          },
+          "gdef": [
+            {
+              "format": 1,
+              "coordinate": 220
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            220
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            630
+          ],
+          "comparison": "candidate_query_match"
+        },
+        {
+          "text": "fl",
+          "direction": "ltr",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": -30,
+                "y": 20,
+                "advance": 1100,
+                "candidates": [
+                  700.0
+                ]
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": 700,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "FontAuthored"
+              },
+              {
+                "byte": 2,
+                "x": 1100,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 7,
+              "cluster": 0,
+              "advance": 1100,
+              "x_offset": -30,
+              "y_offset": -20
+            }
+          ],
+          "same_reference_glyph_selection": true,
+          "reference_glyph": {
+            "id": 7,
+            "name": "fl"
+          },
+          "gdef": [
+            {
+              "format": 1,
+              "coordinate": 730
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            730
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            700
+          ],
+          "comparison": "candidate_query_match"
+        },
+        {
+          "text": "fl",
+          "direction": "rtl",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  2
+                ],
+                "x": -1130,
+                "y": 20,
+                "advance": 1100,
+                "candidates": [
+                  400.0
+                ]
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": -400,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "FontAuthored"
+              },
+              {
+                "byte": 2,
+                "x": -1100,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 4,
+              "cluster": 1,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            },
+            {
+              "glyph_id": 2,
+              "cluster": 0,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": false,
+          "reference_glyph": {
+            "id": 7,
+            "name": "fl"
+          },
+          "gdef": [
+            {
+              "format": 1,
+              "coordinate": 730
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            730
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            400
+          ],
+          "comparison": "candidate_query_match"
+        }
+      ]
+    },
+    {
+      "font": "gdef-carets.ttc",
+      "sha256": "313d2439d4ffefffb38ea5e006d7202785d2154eab7d164ec9e45e199c371c1c",
+      "face": 7,
+      "upem": 1000,
+      "fontcore_size": 1000,
+      "harfbuzz_ppem": 0,
+      "weight": null,
+      "harfbuzz_version": "10.2.0",
+      "rows": [
+        {
+          "text": "ffi",
+          "direction": "ltr",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  3
+                ],
+                "x": 0,
+                "y": 0,
+                "advance": 1200,
+                "candidates": [
+                  200.0,
+                  500.0
+                ]
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": 200,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "FontAuthored"
+              },
+              {
+                "byte": 2,
+                "x": 500,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "FontAuthored"
+              },
+              {
+                "byte": 3,
+                "x": 1200,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 8,
+              "cluster": 0,
+              "advance": 1200,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": true,
+          "reference_glyph": {
+            "id": 8,
+            "name": "ffi"
+          },
+          "gdef": [
+            {
+              "format": 1,
+              "coordinate": 200
+            },
+            {
+              "format": 1,
+              "coordinate": 500
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            200,
+            500
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            200,
+            500
+          ],
+          "comparison": "candidate_query_match"
+        },
+        {
+          "text": "ffi",
+          "direction": "rtl",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  3
+                ],
+                "x": -1200,
+                "y": 0,
+                "advance": 1200,
+                "candidates": [
+                  700.0,
+                  1000.0
+                ]
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": -700,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "FontAuthored"
+              },
+              {
+                "byte": 2,
+                "x": -1000,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "FontAuthored"
+              },
+              {
+                "byte": 3,
+                "x": -1200,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 3,
+              "cluster": 2,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            },
+            {
+              "glyph_id": 2,
+              "cluster": 1,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            },
+            {
+              "glyph_id": 2,
+              "cluster": 0,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": false,
+          "reference_glyph": {
+            "id": 8,
+            "name": "ffi"
+          },
+          "gdef": [
+            {
+              "format": 1,
+              "coordinate": 200
+            },
+            {
+              "format": 1,
+              "coordinate": 500
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            200,
+            500
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            700,
+            1000
+          ],
+          "comparison": "candidate_query_match"
+        }
+      ]
+    },
+    {
+      "font": "gdef-carets.ttc",
+      "sha256": "313d2439d4ffefffb38ea5e006d7202785d2154eab7d164ec9e45e199c371c1c",
+      "face": 8,
+      "upem": 1000,
+      "fontcore_size": 1000,
+      "harfbuzz_ppem": 0,
+      "weight": null,
+      "harfbuzz_version": "10.2.0",
+      "rows": [
+        {
+          "text": "ffi",
+          "direction": "ltr",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  3
+                ],
+                "x": 0,
+                "y": 0,
+                "advance": 1200,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": 400,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": 800,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 3,
+                "x": 1200,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 8,
+              "cluster": 0,
+              "advance": 1200,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": true,
+          "reference_glyph": {
+            "id": 8,
+            "name": "ffi"
+          },
+          "gdef": [
+            {
+              "format": 1,
+              "coordinate": 500
+            },
+            {
+              "format": 1,
+              "coordinate": 200
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            500,
+            200
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            200,
+            500
+          ],
+          "comparison": "fallback_or_absent"
+        },
+        {
+          "text": "ffi",
+          "direction": "rtl",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  3
+                ],
+                "x": -1200,
+                "y": 0,
+                "advance": 1200,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": -400,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": -800,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 3,
+                "x": -1200,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 3,
+              "cluster": 2,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            },
+            {
+              "glyph_id": 2,
+              "cluster": 1,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            },
+            {
+              "glyph_id": 2,
+              "cluster": 0,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": false,
+          "reference_glyph": {
+            "id": 8,
+            "name": "ffi"
+          },
+          "gdef": [
+            {
+              "format": 1,
+              "coordinate": 500
+            },
+            {
+              "format": 1,
+              "coordinate": 200
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            500,
+            200
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            700,
+            1000
+          ],
+          "comparison": "fallback_or_absent"
+        }
+      ]
+    },
+    {
+      "font": "gdef-carets.ttc",
+      "sha256": "313d2439d4ffefffb38ea5e006d7202785d2154eab7d164ec9e45e199c371c1c",
+      "face": 9,
+      "upem": 1000,
+      "fontcore_size": 1000,
+      "harfbuzz_ppem": 0,
+      "weight": null,
+      "harfbuzz_version": "10.2.0",
+      "rows": [
+        {
+          "text": "ffi",
+          "direction": "ltr",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  3
+                ],
+                "x": 0,
+                "y": 0,
+                "advance": 1200,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": 400,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": 800,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 3,
+                "x": 1200,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 8,
+              "cluster": 0,
+              "advance": 1200,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": true,
+          "reference_glyph": {
+            "id": 8,
+            "name": "ffi"
+          },
+          "gdef": [
+            {
+              "format": 1,
+              "coordinate": 200
+            },
+            {
+              "format": 1,
+              "coordinate": 200
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            200,
+            200
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            200,
+            200
+          ],
+          "comparison": "fallback_or_absent"
+        },
+        {
+          "text": "ffi",
+          "direction": "rtl",
+          "fontcore": {
+            "glyphs": [
+              {
+                "source": [
+                  0,
+                  3
+                ],
+                "x": -1200,
+                "y": 0,
+                "advance": 1200,
+                "candidates": null
+              }
+            ],
+            "stops": [
+              {
+                "byte": 0,
+                "x": 0,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              },
+              {
+                "byte": 1,
+                "x": -400,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 2,
+                "x": -800,
+                "y": 0,
+                "quality": "Approximate",
+                "source": "Approximate"
+              },
+              {
+                "byte": 3,
+                "x": -1200,
+                "y": 0,
+                "quality": "AdvanceBoundary",
+                "source": "Advance"
+              }
+            ]
+          },
+          "harfbuzz_shaping": [
+            {
+              "glyph_id": 3,
+              "cluster": 2,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            },
+            {
+              "glyph_id": 2,
+              "cluster": 1,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            },
+            {
+              "glyph_id": 2,
+              "cluster": 0,
+              "advance": 600,
+              "x_offset": 0,
+              "y_offset": 0
+            }
+          ],
+          "same_reference_glyph_selection": false,
+          "reference_glyph": {
+            "id": 8,
+            "name": "ffi"
+          },
+          "gdef": [
+            {
+              "format": 1,
+              "coordinate": 200
+            },
+            {
+              "format": 1,
+              "coordinate": 200
+            }
+          ],
+          "harfbuzz_caret_coordinates": [
+            200,
+            200
+          ],
+          "reference_basis": "glyph selected by HarfBuzz LTR; GDEF queried with requested direction",
+          "harfbuzz_initial_pen_distances": [
+            1000,
+            1000
+          ],
+          "comparison": "fallback_or_absent"
+        }
+      ]
+    }
+  ]
+}

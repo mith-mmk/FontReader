@@ -2,7 +2,7 @@
 
 ## 0.0.19 opt-in layout additions
 
-New source-preserving and upper-layout APIs are described in [mapped shaping](mapped-shaping.md), [hard lines](hard-line-layout.md), and [bounded BiDi/mixed vertical](bidi-and-mixed-vertical.md). Legacy shaping limits in the sections below remain in force unless those opt-in routes explicitly say otherwise. Source ranges are conservative grapheme envelopes. GDEF carets are not implemented; internal ligature carets are approximate. Upper layouts do not provide family fallback, wrapping or cross-run joining. This is not general Unicode/script conformance.
+New source-preserving and upper-layout APIs are described in [mapped shaping](mapped-shaping.md), [hard lines](hard-line-layout.md), and [bounded BiDi/mixed vertical](bidi-and-mixed-vertical.md). Legacy shaping limits in the sections below remain in force unless those opt-in routes explicitly say otherwise. Source ranges are conservative grapheme envelopes. Static GDEF Format 1, bounded simple TrueType Format 2, and unadjusted Format 3 carets are used when validated; unsupported cases retain explicitly labelled approximation. Upper layouts do not provide family fallback, wrapping or cross-run joining. This is not general Unicode/script conformance.
 
 
 This document keeps the implementation-oriented notes that were previously in `README.md`.
@@ -402,7 +402,8 @@ raw glyph/SVG APIs are unchanged. TrueType ignores VORG as required by OpenType.
 - `GPOS mark-to-base` (Type 4 Format 1) is now parsed and used during shaping when a `mark` feature lookup is available
 - `GPOS mark-to-mark` (Type 6 Format 1) is now parsed and used during shaping when an `mkmk` feature lookup is available
 - The historical GDEF-based mark attachment heuristic remains only for fonts without GPOS. With GPOS present, absent anchors retain cursor/authored placement rather than synthesizing that heuristic.
-- Attach / caret / mark-set data is still not fully integrated into higher-level layout
+- Static ligature carets are integrated into mapped caret layouts with explicit source provenance. Contour points are resolved only for unhinted static simple monochrome TrueType outlines; composite/COLR/variable points and Device/VariationIndex remain approximate. Bounds validation added here covers the ligature-caret path, not every historical GDEF subtable.
+- Attach / mark-set data is still not fully integrated into higher-level layout
 
 ## Notes
 

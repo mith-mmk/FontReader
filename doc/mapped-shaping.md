@@ -32,10 +32,14 @@ Source ownership is a prerequisite for editing but not a complete editor model.
 Do not use separate prefix measurement as an oracle for caret placement: it can
 change kerning, joining, and ligatures. Caret geometry must use the shaped run.
 
-Font-authored ligature carets are not yet exposed. The existing GDEF parser also
-needs a signed-format-3 audit, contour-point resolution and Device/VariationIndex
-handling before claiming exact font-authored carets. Approximate internal
-ligature stops must be explicitly labelled rather than silently treated as exact.
+Mapped results expose optional font-authored ligature caret candidates through
+`glyph_ligature_carets()`. Static GDEF Format 1 and Format 3 without adjustment
+are supported. Format 2 resolves real points only for unhinted static simple
+monochrome TrueType outlines. Composite/variable/COLR point resolution and
+Device/VariationIndex adjustments fall back conservatively. Layout adopts candidates only with unambiguous single-glyph
+ownership, matching EGC count, and finite strictly interior ordered positions.
+`CaretSource::FontAuthored` distinguishes adoption from `Approximate` fallback.
+The legacy `CaretQuality` remains conservative and unchanged for compatibility.
 
 Paragraph BiDi needs resolved embedding levels, visual run ordering and affinity
 at directional boundaries. Wrapping needs line ownership and line boxes. Mixed
@@ -54,14 +58,15 @@ offset. Both affinities currently share geometry. LTR uses positive x, explicit
 RTL negative x, and upright TTB positive y. Geometry is pen/advance based, not ink
 or GPOS mark placement. Composite baseline shifts are also ignored: returned
 points stay on the common initial pen baseline, not the shifted glyph baseline.
-They do not specify caret height or selection rectangles. Internal stops of a multi-EGC ownership envelope use equal
-advance division and carry `CaretQuality::Approximate`.
+They do not specify caret height or selection rectangles. Internal stops prefer validated GDEF candidates; otherwise they use equal
+advance division. Both retain legacy `CaretQuality::Approximate`; inspect
+`source()` for the detailed provenance.
 
 This deliberately rejects tabs/newlines/BiDi controls, unowned source gaps,
 reordered ownership, non-finite/negative inline advances and nonzero cross-axis
 advances with `Unsupported`. Non-finite hit-test coordinates and non-EGC byte
 positions return `InvalidInput`. Empty text has a single origin stop. This is not
-mixed-direction paragraph hit testing or font-authored ligature caret support.
+mixed-direction paragraph hit testing.
 
 Stage 3 remains a separate layout project: returning guessed positions for
 paragraph BiDi or wrapped/mixed-vertical text would silently violate the source

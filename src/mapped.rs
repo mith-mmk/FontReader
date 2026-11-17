@@ -44,6 +44,7 @@ pub struct ShapedText {
     sources: Vec<GlyphSource>,
     graphemes: Vec<Range<usize>>,
     direction: TextDirection,
+    ligature_carets: Vec<Option<Vec<f32>>>,
 }
 impl ShapedText {
     pub(crate) fn new(
@@ -56,7 +57,9 @@ impl ShapedText {
         debug_assert!(sources.iter().all(|s| s.range.start <= s.range.end
             && text.is_char_boundary(s.range.start)
             && text.is_char_boundary(s.range.end)));
+        let ligature_carets = vec![None; run.glyphs.len()];
         Self {
+            ligature_carets,
             text: text.to_owned(),
             run,
             sources,
@@ -67,6 +70,20 @@ impl ShapedText {
             direction,
         }
     }
+    pub(crate) fn with_ligature_carets(mut self, carets: Vec<Option<Vec<f32>>>) -> Self {
+        assert_eq!(carets.len(), self.run.glyphs.len());
+        self.ligature_carets = carets;
+        self
+    }
+    /// Supported font-authored caret candidates, parallel to output glyphs.
+    /// Values are logical inline distances from the glyph's initial pen in
+    /// output units, not raw font design units. `None` means absent or unsupported
+    /// data. Layout validates component count, ownership and monotonic bounds
+    /// before preferring these candidates to its explicit approximation.
+    pub fn glyph_ligature_carets(&self) -> &[Option<Vec<f32>>] {
+        &self.ligature_carets
+    }
+
     /// Unmodified original text, including controls which emit no glyph.
     pub fn text(&self) -> &str {
         &self.text

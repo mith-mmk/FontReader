@@ -2,6 +2,7 @@
 //! Unicode 16.0 BiDi levels/order are resolved on original text before controls
 //! are hidden. Shaping retains logical order; visual runs are translated, never
 //! reversed. No wrapping, vertical layout, overrides, or fallback is performed.
+use crate::caret::{authored_carets, CaretSource};
 use crate::{CaretAffinity, CaretQuality, FontEngine, ShapedText, TextDirection, TextPosition};
 use std::io::{Error, ErrorKind};
 use std::ops::Range;
@@ -85,6 +86,7 @@ pub struct BidiCaretPosition {
     y: f32,
     line_index: usize,
     quality: CaretQuality,
+    source: CaretSource,
 }
 impl BidiCaretPosition {
     pub fn text_position(self) -> TextPosition {
@@ -102,13 +104,19 @@ impl BidiCaretPosition {
     pub fn quality(self) -> CaretQuality {
         self.quality
     }
+    /// Authoritative provenance; legacy `quality()` stays conservative for internal stops.
+    pub fn source(self) -> CaretSource {
+        self.source
+    }
 }
 
 /// Horizontal hard-line layout. Every line has left edge x=0, even when its
 /// base direction is RTL. Fixed baseline spacing comes from the engine options.
 /// Formatting controls remain editable zero-width source boundaries. LRO/RLO,
 /// tabs, other separators, split EGCs, and unsupported shaping mappings error.
-/// Ligature-internal stops are approximate; no GDEF caret data is used.
+/// Ligature-internal stops prefer validated GDEF caret data for a single owning
+/// glyph, otherwise use explicit approximation. `source()` identifies which;
+/// legacy `quality()` remains Approximate for both kinds of internal stop.
 /// With `layout`, contextual joining that crosses a level-run boundary is
 /// rejected rather than silently shaping isolated forms (for example Arabic
 /// letters separated by LRM). Isolates remain genuine joining barriers.
@@ -214,7 +222,7 @@ impl BidiParagraphLayout {
                     {
                         return Err(invalid("translated glyph origin overflow"));
                     }
-                    for (offset, inline, quality) in stops {
+                    for (offset, inline, quality, source) in stops {
                         let x = origin_x + if run_level.is_rtl() { -inline } else { inline };
                         if !x.is_finite() {
                             return Err(invalid("caret coordinate overflow"));
@@ -238,6 +246,7 @@ impl BidiParagraphLayout {
                                 y: baseline,
                                 line_index,
                                 quality,
+                                source,
                             });
                         }
                     }
@@ -259,6 +268,7 @@ impl BidiParagraphLayout {
                         y: baseline,
                         line_index,
                         quality: CaretQuality::AdvanceBoundary,
+                        source: CaretSource::Advance,
                     });
                 }
             }
@@ -413,7 +423,7 @@ fn control(ch: char) -> bool {
 
 // Logical, positive-advance stops. Invisible controls retain zero-width source
 // positions. Any other missing ownership is rejected, never guessed.
-type RunStop = (usize, f32, CaretQuality);
+type RunStop = (usize, f32, CaretQuality, CaretSource);
 
 fn run_stops(shaped: &ShapedText) -> Result<(Vec<RunStop>, f32), Error> {
     let text = shaped.text();
@@ -423,8 +433,14 @@ fn run_stops(shaped: &ShapedText) -> Result<(Vec<RunStop>, f32), Error> {
         .collect();
     let mut boundaries = vec![0];
     boundaries.extend(graphemes.iter().map(|(r, _)| r.end));
-    let mut groups: Vec<(Range<usize>, f32)> = Vec::new();
-    for (glyph, source) in shaped.glyph_run().glyphs.iter().zip(shaped.glyph_sources()) {
+    let mut groups: Vec<(Range<usize>, f32, Option<usize>)> = Vec::new();
+    for (glyph_index, (glyph, source)) in shaped
+        .glyph_run()
+        .glyphs
+        .iter()
+        .zip(shaped.glyph_sources())
+        .enumerate()
+    {
         let advance = glyph.glyph.metrics.advance_x;
         if !advance.is_finite() || advance < 0.0 || glyph.glyph.metrics.advance_y != 0.0 {
             return Err(unsupported(
@@ -435,25 +451,26 @@ fn run_stops(shaped: &ShapedText) -> Result<(Vec<RunStop>, f32), Error> {
         if range.is_empty() {
             return Err(unsupported("empty source ownership"));
         }
-        if let Some((last, width)) = groups.last_mut() {
+        if let Some((last, width, owner)) = groups.last_mut() {
             if range.start < last.start {
                 return Err(unsupported("reordered source mapping"));
             }
             if range.start < last.end {
                 last.end = last.end.max(range.end);
                 *width += advance;
+                *owner = None;
                 if !width.is_finite() {
                     return Err(invalid("advance overflow"));
                 }
                 continue;
             }
         }
-        groups.push((range, advance));
+        groups.push((range, advance, Some(glyph_index)));
     }
-    let mut stops = vec![(0, 0.0, CaretQuality::AdvanceBoundary)];
+    let mut stops = vec![(0, 0.0, CaretQuality::AdvanceBoundary, CaretSource::Advance)];
     let mut cursor = 0;
     let mut pen = 0.0;
-    for (range, advance) in groups {
+    for (range, advance, owner) in groups {
         let start = boundaries
             .binary_search(&range.start)
             .map_err(|_| unsupported("partial grapheme ownership"))?;
@@ -467,7 +484,12 @@ fn run_stops(shaped: &ShapedText) -> Result<(Vec<RunStop>, f32), Error> {
             if !hidden {
                 return Err(unsupported("unowned visible source"));
             }
-            stops.push((gap.end, pen, CaretQuality::AdvanceBoundary));
+            stops.push((
+                gap.end,
+                pen,
+                CaretQuality::AdvanceBoundary,
+                CaretSource::Advance,
+            ));
         }
         let visible = graphemes[start..end]
             .iter()
@@ -476,12 +498,25 @@ fn run_stops(shaped: &ShapedText) -> Result<(Vec<RunStop>, f32), Error> {
         if visible == 0 {
             return Err(unsupported("visible glyph owns only formatting controls"));
         }
+        let authored = owner.and_then(|index| authored_carets(shaped, index, visible, advance));
         let mut count = 0;
         for (grapheme, hidden) in &graphemes[start..end] {
             if !hidden {
                 count += 1;
             }
-            let x = pen + advance * (count as f32 / visible as f32);
+            let (distance, source) = if count == 0 {
+                (0.0, CaretSource::Advance)
+            } else if count == visible {
+                (advance, CaretSource::Advance)
+            } else if let Some(authored) = authored {
+                (authored[count - 1], CaretSource::FontAuthored)
+            } else {
+                (
+                    advance * (count as f32 / visible as f32),
+                    CaretSource::Approximate,
+                )
+            };
+            let x = pen + distance;
             if !x.is_finite() {
                 return Err(invalid("caret advance overflow"));
             }
@@ -493,6 +528,7 @@ fn run_stops(shaped: &ShapedText) -> Result<(Vec<RunStop>, f32), Error> {
                 } else {
                     CaretQuality::Approximate
                 },
+                source,
             ));
         }
         pen += advance;
@@ -502,7 +538,12 @@ fn run_stops(shaped: &ShapedText) -> Result<(Vec<RunStop>, f32), Error> {
         if !hidden {
             return Err(unsupported("unowned visible source"));
         }
-        stops.push((gap.end, pen, CaretQuality::AdvanceBoundary));
+        stops.push((
+            gap.end,
+            pen,
+            CaretQuality::AdvanceBoundary,
+            CaretSource::Advance,
+        ));
     }
     Ok((stops, pen))
 }
@@ -812,6 +853,96 @@ mod tests {
                     format!("{:?}", expected.glyph.layers)
                 );
             }
+        }
+    }
+    #[test]
+    fn authored_control_plateaus_preserve_provenance() {
+        let file = FontFile::from_buffer(FONT).unwrap();
+        let face = file.face(0).unwrap();
+        let mut run = face.engine().shape("a").unwrap();
+        run.glyphs[0].glyph.metrics.advance_x = 800.0;
+        let text = "f\u{200e}i";
+        let shaped = ShapedText::new(
+            text,
+            run.clone(),
+            vec![crate::GlyphSource::new(0..text.len(), 0, 0)],
+            TextDirection::LeftToRight,
+        )
+        .with_ligature_carets(vec![Some(vec![200.0])]);
+        let (stops, width) = run_stops(&shaped).unwrap();
+        assert_eq!(width, 800.0);
+        assert_eq!(
+            stops,
+            vec![
+                (0, 0.0, CaretQuality::AdvanceBoundary, CaretSource::Advance),
+                (
+                    1,
+                    200.0,
+                    CaretQuality::Approximate,
+                    CaretSource::FontAuthored
+                ),
+                (
+                    4,
+                    200.0,
+                    CaretQuality::Approximate,
+                    CaretSource::FontAuthored
+                ),
+                (
+                    5,
+                    800.0,
+                    CaretQuality::AdvanceBoundary,
+                    CaretSource::Advance
+                )
+            ]
+        );
+        let invalid = ShapedText::new(
+            text,
+            run,
+            vec![crate::GlyphSource::new(0..text.len(), 0, 0)],
+            TextDirection::LeftToRight,
+        )
+        .with_ligature_carets(vec![Some(vec![900.0])]);
+        let (stops, _) = run_stops(&invalid).unwrap();
+        assert_eq!((stops[1].1, stops[1].3), (400.0, CaretSource::Approximate));
+    }
+    #[cfg(feature = "layout")]
+    #[test]
+    fn paragraph_propagates_font_authored_caret_source() {
+        let file =
+            FontFile::from_buffer(include_bytes!("../tests/fixtures/gdef-carets.ttc")).unwrap();
+        let face = file.face(0).unwrap();
+        let engine = face.engine().with_font_size(1000.0);
+        let layout =
+            BidiParagraphLayout::shape(&engine, "fi", BidiBaseDirection::LeftToRight).unwrap();
+        let caret = layout
+            .caret_positions(position(1, CaretAffinity::Downstream))
+            .unwrap()[0];
+        assert_eq!(caret.source(), CaretSource::FontAuthored);
+        assert_eq!(caret.x(), 220.0);
+        assert_eq!(caret.quality(), CaretQuality::Approximate);
+        assert_eq!(
+            layout.hit_test(220.0, 0.0).unwrap().source(),
+            CaretSource::FontAuthored
+        );
+    }
+    #[cfg(feature = "layout")]
+    #[test]
+    fn paragraph_keeps_format_two_point_carets_in_global_run_coordinates() {
+        let file =
+            FontFile::from_buffer(include_bytes!("../tests/fixtures/gdef-carets.ttc")).unwrap();
+        let face = file.face(1).unwrap();
+        let engine = face.engine().with_font_size(1000.0);
+        let layout =
+            BidiParagraphLayout::shape(&engine, "fifl", BidiBaseDirection::LeftToRight).unwrap();
+        for (byte, x) in [(1, 280.0), (3, 1730.0)] {
+            let caret = layout
+                .caret_positions(position(byte, CaretAffinity::Downstream))
+                .unwrap()[0];
+            assert_eq!(caret.x(), x);
+            assert_eq!(caret.source(), CaretSource::FontAuthored);
+            let hit = layout.hit_test(x, 0.0).unwrap();
+            assert_eq!(hit.text_position().byte_offset(), byte);
+            assert_eq!(hit.source(), CaretSource::FontAuthored);
         }
     }
 }
