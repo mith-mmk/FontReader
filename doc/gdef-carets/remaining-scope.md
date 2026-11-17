@@ -2,11 +2,13 @@
 
 ## Format 2 implemented boundary
 
-Only unhinted, static, simple, monochrome TrueType real contour points are
-eligible. The decoder validates its own byte stream, contour endpoints,
+The simple-glyph path accepts unhinted, static, monochrome TrueType real
+contour points. The decoder validates its own byte stream, contour endpoints,
 instruction length and repeated flags before resolving an index. Actual
 on/off-curve points count; implicit curve midpoints and phantom points do not.
-Composite, COLR and variable cases remain unsupported. At most 16 Format 2 records per glyph are
+Bounded integer-translation composites are also supported as described in
+[composite-points.md](composite-points.md). General transformed composites, COLR
+and variable cases remain unsupported. At most 16 Format 2 records per glyph are
 resolved; larger lists fall back to bound repeated point-decoding work. A separate eligibility
 guard checks every accumulated point, contour-adjacent/closing midpoint sum,
 baseline calculation and baseline-minus-Y against the legacy renderer's integer
@@ -19,14 +21,18 @@ vertical points use Y plus the existing vertical-origin conversion. The
 [FreeType-backed oracle](point-carets-reference.md) demonstrates why the old
 OT-only backend is not a valid Format 2 reference.
 
-## Device adjustments: deferred, not guessed
+## Device adjustments: low-level decoder only
 
 `FontOptions` currently has nominal size and stretch, but no device ppem, DPI or
 hinting context. Nominal size is line-height based, not a pixel-size substitute.
 A packed Device adjustment cannot safely be inferred from it. Device carets
-therefore remain explicit fallback. A future device-aware context must define
-axis-specific ppem and scaling before a resolver can be added. No new dependency
-or public option is introduced in this work.
+therefore remain explicit fallback in mapped shaping. The internal
+`CaretValue::device_pixel_delta(ppem)` decoder now handles signed 2/4/8-bit
+packed values, rejects zero ppem, and returns zero outside the declared range.
+It deliberately does not infer a device context or convert pixels into design
+units. A future device-aware context must define axis-specific ppem and scaling
+before this decoder can be integrated. No new dependency or public option is
+introduced in this work.
 
 ## VariationIndex: strict store validation first
 
@@ -36,11 +42,18 @@ normalization. They are useful foundations, not sufficient fail-closed caret
 validation: current tolerant paths can return zero for invalid region indices
 or missing axes, and word-count arithmetic needs bounded checking.
 
-GDEF currently retains the ItemVariationStore offset. A follow-up must bound the
-store to the declared GDEF table, validate outer/inner and region indices, axis
-counts and all size arithmetic, then calculate finite base-plus-delta values.
-Only proven supported cases should relax the variable-face fallback. Fixture
-face 4 at wght 650/900 (+25/+100) and invalid face 5 provide initial regression
+GDEF now retains a separately bounded, strict `CaretVariationStore`. Its parser
+validates the declared table span, region indices, checked sizes, overlapping
+spans and resource budgets; resolution checks outer/inner indices and the
+normalized coordinate count. The internal
+`Gdef::caret_coordinate` resolver produces finite base-plus-delta values from
+explicit normalized coordinates; malformed optional stores do not disable
+static carets or legacy shaping.
+
+These are low-level foundations, not a public variable-caret feature. Mapped
+shaping still rejects variable faces. Integration must validate fvar/avar
+normalization and reconcile varied metrics and rendered geometry before
+relaxing that guard. Fixture face 4 at wght 650/900 (+25/+100) and invalid face 5 provide initial regression
 controls; they are not a real-font variation coverage claim.
 
 ## RTL Latin is a separate shaping contract

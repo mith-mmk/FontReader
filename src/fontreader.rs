@@ -3299,7 +3299,8 @@ impl Font {
             return value.design_coordinate().ok().map(f32::from);
         };
         // A point index is not a design coordinate. Resolve only real points in
-        // a static monochrome simple glyf; never guess composites or phantoms.
+        // a static monochrome glyf within the simple/translated-composite subset;
+        // never guess unsupported transforms or phantom points.
         if self.current_fvar().is_some()
             || self.current_gvar().is_some()
             || self.current_colr().is_some()

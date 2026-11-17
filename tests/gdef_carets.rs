@@ -184,3 +184,36 @@ fn format_two_survives_hard_lines_and_sideways_group_transforms() {
         );
     }
 }
+
+#[test]
+fn translated_composite_points_survive_hard_lines_and_sideways_hit_testing() {
+    let file = FontFile::from_buffer(include_bytes!("fixtures/gdef-composite-carets.ttc")).unwrap();
+    for (index, expected) in [(0, 470.0), (1, 490.0)] {
+        let face = file.face(index).unwrap();
+        let engine = face
+            .engine()
+            .with_font_size(1000.0)
+            .with_line_height(1200.0);
+        let lines = HardLineLayout::shape(&engine, "fi\r\nfi").unwrap();
+        for (byte, y) in [(1, 0.0), (5, 1200.0)] {
+            let caret = lines.caret_positions(pos(byte)).unwrap()[0];
+            assert_eq!((caret.x(), caret.y()), (expected, y));
+            assert_eq!(caret.source(), CaretSource::FontAuthored);
+            let hit = lines.hit_test(expected, y).unwrap();
+            assert_eq!(hit.text_position().byte_offset(), byte);
+            assert_eq!(hit.source(), CaretSource::FontAuthored);
+        }
+        let vertical = engine
+            .shape_vertical_mixed_ltr_mapped("fi\u{3000}fi")
+            .unwrap();
+        for (group, byte) in [(0, 1), (2, 6)] {
+            let xy = vertical.groups()[group].transform_point(expected, 0.0);
+            let caret = vertical.caret_positions(pos(byte)).unwrap()[0];
+            assert_eq!((caret.x(), caret.y()), xy);
+            assert_eq!(caret.source(), CaretSource::FontAuthored);
+            let hit = vertical.hit_test(xy.0, xy.1).unwrap();
+            assert_eq!(hit.text_position().byte_offset(), byte);
+            assert_eq!(hit.source(), CaretSource::FontAuthored);
+        }
+    }
+}
