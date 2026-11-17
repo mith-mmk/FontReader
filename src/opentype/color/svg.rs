@@ -422,6 +422,17 @@ fn skip_svg_whitespace(bytes: &[u8], cursor: &mut usize) {
 }
 
 fn extract_svg_payload_for_gid(document: &str, gid: u16) -> Option<String> {
+    // The document root can itself be the glyph element. Do not discard its ID
+    // before deciding whether this document belongs to the requested glyph.
+    if let Some(start) = document.find("<svg") {
+        let end = find_svg_tag_end(document, start)?;
+        let root = &document[start..end];
+        if element_id(root).is_some_and(is_glyph_id) {
+            return fragment_matches_glyph_id(root, gid)
+                .then(|| extract_root_inner(document).map(str::to_string))
+                .flatten();
+        }
+    }
     let (root_inner, defs_blocks) = if let Some(inner) = extract_root_inner(document) {
         (inner, collect_tag_blocks(inner, "defs"))
     } else {
@@ -438,18 +449,8 @@ fn extract_svg_payload_for_gid(document: &str, gid: u16) -> Option<String> {
 
     // A shared document with glyph IDs must not render every sibling when the
     // requested glyph is absent. Keep the legacy untagged single-document path.
-    let mut cursor = 0;
-    while let Some(relative) = root_inner[cursor..].find('<') {
-        let start = cursor + relative;
-        let end = find_svg_tag_end(root_inner, start)?;
-        if element_id(&root_inner[start..end]).is_some_and(|id| {
-            id.strip_prefix("glyph")
-                .is_some_and(|suffix| suffix.parse::<u16>().is_ok())
-                || id.parse::<u16>().is_ok()
-        }) {
-            return None;
-        }
-        cursor = end;
+    if contains_glyph_ids(root_inner) {
+        return None;
     }
     if let Some(inner) = extract_root_inner(document) {
         return Some(inner.to_string());
@@ -457,6 +458,27 @@ fn extract_svg_payload_for_gid(document: &str, gid: u16) -> Option<String> {
 
     extract_payload_from_svg_fragments(document, gid, &[])
         .or_else(|| extract_payload_from_tagged_elements(document, gid, &[]))
+}
+
+fn is_glyph_id(id: &str) -> bool {
+    id.strip_prefix("glyph")
+        .is_some_and(|suffix| suffix.parse::<u16>().is_ok())
+        || id.parse::<u16>().is_ok()
+}
+
+fn contains_glyph_ids(source: &str) -> bool {
+    let mut cursor = 0;
+    while let Some(relative) = source[cursor..].find('<') {
+        let start = cursor + relative;
+        let Some(end) = find_svg_tag_end(source, start) else {
+            return true;
+        };
+        if element_id(&source[start..end]).is_some_and(is_glyph_id) {
+            return true;
+        }
+        cursor = end;
+    }
+    false
 }
 
 fn extract_payload_from_svg_fragments(
@@ -481,6 +503,11 @@ fn extract_payload_from_svg_fragments(
             }
         })?;
 
+    if element_id(selected).is_none() && contains_glyph_ids(selected) {
+        // An untagged wrapper is not itself a glyph. Select its tagged child
+        // instead of returning all siblings, including when the ID is absent.
+        return extract_payload_from_tagged_elements(selected, gid, defs_blocks);
+    }
     let fragment_inner = extract_root_inner(selected).unwrap_or(selected);
     Some(combine_defs_and_payload(defs_blocks, fragment_inner))
 }
@@ -778,6 +805,29 @@ mod tests {
         }
         bytes.extend_from_slice(document);
         bytes
+    }
+
+    #[test]
+    fn untagged_svg_wrappers_cannot_bypass_glyph_selection() {
+        let svg = "<svg><svg><g id='glyph1'><path d='M1 0'/></g><g id='glyph10'><path d='M10 0'/></g></svg></svg>";
+        assert!(extract_svg_payload_for_gid(svg, 2).is_none());
+        let selected = extract_svg_payload_for_gid(svg, 1).unwrap();
+        assert!(selected.contains("glyph1"));
+        assert!(!selected.contains("glyph10"));
+        let wrapped = format!("<svg>{svg}</svg>");
+        assert!(extract_svg_payload_for_gid(&wrapped, 2).is_none());
+        assert!(!extract_svg_payload_for_gid(&wrapped, 1)
+            .unwrap()
+            .contains("glyph10"));
+        let plain = "<svg><svg><path d='M1 0'/></svg></svg>";
+        assert!(extract_svg_payload_for_gid(plain, 1).is_some());
+    }
+
+    #[test]
+    fn document_root_glyph_id_is_not_discarded() {
+        let svg = "<svg id='glyph10'><path d='M10 0'/></svg>";
+        assert!(extract_svg_payload_for_gid(svg, 1).is_none());
+        assert!(extract_svg_payload_for_gid(svg, 10).is_some());
     }
 
     #[test]

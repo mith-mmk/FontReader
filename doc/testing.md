@@ -375,7 +375,9 @@ list and table offset, shared documents referenced by disjoint glyph ranges,
 encoded document bounds, and gzip output bounded independently of encoded
 length. Shared encoded payloads use one allocation. Selection tests distinguish
 `glyph1` from `glyph10` and from non-ID attributes, accept quoted ID whitespace,
-and reject missing glyph IDs in a tagged shared document.
+and reject missing glyph IDs in a tagged shared document, including untagged
+nested SVG wrappers. A glyph ID on the document root is checked before stripping
+the root element.
 
 This remains bounded SVG extraction, not a general XML engine or complete SVG
 rendering: ancestor styling/transforms and arbitrary shared references still
