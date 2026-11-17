@@ -1,6 +1,7 @@
 //! Bounded, unhinted real-point lookup for GDEF CaretValue format 2.
 //! Returns raw glyf coordinates, not metric-origin-adjusted coordinates.
-//! Composite outlines, implied curve midpoints and phantom points are excluded.
+//! Composite support is restricted to bounded integer XY translations.
+//! Implied curve midpoints and phantom points are never selectable.
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum CaretPointError {
@@ -182,6 +183,147 @@ fn decode_point(
     Ok(point)
 }
 
+/// Bounded XY-translation-only composite point lookup. No metrics inheritance,
+/// point attachments, scaled offsets, transforms or instructions are accepted.
+/// The caller must prove the root's metric origin equals its raw design origin.
+#[cfg_attr(not(feature = "layout"), allow(dead_code))]
+pub(crate) fn translated_composite_point_for_render<'a>(
+    data: &[u8],
+    point_index: u16,
+    baseline: i32,
+    lookup: impl Fn(u16) -> Option<&'a [u8]>,
+) -> Result<(i32, i32), CaretPointError> {
+    struct Budget {
+        components: usize,
+        points: usize,
+    }
+    #[allow(clippy::too_many_arguments)] // Explicit recursion/work-budget state.
+    fn walk<'a>(
+        data: &[u8],
+        target: Option<usize>,
+        baseline: i32,
+        depth: usize,
+        offset: (i32, i32),
+        active: &mut Vec<u16>,
+        budget: &mut Budget,
+        lookup: &impl Fn(u16) -> Option<&'a [u8]>,
+    ) -> Result<(usize, Option<(i32, i32)>), CaretPointError> {
+        if depth > 4 || data.len() < 10 {
+            return Err(CaretPointError::Malformed);
+        }
+        let contours = i16::from_be_bytes([data[0], data[1]]);
+        if contours >= 0 {
+            let count = if contours == 0 {
+                0
+            } else {
+                let end = 10usize
+                    .checked_add((contours as usize - 1) * 2)
+                    .ok_or(CaretPointError::Malformed)?;
+                let bytes = data.get(end..end + 2).ok_or(CaretPointError::Malformed)?;
+                usize::from(u16::from_be_bytes([bytes[0], bytes[1]])) + 1
+            };
+            budget.points = budget
+                .points
+                .checked_add(count)
+                .ok_or(CaretPointError::Malformed)?;
+            if budget.points > 4096 {
+                return Err(CaretPointError::CompositeUnsupported);
+            }
+            let selected = target.filter(|index| *index < count);
+            let point = simple_glyph_point_for_render(data, selected.unwrap_or(0) as u16, baseline);
+            if count == 0 && point == Err(CaretPointError::PointOutOfRange) {
+                return Ok((0, None));
+            }
+            let point = point?;
+            return Ok((
+                count,
+                selected.map(|_| (point.0 + offset.0, point.1 + offset.1)),
+            ));
+        }
+        if contours != -1 {
+            return Err(CaretPointError::Malformed);
+        }
+        let mut cursor = 10;
+        let mut total = 0usize;
+        let mut selected = None;
+        loop {
+            let flags = word(data, &mut cursor)?;
+            let glyph = word(data, &mut cursor)?;
+            const ALLOWED: u16 = 0x0001 | 0x0002 | 0x0004 | 0x0020 | 0x1000;
+            if flags & 0x0002 == 0 || flags & !ALLOWED != 0 {
+                return Err(CaretPointError::CompositeUnsupported);
+            }
+            let (dx, dy) = if flags & 1 != 0 {
+                (
+                    i32::from(word(data, &mut cursor)? as i16),
+                    i32::from(word(data, &mut cursor)? as i16),
+                )
+            } else {
+                (
+                    i32::from(byte(data, &mut cursor)? as i8),
+                    i32::from(byte(data, &mut cursor)? as i8),
+                )
+            };
+            budget.components += 1;
+            if budget.components > 32 || active.contains(&glyph) {
+                return Err(CaretPointError::CompositeUnsupported);
+            }
+            let child = lookup(glyph).ok_or(CaretPointError::Malformed)?;
+            let child_offset = (
+                offset
+                    .0
+                    .checked_add(dx)
+                    .ok_or(CaretPointError::CoordinateUnsafe)?,
+                offset
+                    .1
+                    .checked_add(dy)
+                    .ok_or(CaretPointError::CoordinateUnsafe)?,
+            );
+            active.push(glyph);
+            let child_target = target.and_then(|index| index.checked_sub(total));
+            let (count, point) = walk(
+                child,
+                child_target,
+                baseline,
+                depth + 1,
+                child_offset,
+                active,
+                budget,
+                lookup,
+            )?;
+            active.pop();
+            if point.is_some() {
+                selected = point;
+            }
+            total = total.checked_add(count).ok_or(CaretPointError::Malformed)?;
+            if flags & 0x20 == 0 {
+                break;
+            }
+        }
+        Ok((total, selected))
+    }
+    if i16::try_from(baseline).is_err() {
+        return Err(CaretPointError::CoordinateUnsafe);
+    }
+    if data.get(..2) != Some(&[0xff, 0xff]) {
+        return Err(CaretPointError::CompositeUnsupported);
+    }
+    let (_, point) = walk(
+        data,
+        Some(usize::from(point_index)),
+        baseline,
+        0,
+        (0, 0),
+        &mut Vec::new(),
+        &mut Budget {
+            components: 0,
+            points: 0,
+        },
+        &lookup,
+    )?;
+    point.ok_or(CaretPointError::PointOutOfRange)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -200,6 +342,69 @@ mod tests {
             data.extend_from_slice(&v.to_be_bytes());
         }
         data
+    }
+
+    fn translated_component(records: &[(u16, u16, i16, i16)]) -> Vec<u8> {
+        let mut data = header(-1);
+        for &(flags, glyph, x, y) in records {
+            for value in [flags, glyph, x as u16, y as u16] {
+                data.extend_from_slice(&value.to_be_bytes());
+            }
+        }
+        data
+    }
+    #[test]
+    fn translated_composite_validates_all_children_and_component_order() {
+        let leaf = sample();
+        let root = translated_component(&[(0x23, 1, 10, 20), (3, 1, 100, 200)]);
+        let lookup = |id| if id == 1 { Some(leaf.as_slice()) } else { None };
+        assert_eq!(
+            translated_composite_point_for_render(&root, 0, 800, lookup),
+            Ok((110, -80))
+        );
+        assert_eq!(
+            translated_composite_point_for_render(&root, 3, 800, lookup),
+            Ok((200, 100))
+        );
+        assert_eq!(
+            translated_composite_point_for_render(&root, 6, 800, lookup),
+            Err(CaretPointError::PointOutOfRange)
+        );
+        let missing = translated_component(&[(0x23, 1, 0, 0), (3, 2, 0, 0)]);
+        assert_eq!(
+            translated_composite_point_for_render(&missing, 0, 800, lookup),
+            Err(CaretPointError::Malformed)
+        );
+        for flag in [1, 0x203, 0x103, 0xb, 0x43, 0x83, 0x803] {
+            let root = translated_component(&[(flag, 1, 0, 0)]);
+            assert_eq!(
+                translated_composite_point_for_render(&root, 0, 800, lookup),
+                Err(CaretPointError::CompositeUnsupported)
+            );
+        }
+    }
+    #[test]
+    fn translated_composite_work_and_recursion_are_bounded() {
+        let leaf = sample();
+        let mut records = vec![(0x23, 1, 0, 0); 33];
+        records[32].0 = 3;
+        let root = translated_component(&records);
+        assert_eq!(
+            translated_composite_point_for_render(&root, 0, 800, |_| Some(&leaf)),
+            Err(CaretPointError::CompositeUnsupported)
+        );
+        let cycle = translated_component(&[(3, 1, 0, 0)]);
+        assert_eq!(
+            translated_composite_point_for_render(&cycle, 0, 800, |_| Some(&cycle)),
+            Err(CaretPointError::CompositeUnsupported)
+        );
+        let mut oversized = header(1);
+        oversized.extend_from_slice(&4096u16.to_be_bytes());
+        let root = translated_component(&[(3, 1, 0, 0)]);
+        assert_eq!(
+            translated_composite_point_for_render(&root, 0, 800, |_| Some(&oversized)),
+            Err(CaretPointError::CompositeUnsupported)
+        );
     }
 
     #[test]

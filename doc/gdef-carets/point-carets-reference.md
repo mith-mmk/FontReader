@@ -68,3 +68,17 @@ PYTHONDONTWRITEBYTECODE=1 python tools/compare_gdef_point_carets.py \
 No optional Python FreeType wrapper is required; the script binds installed
 FreeType and HarfBuzz C APIs with ctypes. The JSON is diagnostic evidence rather
 than a claim that the library under development already supports these cases.
+
+## Bounded translated-composite extension
+
+`point-carets-composite-reference-0.json` and `-1.json` query the new composite
+fixture's fi point 5 using the same FT setup. Face 0 has two translated children;
+face 1 adds a nested translation. Despite deliberately differing child LSBs,
+FT returns the flattened raw points (470,50) and (490,80), respectively: child
+metric-origin shifts must not be applied independently inside the parent.
+Root xMin equals root LSB in both cases. Horizontal queries are 470 and 490.
+Vertical origins are 775 and 805, so both TTB queries are -725 (y-down 725).
+These two positive oracle cases do not establish support for transforms,
+USE_MY_METRICS, point attachment, hinting, depth-limit violations or bad indices.
+Reproduce with `--fixture tests/fixtures/gdef-composite-carets.ttc --face 0 --glyph fi`
+(or `--face 1`) in the command above.

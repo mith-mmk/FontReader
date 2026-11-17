@@ -3319,7 +3319,7 @@ impl Font {
         } else {
             self.more_fonts[self.current_font - 1].hmtx.as_ref()
         }?;
-        hmtx.h_metrics.get(glyph_id)?;
+        let horizontal_metric = hmtx.h_metrics.get(glyph_id)?;
         if self.current_outline_format() != GlyphFormat::OpenTypeGlyph {
             return None;
         }
@@ -3340,16 +3340,44 @@ impl Font {
                 .checked_sub(i16::try_from(layout.descender).ok()?)?,
             FontLayout::Unknown => 0,
         };
-        let (x, y) = crate::opentype::outline::caret_points::simple_glyph_point_for_render(
-            data,
-            point.caret_value_point,
-            i32::from(baseline),
-        )
-        .ok()?;
+        let header = data.get(..10)?;
+        let composite = i16::from_be_bytes([header[0], header[1]]) < 0;
+        let (x, y) = if composite {
+            // Composite drawing still uses raw assembled coordinates. Only a
+            // zero root phantom-X offset is certified here; child bearings are
+            // deliberately NOT applied to component points independently.
+            let x_min = i16::from_be_bytes([header[2], header[3]]);
+            if horizontal_metric.left_side_bearing != x_min {
+                return None;
+            }
+            let glyf = self.current_glyf()?;
+            crate::opentype::outline::caret_points::translated_composite_point_for_render(
+                data,
+                point.caret_value_point,
+                i32::from(baseline),
+                |id| {
+                    let child = glyf.get_glyph(usize::from(id))?;
+                    child.glyphs.get(..child.length as usize)
+                },
+            )
+            .ok()?
+        } else {
+            crate::opentype::outline::caret_points::simple_glyph_point_for_render(
+                data,
+                point.caret_value_point,
+                i32::from(baseline),
+            )
+            .ok()?
+        };
         Some(if is_vertical {
             y as f32
         } else {
-            x as f32 + self.static_simple_metric_origin_x(glyph_id, raw)
+            x as f32
+                + if composite {
+                    0.0
+                } else {
+                    self.static_simple_metric_origin_x(glyph_id, raw)
+                }
         })
     }
 
@@ -6112,6 +6140,36 @@ mod authored_caret_plumbing_tests {
         let output = font.text2glyph_run_with_carets("fi", &options).unwrap();
         assert_eq!(output.ligature_carets, vec![None]);
         assert_eq!(output.run.glyphs.len(), 1);
+    }
+
+    #[test]
+    fn bounded_translated_composites_keep_component_order_and_raw_child_origins() {
+        let file = FontFile::from_buffer(include_bytes!(
+            "../tests/fixtures/gdef-composite-carets.ttc"
+        ))
+        .unwrap();
+        for index in 0..8 {
+            let face = file.face(index).unwrap();
+            for (direction, expected) in [
+                (TextDirection::LeftToRight, [470.0, 490.0]),
+                (TextDirection::RightToLeft, [430.0, 410.0]),
+                (TextDirection::TopToBottom, [725.0, 725.0]),
+            ] {
+                let options = FontOptions::new(&face)
+                    .with_font_size(1000.0)
+                    .with_text_direction(direction);
+                let out = face
+                    .font()
+                    .text2glyph_run_with_carets("fi", &options)
+                    .unwrap();
+                assert_eq!(out.run.glyphs.len(), 1);
+                if index < 2 {
+                    close(out.ligature_carets[0].as_ref().unwrap()[0], expected[index]);
+                } else {
+                    assert_eq!(out.ligature_carets, vec![None], "face {index}");
+                }
+            }
+        }
     }
 
     #[test]

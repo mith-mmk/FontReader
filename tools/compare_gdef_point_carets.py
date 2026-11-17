@@ -13,6 +13,8 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--fixture',required=True)
     p.add_argument('--output',required=True)
+    p.add_argument('--face',type=int,default=1)
+    p.add_argument('--glyph',action='append',help='known glyph name; defaults to fi and fl')
     a=p.parse_args()
     ft=C.CDLL(ctypes.util.find_library('freetype'))
     def bind(name,result,args):
@@ -24,11 +26,11 @@ def main():
     done_face=bind('FT_Done_Face',C.c_int,[ptr])
     done_lib=bind('FT_Done_FreeType',C.c_int,[ptr])
     assert init(C.byref(library))==0
-    assert new(library,a.fixture.encode(),1,C.byref(face))==0
+    assert new(library,a.fixture.encode(),a.face,C.byref(face))==0
     major,minor,patch=C.c_int(),C.c_int(),C.c_int()
     bind('FT_Library_Version',None,[ptr,C.POINTER(C.c_int),C.POINTER(C.c_int),C.POINTER(C.c_int)])(library,C.byref(major),C.byref(minor),C.byref(patch))
-    font=TTFont(a.fixture,fontNumber=1)
-    hb=HB(a.fixture,1,font['head'].unitsPerEm)
+    font=TTFont(a.fixture,fontNumber=a.face)
+    hb=HB(a.fixture,a.face,font['head'].unitsPerEm)
     ot_font=hb.font
     ft_font=hb.bind('hb_ft_font_create_referenced',ptr,[ptr])(face)
     assert ft_font
@@ -41,7 +43,7 @@ def main():
     try:
         for backend,handle in [('opentype_no_contour_callback',ot_font),('freetype_unhinted',ft_font)]:
             hb.font=handle
-            for name in ['fi','fl']:
+            for name in (a.glyph or ['fi','fl']):
                 # Obtain known glyph IDs from the fixture, not from alternate-direction shaping.
                 gid=font.getGlyphID(name)
                 records=caret_records(font,name)
@@ -52,7 +54,7 @@ def main():
                         supported=bool(hb.contour_point(handle,gid,i,C.byref(x),C.byref(y)))
                         ox,oy=C.c_int32(),C.c_int32()
                         origin_supported=bool(origin_point(handle,gid,i,code,C.byref(ox),C.byref(oy)))
-                        points.append(dict(index=i,raw_design_point=r['unhinted_contour_point'],
+                        points.append(dict(index=i,raw_design_point=r.get('unhinted_contour_point'),
                             callback_supported=supported,callback_point=[x.value,y.value] if supported else None,
                             origin_callback_supported=origin_supported,origin_point=[ox.value,oy.value] if origin_supported else None))
                     vx,vy=C.c_int32(),C.c_int32()
@@ -68,7 +70,7 @@ def main():
         done_face(face);done_lib(library);font.close()
     with open(a.output,'w') as f:
         json.dump(dict(harfbuzz_version=hb.version,freetype_version=f'{major.value}.{minor.value}.{patch.value}',
-            fixture_sha256=hashlib.sha256(open(a.fixture,'rb').read()).hexdigest(),face=1,
+            fixture_sha256=hashlib.sha256(open(a.fixture,'rb').read()).hexdigest(),face=a.face,
             ft_load_flags=flags,ft_load_flags_names=['NO_HINTING','NO_BITMAP'],scale=[1000,1000],
             scope='direct known fixture glyph queries; not text shaping equivalence; no product implementation compared',rows=rows),f,indent=2)
         f.write('\n')
