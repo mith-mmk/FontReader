@@ -1,0 +1,20 @@
+{
+  "renderer": "CairoSVG",
+  "version": "2.9.1",
+  "pixels": [
+    256,
+    256
+  ],
+  "results": [
+    {
+      "fixture": "noto",
+      "identical_rgba": true,
+      "nonempty": true
+    },
+    {
+      "fixture": "twemoji",
+      "identical_rgba": true,
+      "nonempty": true
+    }
+  ]
+}

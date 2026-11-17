@@ -222,6 +222,10 @@ fn decompress_gzip(document: &[u8], max_output: usize) -> Option<Vec<u8>> {
         cursor += 1;
     }
     if flags & 0x02 != 0 {
+        let expected = u16::from_le_bytes([*document.get(cursor)?, *document.get(cursor + 1)?]);
+        if crc32(document.get(..cursor)?) as u16 != expected {
+            return None;
+        }
         cursor += 2;
     }
 
@@ -570,6 +574,23 @@ mod tests {
         assert!(validated_fragment("<path\nonload = \"alert(1)\"/>").is_none());
         assert!(validated_fragment("<use href = \" javascript:alert(1)\"/>").is_none());
         assert!(validated_fragment("<style>@import url(https://example.test);</style>").is_none());
+    }
+
+    #[test]
+    fn gzip_header_and_payload_checksums_are_verified() {
+        let source = b"<svg><g id='glyph1'/></svg>";
+        let mut gzip = vec![0x1f, 0x8b, 8, 2, 0, 0, 0, 0, 0, 0];
+        gzip.extend((crc32(&gzip) as u16).to_le_bytes());
+        gzip.extend(miniz_oxide::deflate::compress_to_vec(source, 6));
+        gzip.extend(crc32(source).to_le_bytes());
+        gzip.extend((source.len() as u32).to_le_bytes());
+        assert!(decode_svg_document(&gzip, 1024).is_some());
+        gzip[10] ^= 1;
+        assert!(decode_svg_document(&gzip, 1024).is_none());
+        gzip[10] ^= 1;
+        let trailer = gzip.len() - 8;
+        gzip[trailer] ^= 1;
+        assert!(decode_svg_document(&gzip, 1024).is_none());
     }
 
     #[test]

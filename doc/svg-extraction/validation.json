@@ -1,0 +1,35 @@
+{
+  "rust": "1.91.0",
+  "checks": {
+    "nodefaultfeatures": {
+      "passed": 325,
+      "failed": 0,
+      "ignored": 2
+    },
+    "default": {
+      "passed": 562,
+      "failed": 0,
+      "ignored": 3
+    },
+    "featureslayoutcff": {
+      "passed": 562,
+      "failed": 0,
+      "ignored": 3
+    },
+    "allfeatures": {
+      "passed": 681,
+      "failed": 0,
+      "ignored": 3
+    }
+  },
+  "clippy_all_targets_all_features": "passed",
+  "examples_all_features": "passed",
+  "doc_all_features": "passed",
+  "wasm32_unknown_unknown_all_features": "passed",
+  "twemoji_15_1_0": {
+    "font_sha256": "42d4b2a827c9ed557dff88c2f4723cb93985003a81dee76797324d66d04a57b8",
+    "accepted": 3838,
+    "rejected": 0
+  },
+  "rendering": "see pixel-check.json; paintcore not tested"
+}

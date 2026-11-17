@@ -156,7 +156,7 @@ pub(crate) fn svg_requires_svg_fallback(document: &str) -> bool {
     let lowered = document.to_ascii_lowercase();
     // Extraction now preserves viewport and compositing information which the
     // path subset cannot faithfully represent. Keep the source alternative.
-    lowered.contains("viewbox=")
+    svg_viewports_require_fallback(document)
         || lowered.contains("opacity")
         || lowered.contains("display")
         || lowered.contains("visibility")
@@ -173,6 +173,53 @@ pub(crate) fn svg_requires_svg_fallback(document: &str) -> bool {
         || lowered.contains("filter=\"")
         || lowered.contains("mask=\"")
         || lowered.contains("mask:")
+}
+
+// The existing path subset treats svg as a group. Only identity viewports may
+// use that shortcut; preserve non-identity viewport semantics in the SVG layer.
+fn svg_viewports_require_fallback(document: &str) -> bool {
+    let Ok(root) = parse_svg_document(document) else {
+        return true;
+    };
+    let mut pending = vec![&root];
+    while let Some(node) = pending.pop() {
+        let SvgNode::Element(element) = node else {
+            continue;
+        };
+        if element.name == "svg" {
+            for key in ["x", "y"] {
+                if element.attrs.get(key).is_some_and(|v| v.trim() != "0") {
+                    return true;
+                }
+            }
+            if let Some(viewbox) = element.attrs.get("viewbox") {
+                let values: Vec<_> = viewbox
+                    .split(|c: char| c.is_ascii_whitespace() || c == ',')
+                    .filter(|s| !s.is_empty())
+                    .map(str::parse::<f32>)
+                    .collect();
+                let width = element
+                    .attrs
+                    .get("width")
+                    .and_then(|v| v.parse::<f32>().ok());
+                let height = element
+                    .attrs
+                    .get("height")
+                    .and_then(|v| v.parse::<f32>().ok());
+                if values.len() != 4
+                    || values.iter().any(Result::is_err)
+                    || values[0] != Ok(0.0)
+                    || values[1] != Ok(0.0)
+                    || values[2].as_ref().ok().copied() != width
+                    || values[3].as_ref().ok().copied() != height
+                {
+                    return true;
+                }
+            }
+        }
+        pending.extend(&element.children);
+    }
+    false
 }
 
 fn parse_svg_document(document: &str) -> Result<SvgNode, ()> {
@@ -2325,6 +2372,22 @@ mod tests {
             matches!(layers[0].commands.last(), Some(Command::CubicBezier(_, _, (x, y))) if (*x - 20.0).abs() < 0.01 && (*y - 20.0).abs() < 0.01),
             "expected relative arc to end at the translated target"
         );
+    }
+
+    #[test]
+    fn svg_viewport_fallback_distinguishes_identity_from_transform() {
+        assert!(!svg_requires_svg_fallback(
+            "<svg width='1000' height='1000' viewBox='0 0 1000 1000'><path/></svg>"
+        ));
+        assert!(svg_requires_svg_fallback(
+            "<svg width='1000' height='1000' viewBox='0 -800 1000 1000'><path/></svg>"
+        ));
+        assert!(svg_requires_svg_fallback(
+            "<svg width='1000' height='1000' viewBox='0 0 100 100'><path/></svg>"
+        ));
+        assert!(svg_requires_svg_fallback(
+            "<svg><g opacity='.5'><path/></g></svg>"
+        ));
     }
 
     #[test]

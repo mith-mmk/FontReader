@@ -287,6 +287,9 @@ fn validate(nodes: &[Node], i: usize) -> Option<Vec<String>> {
             if !matches!(value.as_str(), SVG_NS | XLINK_NS | XML_NS) {
                 return None;
             }
+            if name == "xmlns:xmlns" || (name != "xmlns:xml" && value == XML_NS) {
+                return None;
+            }
             if name == "xmlns:xml" && value != XML_NS {
                 return None;
             }
