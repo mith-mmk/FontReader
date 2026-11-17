@@ -81,3 +81,19 @@ The pixel oracle requires CairoSVG and Pillow and compares all RGBA channels at
 256×256. Both included real examples match their source with OpenType root
 viewport normalization exactly (`pixel-check.json`). This validates extraction,
 **not paintcore rendering** or conformance across all SVG features/fonts.
+
+## Partial path conversion follow-up
+
+The paintcore integration probe found that the existing path subset converted
+only one shape of the Noto example and silently discarded unsupported path
+commands in siblings. Path conversion is now atomic for reported geometry,
+use-reference, element, and unresolved-paint failures: any such failure discards
+all tentative paths and returns the complete raw SVG alternative. Valid
+fully-converted glyphs retain their existing Path result. Intentionally empty
+paint (`none`) is not treated as an unknown paint.
+
+The Noto example now produces a raw SVG layer, not a partial face. This is a
+safety correction, **not** implementation of its unsupported path commands.
+paintcore's raw-SVG route remains unimplemented; its coordinated fail-closed
+change must return Unsupported without painting any partial glyph. This does
+not claim a complete semantic audit of all older gradient/clip/path parsing.

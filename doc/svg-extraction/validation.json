@@ -31,5 +31,12 @@
     "accepted": 3838,
     "rejected": 0
   },
-  "rendering": "see pixel-check.json; paintcore not tested"
+  "rendering": "see pixel-check.json; paintcore not tested",
+  "partial_path_followup": {
+    "all_features_passed": 683,
+    "failed": 0,
+    "ignored": 3,
+    "clippy": "passed",
+    "noto": "raw SVG only; no partial Paths"
+  }
 }

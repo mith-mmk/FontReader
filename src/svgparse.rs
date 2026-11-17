@@ -148,7 +148,10 @@ pub(crate) fn svg_to_path_layers(
 
     let mut layers = Vec::new();
     let state = RenderState::default();
-    flatten_node(&root, &defs, &state, scale_x, scale_y, &mut layers);
+    // A glyph is atomic: never report only the successfully converted shapes.
+    if flatten_node(&root, &defs, &state, scale_x, scale_y, &mut layers).is_err() {
+        return Vec::new();
+    }
     layers
 }
 
@@ -345,20 +348,20 @@ fn flatten_node(
     scale_x: f32,
     scale_y: f32,
     out: &mut Vec<PathGlyphLayer>,
-) {
+) -> Result<(), ()> {
     let SvgNode::Element(element) = node else {
-        return;
+        return Ok(());
     };
 
     if element.name == "#document" {
         for child in &element.children {
-            flatten_node(child, defs, state, scale_x, scale_y, out);
+            flatten_node(child, defs, state, scale_x, scale_y, out)?;
         }
-        return;
+        return Ok(());
     }
 
     if element.name == "defs" {
-        return;
+        return Ok(());
     }
 
     let style = element.attrs.get("style").map(|value| parse_style(value));
@@ -384,6 +387,18 @@ fn flatten_node(
         scale_x,
         scale_y,
     );
+    // Unknown paints must not silently erase a shape while siblings survive.
+    for (key, paint) in [("fill", &local_fill), ("stroke", &local_stroke)] {
+        let explicit = style
+            .as_ref()
+            .and_then(|style| style.get(key))
+            .or_else(|| element.attrs.get(key));
+        if explicit.is_some_and(|value| !value.trim().eq_ignore_ascii_case("none"))
+            && paint.is_none()
+        {
+            return Err(());
+        }
+    }
     let local_stroke_width = style
         .as_ref()
         .and_then(|style| style.get("stroke-width"))
@@ -427,20 +442,17 @@ fn flatten_node(
     match element.name.as_str() {
         "svg" | "g" | "symbol" => {
             for child in &element.children {
-                flatten_node(child, defs, &next_state, scale_x, scale_y, out);
+                flatten_node(child, defs, &next_state, scale_x, scale_y, out)?;
             }
         }
-        "use" => flatten_use(element, defs, next_state, scale_x, scale_y, out),
+        "use" => flatten_use(element, defs, next_state, scale_x, scale_y, out)?,
         "path" | "rect" | "circle" | "ellipse" | "line" | "polyline" | "polygon" => {
-            out.extend(element_to_path_layers(
-                element,
-                &next_state,
-                scale_x,
-                scale_y,
-            ));
+            out.extend(element_to_path_layers(element, &next_state, scale_x, scale_y).ok_or(())?);
         }
-        _ => {}
+        "lineargradient" | "radialgradient" | "stop" | "clippath" | "mask" => {}
+        _ => return Err(()),
     }
+    Ok(())
 }
 
 fn flatten_use(
@@ -450,17 +462,17 @@ fn flatten_use(
     scale_x: f32,
     scale_y: f32,
     out: &mut Vec<PathGlyphLayer>,
-) {
+) -> Result<(), ()> {
     let Some(reference) = element
         .attrs
         .get("href")
         .or_else(|| element.attrs.get("xlink:href"))
         .and_then(|value| value.strip_prefix('#'))
     else {
-        return;
+        return Err(());
     };
     let Some(referenced) = defs.get(reference) else {
-        return;
+        return Err(());
     };
     let mut referenced = referenced.clone();
     for key in ["fill", "fill-rule", "stroke", "stroke-width"] {
@@ -488,7 +500,7 @@ fn flatten_use(
         scale_x,
         scale_y,
         out,
-    );
+    )
 }
 
 fn element_to_path_layers(
@@ -496,7 +508,7 @@ fn element_to_path_layers(
     state: &RenderState,
     scale_x: f32,
     scale_y: f32,
-) -> Vec<PathGlyphLayer> {
+) -> Option<Vec<PathGlyphLayer>> {
     let commands = match element.name.as_str() {
         "path" => element
             .attrs
@@ -508,13 +520,11 @@ fn element_to_path_layers(
         "line" => line_to_commands(&element.attrs, scale_x, scale_y),
         "polyline" => poly_points_to_commands(&element.attrs, false, scale_x, scale_y),
         "polygon" => poly_points_to_commands(&element.attrs, true, scale_x, scale_y),
-        _ => return Vec::new(),
+        _ => return None,
     };
-    let Some(commands) = commands else {
-        return Vec::new();
-    };
+    let commands = commands?;
     if commands.is_empty() {
-        return Vec::new();
+        return Some(Vec::new());
     }
     let transformed = transform_commands(&commands, state.transform);
     let bounds = command_bounds(&transformed);
@@ -555,7 +565,7 @@ fn element_to_path_layers(
         }
     }
 
-    layers
+    Some(layers)
 }
 
 fn resolve_gradient_paint(
@@ -2371,6 +2381,38 @@ mod tests {
         assert!(
             matches!(layers[0].commands.last(), Some(Command::CubicBezier(_, _, (x, y))) if (*x - 20.0).abs() < 0.01 && (*y - 20.0).abs() < 0.01),
             "expected relative arc to end at the translated target"
+        );
+    }
+
+    #[test]
+    fn partial_shape_conversion_never_returns_partial_glyph() {
+        let valid = "<path d='M0 0L10 10Z' fill='#ff0000'/>";
+        let invalid = "<path d='M0 0C1 2' fill='#0000ff'/>";
+        assert!(!svg_to_path_layers(&format!("<svg>{valid}</svg>"), 1.0, 1.0).is_empty());
+        for body in [
+            format!("{valid}{invalid}"),
+            format!("{invalid}{valid}"),
+            format!("{valid}<path d='M0 0L10 10Z' fill='burlywood'/>"),
+            format!("{valid}<use href='#missing'/>"),
+            format!("<defs><g id='p'>{valid}{invalid}</g></defs><use href='#p'/>"),
+        ] {
+            assert!(svg_to_path_layers(&format!("<svg>{body}</svg>"), 1.0, 1.0).is_empty());
+        }
+    }
+
+    #[test]
+    fn real_noto_partial_pathification_preserves_raw_document() {
+        let payload = include_str!("../doc/svg-extraction/examples/noto-smile.svg").to_string();
+        let document = crate::opentype::color::svg::SvgGlyphDocument {
+            payload: payload.clone(),
+            view_box_min_x: 0.0,
+            view_box_min_y: 0.0,
+            view_box_width: 128.0,
+            view_box_height: 128.0,
+        };
+        let layers = crate::fontreader::svg_document_to_glyph_layers(&document, 1.0, 1.0);
+        assert!(
+            matches!(layers.as_slice(), [crate::GlyphLayer::Svg(svg)] if svg.document == payload)
         );
     }
 
