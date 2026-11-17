@@ -1,6 +1,28 @@
 # GDEF caret reference checks
 
-## Current comparison: actual-direction shaping
+## Implementation stages after the baseline comparison
+
+The bounded static/simple TrueType drawable-origin correction is recorded in
+[bearing-fix-realfonts.md](bearing-fix-realfonts.md). Format 2 now resolves real
+unhinted contour points for static simple monochrome TrueType glyphs; see the
+independent [HarfBuzz + FreeType oracle](point-carets-reference.md). Raw X points
+are converted to metric-origin coordinates. Off-curve real points count, but
+implicit curve midpoints and phantom points do not. Composite, variable and COLR
+point resolution stays unsupported. At most 16 Format 2 records per glyph are
+resolved; larger lists fall back to bound repeated point-decoding work. The legacy `CaretQuality` remains unchanged;
+`source()` reports authored adoption versus explicit approximation.
+
+Device deltas remain unsupported because the API has no device ppem context.
+VariationIndex needs a bounded, strict GDEF ItemVariationStore resolver before
+variable-face fallback can be relaxed. Existing tolerant variation-store helpers
+must not turn malformed indices into apparently valid zero adjustments. See
+[remaining implementation boundaries](remaining-scope.md) for the code-level
+prerequisites and the separate RTL contract investigation.
+
+The JSON snapshots below predate these follow-up implementation stages. Preserve
+their observed exclusions rather than retroactively counting them as successes.
+
+## Baseline comparison: actual-direction shaping
 
 `actual-direction-comparison.json` (schema 2) queries GDEF on glyphs that
 HarfBuzz actually shapes in the requested direction. It never substitutes an

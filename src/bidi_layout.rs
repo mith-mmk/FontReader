@@ -925,4 +925,24 @@ mod tests {
             CaretSource::FontAuthored
         );
     }
+    #[cfg(feature = "layout")]
+    #[test]
+    fn paragraph_keeps_format_two_point_carets_in_global_run_coordinates() {
+        let file =
+            FontFile::from_buffer(include_bytes!("../tests/fixtures/gdef-carets.ttc")).unwrap();
+        let face = file.face(1).unwrap();
+        let engine = face.engine().with_font_size(1000.0);
+        let layout =
+            BidiParagraphLayout::shape(&engine, "fifl", BidiBaseDirection::LeftToRight).unwrap();
+        for (byte, x) in [(1, 280.0), (3, 1730.0)] {
+            let caret = layout
+                .caret_positions(position(byte, CaretAffinity::Downstream))
+                .unwrap()[0];
+            assert_eq!(caret.x(), x);
+            assert_eq!(caret.source(), CaretSource::FontAuthored);
+            let hit = layout.hit_test(x, 0.0).unwrap();
+            assert_eq!(hit.text_position().byte_offset(), byte);
+            assert_eq!(hit.source(), CaretSource::FontAuthored);
+        }
+    }
 }

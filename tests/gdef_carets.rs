@@ -10,7 +10,7 @@ fn pos(byte: usize) -> TextPosition {
     TextPosition::new(byte, CaretAffinity::Downstream)
 }
 
-fn check_fallback_metadata(mapped: &ShapedText) {
+fn check_fallback_metadata(mapped: &ShapedText, expected_caret: f32) {
     assert_eq!(mapped.text(), "\u{308}fiB");
     assert_eq!(mapped.glyph_sources().len(), 3);
     assert_eq!(mapped.glyph_sources()[0].face_index(), 0);
@@ -19,15 +19,15 @@ fn check_fallback_metadata(mapped: &ShapedText) {
     assert_eq!(mapped.glyph_sources()[2].byte_range(), 4..5);
     assert_eq!(
         mapped.glyph_ligature_carets(),
-        &[None, Some(vec![220.0]), None]
+        &[None, Some(vec![expected_caret]), None]
     );
     let layout = CaretLayout::new(mapped).unwrap();
     let internal = layout.caret_positions(pos(3)).unwrap()[0];
-    assert_eq!(internal.x(), 220.0); // Primary's standalone combining mark has zero advance.
+    assert_eq!(internal.x(), expected_caret); // Primary's standalone combining mark has zero advance.
     assert_eq!(internal.source(), CaretSource::FontAuthored);
     assert_eq!(internal.quality(), CaretQuality::Approximate); // Legacy enum stays conservative.
     assert_eq!(
-        layout.hit_test(220.0, 0.0).unwrap().source(),
+        layout.hit_test(expected_caret, 0.0).unwrap().source(),
         CaretSource::FontAuthored
     );
     assert_eq!(
@@ -46,7 +46,7 @@ fn family_fallback_preserves_authored_carets_and_global_mapping() {
     family.add_face(FontFaceDescriptor::new("Fallback"), gdef.face(0).unwrap());
     let options = family.options().with_font_size(1000.0);
     let mapped = family.shape_mapped("\u{308}fiB", options.clone()).unwrap();
-    check_fallback_metadata(&mapped);
+    check_fallback_metadata(&mapped, 220.0);
     assert_eq!(
         format!("{:?}", mapped.glyph_run()),
         format!(
@@ -66,7 +66,7 @@ fn composite_fallback_preserves_authored_carets_and_global_mapping() {
         .unwrap()
         .with_font_size(1000.0);
     let mapped = composite.shape_mapped_ltr("\u{308}fiB").unwrap();
-    check_fallback_metadata(&mapped);
+    check_fallback_metadata(&mapped, 220.0);
     assert_eq!(
         format!("{:?}", mapped.glyph_run()),
         format!("{:?}", composite.shape_ltr("\u{308}fiB").unwrap())
@@ -130,5 +130,57 @@ fn mixed_vertical_wrappers_transform_authored_carets_without_losing_source() {
         let hit = layout.hit_test(caret.x(), caret.y()).unwrap();
         assert_eq!(hit.text_position().byte_offset(), byte);
         assert_eq!(hit.source(), CaretSource::FontAuthored);
+    }
+}
+
+#[test]
+fn format_two_survives_family_and_composite_fallback() {
+    let gdef = FontFile::from_buffer(GDEF).unwrap();
+    let other = FontFile::from_buffer(FALLBACK).unwrap();
+    let primary = other.face(2).unwrap();
+    let fallback = gdef.face(1).unwrap();
+    let mut family = FontFamily::new("Primary");
+    family.add_face(FontFaceDescriptor::new("Primary"), primary.clone());
+    family.add_face(FontFaceDescriptor::new("Fallback"), fallback.clone());
+    let mapped = family
+        .shape_mapped("\u{308}fiB", family.options().with_font_size(1000.0))
+        .unwrap();
+    check_fallback_metadata(&mapped, 280.0);
+    let composite = CompositeFont::new(vec![&primary, &fallback])
+        .unwrap()
+        .with_font_size(1000.0);
+    check_fallback_metadata(&composite.shape_mapped_ltr("\u{308}fiB").unwrap(), 280.0);
+}
+
+#[test]
+fn format_two_survives_hard_lines_and_sideways_group_transforms() {
+    let file = FontFile::from_buffer(GDEF).unwrap();
+    let face = file.face(1).unwrap();
+    let engine = face
+        .engine()
+        .with_font_size(1000.0)
+        .with_line_height(1200.0);
+    let lines = HardLineLayout::shape(&engine, "fi\r\nfl").unwrap();
+    for (byte, x, y) in [(1, 280.0, 0.0), (5, 830.0, 1200.0)] {
+        let caret = lines.caret_positions(pos(byte)).unwrap()[0];
+        assert_eq!((caret.x(), caret.y()), (x, y));
+        assert_eq!(caret.source(), CaretSource::FontAuthored);
+        assert_eq!(
+            lines.hit_test(x, y).unwrap().source(),
+            CaretSource::FontAuthored
+        );
+    }
+    let vertical = engine
+        .shape_vertical_mixed_ltr_mapped("fi\u{3000}fl")
+        .unwrap();
+    for (group, byte, point) in [(0, 1, 280.0), (2, 6, 830.0)] {
+        let expected = vertical.groups()[group].transform_point(point, 0.0);
+        let caret = vertical.caret_positions(pos(byte)).unwrap()[0];
+        assert_eq!((caret.x(), caret.y()), expected);
+        assert_eq!(caret.source(), CaretSource::FontAuthored);
+        assert_eq!(
+            vertical.hit_test(caret.x(), caret.y()).unwrap().source(),
+            CaretSource::FontAuthored
+        );
     }
 }

@@ -34,8 +34,9 @@ change kerning, joining, and ligatures. Caret geometry must use the shaped run.
 
 Mapped results expose optional font-authored ligature caret candidates through
 `glyph_ligature_carets()`. Static GDEF Format 1 and Format 3 without adjustment
-are supported; contour points, Device/VariationIndex and variable faces fall
-back conservatively. Layout adopts candidates only with unambiguous single-glyph
+are supported. Format 2 resolves real points only for unhinted static simple
+monochrome TrueType outlines. Composite/variable/COLR point resolution and
+Device/VariationIndex adjustments fall back conservatively. Layout adopts candidates only with unambiguous single-glyph
 ownership, matching EGC count, and finite strictly interior ordered positions.
 `CaretSource::FontAuthored` distinguishes adoption from `Approximate` fallback.
 The legacy `CaretQuality` remains conservative and unchanged for compatibility.

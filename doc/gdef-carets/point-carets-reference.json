@@ -1,0 +1,394 @@
+{
+  "harfbuzz_version": "10.2.0",
+  "freetype_version": "2.13.3",
+  "fixture_sha256": "313d2439d4ffefffb38ea5e006d7202785d2154eab7d164ec9e45e199c371c1c",
+  "face": 1,
+  "ft_load_flags": 10,
+  "ft_load_flags_names": [
+    "NO_HINTING",
+    "NO_BITMAP"
+  ],
+  "scale": [
+    1000,
+    1000
+  ],
+  "scope": "direct known fixture glyph queries; not text shaping equivalence; no product implementation compared",
+  "rows": [
+    {
+      "backend": "opentype_no_contour_callback",
+      "glyph": "fi",
+      "glyph_id": 6,
+      "direction": "ltr",
+      "points": [
+        {
+          "index": 1,
+          "raw_design_point": [
+            300,
+            0
+          ],
+          "callback_supported": false,
+          "callback_point": null,
+          "origin_callback_supported": false,
+          "origin_point": null
+        }
+      ],
+      "vertical_origin": [
+        450,
+        750
+      ],
+      "gdef_query": [
+        0
+      ],
+      "classification": "unsupported_callback_not_a_zero_coordinate",
+      "ttb_pen_distance": null
+    },
+    {
+      "backend": "opentype_no_contour_callback",
+      "glyph": "fi",
+      "glyph_id": 6,
+      "direction": "rtl",
+      "points": [
+        {
+          "index": 1,
+          "raw_design_point": [
+            300,
+            0
+          ],
+          "callback_supported": false,
+          "callback_point": null,
+          "origin_callback_supported": false,
+          "origin_point": null
+        }
+      ],
+      "vertical_origin": [
+        450,
+        750
+      ],
+      "gdef_query": [
+        0
+      ],
+      "classification": "unsupported_callback_not_a_zero_coordinate",
+      "ttb_pen_distance": null
+    },
+    {
+      "backend": "opentype_no_contour_callback",
+      "glyph": "fi",
+      "glyph_id": 6,
+      "direction": "ttb",
+      "points": [
+        {
+          "index": 1,
+          "raw_design_point": [
+            300,
+            0
+          ],
+          "callback_supported": false,
+          "callback_point": null,
+          "origin_callback_supported": false,
+          "origin_point": null
+        }
+      ],
+      "vertical_origin": [
+        450,
+        750
+      ],
+      "gdef_query": [
+        0
+      ],
+      "classification": "unsupported_callback_not_a_zero_coordinate",
+      "ttb_pen_distance": null
+    },
+    {
+      "backend": "opentype_no_contour_callback",
+      "glyph": "fl",
+      "glyph_id": 7,
+      "direction": "ltr",
+      "points": [
+        {
+          "index": 2,
+          "raw_design_point": [
+            850,
+            500
+          ],
+          "callback_supported": false,
+          "callback_point": null,
+          "origin_callback_supported": false,
+          "origin_point": null
+        }
+      ],
+      "vertical_origin": [
+        550,
+        750
+      ],
+      "gdef_query": [
+        0
+      ],
+      "classification": "unsupported_callback_not_a_zero_coordinate",
+      "ttb_pen_distance": null
+    },
+    {
+      "backend": "opentype_no_contour_callback",
+      "glyph": "fl",
+      "glyph_id": 7,
+      "direction": "rtl",
+      "points": [
+        {
+          "index": 2,
+          "raw_design_point": [
+            850,
+            500
+          ],
+          "callback_supported": false,
+          "callback_point": null,
+          "origin_callback_supported": false,
+          "origin_point": null
+        }
+      ],
+      "vertical_origin": [
+        550,
+        750
+      ],
+      "gdef_query": [
+        0
+      ],
+      "classification": "unsupported_callback_not_a_zero_coordinate",
+      "ttb_pen_distance": null
+    },
+    {
+      "backend": "opentype_no_contour_callback",
+      "glyph": "fl",
+      "glyph_id": 7,
+      "direction": "ttb",
+      "points": [
+        {
+          "index": 2,
+          "raw_design_point": [
+            850,
+            500
+          ],
+          "callback_supported": false,
+          "callback_point": null,
+          "origin_callback_supported": false,
+          "origin_point": null
+        }
+      ],
+      "vertical_origin": [
+        550,
+        750
+      ],
+      "gdef_query": [
+        0
+      ],
+      "classification": "unsupported_callback_not_a_zero_coordinate",
+      "ttb_pen_distance": null
+    },
+    {
+      "backend": "freetype_unhinted",
+      "glyph": "fi",
+      "glyph_id": 6,
+      "direction": "ltr",
+      "points": [
+        {
+          "index": 1,
+          "raw_design_point": [
+            300,
+            0
+          ],
+          "callback_supported": true,
+          "callback_point": [
+            280,
+            0
+          ],
+          "origin_callback_supported": true,
+          "origin_point": [
+            280,
+            0
+          ]
+        }
+      ],
+      "vertical_origin": [
+        450,
+        750
+      ],
+      "gdef_query": [
+        280
+      ],
+      "classification": "supported_reference",
+      "ttb_pen_distance": null
+    },
+    {
+      "backend": "freetype_unhinted",
+      "glyph": "fi",
+      "glyph_id": 6,
+      "direction": "rtl",
+      "points": [
+        {
+          "index": 1,
+          "raw_design_point": [
+            300,
+            0
+          ],
+          "callback_supported": true,
+          "callback_point": [
+            280,
+            0
+          ],
+          "origin_callback_supported": true,
+          "origin_point": [
+            280,
+            0
+          ]
+        }
+      ],
+      "vertical_origin": [
+        450,
+        750
+      ],
+      "gdef_query": [
+        280
+      ],
+      "classification": "supported_reference",
+      "ttb_pen_distance": null
+    },
+    {
+      "backend": "freetype_unhinted",
+      "glyph": "fi",
+      "glyph_id": 6,
+      "direction": "ttb",
+      "points": [
+        {
+          "index": 1,
+          "raw_design_point": [
+            300,
+            0
+          ],
+          "callback_supported": true,
+          "callback_point": [
+            280,
+            0
+          ],
+          "origin_callback_supported": true,
+          "origin_point": [
+            -170,
+            -750
+          ]
+        }
+      ],
+      "vertical_origin": [
+        450,
+        750
+      ],
+      "gdef_query": [
+        -750
+      ],
+      "classification": "supported_reference",
+      "ttb_pen_distance": [
+        750
+      ]
+    },
+    {
+      "backend": "freetype_unhinted",
+      "glyph": "fl",
+      "glyph_id": 7,
+      "direction": "ltr",
+      "points": [
+        {
+          "index": 2,
+          "raw_design_point": [
+            850,
+            500
+          ],
+          "callback_supported": true,
+          "callback_point": [
+            830,
+            500
+          ],
+          "origin_callback_supported": true,
+          "origin_point": [
+            830,
+            500
+          ]
+        }
+      ],
+      "vertical_origin": [
+        550,
+        750
+      ],
+      "gdef_query": [
+        830
+      ],
+      "classification": "supported_reference",
+      "ttb_pen_distance": null
+    },
+    {
+      "backend": "freetype_unhinted",
+      "glyph": "fl",
+      "glyph_id": 7,
+      "direction": "rtl",
+      "points": [
+        {
+          "index": 2,
+          "raw_design_point": [
+            850,
+            500
+          ],
+          "callback_supported": true,
+          "callback_point": [
+            830,
+            500
+          ],
+          "origin_callback_supported": true,
+          "origin_point": [
+            830,
+            500
+          ]
+        }
+      ],
+      "vertical_origin": [
+        550,
+        750
+      ],
+      "gdef_query": [
+        830
+      ],
+      "classification": "supported_reference",
+      "ttb_pen_distance": null
+    },
+    {
+      "backend": "freetype_unhinted",
+      "glyph": "fl",
+      "glyph_id": 7,
+      "direction": "ttb",
+      "points": [
+        {
+          "index": 2,
+          "raw_design_point": [
+            850,
+            500
+          ],
+          "callback_supported": true,
+          "callback_point": [
+            830,
+            500
+          ],
+          "origin_callback_supported": true,
+          "origin_point": [
+            280,
+            -250
+          ]
+        }
+      ],
+      "vertical_origin": [
+        550,
+        750
+      ],
+      "gdef_query": [
+        -250
+      ],
+      "classification": "supported_reference",
+      "ttb_pen_distance": [
+        250
+      ]
+    }
+  ]
+}

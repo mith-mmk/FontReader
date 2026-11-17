@@ -729,7 +729,7 @@ mod tests {
             );
             assert_eq!(caret.quality(), CaretQuality::Approximate);
         }
-        for index in 1..6 {
+        for index in 2..6 {
             let face = file.face(index).unwrap();
             let mapped = face
                 .engine()
@@ -742,6 +742,50 @@ mod tests {
                 .unwrap()[0];
             assert_eq!(caret.source(), CaretSource::Approximate, "face {index}");
             assert_eq!(caret.x(), 450.0, "face {index}");
+        }
+    }
+    #[cfg(feature = "layout")]
+    #[test]
+    fn static_format_two_uses_real_points_and_axis_specific_metric_origins() {
+        let file =
+            FontFile::from_buffer(include_bytes!("../tests/fixtures/gdef-carets.ttc")).unwrap();
+        let face = file.face(1).unwrap();
+        for (text, ltr, rtl, ttb) in [("fi", 280.0, -620.0, 750.0), ("fl", 830.0, -270.0, 250.0)] {
+            for (direction, expected) in [
+                (TextDirection::LeftToRight, ltr),
+                (TextDirection::RightToLeft, rtl),
+                (TextDirection::TopToBottom, ttb),
+            ] {
+                let options = face
+                    .engine()
+                    .options()
+                    .with_font_size(1000.0)
+                    .with_text_direction(direction);
+                let mapped = face
+                    .engine()
+                    .with_options(options)
+                    .shape_mapped(text)
+                    .unwrap();
+                let caret = CaretLayout::new(&mapped)
+                    .unwrap()
+                    .caret_positions(TextPosition::new(1, CaretAffinity::Downstream))
+                    .unwrap()[0];
+                assert_eq!(
+                    caret.source(),
+                    CaretSource::FontAuthored,
+                    "{text} {direction:?}"
+                );
+                assert_eq!(caret.quality(), CaretQuality::Approximate);
+                assert_eq!(
+                    if direction == TextDirection::TopToBottom {
+                        caret.y()
+                    } else {
+                        caret.x()
+                    },
+                    expected,
+                    "{text} {direction:?}"
+                );
+            }
         }
     }
 }
