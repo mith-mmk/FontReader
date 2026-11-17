@@ -16,6 +16,9 @@ pub(crate) struct Gdef {
     pub(crate) mark_glyph_sets_def: Option<MarkGlyphSetsDef>,
     // 1.3
     pub(crate) item_var_store_offset: Option<u32>,
+    pub(crate) caret_variation_store: Option<
+        Result<super::gdef_variation::CaretVariationStore, super::gdef_variation::VariationError>,
+    >,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -103,6 +106,30 @@ impl Gdef {
             None
         };
 
+        // Optional malformed variation data must not disable legacy shaping.
+        // Preserve a typed failure; never reinterpret it as a valid zero delta.
+        let caret_variation_store = (_item_var_store_offset != 0).then(|| {
+            use super::gdef_variation::{CaretVariationStore, VariationError, MAX_STORE_BYTES};
+            let relative =
+                usize::try_from(_item_var_store_offset).map_err(|_| VariationError::Malformed)?;
+            let remaining = length
+                .checked_sub(relative)
+                .ok_or(VariationError::Malformed)?;
+            if remaining > MAX_STORE_BYTES {
+                return Err(VariationError::ResourceLimit);
+            }
+            let start = bounds
+                .relative(offset, u64::from(_item_var_store_offset), 18, 8)
+                .map_err(|_| VariationError::Malformed)?;
+            reader
+                .seek(SeekFrom::Start(start))
+                .map_err(|_| VariationError::Malformed)?;
+            let data = reader
+                .read_bytes_as_vec(remaining)
+                .map_err(|_| VariationError::Malformed)?;
+            CaretVariationStore::parse(&data)
+        });
+
         Ok(Gdef {
             major_versionn,
             minor_version,
@@ -112,7 +139,40 @@ impl Gdef {
             mark_attach_class_def,
             mark_glyph_sets_def,
             item_var_store_offset: (_item_var_store_offset != 0).then_some(_item_var_store_offset),
+            caret_variation_store,
         })
+    }
+
+    /// Normalized coordinates must include the caller's validated fvar/avar
+    /// mapping. Point carets and device-pixel adjustments remain separate paths.
+    pub(crate) fn caret_coordinate(
+        &self,
+        value: &CaretValue,
+        coordinates: &[f32],
+    ) -> Result<f32, UnsupportedCaret> {
+        if let CaretValue::Format3(value) = value {
+            if let Some(index) = value.device_table.as_ref().and_then(|d| d.variation_index) {
+                let store = self
+                    .caret_variation_store
+                    .as_ref()
+                    .and_then(|result| result.as_ref().ok())
+                    .ok_or(UnsupportedCaret::VariationAdjustment)?;
+                let delta = store
+                    .delta(
+                        index.delta_set_outer_index,
+                        index.delta_set_inner_index,
+                        coordinates,
+                    )
+                    .map_err(|_| UnsupportedCaret::VariationAdjustment)?;
+                let coordinate = f32::from(value.coordinate) + delta;
+                return if coordinate.is_finite() {
+                    Ok(coordinate)
+                } else {
+                    Err(UnsupportedCaret::VariationAdjustment)
+                };
+            }
+        }
+        value.design_coordinate().map(f32::from)
     }
 
     fn dump_text(&self) -> String {
@@ -389,6 +449,58 @@ pub(crate) enum UnsupportedCaret {
 }
 
 impl CaretValue {
+    /// Authored scalar before any Device/VariationIndex adjustment. Point
+    /// indices are deliberately not interpreted as coordinates.
+    pub(crate) fn unadjusted_coordinate(&self) -> Option<i16> {
+        match self {
+            Self::Format1(value) => Some(value.coordinate),
+            Self::Format2(_) => None,
+            Self::Format3(value) => Some(value.coordinate),
+        }
+    }
+
+    /// Device delta in physical pixels at an explicit axis ppem. The caller
+    /// converts pixels into its local coordinate units. Not a design-unit delta.
+    pub(crate) fn device_pixel_delta(&self, ppem: u16) -> Result<i32, UnsupportedCaret> {
+        let Self::Format3(value) = self else {
+            return Err(UnsupportedCaret::DeviceAdjustment);
+        };
+        let device = value
+            .device_table
+            .as_ref()
+            .ok_or(UnsupportedCaret::DeviceAdjustment)?;
+        if device.is_variation_index() {
+            return Err(UnsupportedCaret::VariationAdjustment);
+        }
+        if ppem == 0 || device.start_size > device.end_size {
+            return Err(UnsupportedCaret::DeviceAdjustment);
+        }
+        let bits = match device.delta_format {
+            1 => 2usize,
+            2 => 4,
+            3 => 8,
+            _ => return Err(UnsupportedCaret::DeviceAdjustment),
+        };
+        let count = usize::from(device.end_size) - usize::from(device.start_size) + 1;
+        if device.delta_value.len() != (count * bits).div_ceil(16) {
+            return Err(UnsupportedCaret::DeviceAdjustment);
+        }
+        if ppem < device.start_size || ppem > device.end_size {
+            return Ok(0);
+        }
+        let index = usize::from(ppem - device.start_size);
+        let per_word = 16 / bits;
+        let shift = 16 - bits * (index % per_word + 1);
+        let mask = (1u16 << bits) - 1;
+        let packed = (device.delta_value[index / per_word] >> shift) & mask;
+        let value = i32::from(packed);
+        Ok(if packed & (1 << (bits - 1)) != 0 {
+            value - (1 << bits)
+        } else {
+            value
+        })
+    }
+
     pub(crate) fn design_coordinate(&self) -> Result<i16, UnsupportedCaret> {
         match self {
             Self::Format1(value) => Ok(value.coordinate),
@@ -865,5 +977,81 @@ mod caret_tests {
         let mut budget = 2;
         assert!(LigatureGlyph::new(&mut reader, 0, bounds, &mut budget).is_ok());
         assert!(LigatureGlyph::new(&mut reader, 0, bounds, &mut budget).is_err());
+    }
+    #[test]
+    fn fixture_variation_carets_resolve_normalized_and_reject_invalid_indices() {
+        let font = crate::fontreader::Font::get_font_from_buffer(include_bytes!(
+            "../../../tests/fixtures/gdef-carets.ttc"
+        ))
+        .unwrap();
+        let valid = font.more_fonts[3].gdef.as_ref().unwrap(); // face 4
+        for (glyph, base) in [(6, 220.0), (7, 730.0)] {
+            let caret = &valid.ligature_carets(glyph).unwrap()[0];
+            for (coordinate, delta) in [(0.0, 0.0), (0.25, 25.0), (1.0, 100.0)] {
+                assert_eq!(
+                    valid.caret_coordinate(caret, &[coordinate]),
+                    Ok(base + delta)
+                );
+            }
+            assert_eq!(
+                valid.caret_coordinate(caret, &[]),
+                Err(UnsupportedCaret::VariationAdjustment)
+            );
+            let invalid = font.more_fonts[4].gdef.as_ref().unwrap(); // face 5
+            assert_eq!(
+                invalid.caret_coordinate(&invalid.ligature_carets(glyph).unwrap()[0], &[1.0]),
+                Err(UnsupportedCaret::VariationAdjustment)
+            );
+        }
+    }
+
+    #[test]
+    fn optional_malformed_variation_store_preserves_static_carets() {
+        let mut data = two_ligatures();
+        // Upgrade header by moving all body bytes six bytes and fixing its
+        // sole header-relative LigCaret offset; internal offsets stay unchanged.
+        data[2..4].copy_from_slice(&3u16.to_be_bytes());
+        data.splice(12..12, [0, 0, 0xff, 0xff, 0xff, 0xff]);
+        data[8..10].copy_from_slice(&18u16.to_be_bytes());
+        let parsed = parse(&data).unwrap();
+        assert!(parsed.caret_variation_store.as_ref().unwrap().is_err());
+        assert_eq!(
+            parsed.caret_coordinate(&parsed.ligature_carets(10).unwrap()[0], &[]),
+            Ok(220.0)
+        );
+    }
+    #[test]
+    fn device_signed_pixels_all_formats_boundaries_and_invalid_context() {
+        for (format, bits, values) in [
+            (1, 2, vec![-2, -1, 0, 1, -2, -1, 0, 1, -2]),
+            (2, 4, vec![-8, -1, 0, 7, -8]),
+            (3, 8, vec![-128, 127, -1]),
+        ] {
+            let mut words = vec![0u16; (values.len() * bits).div_ceil(16)];
+            for (i, &value) in values.iter().enumerate() {
+                words[i / (16 / bits)] |=
+                    ((value as u16) & ((1 << bits) - 1)) << (16 - bits * (i % (16 / bits) + 1));
+            }
+            let caret = CaretValue::Format3(CaretValueFormat3 {
+                coordinate: 100,
+                device_table: Some(DeviceTable {
+                    start_size: 20,
+                    end_size: 20 + values.len() as u16 - 1,
+                    delta_format: format,
+                    delta_value: words,
+                    variation_index: None,
+                }),
+            });
+            assert_eq!(caret.unadjusted_coordinate(), Some(100));
+            assert_eq!(
+                caret.device_pixel_delta(0),
+                Err(UnsupportedCaret::DeviceAdjustment)
+            );
+            assert_eq!(caret.device_pixel_delta(19), Ok(0));
+            for (i, value) in values.iter().enumerate() {
+                assert_eq!(caret.device_pixel_delta(20 + i as u16), Ok(*value));
+            }
+            assert_eq!(caret.device_pixel_delta(20 + values.len() as u16), Ok(0));
+        }
     }
 }

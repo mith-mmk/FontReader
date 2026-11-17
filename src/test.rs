@@ -2177,6 +2177,7 @@ mod tests {
             mark_attach_class_def: None,
             mark_glyph_sets_def: None,
             item_var_store_offset: None,
+            caret_variation_store: None,
         };
         let original = vec![
             GsubGlyph {
@@ -2271,6 +2272,7 @@ mod tests {
             mark_attach_class_def: None,
             mark_glyph_sets_def: None,
             item_var_store_offset: None,
+            caret_variation_store: None,
         }
     }
 
