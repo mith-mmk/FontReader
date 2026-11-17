@@ -97,3 +97,36 @@ safety correction, **not** implementation of its unsupported path commands.
 paintcore's raw-SVG route remains unimplemented; its coordinated fail-closed
 change must return Unsupported without painting any partial glyph. This does
 not claim a complete semantic audit of all older gradient/clip/path parsing.
+
+## Explicit renderer coordinate context (additive API)
+
+`FontEngine::shape_with_svg_context(text)` returns `SvgGlyphRun`, an immutable
+companion to the exact same legacy run from `shape(text)`. `run()` exposes that
+run, and `svg_layer_transform(glyph_index, layer_index)` returns a finite SVG
+matrix `[a,b,c,d,e,f]` for a raw SVG layer. `into_run()` discards the companion.
+
+Renderer order is:
+1. Parse the SVG document and apply its root viewBox/preserveAspectRatio into its
+   explicit root viewport (font design units).
+2. Apply the returned matrix: x'=a*x+c*y+e, y'=b*x+d*y+f.
+3. Add any external screen/canvas origin, if needed.
+
+Matrix translation already includes positioned glyph origin and layer offset.
+Do not add them a second time. Do not use advance width, legacy `view_box_*`, or
+`width/height` to infer a font scale. Those public fields retain their existing
+layout/bounds meaning and are unchanged. The SVG document is also unchanged;
+no trusted render metadata is read from or inserted into SVG data attributes.
+The companion's private scales come from the same internal calculation used by
+shaping, including font stretch and variation-adjusted line metrics. In this
+API font_size denotes nominal line height, not necessarily the em size.
+
+The new API supports standard single-face LTR/RTL/vertical shaping. It does not
+claim family fallback, CompositeFont, sideways/mixed-vertical companions, or
+context for arbitrary user-constructed legacy layers. Callers with those inputs
+must supply an explicit trustworthy transform or report unsupported. Existing
+`shape`/layer construction, serialized fields, and rendering routes are retained.
+
+Regression tests compare full legacy runs (including documents/fields) against
+the new companion for LTR/RTL/vertical and nonuniform stretch, exercise invalid
+indices/options, layer offsets, and verify that forged SVG data attributes or
+legacy layout-box values cannot alter the typed transform.

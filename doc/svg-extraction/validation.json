@@ -38,5 +38,15 @@
     "ignored": 3,
     "clippy": "passed",
     "noto": "raw SVG only; no partial Paths"
+  },
+  "typed_render_context": {
+    "all_features_passed": 686,
+    "all_features_ignored": 3,
+    "no_default_passed": 325,
+    "no_default_ignored": 2,
+    "clippy": "passed",
+    "wasm": "passed",
+    "docs": "passed",
+    "compatibility": "same legacy run fields and document; explicit typed companion transform"
   }
 }

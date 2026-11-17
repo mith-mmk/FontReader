@@ -197,6 +197,20 @@ impl<'a> FontEngine<'a> {
         self.text2glyph_run(text)
     }
 
+    /// Shapes the same single-face run as [`Self::shape`] and pairs it with an
+    /// explicit SVG viewport-to-output transform. Existing layer fields and
+    /// SVG document bytes are unchanged. No inferred scale from glyph advance.
+    #[cfg(feature = "svg-fonts")]
+    pub fn shape_with_svg_context(&self, text: &str) -> Result<crate::SvgGlyphRun, Error> {
+        let run = self.shape(text)?;
+        let (scale_x, scale_y) = self.face.font().glyph_scale_with_options(&self.options())?;
+        Ok(crate::SvgGlyphRun {
+            run,
+            scale_x,
+            scale_y,
+        })
+    }
+
     /// Shapes with original UTF-8 source ownership, without changing the legacy run.
     /// This uses one selected face and an explicit direction, not paragraph BiDi.
     pub fn shape_mapped(&self, text: &str) -> Result<crate::ShapedText, Error> {

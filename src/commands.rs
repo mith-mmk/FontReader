@@ -235,6 +235,11 @@ impl RasterGlyphLayer {
 /// `GlyphLayer::Svg` remains intentionally available as a raw payload fallback and for future
 /// delegated renderers, even when a subset of SVG glyphs can already be converted into
 /// `GlyphLayer::Path`.
+///
+/// The existing `view_box_*`, `width`, and `height` fields describe scaled
+/// layout/bounds metadata; they are not the source SVG root's viewport. Use
+/// [`SvgGlyphRun::svg_layer_transform`] for an explicit rendering coordinate
+/// contract rather than inferring a scale from these fields or glyph advance.
 #[cfg(feature = "svg-fonts")]
 #[derive(Debug, Clone)]
 pub struct SvgGlyphLayer {
@@ -247,6 +252,95 @@ pub struct SvgGlyphLayer {
     pub height: f32,
     pub offset_x: f32,
     pub offset_y: f32,
+}
+
+/// A single-face shaped run with explicit SVG design-unit rendering context.
+///
+/// Construct with [`crate::FontEngine::shape_with_svg_context`]. This companion
+/// does not reinterpret any fields of [`SvgGlyphLayer`] or alter its document.
+/// It does not cover CompositeFont/family fallback or sideways/mixed layout.
+#[cfg(feature = "svg-fonts")]
+#[derive(Debug, Clone)]
+pub struct SvgGlyphRun {
+    pub(crate) run: GlyphRun,
+    pub(crate) scale_x: f32,
+    pub(crate) scale_y: f32,
+}
+
+#[cfg(feature = "svg-fonts")]
+impl SvgGlyphRun {
+    /// The unchanged legacy shaped run. Kept immutable so its context stays paired.
+    pub fn run(&self) -> &GlyphRun {
+        &self.run
+    }
+
+    /// Consume the companion and return the unchanged legacy run.
+    pub fn into_run(self) -> GlyphRun {
+        self.run
+    }
+
+    /// Matrix `[a, b, c, d, e, f]` mapping the SVG root's viewport/design units
+    /// to the shaped run's output coordinates: `x'=a*x+c*y+e`, `y'=b*x+d*y+f`.
+    ///
+    /// Apply SVG's own root `viewBox`/`preserveAspectRatio` mapping first, then
+    /// this matrix. Root width/height are the extracted font viewport, not the
+    /// glyph advance. Translation already includes glyph origin and layer
+    /// offset; do not add either twice. The legacy `view_box_*`/`width`/`height`
+    /// fields are layout metadata, not this coordinate transform.
+    ///
+    /// Returns None for invalid indices, non-SVG layers, or non-finite output.
+    /// Standard LTR/RTL/vertical runs share this contract; vertical placement
+    /// comes from the positioned glyph. Zero horizontal stretch is preserved.
+    pub fn svg_layer_transform(&self, glyph_index: usize, layer_index: usize) -> Option<[f32; 6]> {
+        let glyph = self.run.glyphs.get(glyph_index)?;
+        let GlyphLayer::Svg(layer) = glyph.glyph.layers.get(layer_index)? else {
+            return None;
+        };
+        let matrix = [
+            self.scale_x,
+            0.0,
+            0.0,
+            self.scale_y,
+            glyph.x + layer.offset_x,
+            glyph.y + layer.offset_y,
+        ];
+        matrix
+            .iter()
+            .all(|value| value.is_finite())
+            .then_some(matrix)
+    }
+}
+
+#[cfg(all(test, feature = "svg-fonts"))]
+#[test]
+fn svg_context_ignores_payload_metadata_and_legacy_layout_box() {
+    let svg = SvgGlyphLayer {
+        document: "<svg data-fontcore-svg-scale-x='999' viewBox='0 -900 80 80'/>".into(),
+        view_box_min_x: -100.0,
+        view_box_min_y: -800.0,
+        view_box_width: 500.0,
+        view_box_height: 700.0,
+        width: 123.0,
+        height: 456.0,
+        offset_x: 3.0,
+        offset_y: -4.0,
+    };
+    let run = GlyphRun::new(vec![PositionedGlyph::new(
+        Glyph::new(vec![GlyphLayer::Svg(svg)]),
+        20.0,
+        30.0,
+    )]);
+    let mut context = SvgGlyphRun {
+        run,
+        scale_x: 0.2,
+        scale_y: 0.1,
+    };
+    assert_eq!(
+        context.svg_layer_transform(0, 0),
+        Some([0.2, 0.0, 0.0, 0.1, 23.0, 26.0])
+    );
+    context.scale_x = f32::INFINITY;
+    assert_eq!(context.svg_layer_transform(0, 0), None);
 }
 
 /// Extensible glyph layer model.

@@ -2274,6 +2274,29 @@ impl Font {
         Ok(em)
     }
 
+    pub(crate) fn glyph_scale_with_options(
+        &self,
+        options: &crate::commands::FontOptions<'_>,
+    ) -> Result<(f32, f32), Error> {
+        if !options.font_size.is_finite() || options.font_size <= 0.0 {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "font_size must be a positive finite value",
+            ));
+        }
+        if !options.font_stretch.0.is_finite() || options.font_stretch.0 < 0.0 {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "font_stretch must be a finite non-negative value",
+            ));
+        }
+
+        let default_line_height = self.default_line_height_with_options(options)? as f32;
+        let scale_y = options.font_size / default_line_height.max(1.0);
+        let scale_x = scale_y * options.font_stretch.0.max(0.0);
+        Ok((scale_x, scale_y))
+    }
+
     fn default_line_height_with_options(
         &self,
         options: &crate::commands::FontOptions<'_>,
@@ -2786,22 +2809,7 @@ impl Font {
     ) -> Result<MappedGlyphOutput, Error> {
         let _ = self.current_head()?;
 
-        if !options.font_size.is_finite() || options.font_size <= 0.0 {
-            return Err(Error::new(
-                ErrorKind::InvalidInput,
-                "font_size must be a positive finite value",
-            ));
-        }
-        if !options.font_stretch.0.is_finite() || options.font_stretch.0 < 0.0 {
-            return Err(Error::new(
-                ErrorKind::InvalidInput,
-                "font_stretch must be a finite non-negative value",
-            ));
-        }
-
-        let default_line_height = self.default_line_height_with_options(options)? as f32;
-        let scale_y = options.font_size / default_line_height.max(1.0);
-        let scale_x = scale_y * options.font_stretch.0.max(0.0);
+        let (scale_x, scale_y) = self.glyph_scale_with_options(options)?;
         let line_height = options.line_height.unwrap_or(options.font_size);
         let is_vertical = options.text_direction.is_vertical();
         let is_right_to_left = options.text_direction.is_right_to_left();
