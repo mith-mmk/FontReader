@@ -707,7 +707,13 @@ impl Font {
                     return Ok(string);
                 }
             } else if let Some(svg) = self.current_svg_table() {
-                let result = svg.get_svg(pos, fontsize, fontunit, &layout, 0.0, 0.0);
+                let result = svg.get_svg(
+                    pos,
+                    fontsize,
+                    fontunit,
+                    &layout,
+                    self.current_head()?.units_per_em,
+                );
                 if let Some(svg) = result {
                     let mut string = "".to_string();
                     #[cfg(debug_assertions)]
@@ -839,7 +845,13 @@ impl Font {
                         return Ok(string);
                     }
                 } else if let Some(svg) = self.current_svg_table() {
-                    let result = svg.get_svg(glyph_id as u32, fontsize, fontunit, layout, 0.0, 0.0);
+                    let result = svg.get_svg(
+                        glyph_id as u32,
+                        fontsize,
+                        fontunit,
+                        layout,
+                        self.current_head()?.units_per_em,
+                    );
                     if let Some(svg) = result {
                         let mut string = "".to_string();
                         #[cfg(debug_assertions)]
@@ -2318,9 +2330,11 @@ impl Font {
         scale_x: f32,
         scale_y: f32,
     ) -> Option<Vec<GlyphLayer>> {
-        let document = self
-            .current_svg_table()?
-            .get_glyph_document(glyph_id as u32, layout)?;
+        let document = self.current_svg_table()?.get_glyph_document_with_units(
+            glyph_id as u32,
+            layout,
+            self.current_head().ok()?.units_per_em,
+        )?;
         Some(svg_document_to_glyph_layers(&document, scale_x, scale_y))
     }
 

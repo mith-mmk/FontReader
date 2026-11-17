@@ -154,7 +154,16 @@ pub(crate) fn svg_to_path_layers(
 
 pub(crate) fn svg_requires_svg_fallback(document: &str) -> bool {
     let lowered = document.to_ascii_lowercase();
-    lowered.contains("<pattern")
+    // Extraction now preserves viewport and compositing information which the
+    // path subset cannot faithfully represent. Keep the source alternative.
+    lowered.contains("viewbox=")
+        || lowered.contains("opacity")
+        || lowered.contains("display")
+        || lowered.contains("visibility")
+        || lowered.contains("preserveaspectratio")
+        || lowered.contains("stroke-line")
+        || lowered.contains("stroke-dash")
+        || lowered.contains("<pattern")
         || lowered.contains("<mask")
         || lowered.contains("<filter")
         || lowered.contains("patternunits=")
