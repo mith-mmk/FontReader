@@ -1,7 +1,8 @@
 #![allow(dead_code)]
 
 use miniz_oxide::inflate::decompress_to_vec_with_limit;
-use std::io::SeekFrom;
+use std::io::{Error, ErrorKind, SeekFrom};
+use std::sync::Arc;
 
 use bin_rs::reader::BinaryReader;
 
@@ -40,19 +41,31 @@ impl Svg {
         length: u32,
         limits: &DecodeLimits,
     ) -> Result<Self, std::io::Error> {
+        if length < 10 {
+            return Err(Error::new(ErrorKind::InvalidData, "short SVG header"));
+        }
         let offset = offset as u64;
         reader.seek(SeekFrom::Start(offset))?;
         let version = reader.read_u16_be()?;
         let svg_document_list_offset = reader.read_u32_be()?;
         reader.read_u32()?; // reserved
 
-        let svg_document_list =
-            SVGDocumetList::new(reader, offset + svg_document_list_offset as u64)?;
+        if version != 0 || svg_document_list_offset < 10 || svg_document_list_offset > length - 2 {
+            return Err(Error::new(
+                ErrorKind::InvalidData,
+                "invalid SVG document list",
+            ));
+        }
+        let svg_document_list = SVGDocumetList::new(
+            reader,
+            offset + svg_document_list_offset as u64,
+            (length - svg_document_list_offset) as usize,
+        )?;
 
         Ok(Self {
             version,
             svg_document_list,
-            max_svg_bytes: limits.max_svg_bytes.min(length as usize),
+            max_svg_bytes: limits.max_svg_bytes,
         })
     }
 
@@ -80,7 +93,9 @@ impl Svg {
     }
 
     pub(crate) fn has_glyph(&self, gid: u32) -> bool {
-        let gid = gid as u16;
+        let Ok(gid) = u16::try_from(gid) else {
+            return false;
+        };
         self.svg_document_list
             .svg_document_records
             .iter()
@@ -118,12 +133,12 @@ impl Svg {
         gid: u32,
         layout: &FontLayout,
     ) -> Option<SvgGlyphDocument> {
-        let gid = gid as u16;
+        let gid = u16::try_from(gid).ok()?;
         let mut svg_document = None;
         for svg_document_record in self.svg_document_list.svg_document_records.iter() {
             if svg_document_record.start_glyph_id <= gid && gid <= svg_document_record.end_glyph_id
             {
-                svg_document = svg_document_record.svg_document.as_ref();
+                svg_document = svg_document_record.svg_document.as_deref();
                 break;
             }
         }
@@ -177,6 +192,9 @@ fn decompress_gzip(document: &[u8], max_output: usize) -> Option<Vec<u8>> {
         return None;
     }
     let flags = document[3];
+    if flags & 0xe0 != 0 {
+        return None;
+    }
     let mut cursor = 10usize;
 
     if flags & 0x04 != 0 {
@@ -404,6 +422,17 @@ fn skip_svg_whitespace(bytes: &[u8], cursor: &mut usize) {
 }
 
 fn extract_svg_payload_for_gid(document: &str, gid: u16) -> Option<String> {
+    // The document root can itself be the glyph element. Do not discard its ID
+    // before deciding whether this document belongs to the requested glyph.
+    if let Some(start) = document.find("<svg") {
+        let end = find_svg_tag_end(document, start)?;
+        let root = &document[start..end];
+        if element_id(root).is_some_and(is_glyph_id) {
+            return fragment_matches_glyph_id(root, gid)
+                .then(|| extract_root_inner(document).map(str::to_string))
+                .flatten();
+        }
+    }
     let (root_inner, defs_blocks) = if let Some(inner) = extract_root_inner(document) {
         (inner, collect_tag_blocks(inner, "defs"))
     } else {
@@ -418,12 +447,38 @@ fn extract_svg_payload_for_gid(document: &str, gid: u16) -> Option<String> {
         return Some(payload);
     }
 
+    // A shared document with glyph IDs must not render every sibling when the
+    // requested glyph is absent. Keep the legacy untagged single-document path.
+    if contains_glyph_ids(root_inner) {
+        return None;
+    }
     if let Some(inner) = extract_root_inner(document) {
         return Some(inner.to_string());
     }
 
     extract_payload_from_svg_fragments(document, gid, &[])
         .or_else(|| extract_payload_from_tagged_elements(document, gid, &[]))
+}
+
+fn is_glyph_id(id: &str) -> bool {
+    id.strip_prefix("glyph")
+        .is_some_and(|suffix| suffix.parse::<u16>().is_ok())
+        || id.parse::<u16>().is_ok()
+}
+
+fn contains_glyph_ids(source: &str) -> bool {
+    let mut cursor = 0;
+    while let Some(relative) = source[cursor..].find('<') {
+        let start = cursor + relative;
+        let Some(end) = find_svg_tag_end(source, start) else {
+            return true;
+        };
+        if element_id(&source[start..end]).is_some_and(is_glyph_id) {
+            return true;
+        }
+        cursor = end;
+    }
+    false
 }
 
 fn extract_payload_from_svg_fragments(
@@ -441,13 +496,18 @@ fn extract_payload_from_svg_fragments(
         .find(|fragment| fragment_matches_glyph_id(fragment, gid))
         .copied()
         .or_else(|| {
-            if fragments.len() == 1 {
+            if fragments.len() == 1 && element_id(fragments[0]).is_none() {
                 fragments.first().copied()
             } else {
                 None
             }
         })?;
 
+    if element_id(selected).is_none() && contains_glyph_ids(selected) {
+        // An untagged wrapper is not itself a glyph. Select its tagged child
+        // instead of returning all siblings, including when the ID is absent.
+        return extract_payload_from_tagged_elements(selected, gid, defs_blocks);
+    }
     let fragment_inner = extract_root_inner(selected).unwrap_or(selected);
     Some(combine_defs_and_payload(defs_blocks, fragment_inner))
 }
@@ -562,51 +622,75 @@ fn find_balanced_tag_end(source: &str, start: usize, tag: &str) -> Option<usize>
     None
 }
 
+// Match the ID attribute on this element only, never a descendant or substring.
+fn element_id(fragment: &str) -> Option<&str> {
+    let end = find_svg_tag_end(fragment, 0)?;
+    let tag = &fragment[1..end - 1];
+    let bytes = tag.as_bytes();
+    let mut cursor = 0;
+    while bytes.get(cursor).is_some_and(|b| !b.is_ascii_whitespace()) {
+        cursor += 1;
+    }
+    loop {
+        skip_svg_whitespace(bytes, &mut cursor);
+        let start = cursor;
+        while bytes
+            .get(cursor)
+            .is_some_and(|b| !b.is_ascii_whitespace() && *b != b'=')
+        {
+            cursor += 1;
+        }
+        let name = tag.get(start..cursor)?;
+        skip_svg_whitespace(bytes, &mut cursor);
+        if bytes.get(cursor) != Some(&b'=') {
+            return None;
+        }
+        cursor += 1;
+        skip_svg_whitespace(bytes, &mut cursor);
+        let quote = *bytes.get(cursor)?;
+        if quote != b'\'' && quote != b'"' {
+            return None;
+        }
+        cursor += 1;
+        let start = cursor;
+        while *bytes.get(cursor)? != quote {
+            cursor += 1;
+        }
+        let value = &tag[start..cursor];
+        cursor += 1;
+        if name == "id" {
+            return Some(value);
+        }
+    }
+}
+
 fn fragment_matches_glyph_id(fragment: &str, gid: u16) -> bool {
-    let lower = fragment.to_ascii_lowercase();
-    let marker = format!("glyph{}", gid);
-    let gid_marker = format!("id=\"{}\"", gid);
-    lower.contains(&marker) || lower.contains(&gid_marker)
+    element_id(fragment).is_some_and(|id| id == format!("glyph{gid}") || id == gid.to_string())
 }
 
 fn collect_glyph_tagged_elements(source: &str, gid: u16) -> Vec<&str> {
-    let lower = source.to_ascii_lowercase();
-    let markers = [format!("glyph{}", gid), format!("id=\"{}\"", gid)];
     let mut elements = Vec::new();
-
-    for marker in markers {
-        let mut cursor = 0usize;
-        while let Some(relative_pos) = lower[cursor..].find(&marker) {
-            let pos = cursor + relative_pos;
-            let Some(start) = source[..pos].rfind('<') else {
-                cursor = pos + marker.len();
-                continue;
-            };
-            if source[start..].starts_with("</") {
-                cursor = pos + marker.len();
-                continue;
-            }
-
-            let tag_name_end = source[start + 1..]
-                .find(|ch: char| ch.is_whitespace() || ch == '>' || ch == '/')
-                .map(|offset| start + 1 + offset);
-            let Some(tag_name_end) = tag_name_end else {
-                cursor = pos + marker.len();
-                continue;
-            };
-            let tag = &source[start + 1..tag_name_end];
-            let Some(end) = find_balanced_tag_end(source, start, tag) else {
-                cursor = pos + marker.len();
-                continue;
-            };
-            let candidate = &source[start..end];
-            if !elements.contains(&candidate) {
-                elements.push(candidate);
-            }
+    let mut cursor = 0;
+    while let Some(relative) = source[cursor..].find('<') {
+        let start = cursor + relative;
+        let Some(open_end) = find_svg_tag_end(source, start) else {
+            break;
+        };
+        cursor = open_end;
+        if !fragment_matches_glyph_id(&source[start..open_end], gid) {
+            continue;
+        }
+        let Some(name_end) =
+            source[start + 1..].find(|ch: char| ch.is_whitespace() || ch == '>' || ch == '/')
+        else {
+            continue;
+        };
+        let tag = &source[start + 1..start + 1 + name_end];
+        if let Some(end) = find_balanced_tag_end(source, start, tag) {
+            elements.push(&source[start..end]);
             cursor = end;
         }
     }
-
     elements
 }
 
@@ -616,19 +700,54 @@ struct SVGDocumetList {
 }
 
 impl SVGDocumetList {
-    fn new<R: BinaryReader>(reader: &mut R, offset: u64) -> Result<Self, std::io::Error> {
+    fn new<R: BinaryReader>(
+        reader: &mut R,
+        offset: u64,
+        length: usize,
+    ) -> Result<Self, std::io::Error> {
         reader.seek(SeekFrom::Start(offset))?;
         let num_svg_entries = reader.read_u16_be()?;
+        let records_end = 2 + num_svg_entries as usize * 12;
+        if records_end > length {
+            return Err(Error::new(
+                ErrorKind::InvalidData,
+                "SVG records exceed table",
+            ));
+        }
         let mut svg_document_records = Vec::new();
         for _ in 0..num_svg_entries {
             svg_document_records.push(SVGDocumetRecord::new(reader)?);
         }
+        let mut documents = std::collections::HashMap::new();
+        let mut previous_end = None;
         for svg_document_record in svg_document_records.iter_mut() {
+            let record = &svg_document_record;
+            let start = record.svg_document_offset as usize;
+            let size = record.svg_document_length as usize;
+            if record.start_glyph_id > record.end_glyph_id
+                || previous_end.is_some_and(|end| record.start_glyph_id <= end)
+                || start < records_end
+                || start > length
+                || size > length - start
+            {
+                return Err(Error::new(
+                    ErrorKind::InvalidData,
+                    "invalid SVG document range",
+                ));
+            }
+            previous_end = Some(record.end_glyph_id);
+            let key = (record.svg_document_offset, record.svg_document_length);
+            if let Some(document) = documents.get(&key) {
+                svg_document_record.svg_document = Some(Arc::clone(document));
+                continue;
+            }
             reader.seek(SeekFrom::Start(
                 offset + svg_document_record.svg_document_offset as u64,
             ))?;
             let svg_document =
                 reader.read_bytes_as_vec(svg_document_record.svg_document_length as usize)?;
+            let svg_document: Arc<[u8]> = svg_document.into();
+            documents.insert(key, Arc::clone(&svg_document));
             svg_document_record.svg_document = Some(svg_document);
         }
 
@@ -644,7 +763,7 @@ struct SVGDocumetRecord {
     end_glyph_id: u16,
     svg_document_offset: u32,
     svg_document_length: u32,
-    svg_document: Option<Vec<u8>>,
+    svg_document: Option<Arc<[u8]>>,
 }
 
 impl SVGDocumetRecord {
@@ -673,6 +792,95 @@ impl std::fmt::Display for Svg {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn table(document: &[u8]) -> Vec<u8> {
+        let mut bytes = vec![0; 18];
+        bytes[2..6].copy_from_slice(&18u32.to_be_bytes());
+        bytes.extend_from_slice(&2u16.to_be_bytes());
+        for gid in [1u16, 10] {
+            bytes.extend_from_slice(&gid.to_be_bytes());
+            bytes.extend_from_slice(&gid.to_be_bytes());
+            bytes.extend_from_slice(&26u32.to_be_bytes());
+            bytes.extend_from_slice(&(document.len() as u32).to_be_bytes());
+        }
+        bytes.extend_from_slice(document);
+        bytes
+    }
+
+    #[test]
+    fn untagged_svg_wrappers_cannot_bypass_glyph_selection() {
+        let svg = "<svg><svg><g id='glyph1'><path d='M1 0'/></g><g id='glyph10'><path d='M10 0'/></g></svg></svg>";
+        assert!(extract_svg_payload_for_gid(svg, 2).is_none());
+        let selected = extract_svg_payload_for_gid(svg, 1).unwrap();
+        assert!(selected.contains("glyph1"));
+        assert!(!selected.contains("glyph10"));
+        let wrapped = format!("<svg>{svg}</svg>");
+        assert!(extract_svg_payload_for_gid(&wrapped, 2).is_none());
+        assert!(!extract_svg_payload_for_gid(&wrapped, 1)
+            .unwrap()
+            .contains("glyph10"));
+        let plain = "<svg><svg><path d='M1 0'/></svg></svg>";
+        assert!(extract_svg_payload_for_gid(plain, 1).is_some());
+    }
+
+    #[test]
+    fn document_root_glyph_id_is_not_discarded() {
+        let svg = "<svg id='glyph10'><path d='M10 0'/></svg>";
+        assert!(extract_svg_payload_for_gid(svg, 1).is_none());
+        assert!(extract_svg_payload_for_gid(svg, 10).is_some());
+    }
+
+    #[test]
+    fn table_offsets_shared_documents_and_bounds() {
+        use bin_rs::reader::BytesReader;
+        let bytes = table(b"<svg><g id='glyph1'/></svg>");
+        let svg = Svg::new(&mut BytesReader::new(&bytes), 0, bytes.len() as u32).unwrap();
+        let records = &svg.svg_document_list.svg_document_records;
+        assert!(Arc::ptr_eq(
+            records[0].svg_document.as_ref().unwrap(),
+            records[1].svg_document.as_ref().unwrap()
+        ));
+        let mut embedded = vec![0xff; 7];
+        embedded.extend_from_slice(&bytes);
+        assert!(Svg::new(&mut BytesReader::new(&embedded), 7, bytes.len() as u32).is_ok());
+        let mut bad = bytes.clone();
+        bad[24..28].copy_from_slice(&u32::MAX.to_be_bytes());
+        assert!(Svg::new(&mut BytesReader::new(&bad), 0, bad.len() as u32).is_err());
+        assert!(svg.has_glyph(1));
+        assert!(!svg.has_glyph(65537));
+        assert!(Svg::new(&mut BytesReader::new(&bytes), 0, bytes.len() as u32 - 1).is_err());
+        assert!(Svg::new(&mut BytesReader::new(&bytes), 0, 9).is_err());
+    }
+
+    #[test]
+    fn compressed_size_is_not_the_decoded_size_limit() {
+        use bin_rs::reader::BytesReader;
+        let plain = format!(
+            "<svg><g id='glyph1'>{}</g></svg>",
+            "<path d='M0 0'/>".repeat(80)
+        );
+        let mut gzip = vec![0x1f, 0x8b, 8, 0, 0, 0, 0, 0, 0, 0];
+        gzip.extend(miniz_oxide::deflate::compress_to_vec(plain.as_bytes(), 6));
+        gzip.extend(crc32(plain.as_bytes()).to_le_bytes());
+        gzip.extend((plain.len() as u32).to_le_bytes());
+        let bytes = table(&gzip);
+        assert!(bytes.len() < plain.len());
+        let svg = Svg::new(&mut BytesReader::new(&bytes), 0, bytes.len() as u32).unwrap();
+        assert!(svg.get_glyph_document(1, &FontLayout::Unknown).is_some());
+        assert!(decode_svg_document(&gzip, plain.len() - 1).is_none());
+    }
+
+    #[test]
+    fn glyph_ids_match_exact_attributes_not_substrings() {
+        let svg =
+            "<svg><g id='glyph10'><path d='M10 0'/></g><g id = 'glyph1'><path d='M1 0'/></g></svg>";
+        let payload = extract_svg_payload_for_gid(svg, 1).unwrap();
+        assert!(extract_svg_payload_for_gid(svg, 2).is_none());
+        assert!(!payload.contains("glyph10"));
+        assert!(payload.contains("glyph1"));
+        assert!(!fragment_matches_glyph_id("<g data-id='glyph1'>", 1));
+        assert!(!fragment_matches_glyph_id("<g id='glyph1-path'>", 1));
+    }
 
     #[test]
     fn svg_payload_extracts_only_matching_nested_fragment() {
