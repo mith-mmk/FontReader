@@ -91,6 +91,8 @@ pub struct VerticalMappedLayout {
     run: GlyphRun,
     sources: Vec<GlyphSource>,
     groups: Vec<VerticalGroup>,
+    #[cfg(feature = "svg-fonts")]
+    svg_placements: crate::commands::SvgPlacements,
 }
 impl VerticalMappedLayout {
     pub(crate) fn new(
@@ -104,8 +106,35 @@ impl VerticalMappedLayout {
             run,
             sources,
             groups,
+            #[cfg(feature = "svg-fonts")]
+            svg_placements: Default::default(),
         }
     }
+
+    #[cfg(feature = "svg-fonts")]
+    pub(crate) fn with_svg_placements(
+        mut self,
+        placements: crate::commands::SvgPlacements,
+    ) -> Self {
+        self.svg_placements = placements;
+        self
+    }
+
+    #[cfg(feature = "svg-fonts")]
+    pub(crate) fn into_svg_run(self) -> crate::SvgGlyphRun {
+        crate::SvgGlyphRun {
+            run: self.run,
+            placements: self.svg_placements,
+        }
+    }
+
+    /// SVG viewport transform in the final run's coordinates. The orientation
+    /// group rotation and offset are already applied to this matrix.
+    #[cfg(feature = "svg-fonts")]
+    pub fn svg_layer_transform(&self, glyph: usize, layer: usize) -> Option<[f32; 6]> {
+        self.svg_placements.get(glyph, layer)
+    }
+
     pub fn text(&self) -> &str {
         &self.text
     }

@@ -203,12 +203,42 @@ impl<'a> FontEngine<'a> {
     #[cfg(feature = "svg-fonts")]
     pub fn shape_with_svg_context(&self, text: &str) -> Result<crate::SvgGlyphRun, Error> {
         let run = self.shape(text)?;
-        let (scale_x, scale_y) = self.face.font().glyph_scale_with_options(&self.options())?;
-        Ok(crate::SvgGlyphRun {
-            run,
-            scale_x,
-            scale_y,
-        })
+        self.svg_glyph_run(run, false)
+    }
+
+    #[cfg(feature = "svg-fonts")]
+    fn svg_glyph_run(&self, run: GlyphRun, turned: bool) -> Result<crate::SvgGlyphRun, Error> {
+        let mut placements = crate::commands::SvgPlacements::default();
+        placements.append_run(self.face.font(), &self.options(), &run.glyphs, 0, turned)?;
+        Ok(crate::SvgGlyphRun { run, placements })
+    }
+
+    fn wrap_mapped_run(
+        &self,
+        text: &str,
+        output: crate::fontreader::MappedGlyphOutput,
+        options: &FontOptions<'_>,
+    ) -> Result<crate::ShapedText, Error> {
+        let sources = output
+            .ranges
+            .into_iter()
+            .map(|range| crate::GlyphSource::new(range, 0, 0))
+            .collect();
+        let shaped = crate::ShapedText::new(text, output.run, sources, options.text_direction)
+            .with_ligature_carets(output.ligature_carets);
+        #[cfg(feature = "svg-fonts")]
+        let shaped = {
+            let mut placements = crate::commands::SvgPlacements::default();
+            placements.append_run(
+                self.face.font(),
+                options,
+                &shaped.glyph_run().glyphs,
+                0,
+                false,
+            )?;
+            shaped.with_svg_placements(placements)
+        };
+        Ok(shaped)
     }
 
     /// Shapes with original UTF-8 source ownership, without changing the legacy run.
@@ -219,15 +249,7 @@ impl<'a> FontEngine<'a> {
             .face
             .font()
             .text2glyph_run_with_carets(text, &options)?;
-        let sources = output
-            .ranges
-            .into_iter()
-            .map(|range| crate::GlyphSource::new(range, 0, 0))
-            .collect();
-        Ok(
-            crate::ShapedText::new(text, output.run, sources, options.text_direction)
-                .with_ligature_carets(output.ligature_carets),
-        )
+        self.wrap_mapped_run(text, output, &options)
     }
 
     pub(crate) fn shape_bidi_run_mapped(
@@ -240,13 +262,7 @@ impl<'a> FontEngine<'a> {
             .face
             .font()
             .text2glyph_run_bidi_with_carets(text, &options)?;
-        let sources = output
-            .ranges
-            .into_iter()
-            .map(|range| crate::GlyphSource::new(range, 0, 0))
-            .collect();
-        Ok(crate::ShapedText::new(text, output.run, sources, direction)
-            .with_ligature_carets(output.ligature_carets))
+        self.wrap_mapped_run(text, output, &options)
     }
 
     /// Shapes one horizontal LTR line, then rotates it 90 degrees clockwise.
@@ -277,6 +293,23 @@ impl<'a> FontEngine<'a> {
             .font()
             .text2glyph_run_sideways_ltr(text, &self.options())?;
         rotate_sideways_ltr(run)
+    }
+
+    /// Shapes the same clockwise sideways flow, also accepting raw SVG glyphs.
+    /// The raw document is the whole-glyph alternative to approximation paths.
+    /// The returned matrix already combines positioning, scaling and rotation.
+    /// Other color/raster layers remain restricted by `shape_sideways_ltr`.
+    #[cfg(feature = "svg-fonts")]
+    pub fn shape_sideways_ltr_with_svg_context(
+        &self,
+        text: &str,
+    ) -> Result<crate::SvgGlyphRun, Error> {
+        validate_single_line(text, "sideways LTR")?;
+        let run = self
+            .face
+            .font()
+            .text2glyph_run_sideways_ltr(text, &self.options())?;
+        self.svg_glyph_run(rotate_sideways_run(run, true)?, true)
     }
 
     /// Measures the absolute sum of the rotated run's y advances.
@@ -374,6 +407,37 @@ impl<'a> FontEngine<'a> {
         &self,
         text: &str,
     ) -> Result<crate::vertical_mapped::VerticalMappedLayout, Error> {
+        self.shape_vertical_mixed_ltr_mapped_impl(text, false)
+    }
+
+    /// Shapes mixed vertical text with explicit placement for raw SVG glyphs.
+    /// Layout policy is unchanged: upright glyphs remain upright, and the
+    /// rotation of each sideways group is already included in its SVG matrices.
+    #[cfg(feature = "svg-fonts")]
+    pub fn shape_vertical_mixed_ltr_with_svg_context(
+        &self,
+        text: &str,
+    ) -> Result<crate::SvgGlyphRun, Error> {
+        Ok(self
+            .shape_vertical_mixed_ltr_mapped_with_svg_context(text)?
+            .into_svg_run())
+    }
+
+    /// Like `shape_vertical_mixed_ltr_with_svg_context`, retaining source ownership,
+    /// carets and each group's local SVG matrices before its overall transform.
+    #[cfg(feature = "svg-fonts")]
+    pub fn shape_vertical_mixed_ltr_mapped_with_svg_context(
+        &self,
+        text: &str,
+    ) -> Result<crate::vertical_mapped::VerticalMappedLayout, Error> {
+        self.shape_vertical_mixed_ltr_mapped_impl(text, true)
+    }
+
+    fn shape_vertical_mixed_ltr_mapped_impl(
+        &self,
+        text: &str,
+        allow_raw_svg: bool,
+    ) -> Result<crate::vertical_mapped::VerticalMappedLayout, Error> {
         use crate::vertical_mapped::{VerticalGroup, VerticalMappedLayout};
         validate_single_line(text, "mixed vertical LTR")?;
         let options = self.options();
@@ -381,6 +445,8 @@ impl<'a> FontEngine<'a> {
         let mut glyphs = Vec::new();
         let mut sources = Vec::new();
         let mut mapped_groups = Vec::new();
+        #[cfg(feature = "svg-fonts")]
+        let mut svg_placements = crate::commands::SvgPlacements::default();
         let (mut pen_x, mut pen_y) = (0.0f32, 0.0f32);
         let mut byte_start = 0;
         let mut groups = mixed_orientation_groups(text);
@@ -427,12 +493,21 @@ impl<'a> FontEngine<'a> {
                 },
             )
             .with_ligature_carets(output.ligature_carets);
-            let mut run = if sideways {
-                rotate_sideways_ltr(local_run)?
+            #[cfg(feature = "svg-fonts")]
+            let local = if allow_raw_svg {
+                let mut placements = crate::commands::SvgPlacements::default();
+                placements.append_run(font, &options, &local_run.glyphs, 0, false)?;
+                local.with_svg_placements(placements)
             } else {
-                local_run
+                local
             };
-            validate_outline_run(&run, "mixed vertical LTR")?;
+            let mut run = if sideways {
+                rotate_sideways_run(local_run, allow_raw_svg)?
+            } else {
+                let mut run = local_run;
+                validate_vertical_run(&mut run, "mixed vertical LTR", allow_raw_svg)?;
+                run
+            };
             let translation = (pen_x + shift_x, pen_y);
             if !translation.0.is_finite() || !translation.1.is_finite() {
                 return Err(Error::new(
@@ -459,6 +534,10 @@ impl<'a> FontEngine<'a> {
                     ));
                 }
             }
+            #[cfg(feature = "svg-fonts")]
+            if allow_raw_svg {
+                svg_placements.append_run(font, &options, &run.glyphs, glyphs.len(), sideways)?;
+            }
             mapped_groups.push(VerticalGroup::new(
                 byte_start..byte_start + group.len(),
                 local,
@@ -483,12 +562,10 @@ impl<'a> FontEngine<'a> {
             }
             byte_start += group.len();
         }
-        Ok(VerticalMappedLayout::new(
-            text,
-            GlyphRun::new(glyphs),
-            sources,
-            mapped_groups,
-        ))
+        let layout = VerticalMappedLayout::new(text, GlyphRun::new(glyphs), sources, mapped_groups);
+        #[cfg(feature = "svg-fonts")]
+        let layout = layout.with_svg_placements(svg_placements);
+        Ok(layout)
     }
 
     /// Measures the absolute sum of the mixed run's final y advances.
@@ -685,10 +762,23 @@ fn measure_vertical_run(run: &GlyphRun) -> LayoutMetrics {
 }
 
 fn validate_outline_run(run: &GlyphRun, context: &str) -> Result<(), Error> {
+    validate_vertical_layers(run, context, false)
+}
+
+fn validate_vertical_layers(
+    run: &GlyphRun,
+    context: &str,
+    allow_raw_svg: bool,
+) -> Result<(), Error> {
+    let _ = allow_raw_svg;
     // Validate the entire run before changing any geometry. Capability-based
     // scope also permits pathified SVG or foreground COLR that meets it.
     for positioned in &run.glyphs {
         for layer in &positioned.glyph.layers {
+            #[cfg(feature = "svg-fonts")]
+            if allow_raw_svg && matches!(layer, GlyphLayer::Svg(_)) {
+                continue;
+            }
             if !matches!(layer, GlyphLayer::Path(path)
                 if path.paint == GlyphPaint::CurrentColor
                     && path.paint_mode == PathPaintMode::Fill
@@ -704,8 +794,54 @@ fn validate_outline_run(run: &GlyphRun, context: &str) -> Result<(), Error> {
     Ok(())
 }
 
-fn rotate_sideways_ltr(mut run: GlyphRun) -> Result<GlyphRun, Error> {
-    validate_outline_run(&run, "sideways LTR")?;
+fn validate_vertical_run(
+    run: &mut GlyphRun,
+    context: &str,
+    allow_raw_svg: bool,
+) -> Result<(), Error> {
+    #[cfg(feature = "svg-fonts")]
+    if allow_raw_svg {
+        for glyph in &mut run.glyphs {
+            let raw_count = glyph
+                .glyph
+                .layers
+                .iter()
+                .filter(|layer| matches!(layer, GlyphLayer::Svg(_)))
+                .count();
+            if raw_count == 0 {
+                continue;
+            }
+            if raw_count != 1
+                || glyph
+                    .glyph
+                    .layers
+                    .iter()
+                    .any(|layer| matches!(layer, GlyphLayer::Raster(_)))
+            {
+                return Err(Error::new(
+                    ErrorKind::Unsupported,
+                    "ambiguous mixed SVG glyph representation",
+                ));
+            }
+            // Full SVG takes precedence. Do not rotate an approximation (which
+            // could carry clip or gradient coordinates) and paint it twice.
+            glyph
+                .glyph
+                .layers
+                .retain(|layer| matches!(layer, GlyphLayer::Svg(_)));
+        }
+        return validate_vertical_layers(run, context, true);
+    }
+    let _ = allow_raw_svg;
+    validate_outline_run(run, context)
+}
+
+fn rotate_sideways_ltr(run: GlyphRun) -> Result<GlyphRun, Error> {
+    rotate_sideways_run(run, false)
+}
+
+fn rotate_sideways_run(mut run: GlyphRun, allow_raw_svg: bool) -> Result<GlyphRun, Error> {
+    validate_vertical_run(&mut run, "sideways LTR", allow_raw_svg)?;
     for positioned in &mut run.glyphs {
         (positioned.x, positioned.y) = (-positioned.y, positioned.x);
         let glyph = &mut positioned.glyph;
@@ -724,6 +860,17 @@ fn rotate_sideways_ltr(mut run: GlyphRun) -> Result<GlyphRun, Error> {
             font.flow = crate::commands::GlyphFlow::Vertical;
         }
         for layer in &mut glyph.layers {
+            #[cfg(feature = "svg-fonts")]
+            if let GlyphLayer::Svg(svg) = layer {
+                (svg.offset_x, svg.offset_y) = (-svg.offset_y, svg.offset_x);
+                (svg.view_box_min_x, svg.view_box_min_y) = (
+                    -(svg.view_box_min_y + svg.view_box_height),
+                    svg.view_box_min_x,
+                );
+                (svg.view_box_width, svg.view_box_height) =
+                    (svg.view_box_height, svg.view_box_width);
+                (svg.width, svg.height) = (svg.height, svg.width);
+            }
             if let GlyphLayer::Path(path) = layer {
                 (path.offset_x, path.offset_y) = (-path.offset_y, path.offset_x);
                 for command in &mut path.commands {

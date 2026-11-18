@@ -142,6 +142,23 @@ More runnable examples live in [doc/api-recipes.md](doc/api-recipes.md).
 
 ## About SVG Color Fonts
 
+Renderers that need the placement of raw `GlyphLayer::Svg` data can use
+`FontEngine::shape_with_svg_context`, `FontFamily::shape_with_svg_context`, or
+`CompositeFont::shape_ltr_with_svg_context`. The matrix is per layer, in final
+run coordinates, and includes the face's actual scale and placement.
+`ShapedText::svg_layer_transform` exposes the same contract for source-mapped
+runs. In hard-line and BiDi layouts, add each line or run origin before adding
+the caller's placement. The typed mixed-vertical result already contains group
+placement and rotation; do not apply the group transform a second time.
+
+For raw SVG in sideways or mixed vertical LTR, use the engine's
+`shape_sideways_ltr_with_svg_context`,
+`shape_vertical_mixed_ltr_with_svg_context`, or
+`shape_vertical_mixed_ltr_mapped_with_svg_context`. The old outline APIs keep
+their previous restrictions. Raw SVG is a whole-glyph alternative to any
+approximation paths, not an extra layer. Other colored paths and bitmap glyphs
+are not newly enabled in these restricted flows.
+
 `sbix` is exposed as raster layers, `COLR/CPAL` as path layers, and the OpenType `SVG ` table is pathified first under `svg-fonts`, falling back to `Svg` layers only when needed.
 
 The current `svg-fonts` implementation converts simple `path`, `rect`, `circle`, `ellipse`, `line`, `polyline`, and `polygon` elements into `PathGlyphLayer` values. It includes minimal `defs` / `use`, `fill` / `fill-rule` / `stroke` / `stroke-width`, `clipPath` / `clip-path`, simple `mask`, `translate` / `scale` / `rotate` / `skewX` / `skewY` / `matrix`, `linearGradient` / `radialGradient` / `stop`, and preserved `gradientUnits` / `gradientTransform` support, and keeps a `GlyphLayer::Svg` fallback not only for payloads that cannot be pathified, but also for payloads that still contain unsupported constructs such as `pattern`, complex `mask`, or `filter`.

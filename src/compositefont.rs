@@ -10,6 +10,8 @@ struct CompositeLayoutResult {
     run: GlyphRun,
     sources: Vec<crate::mapped::GlyphSource>,
     ligature_carets: Vec<Option<Vec<f32>>>,
+    #[cfg(feature = "svg-fonts")]
+    svg_placements: crate::commands::SvgPlacements,
 }
 
 /// An inclusive range of Unicode scalar values (not UTF-8 bytes).
@@ -264,6 +266,17 @@ impl<'a> CompositeFont<'a> {
         Ok(self.shape_ltr_impl(text, false)?.run)
     }
 
+    /// Like `shape_ltr`, retaining the actual face, effective size and baseline
+    /// adjustments in each raw SVG transform.
+    #[cfg(feature = "svg-fonts")]
+    pub fn shape_ltr_with_svg_context(&self, text: &str) -> Result<crate::SvgGlyphRun, Error> {
+        let result = self.shape_ltr_impl(text, false)?;
+        Ok(crate::SvgGlyphRun {
+            run: result.run,
+            placements: result.svg_placements,
+        })
+    }
+
     /// Shapes one LTR line with original UTF-8 source and face/span provenance.
     ///
     /// Face indices are the first occurrence in the default face list followed
@@ -271,13 +284,16 @@ impl<'a> CompositeFont<'a> {
     /// These indices are local to this composition, not stable font identifiers.
     pub fn shape_mapped_ltr(&self, text: &str) -> Result<crate::mapped::ShapedText, Error> {
         let result = self.shape_ltr_impl(text, true)?;
-        Ok(crate::mapped::ShapedText::new(
+        let shaped = crate::mapped::ShapedText::new(
             text,
             result.run,
             result.sources,
             crate::TextDirection::LeftToRight,
         )
-        .with_ligature_carets(result.ligature_carets))
+        .with_ligature_carets(result.ligature_carets);
+        #[cfg(feature = "svg-fonts")]
+        let shaped = shaped.with_svg_placements(result.svg_placements);
+        Ok(shaped)
     }
 
     fn shape_ltr_impl(&self, text: &str, mapped: bool) -> Result<CompositeLayoutResult, Error> {
@@ -354,6 +370,8 @@ impl<'a> CompositeFont<'a> {
             run: output,
             sources: provenance.sources,
             ligature_carets: provenance.ligature_carets,
+            #[cfg(feature = "svg-fonts")]
+            svg_placements: provenance.svg_placements,
         })
     }
 
@@ -374,7 +392,11 @@ impl<'a> CompositeFont<'a> {
                 "composite effective size must be positive and finite",
             ));
         }
-        let options = self.options.clone().with_font_size(size);
+        let options = self
+            .options
+            .clone()
+            .with_font_size(size)
+            .with_face(selection.face);
         let mut run = if mapped {
             let mapped_output = selection
                 .face
@@ -392,7 +414,7 @@ impl<'a> CompositeFont<'a> {
             provenance.finish(mapped_output.ranges, face_index);
             mapped_output.run
         } else {
-            selection.face.engine().with_options(options).shape(text)?
+            selection.face.font().text2glyph_run(text, &options)?
         };
         let mut delta = (0.0, 0.0);
         for glyph in &mut run.glyphs {
@@ -404,6 +426,14 @@ impl<'a> CompositeFont<'a> {
         }
         cursor.0 += delta.0;
         cursor.1 += delta.1;
+        #[cfg(feature = "svg-fonts")]
+        provenance.svg_placements.append_run(
+            selection.face.font(),
+            &options,
+            &run.glyphs,
+            output.glyphs.len(),
+            false,
+        )?;
         output.glyphs.extend(run.glyphs);
         Ok(())
     }
