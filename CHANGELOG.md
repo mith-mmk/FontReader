@@ -2,13 +2,27 @@
 
 ## Unreleased
 
+## 0.0.20 - 2026-11-18
+
+### OpenType SVG
+
+- Extract bounded self-contained glyph documents with exact glyph selection, transitive local references, inherited presentation context, and em-based root viewport normalization. Unsupported or unsafe SVG input is rejected. See [SVG extraction and fixtures](doc/svg-extraction/README.md).
+- Drop incomplete path conversion atomically, including unresolved clips. Nested SVG viewports and symbols use raw SVG only, preserving viewport and instantiation semantics.
+- Add `FontEngine::shape_with_svg_context` and `SvgGlyphRun::svg_layer_transform` for raw SVG renderers. The typed transform does not change legacy glyph metadata or itself render raw SVG.
+
+### GDEF ligature carets
+
 - Correct the drawable metric origin of static, simple, monochrome TrueType outlines by applying `LSB - xMin` once to the path layer. Raw outline coordinates, advances, GPOS placement and Format 1 GDEF carets remain unchanged. Composite, rendered COLR and variable outline paths are deliberately excluded pending separate origin audits. This changes positioned ink bounds for affected valid fonts, not their text advances.
 
 - Prefer validated static GDEF Format 1 and Format 3 (without adjustments) ligature carets in mapped single-run, hard-line, BiDi and mixed-vertical geometry. Preserve authored candidates through family/composite shaping.
 - Add `CaretSource` and `source()` getters. Existing exhaustive `CaretQuality` stays unchanged: internal positions retain its conservative `Approximate` value, including font-authored positions. Use the new source getter to distinguish them.
 - Correct signed Format 3 coordinates and bound ligature-caret parsing; preserve Coverage index order independently of physical table order. The private Format 3 parser now stores a signed coordinate instead of the incorrectly named unsigned point field.
-- Resolve GDEF Format 2 real contour points for unhinted static simple monochrome TrueType glyphs using a bounded decoder. Apply metric-origin correction to X, preserve actual off-curve point indices, and exclude implicit/phantom points. Composite, variable and COLR point resolution remains unsupported.
+- Resolve GDEF Format 2 real contour points for unhinted static monochrome TrueType glyphs using a bounded decoder for simple outlines and integer-translation composites. Apply metric-origin correction to X, preserve actual off-curve point indices, and exclude implicit/phantom points. General transformed composites, variable and COLR point resolution remain unsupported.
 - Unsupported point-resolution, Device/VariationIndex, variable-face and ambiguous glyph ownership cases retain explicit equal-advance approximation. This does not add wrapping, selection rectangles, cross-run joining or vertical paragraph BiDi. See [HarfBuzz comparison and verification scope](doc/gdef-carets/README.md).
+
+### Compatibility
+
+- Keep Rust 1.91 and the existing feature defaults. Cargo requirements for fontcore 0.0.19 do not select 0.0.20; update the requirement explicitly.
 
 ## 0.0.19 - 2026-11-16
 

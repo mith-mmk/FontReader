@@ -63,8 +63,6 @@ pub mod woff;
 
 #[deprecated(note = "use `fontcore::commands` instead")]
 pub use commands as commads;
-#[cfg(feature = "svg-fonts")]
-pub use commands::SvgGlyphLayer;
 pub use commands::{
     text2commands, Command, FillRule, FontMetrics, FontOptions, FontRef, FontStretch, FontStyle,
     FontVariant, FontVariationSetting, FontWeight, Glyph, GlyphBounds, GlyphFlow,
@@ -72,6 +70,8 @@ pub use commands::{
     GlyphMetrics, GlyphPaint, GlyphRadialGradient, GlyphRun, PathGlyphLayer, PathPaintMode,
     PositionedGlyph, RasterGlyphLayer, RasterGlyphSource, TextDirection,
 };
+#[cfg(feature = "svg-fonts")]
+pub use commands::{SvgGlyphLayer, SvgGlyphRun};
 pub use compositefont::{CompositeFont, CompositeFontRule, UnicodeRange};
 pub use fontengine::{FontEngine, LayoutMetrics, ShapingPolicy};
 pub use fontface::{FontFace, FontFaceDescriptor, FontFamily, FontVariationAxis};

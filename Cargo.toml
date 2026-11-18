@@ -1,6 +1,6 @@
 [package]
 name = "fontcore"
-version = "0.0.19"
+version = "0.0.20"
 edition = "2021"
 rust-version = "1.91"
 authors = ["Mith@mmk"]

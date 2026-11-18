@@ -143,18 +143,34 @@ pub(crate) fn svg_to_path_layers(
         return Vec::new();
     };
 
+    if has_nested_viewport_or_symbol(&root) {
+        return Vec::new();
+    }
+
     let mut defs = HashMap::new();
     collect_definitions(&root, &mut defs);
 
     let mut layers = Vec::new();
     let state = RenderState::default();
-    flatten_node(&root, &defs, &state, scale_x, scale_y, &mut layers);
+    // A glyph is atomic: never report only the successfully converted shapes.
+    if flatten_node(&root, &defs, &state, scale_x, scale_y, &mut layers).is_err() {
+        return Vec::new();
+    }
     layers
 }
 
 pub(crate) fn svg_requires_svg_fallback(document: &str) -> bool {
     let lowered = document.to_ascii_lowercase();
-    lowered.contains("<pattern")
+    // Extraction now preserves viewport and compositing information which the
+    // path subset cannot faithfully represent. Keep the source alternative.
+    svg_viewports_require_fallback(document)
+        || lowered.contains("opacity")
+        || lowered.contains("display")
+        || lowered.contains("visibility")
+        || lowered.contains("preserveaspectratio")
+        || lowered.contains("stroke-line")
+        || lowered.contains("stroke-dash")
+        || lowered.contains("<pattern")
         || lowered.contains("<mask")
         || lowered.contains("<filter")
         || lowered.contains("patternunits=")
@@ -164,6 +180,75 @@ pub(crate) fn svg_requires_svg_fallback(document: &str) -> bool {
         || lowered.contains("filter=\"")
         || lowered.contains("mask=\"")
         || lowered.contains("mask:")
+}
+
+// Nested SVG establishes a viewport, including default overflow clipping even
+// without a viewBox. A symbol renders only through use, whose dimensions can
+// size its viewport. The path subset cannot represent either case faithfully.
+fn has_nested_viewport_or_symbol(root: &SvgNode) -> bool {
+    let mut pending = vec![(root, false)];
+    while let Some((node, is_document_child)) = pending.pop() {
+        let SvgNode::Element(element) = node else {
+            continue;
+        };
+        if element.name == "symbol" || (element.name == "svg" && !is_document_child) {
+            return true;
+        }
+        let is_document = element.name == "#document";
+        pending.extend(element.children.iter().map(|child| (child, is_document)));
+    }
+    false
+}
+
+// The legacy path subset treats the outer SVG as a group; preserve its source
+// alternative when its viewport is non-identity.
+fn svg_viewports_require_fallback(document: &str) -> bool {
+    let Ok(root) = parse_svg_document(document) else {
+        return true;
+    };
+    if has_nested_viewport_or_symbol(&root) {
+        return true;
+    }
+    let SvgNode::Element(document) = &root else {
+        return true;
+    };
+    for node in &document.children {
+        let SvgNode::Element(element) = node else {
+            continue;
+        };
+        if element.name == "svg" {
+            for key in ["x", "y"] {
+                if element.attrs.get(key).is_some_and(|v| v.trim() != "0") {
+                    return true;
+                }
+            }
+            if let Some(viewbox) = element.attrs.get("viewbox") {
+                let values: Vec<_> = viewbox
+                    .split(|c: char| c.is_ascii_whitespace() || c == ',')
+                    .filter(|s| !s.is_empty())
+                    .map(str::parse::<f32>)
+                    .collect();
+                let width = element
+                    .attrs
+                    .get("width")
+                    .and_then(|v| v.parse::<f32>().ok());
+                let height = element
+                    .attrs
+                    .get("height")
+                    .and_then(|v| v.parse::<f32>().ok());
+                if values.len() != 4
+                    || values.iter().any(Result::is_err)
+                    || values[0] != Ok(0.0)
+                    || values[1] != Ok(0.0)
+                    || values[2].as_ref().ok().copied() != width
+                    || values[3].as_ref().ok().copied() != height
+                {
+                    return true;
+                }
+            }
+        }
+    }
+    false
 }
 
 fn parse_svg_document(document: &str) -> Result<SvgNode, ()> {
@@ -289,20 +374,20 @@ fn flatten_node(
     scale_x: f32,
     scale_y: f32,
     out: &mut Vec<PathGlyphLayer>,
-) {
+) -> Result<(), ()> {
     let SvgNode::Element(element) = node else {
-        return;
+        return Ok(());
     };
 
     if element.name == "#document" {
         for child in &element.children {
-            flatten_node(child, defs, state, scale_x, scale_y, out);
+            flatten_node(child, defs, state, scale_x, scale_y, out)?;
         }
-        return;
+        return Ok(());
     }
 
     if element.name == "defs" {
-        return;
+        return Ok(());
     }
 
     let style = element.attrs.get("style").map(|value| parse_style(value));
@@ -328,6 +413,18 @@ fn flatten_node(
         scale_x,
         scale_y,
     );
+    // Unknown paints must not silently erase a shape while siblings survive.
+    for (key, paint) in [("fill", &local_fill), ("stroke", &local_stroke)] {
+        let explicit = style
+            .as_ref()
+            .and_then(|style| style.get(key))
+            .or_else(|| element.attrs.get(key));
+        if explicit.is_some_and(|value| !value.trim().eq_ignore_ascii_case("none"))
+            && paint.is_none()
+        {
+            return Err(());
+        }
+    }
     let local_stroke_width = style
         .as_ref()
         .and_then(|style| style.get("stroke-width"))
@@ -351,6 +448,17 @@ fn flatten_node(
         scale_x,
         scale_y,
     );
+    for (key, resolved) in [("clip-path", &local_clip_path), ("mask", &local_mask_path)] {
+        let explicit = style
+            .as_ref()
+            .and_then(|style| style.get(key))
+            .or_else(|| element.attrs.get(key));
+        if explicit.is_some_and(|value| !value.trim().eq_ignore_ascii_case("none"))
+            && resolved.is_none()
+        {
+            return Err(());
+        }
+    }
     let next_state = RenderState {
         transform: state.transform.multiply(parse_transform(
             style
@@ -369,22 +477,19 @@ fn flatten_node(
     };
 
     match element.name.as_str() {
-        "svg" | "g" | "symbol" => {
+        "svg" | "g" => {
             for child in &element.children {
-                flatten_node(child, defs, &next_state, scale_x, scale_y, out);
+                flatten_node(child, defs, &next_state, scale_x, scale_y, out)?;
             }
         }
-        "use" => flatten_use(element, defs, next_state, scale_x, scale_y, out),
+        "use" => flatten_use(element, defs, next_state, scale_x, scale_y, out)?,
         "path" | "rect" | "circle" | "ellipse" | "line" | "polyline" | "polygon" => {
-            out.extend(element_to_path_layers(
-                element,
-                &next_state,
-                scale_x,
-                scale_y,
-            ));
+            out.extend(element_to_path_layers(element, &next_state, scale_x, scale_y).ok_or(())?);
         }
-        _ => {}
+        "lineargradient" | "radialgradient" | "stop" | "clippath" | "mask" => {}
+        _ => return Err(()),
     }
+    Ok(())
 }
 
 fn flatten_use(
@@ -394,17 +499,17 @@ fn flatten_use(
     scale_x: f32,
     scale_y: f32,
     out: &mut Vec<PathGlyphLayer>,
-) {
+) -> Result<(), ()> {
     let Some(reference) = element
         .attrs
         .get("href")
         .or_else(|| element.attrs.get("xlink:href"))
         .and_then(|value| value.strip_prefix('#'))
     else {
-        return;
+        return Err(());
     };
     let Some(referenced) = defs.get(reference) else {
-        return;
+        return Err(());
     };
     let mut referenced = referenced.clone();
     for key in ["fill", "fill-rule", "stroke", "stroke-width"] {
@@ -432,7 +537,7 @@ fn flatten_use(
         scale_x,
         scale_y,
         out,
-    );
+    )
 }
 
 fn element_to_path_layers(
@@ -440,7 +545,7 @@ fn element_to_path_layers(
     state: &RenderState,
     scale_x: f32,
     scale_y: f32,
-) -> Vec<PathGlyphLayer> {
+) -> Option<Vec<PathGlyphLayer>> {
     let commands = match element.name.as_str() {
         "path" => element
             .attrs
@@ -452,13 +557,11 @@ fn element_to_path_layers(
         "line" => line_to_commands(&element.attrs, scale_x, scale_y),
         "polyline" => poly_points_to_commands(&element.attrs, false, scale_x, scale_y),
         "polygon" => poly_points_to_commands(&element.attrs, true, scale_x, scale_y),
-        _ => return Vec::new(),
+        _ => return None,
     };
-    let Some(commands) = commands else {
-        return Vec::new();
-    };
+    let commands = commands?;
     if commands.is_empty() {
-        return Vec::new();
+        return Some(Vec::new());
     }
     let transformed = transform_commands(&commands, state.transform);
     let bounds = command_bounds(&transformed);
@@ -499,7 +602,7 @@ fn element_to_path_layers(
         }
     }
 
-    layers
+    Some(layers)
 }
 
 fn resolve_gradient_paint(
@@ -1192,7 +1295,7 @@ fn resolve_clip_path(
     }
     let reference = parse_url_reference(value)?;
     let element = defs.get(reference)?;
-    parse_clip_path_spec(element, defs, scale_x, scale_y).or_else(|| inherited.cloned())
+    parse_clip_path_spec(element, defs, scale_x, scale_y)
 }
 
 fn resolve_mask_path(
@@ -1212,7 +1315,7 @@ fn resolve_mask_path(
     }
     let reference = parse_url_reference(value)?;
     let element = defs.get(reference)?;
-    parse_mask_spec(element, defs, scale_x, scale_y).or_else(|| inherited.cloned())
+    parse_mask_spec(element, defs, scale_x, scale_y)
 }
 
 fn parse_clip_path_spec(
@@ -1241,7 +1344,8 @@ fn parse_clip_path_spec(
             scale_x,
             scale_y,
             &mut commands,
-        );
+        )
+        .ok()?;
     }
     if commands.is_empty() {
         None
@@ -1277,7 +1381,8 @@ fn parse_mask_spec(
             scale_x,
             scale_y,
             &mut commands,
-        );
+        )
+        .ok()?;
     }
     if commands.is_empty() {
         None
@@ -1293,9 +1398,9 @@ fn collect_clip_commands(
     scale_x: f32,
     scale_y: f32,
     out: &mut Vec<Command>,
-) {
+) -> Result<(), ()> {
     let SvgNode::Element(element) = node else {
-        return;
+        return Ok(());
     };
     let style = element.attrs.get("style").map(|value| parse_style(value));
     let next_transform = transform.multiply(parse_transform(
@@ -1308,9 +1413,9 @@ fn collect_clip_commands(
     ));
 
     match element.name.as_str() {
-        "g" | "svg" | "symbol" | "clippath" => {
+        "g" | "clippath" => {
             for child in &element.children {
-                collect_clip_commands(child, defs, next_transform, scale_x, scale_y, out);
+                collect_clip_commands(child, defs, next_transform, scale_x, scale_y, out)?;
             }
         }
         "use" => {
@@ -1320,10 +1425,10 @@ fn collect_clip_commands(
                 .or_else(|| element.attrs.get("xlink:href"))
                 .and_then(|value| value.strip_prefix('#'))
             else {
-                return;
+                return Err(());
             };
             let Some(referenced) = defs.get(reference) else {
-                return;
+                return Err(());
             };
             let translate = Transform2D::translate(
                 parse_attr_f32(&element.attrs, "x").unwrap_or(0.0) * scale_x,
@@ -1336,7 +1441,7 @@ fn collect_clip_commands(
                 scale_x,
                 scale_y,
                 out,
-            );
+            )?;
         }
         "path" | "rect" | "circle" | "ellipse" | "line" | "polyline" | "polygon" => {
             let commands = match element.name.as_str() {
@@ -1352,12 +1457,11 @@ fn collect_clip_commands(
                 "polygon" => poly_points_to_commands(&element.attrs, true, scale_x, scale_y),
                 _ => None,
             };
-            if let Some(commands) = commands {
-                out.extend(transform_commands(&commands, next_transform));
-            }
+            out.extend(transform_commands(&commands.ok_or(())?, next_transform));
         }
-        _ => {}
+        _ => return Err(()),
     }
+    Ok(())
 }
 
 fn parse_hex_color(hex: &str) -> Option<u32> {
@@ -2316,6 +2420,113 @@ mod tests {
             matches!(layers[0].commands.last(), Some(Command::CubicBezier(_, _, (x, y))) if (*x - 20.0).abs() < 0.01 && (*y - 20.0).abs() < 0.01),
             "expected relative arc to end at the translated target"
         );
+    }
+
+    #[test]
+    fn unresolved_or_partial_clip_never_disappears_silently() {
+        let shape = "<rect width='10' height='10' clip-path='url(#clip)'/>";
+        let valid = "<rect width='5' height='5'/>";
+        let bad = "<path d='M0 0C1 2'/>";
+        assert!(!svg_to_path_layers(
+            &format!("<svg><defs><clipPath id='clip'>{valid}</clipPath></defs>{shape}</svg>"),
+            1.0,
+            1.0
+        )
+        .is_empty());
+        // Existing subset does not index clip definitions outside defs.
+        for document in [
+            format!("<svg><clipPath id='clip'>{valid}</clipPath>{shape}</svg>"),
+            format!("<svg><defs><clipPath id='clip'>{valid}{bad}</clipPath></defs>{shape}</svg>"),
+        ] {
+            assert!(svg_to_path_layers(&document, 1.0, 1.0).is_empty());
+        }
+    }
+
+    #[test]
+    fn partial_shape_conversion_never_returns_partial_glyph() {
+        let valid = "<path d='M0 0L10 10Z' fill='#ff0000'/>";
+        let invalid = "<path d='M0 0C1 2' fill='#0000ff'/>";
+        assert!(!svg_to_path_layers(&format!("<svg>{valid}</svg>"), 1.0, 1.0).is_empty());
+        for body in [
+            format!("{valid}{invalid}"),
+            format!("{invalid}{valid}"),
+            format!("{valid}<path d='M0 0L10 10Z' fill='burlywood'/>"),
+            format!("{valid}<use href='#missing'/>"),
+            format!("<defs><g id='p'>{valid}{invalid}</g></defs><use href='#p'/>"),
+        ] {
+            assert!(svg_to_path_layers(&format!("<svg>{body}</svg>"), 1.0, 1.0).is_empty());
+        }
+    }
+
+    #[test]
+    fn real_noto_partial_pathification_preserves_raw_document() {
+        let payload = include_str!("../doc/svg-extraction/examples/noto-smile.svg").to_string();
+        let document = crate::opentype::color::svg::SvgGlyphDocument {
+            payload: payload.clone(),
+            view_box_min_x: 0.0,
+            view_box_min_y: 0.0,
+            view_box_width: 128.0,
+            view_box_height: 128.0,
+        };
+        let layers = crate::fontreader::svg_document_to_glyph_layers(&document, 1.0, 1.0);
+        assert!(
+            matches!(layers.as_slice(), [crate::GlyphLayer::Svg(svg)] if svg.document == payload)
+        );
+    }
+
+    #[test]
+    fn svg_viewport_fallback_distinguishes_identity_from_transform() {
+        assert!(!svg_requires_svg_fallback(
+            "<svg width='1000' height='1000' viewBox='0 0 1000 1000'><path/></svg>"
+        ));
+        assert!(svg_requires_svg_fallback(
+            "<svg width='1000' height='1000' viewBox='0 -800 1000 1000'><path/></svg>"
+        ));
+        assert!(svg_requires_svg_fallback(
+            "<svg width='1000' height='1000' viewBox='0 0 100 100'><path/></svg>"
+        ));
+        assert!(svg_requires_svg_fallback(
+            "<svg><g opacity='.5'><path/></g></svg>"
+        ));
+    }
+
+    #[test]
+    fn nested_viewports_and_symbols_return_only_the_complete_svg() {
+        let normal = "<rect width='20' height='20' fill='#f00'/>";
+        let symbol = "<symbol id='s' viewBox='0 0 20 20'><rect width='20' height='20'/></symbol>";
+        let viewport =
+            "<svg width='5' height='5' overflow='hidden'><rect width='20' height='20'/></svg>";
+        for body in [
+            format!("{normal}<g>{viewport}</g>"),
+            format!("{normal}<svg width='5' height='5'><rect width='20' height='20'/></svg>"),
+            format!("{normal}<svg width='5' height='5' viewBox='0 0 5 5'>{normal}</svg>"),
+            format!("{normal}{symbol}"),
+            format!("{normal}<defs>{symbol}</defs><use href='#s' width='5' height='5'/>"),
+            format!("{normal}<defs><svg id='inner' width='5' height='5'>{normal}</svg></defs><use href='#inner'/>"),
+        ] {
+            let payload = format!(
+                "<svg width='100' height='100' viewBox='0 0 100 100' overflow='visible'>{body}</svg>"
+            );
+            assert!(svg_requires_svg_fallback(&payload));
+            let document = crate::opentype::color::svg::SvgGlyphDocument {
+                payload: payload.clone(),
+                view_box_min_x: 0.0,
+                view_box_min_y: 0.0,
+                view_box_width: 100.0,
+                view_box_height: 100.0,
+            };
+            let layers = crate::fontreader::svg_document_to_glyph_layers(&document, 1.0, 1.0);
+            assert!(
+                matches!(layers.as_slice(), [crate::GlyphLayer::Svg(svg)] if svg.document == payload),
+                "{body}: {layers:?}"
+            );
+        }
+
+        let plain = format!(
+            "<svg width='100' height='100' viewBox='0 0 100 100' overflow='visible'>{normal}</svg>"
+        );
+        assert!(!svg_requires_svg_fallback(&plain));
+        assert_eq!(svg_to_path_layers(&plain, 1.0, 1.0).len(), 1);
     }
 
     #[test]

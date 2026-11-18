@@ -1,0 +1,73 @@
+{
+  "rust": "1.91.0",
+  "checks": {
+    "nodefaultfeatures": {
+      "passed": 325,
+      "failed": 0,
+      "ignored": 2
+    },
+    "default": {
+      "passed": 562,
+      "failed": 0,
+      "ignored": 3
+    },
+    "featureslayoutcff": {
+      "passed": 562,
+      "failed": 0,
+      "ignored": 3
+    },
+    "allfeatures": {
+      "passed": 681,
+      "failed": 0,
+      "ignored": 3
+    }
+  },
+  "clippy_all_targets_all_features": "passed",
+  "examples_all_features": "passed",
+  "doc_all_features": "passed",
+  "wasm32_unknown_unknown_all_features": "passed",
+  "twemoji_15_1_0": {
+    "font_sha256": "42d4b2a827c9ed557dff88c2f4723cb93985003a81dee76797324d66d04a57b8",
+    "accepted": 3838,
+    "rejected": 0
+  },
+  "rendering": "see pixel-check.json; paintcore not tested",
+  "partial_path_followup": {
+    "all_features_passed": 683,
+    "failed": 0,
+    "ignored": 3,
+    "clippy": "passed",
+    "noto": "raw SVG only; no partial Paths"
+  },
+  "typed_render_context": {
+    "all_features_passed": 686,
+    "all_features_ignored": 3,
+    "no_default_passed": 325,
+    "no_default_ignored": 2,
+    "clippy": "passed",
+    "wasm": "passed",
+    "docs": "passed",
+    "compatibility": "same legacy run fields and document; explicit typed companion transform"
+  },
+  "noto_metadata_followup": {
+    "all_features": {
+      "passed": 689,
+      "failed": 0,
+      "ignored": 4
+    },
+    "no_default": {
+      "passed": 327,
+      "failed": 0,
+      "ignored": 3
+    },
+    "clippy": "passed",
+    "pinned_noto_extraction": {
+      "accepted": 18,
+      "rejected": [
+        "emoji_u1f436.svg",
+        "emoji_u1f680.svg"
+      ],
+      "reason": "DOCTYPE/entity declarations remain unsupported"
+    }
+  }
+}

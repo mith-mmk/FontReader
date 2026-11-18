@@ -108,12 +108,11 @@ impl Svg {
         fonsize: f64,
         fontunit: &str,
         layout: &FontLayout,
-        _: f64,
-        _: f64,
+        units_per_em: u16,
     ) -> Option<String> {
-        let document = self.get_glyph_document(gid, layout)?;
+        let document = self.get_glyph_document_with_units(gid, layout, units_per_em)?;
         let mut string = format!(
-            "<svg width=\"{}{}\" height=\"{}{}\" viewBox=\"{} {} {} {}\">",
+            "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{}{}\" height=\"{}{}\" viewBox=\"{} {} {} {}\">",
             fonsize,
             fontunit,
             fonsize,
@@ -128,10 +127,20 @@ impl Svg {
         Some(string)
     }
 
+    #[cfg(test)]
     pub(crate) fn get_glyph_document(
         &self,
         gid: u32,
         layout: &FontLayout,
+    ) -> Option<SvgGlyphDocument> {
+        self.get_glyph_document_with_units(gid, layout, 1000)
+    }
+
+    pub(crate) fn get_glyph_document_with_units(
+        &self,
+        gid: u32,
+        layout: &FontLayout,
+        units_per_em: u16,
     ) -> Option<SvgGlyphDocument> {
         let gid = u16::try_from(gid).ok()?;
         let mut svg_document = None;
@@ -143,8 +152,7 @@ impl Svg {
             }
         }
         let svg = decode_svg_document(svg_document?, self.max_svg_bytes)?;
-        let payload = extract_svg_payload_for_gid(&svg, gid)?;
-        let payload = sanitize_svg_payload(&payload)?;
+        let payload = super::svg_extract::extract_with_units(&svg, gid, units_per_em)?;
         let (view_box_min_x, view_box_min_y, view_box_width, view_box_height) =
             layout_view_box(layout);
         Some(SvgGlyphDocument {
@@ -214,6 +222,10 @@ fn decompress_gzip(document: &[u8], max_output: usize) -> Option<Vec<u8>> {
         cursor += 1;
     }
     if flags & 0x02 != 0 {
+        let expected = u16::from_le_bytes([*document.get(cursor)?, *document.get(cursor + 1)?]);
+        if crc32(document.get(..cursor)?) as u16 != expected {
+            return None;
+        }
         cursor += 2;
     }
 
@@ -259,21 +271,7 @@ fn crc32(data: &[u8]) -> u32 {
     !crc
 }
 
-fn sanitize_svg_payload(payload: &str) -> Option<String> {
-    let mut cursor = 0usize;
-    while let Some(relative) = payload.get(cursor..)?.find('<') {
-        let start = cursor + relative;
-        let end = find_svg_tag_end(payload, start)?;
-        validate_svg_tag(&payload[start + 1..end])?;
-        cursor = end;
-    }
-    if payload.get(cursor..)?.contains('>') {
-        return None;
-    }
-    Some(payload.to_string())
-}
-
-fn find_svg_tag_end(payload: &str, start: usize) -> Option<usize> {
+pub(super) fn find_svg_tag_end(payload: &str, start: usize) -> Option<usize> {
     let bytes = payload.as_bytes();
     let mut quote = None;
     for (index, &byte) in bytes.iter().enumerate().skip(start + 1) {
@@ -287,411 +285,9 @@ fn find_svg_tag_end(payload: &str, start: usize) -> Option<usize> {
     None
 }
 
-fn validate_svg_tag(tag: &str) -> Option<()> {
-    const SAFE_ELEMENTS: &[&str] = &[
-        "svg",
-        "g",
-        "path",
-        "rect",
-        "circle",
-        "ellipse",
-        "line",
-        "polyline",
-        "polygon",
-        "defs",
-        "lineargradient",
-        "radialgradient",
-        "stop",
-        "clippath",
-        "mask",
-        "use",
-    ];
-    let bytes = tag.as_bytes();
-    let mut cursor = 0usize;
-    skip_svg_whitespace(bytes, &mut cursor);
-    if bytes.get(cursor).copied() == Some(b'!') || bytes.get(cursor).copied() == Some(b'?') {
-        return None;
-    }
-    let closing = bytes.get(cursor).copied() == Some(b'/');
-    if closing {
-        cursor += 1;
-        skip_svg_whitespace(bytes, &mut cursor);
-    }
-    let name_start = cursor;
-    while bytes
-        .get(cursor)
-        .is_some_and(|byte| byte.is_ascii_alphanumeric() || *byte == b':')
-    {
-        cursor += 1;
-    }
-    if name_start == cursor {
-        return None;
-    }
-    let name = tag.get(name_start..cursor)?.to_ascii_lowercase();
-    if !SAFE_ELEMENTS.contains(&name.as_str()) {
-        return None;
-    }
-    if closing {
-        skip_svg_whitespace(bytes, &mut cursor);
-        return (cursor == bytes.len() - 1).then_some(());
-    }
-
-    loop {
-        skip_svg_whitespace(bytes, &mut cursor);
-        if cursor >= bytes.len() - 1 {
-            return Some(());
-        }
-        if bytes[cursor] == b'/' {
-            cursor += 1;
-            skip_svg_whitespace(bytes, &mut cursor);
-            return (cursor == bytes.len() - 1).then_some(());
-        }
-
-        let attr_start = cursor;
-        while bytes
-            .get(cursor)
-            .is_some_and(|byte| !byte.is_ascii_whitespace() && !matches!(*byte, b'=' | b'>'))
-        {
-            cursor += 1;
-        }
-        if attr_start == cursor {
-            return None;
-        }
-        let attribute = tag.get(attr_start..cursor)?.to_ascii_lowercase();
-        if attribute.starts_with("on")
-            || matches!(attribute.as_str(), "style" | "src" | "action" | "begin")
-        {
-            return None;
-        }
-        skip_svg_whitespace(bytes, &mut cursor);
-        if bytes.get(cursor).copied() != Some(b'=') {
-            return None;
-        }
-        cursor += 1;
-        skip_svg_whitespace(bytes, &mut cursor);
-        let quote = *bytes.get(cursor)?;
-        if quote != b'\'' && quote != b'\"' {
-            return None;
-        }
-        cursor += 1;
-        let value_start = cursor;
-        while bytes.get(cursor).copied() != Some(quote) {
-            cursor += 1;
-            if cursor >= bytes.len() {
-                return None;
-            }
-        }
-        let value = tag.get(value_start..cursor)?;
-        let compact = value
-            .chars()
-            .filter(|character| !character.is_ascii_whitespace())
-            .collect::<String>()
-            .to_ascii_lowercase();
-        if compact.contains("javascript:")
-            || compact.contains("vbscript:")
-            || compact.contains("data:")
-            || compact.contains("file:")
-            || compact.contains("http:")
-            || compact.contains("https:")
-            || compact.contains("//")
-        {
-            return None;
-        }
-        if (attribute == "href" || attribute == "xlink:href") && !compact.starts_with("#") {
-            return None;
-        }
-        let mut url_cursor = 0usize;
-        while let Some(relative) = compact.get(url_cursor..)?.find("url(") {
-            let url_start = url_cursor + relative + 4;
-            if !compact.get(url_start..)?.starts_with('#') {
-                return None;
-            }
-            url_cursor = url_start;
-        }
-        cursor += 1;
-    }
-}
-
-fn skip_svg_whitespace(bytes: &[u8], cursor: &mut usize) {
-    while bytes
-        .get(*cursor)
-        .is_some_and(|byte| byte.is_ascii_whitespace())
-    {
-        *cursor += 1;
-    }
-}
-
+#[cfg(test)]
 fn extract_svg_payload_for_gid(document: &str, gid: u16) -> Option<String> {
-    // The document root can itself be the glyph element. Do not discard its ID
-    // before deciding whether this document belongs to the requested glyph.
-    if let Some(start) = document.find("<svg") {
-        let end = find_svg_tag_end(document, start)?;
-        let root = &document[start..end];
-        if element_id(root).is_some_and(is_glyph_id) {
-            return fragment_matches_glyph_id(root, gid)
-                .then(|| extract_root_inner(document).map(str::to_string))
-                .flatten();
-        }
-    }
-    let (root_inner, defs_blocks) = if let Some(inner) = extract_root_inner(document) {
-        (inner, collect_tag_blocks(inner, "defs"))
-    } else {
-        ("", Vec::new())
-    };
-
-    if let Some(payload) = extract_payload_from_svg_fragments(root_inner, gid, &defs_blocks) {
-        return Some(payload);
-    }
-
-    if let Some(payload) = extract_payload_from_tagged_elements(root_inner, gid, &defs_blocks) {
-        return Some(payload);
-    }
-
-    // A shared document with glyph IDs must not render every sibling when the
-    // requested glyph is absent. Keep the legacy untagged single-document path.
-    if contains_glyph_ids(root_inner) {
-        return None;
-    }
-    if let Some(inner) = extract_root_inner(document) {
-        return Some(inner.to_string());
-    }
-
-    extract_payload_from_svg_fragments(document, gid, &[])
-        .or_else(|| extract_payload_from_tagged_elements(document, gid, &[]))
-}
-
-fn is_glyph_id(id: &str) -> bool {
-    id.strip_prefix("glyph")
-        .is_some_and(|suffix| suffix.parse::<u16>().is_ok())
-        || id.parse::<u16>().is_ok()
-}
-
-fn contains_glyph_ids(source: &str) -> bool {
-    let mut cursor = 0;
-    while let Some(relative) = source[cursor..].find('<') {
-        let start = cursor + relative;
-        let Some(end) = find_svg_tag_end(source, start) else {
-            return true;
-        };
-        if element_id(&source[start..end]).is_some_and(is_glyph_id) {
-            return true;
-        }
-        cursor = end;
-    }
-    false
-}
-
-fn extract_payload_from_svg_fragments(
-    source: &str,
-    gid: u16,
-    defs_blocks: &[&str],
-) -> Option<String> {
-    let fragments = collect_tag_blocks(source, "svg");
-    if fragments.is_empty() {
-        return None;
-    }
-
-    let selected = fragments
-        .iter()
-        .find(|fragment| fragment_matches_glyph_id(fragment, gid))
-        .copied()
-        .or_else(|| {
-            if fragments.len() == 1 && element_id(fragments[0]).is_none() {
-                fragments.first().copied()
-            } else {
-                None
-            }
-        })?;
-
-    if element_id(selected).is_none() && contains_glyph_ids(selected) {
-        // An untagged wrapper is not itself a glyph. Select its tagged child
-        // instead of returning all siblings, including when the ID is absent.
-        return extract_payload_from_tagged_elements(selected, gid, defs_blocks);
-    }
-    let fragment_inner = extract_root_inner(selected).unwrap_or(selected);
-    Some(combine_defs_and_payload(defs_blocks, fragment_inner))
-}
-
-fn extract_payload_from_tagged_elements(
-    source: &str,
-    gid: u16,
-    defs_blocks: &[&str],
-) -> Option<String> {
-    let elements = collect_glyph_tagged_elements(source, gid);
-    if elements.is_empty() {
-        return None;
-    }
-
-    let mut payload = String::new();
-    for defs in defs_blocks {
-        payload += defs;
-    }
-    for element in elements {
-        payload += element;
-    }
-    Some(payload)
-}
-
-fn combine_defs_and_payload(defs_blocks: &[&str], payload: &str) -> String {
-    let mut combined = String::new();
-    for defs in defs_blocks {
-        combined += defs;
-    }
-    combined += payload;
-    combined
-}
-
-fn extract_root_inner(document: &str) -> Option<&str> {
-    let root_start = document.find("<svg")?;
-    let start_tag_end = document[root_start..].find('>')? + root_start;
-    let root_end = document.rfind("</svg>")?;
-    if root_end <= start_tag_end {
-        return None;
-    }
-    Some(&document[start_tag_end + 1..root_end])
-}
-
-fn collect_tag_blocks<'a>(source: &'a str, tag: &str) -> Vec<&'a str> {
-    let mut blocks = Vec::new();
-    let open_pattern = format!("<{}", tag);
-    let mut cursor = 0usize;
-
-    while let Some(relative_start) = source[cursor..].find(&open_pattern) {
-        let start = cursor + relative_start;
-        let Some(end) = find_balanced_tag_end(source, start, tag) else {
-            break;
-        };
-        blocks.push(&source[start..end]);
-        cursor = end;
-    }
-
-    blocks
-}
-
-fn find_balanced_tag_end(source: &str, start: usize, tag: &str) -> Option<usize> {
-    let open_end = source[start..].find('>')? + start;
-    if source[..=open_end].ends_with("/>") {
-        return Some(open_end + 1);
-    }
-
-    let open_pattern = format!("<{}", tag);
-    let close_pattern = format!("</{}", tag);
-    let mut depth = 1usize;
-    let mut cursor = open_end + 1;
-
-    while cursor < source.len() {
-        let next_open = source[cursor..]
-            .find(&open_pattern)
-            .map(|offset| cursor + offset);
-        let next_close = source[cursor..]
-            .find(&close_pattern)
-            .map(|offset| cursor + offset);
-
-        match (next_open, next_close) {
-            (None, Some(close_start)) | (Some(_), Some(close_start))
-                if next_open
-                    .map(|open_start| close_start < open_start)
-                    .unwrap_or(true) =>
-            {
-                let close_end = source[close_start..].find('>')? + close_start + 1;
-                depth = depth.saturating_sub(1);
-                if depth == 0 {
-                    return Some(close_end);
-                }
-                cursor = close_end;
-            }
-            (Some(open_start), _) => {
-                let nested_open_end = source[open_start..].find('>')? + open_start;
-                if !source[..=nested_open_end].ends_with("/>") {
-                    depth += 1;
-                }
-                cursor = nested_open_end + 1;
-            }
-            (None, Some(close_start)) => {
-                let close_end = source[close_start..].find('>')? + close_start + 1;
-                depth = depth.saturating_sub(1);
-                if depth == 0 {
-                    return Some(close_end);
-                }
-                cursor = close_end;
-            }
-            (None, None) => break,
-        }
-    }
-
-    None
-}
-
-// Match the ID attribute on this element only, never a descendant or substring.
-fn element_id(fragment: &str) -> Option<&str> {
-    let end = find_svg_tag_end(fragment, 0)?;
-    let tag = &fragment[1..end - 1];
-    let bytes = tag.as_bytes();
-    let mut cursor = 0;
-    while bytes.get(cursor).is_some_and(|b| !b.is_ascii_whitespace()) {
-        cursor += 1;
-    }
-    loop {
-        skip_svg_whitespace(bytes, &mut cursor);
-        let start = cursor;
-        while bytes
-            .get(cursor)
-            .is_some_and(|b| !b.is_ascii_whitespace() && *b != b'=')
-        {
-            cursor += 1;
-        }
-        let name = tag.get(start..cursor)?;
-        skip_svg_whitespace(bytes, &mut cursor);
-        if bytes.get(cursor) != Some(&b'=') {
-            return None;
-        }
-        cursor += 1;
-        skip_svg_whitespace(bytes, &mut cursor);
-        let quote = *bytes.get(cursor)?;
-        if quote != b'\'' && quote != b'"' {
-            return None;
-        }
-        cursor += 1;
-        let start = cursor;
-        while *bytes.get(cursor)? != quote {
-            cursor += 1;
-        }
-        let value = &tag[start..cursor];
-        cursor += 1;
-        if name == "id" {
-            return Some(value);
-        }
-    }
-}
-
-fn fragment_matches_glyph_id(fragment: &str, gid: u16) -> bool {
-    element_id(fragment).is_some_and(|id| id == format!("glyph{gid}") || id == gid.to_string())
-}
-
-fn collect_glyph_tagged_elements(source: &str, gid: u16) -> Vec<&str> {
-    let mut elements = Vec::new();
-    let mut cursor = 0;
-    while let Some(relative) = source[cursor..].find('<') {
-        let start = cursor + relative;
-        let Some(open_end) = find_svg_tag_end(source, start) else {
-            break;
-        };
-        cursor = open_end;
-        if !fragment_matches_glyph_id(&source[start..open_end], gid) {
-            continue;
-        }
-        let Some(name_end) =
-            source[start + 1..].find(|ch: char| ch.is_whitespace() || ch == '>' || ch == '/')
-        else {
-            continue;
-        };
-        let tag = &source[start + 1..start + 1 + name_end];
-        if let Some(end) = find_balanced_tag_end(source, start, tag) {
-            elements.push(&source[start..end]);
-            cursor = end;
-        }
-    }
-    elements
+    super::svg_extract::extract(document, gid)
 }
 
 #[derive(Debug, Clone)]
@@ -793,6 +389,57 @@ impl std::fmt::Display for Svg {
 mod tests {
     use super::*;
 
+    /// Opt-in real OpenType-SVG corpus check, no network access in tests.
+    #[test]
+    #[ignore = "requires FONTCORE_SVG_FONT pointing at an OpenType-SVG font"]
+    fn external_svg_font_corpus() {
+        use bin_rs::reader::BytesReader;
+        let path = std::env::var("FONTCORE_SVG_FONT").unwrap();
+        let bytes = std::fs::read(path).unwrap();
+        let count = u16::from_be_bytes(bytes[4..6].try_into().unwrap()) as usize;
+        let mut svg_table = None;
+        let mut units = None;
+        for index in 0..count {
+            let start = 12 + index * 16;
+            let offset = u32::from_be_bytes(bytes[start + 8..start + 12].try_into().unwrap());
+            let length = u32::from_be_bytes(bytes[start + 12..start + 16].try_into().unwrap());
+            match &bytes[start..start + 4] {
+                b"SVG " => svg_table = Some((offset, length)),
+                b"head" => {
+                    units = Some(u16::from_be_bytes(
+                        bytes[offset as usize + 18..offset as usize + 20]
+                            .try_into()
+                            .unwrap(),
+                    ))
+                }
+                _ => {}
+            }
+        }
+        let (offset, length) = svg_table.unwrap();
+        let svg = Svg::new(&mut BytesReader::new(&bytes), offset, length).unwrap();
+        let mut accepted = 0usize;
+        let mut rejected = Vec::new();
+        for record in &svg.svg_document_list.svg_document_records {
+            for gid in record.start_glyph_id..=record.end_glyph_id {
+                if svg
+                    .get_glyph_document_with_units(gid as u32, &FontLayout::Unknown, units.unwrap())
+                    .is_some()
+                {
+                    accepted += 1;
+                } else {
+                    rejected.push(gid);
+                }
+            }
+        }
+        eprintln!(
+            "SVG corpus: {accepted} accepted, {} rejected: {:?}",
+            rejected.len(),
+            rejected
+        );
+        assert!(accepted > 0);
+        assert!(rejected.is_empty());
+    }
+
     fn table(document: &[u8]) -> Vec<u8> {
         let mut bytes = vec![0; 18];
         bytes[2..6].copy_from_slice(&18u32.to_be_bytes());
@@ -878,8 +525,6 @@ mod tests {
         assert!(extract_svg_payload_for_gid(svg, 2).is_none());
         assert!(!payload.contains("glyph10"));
         assert!(payload.contains("glyph1"));
-        assert!(!fragment_matches_glyph_id("<g data-id='glyph1'>", 1));
-        assert!(!fragment_matches_glyph_id("<g id='glyph1-path'>", 1));
     }
 
     #[test]
@@ -894,7 +539,7 @@ mod tests {
 
         let payload = extract_svg_payload_for_gid(document, 2).expect("svg payload");
 
-        assert!(payload.contains("linearGradient"));
+        assert!(!payload.contains("linearGradient"));
         assert!(payload.contains("glyph2-path"));
         assert!(!payload.contains("glyph1-path"));
     }
@@ -911,22 +556,41 @@ mod tests {
 
         let payload = extract_svg_payload_for_gid(document, 4).expect("svg payload");
 
-        assert!(payload.contains("clipPath"));
+        assert!(!payload.contains("clipPath"));
         assert!(payload.contains("glyph4-shape"));
         assert!(!payload.contains("glyph3-shape"));
     }
 
+    fn validated_fragment(fragment: &str) -> Option<String> {
+        extract_svg_payload_for_gid(&format!("<svg>{fragment}</svg>"), 1)
+    }
+
     #[test]
     fn svg_payload_rejects_active_content_and_external_references() {
-        assert!(sanitize_svg_payload("<path d=\"M0 0\"/>").is_some());
-        assert!(sanitize_svg_payload("<script>alert(1)</script>").is_none());
-        assert!(sanitize_svg_payload("<path onclick=\"alert(1)\"/>").is_none());
-        assert!(sanitize_svg_payload("<use href=\"https://example.test/x\"/>").is_none());
-        assert!(sanitize_svg_payload("<path\nonload = \"alert(1)\"/>").is_none());
-        assert!(sanitize_svg_payload("<use href = \" javascript:alert(1)\"/>").is_none());
-        assert!(
-            sanitize_svg_payload("<style>@import url(https://example.test);</style>").is_none()
-        );
+        assert!(validated_fragment("<path d=\"M0 0\"/>").is_some());
+        assert!(validated_fragment("<script>alert(1)</script>").is_none());
+        assert!(validated_fragment("<path onclick=\"alert(1)\"/>").is_none());
+        assert!(validated_fragment("<use href=\"https://example.test/x\"/>").is_none());
+        assert!(validated_fragment("<path\nonload = \"alert(1)\"/>").is_none());
+        assert!(validated_fragment("<use href = \" javascript:alert(1)\"/>").is_none());
+        assert!(validated_fragment("<style>@import url(https://example.test);</style>").is_none());
+    }
+
+    #[test]
+    fn gzip_header_and_payload_checksums_are_verified() {
+        let source = b"<svg><g id='glyph1'/></svg>";
+        let mut gzip = vec![0x1f, 0x8b, 8, 2, 0, 0, 0, 0, 0, 0];
+        gzip.extend((crc32(&gzip) as u16).to_le_bytes());
+        gzip.extend(miniz_oxide::deflate::compress_to_vec(source, 6));
+        gzip.extend(crc32(source).to_le_bytes());
+        gzip.extend((source.len() as u32).to_le_bytes());
+        assert!(decode_svg_document(&gzip, 1024).is_some());
+        gzip[10] ^= 1;
+        assert!(decode_svg_document(&gzip, 1024).is_none());
+        gzip[10] ^= 1;
+        let trailer = gzip.len() - 8;
+        gzip[trailer] ^= 1;
+        assert!(decode_svg_document(&gzip, 1024).is_none());
     }
 
     #[test]

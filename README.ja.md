@@ -11,10 +11,10 @@ English: [README.md](README.md)
 [使用例](doc/api-recipes.ja.md#混在縦書き-ltr-のシェーピング計測svg)と
 [対応範囲](doc/feature-status.ja.md#明示的な混在縦書き-ltr-アウトライン)を参照してください。
 
-0.0.19 は元 UTF-8 対応付き shaping と限定的な caret／行／BiDi／混在縦書き layout を追加します。
-合字内部 caret は近似で、GDEF caret・上位 layout の family fallback・自動折返し・
-cross-run joining は未対応です。[対応範囲](doc/bidi-and-mixed-vertical.md)を参照してください。
-Cargo の 0.0.18 指定では 0.0.19 を選択しないため、依存版を明示更新してください。
+0.0.20 は限定された GDEF 合字 caret と、自己完結する OpenType SVG グリフの抽出に対応します。
+raw SVG の描画に必要な配置とスケールは `FontEngine::shape_with_svg_context` で取得できます。
+[GDEF の対応範囲](doc/gdef-carets/remaining-scope.md)と [SVG の描画仕様](doc/svg-extraction/README.md)を参照してください。
+Cargo の 0.0.19 指定では 0.0.20 を選択しないため、依存版を明示更新してください。
 
 ## 最初に使うAPI
 
@@ -77,21 +77,21 @@ default feature には `layout` と `cff` が含まれます。
 
 ```toml
 [dependencies]
-fontcore = "0.0.19"
+fontcore = "0.0.20"
 ```
 
 低レイヤ parser API も必要な場合:
 
 ```toml
 [dependencies]
-fontcore = { version = "0.0.19", features = ["raw"] }
+fontcore = { version = "0.0.20", features = ["raw"] }
 ```
 
 SVG emoji font の暫定サポートも使う場合:
 
 ```toml
 [dependencies]
-fontcore = { version = "0.0.19", features = ["svg-fonts"] }
+fontcore = { version = "0.0.20", features = ["svg-fonts"] }
 ```
 
 ## 最小サンプル
