@@ -1,13 +1,14 @@
 //! Bounded, passive SVG subset extraction. This is not a general XML/CSS engine.
 //!
-//! Index once, follow local references, then serialize a pruned original tree.
+//! Validate and index the source, then follow only the selected glyph's local
+//! references and serialize a pruned original tree.
 //! Unselected dependency branches live in defs, preserving inherited properties
 //! without painting sibling glyphs. No external resources or entity expansion.
 use std::collections::{HashMap, HashSet, VecDeque};
 
 const MAX_NODES: usize = 262_144;
 const MAX_DEPTH: usize = 128;
-const MAX_REFERENCES: usize = 65_536;
+const MAX_REACHABLE_REFERENCES: usize = 65_536;
 const SVG_NS: &str = "http://www.w3.org/2000/svg";
 const XLINK_NS: &str = "http://www.w3.org/1999/xlink";
 const XML_NS: &str = "http://www.w3.org/XML/1998/namespace";
@@ -17,7 +18,6 @@ struct Node {
     attrs: Vec<(String, String)>,
     parent: Option<usize>,
     children: Vec<usize>,
-    refs: Vec<String>,
     end: usize,
 }
 
@@ -166,7 +166,7 @@ fn local_id(value: &str) -> Option<&str> {
     .then_some(id)
 }
 
-fn references(value: &str, refs: &mut Vec<String>) -> Option<()> {
+fn references<'a>(value: &'a str, visit: &mut impl FnMut(&'a str) -> Option<()>) -> Option<()> {
     // Reject CSS escapes/comments rather than attempting a partial CSS decoder.
     if value.contains(['\\', '@']) || value.contains("/*") {
         return None;
@@ -214,7 +214,7 @@ fn references(value: &str, refs: &mut Vec<String>) -> Option<()> {
         } else {
             arg
         };
-        refs.push(local_id(arg)?.to_string());
+        visit(local_id(arg)?)?;
         offset = start + leading + end + 1;
         rest = &lower[offset..];
     }
@@ -255,7 +255,11 @@ fn presentation(name: &str) -> bool {
     )
 }
 
-fn validate(nodes: &[Node], i: usize) -> Option<Vec<String>> {
+fn validate<'a>(
+    nodes: &'a [Node],
+    i: usize,
+    mut visit: impl FnMut(&'a str) -> Option<()>,
+) -> Option<()> {
     let node = &nodes[i];
     let local = local_name(nodes, i, &node.name, false)?;
     if !matches!(
@@ -280,7 +284,6 @@ fn validate(nodes: &[Node], i: usize) -> Option<Vec<String>> {
     ) {
         return None;
     }
-    let mut refs = Vec::new();
     let mut expanded = HashSet::new();
     for (name, value) in &node.attrs {
         if name == "xmlns" || name.starts_with("xmlns:") {
@@ -304,17 +307,17 @@ fn validate(nodes: &[Node], i: usize) -> Option<Vec<String>> {
             return None;
         }
         if local == "href" {
-            refs.push(local_id(value)?.to_string());
+            visit(local_id(value)?)?;
         } else if local == "style" {
             for declaration in value.split(';').map(str::trim).filter(|s| !s.is_empty()) {
                 let (property, value) = declaration.split_once(':')?;
                 if !presentation(property.trim()) || value.contains('!') {
                     return None;
                 }
-                references(value, &mut refs)?;
+                references(value, &mut visit)?;
             }
         } else if presentation(local) {
-            references(value, &mut refs)?;
+            references(value, &mut visit)?;
         } else if !local.starts_with("data-")
             && !matches!(
                 local,
@@ -353,7 +356,7 @@ fn validate(nodes: &[Node], i: usize) -> Option<Vec<String>> {
             return None;
         }
     }
-    Some(refs)
+    Some(())
 }
 
 // enable-background only establishes a filter background buffer. This subset
@@ -460,12 +463,12 @@ fn parse(document: &str) -> Option<Vec<Node>> {
                 attrs,
                 parent,
                 children: Vec::new(),
-                refs: Vec::new(),
                 end: index + 1,
             });
-            // Validate every node, not only the selected branch. Unknown semantics
-            // must not silently alter extraction (e.g. stylesheet selectors).
-            nodes[index].refs = validate(&nodes, index)?;
+            // Checks apply to the entire document, but do not allocate reference
+            // edges for glyphs that may never be extracted. The byte, node,
+            // depth and per-element attribute limits still bound this scan.
+            validate(&nodes, index, |_| Some(()))?;
             if !self_closing {
                 stack.push(index);
             }
@@ -569,6 +572,121 @@ pub(super) fn extract_with_units(document: &str, gid: u16, units_per_em: u16) ->
         return None;
     }
     let mut nodes = parse(document)?;
+    let mut ids = HashMap::new();
+    let mut selected = None;
+    let mut any_glyph = false;
+    for (i, node) in nodes.iter().enumerate() {
+        if let Some(id) = attr(node, "id") {
+            if id.is_empty() || id.chars().any(char::is_whitespace) || ids.insert(id, i).is_some() {
+                return None;
+            }
+            if let Some(glyph) = glyph_id(id) {
+                any_glyph = true;
+                if glyph == gid && selected.replace(i).is_some() {
+                    return None;
+                }
+            }
+        }
+    }
+    let selected = selected.or_else(|| (!any_glyph).then_some(0))?;
+    let mut included = vec![false; nodes.len()];
+    let mut visible = vec![false; nodes.len()];
+    let mut full = vec![false; nodes.len()];
+    let mut queue = VecDeque::new();
+    // Retain whole glyph subtree and only skeleton ancestors, not siblings.
+    for i in selected..nodes[selected].end {
+        included[i] = true;
+        visible[i] = true;
+        full[i] = true;
+        queue.push_back(i);
+    }
+    let mut parent = nodes[selected].parent;
+    while let Some(i) = parent {
+        included[i] = true;
+        visible[i] = true;
+        queue.push_back(i);
+        parent = nodes[i].parent;
+    }
+    // Process each included node once. Budget its references, including those
+    // in ancestors and transitive dependencies. Retain only resolved edges
+    // so cycle/cost checks can reuse them without rescanning.
+    let mut targets: HashMap<usize, Vec<usize>> = HashMap::new();
+    let mut references_remaining = MAX_REACHABLE_REFERENCES;
+    while let Some(i) = queue.pop_front() {
+        validate(&nodes, i, |reference| {
+            references_remaining = references_remaining.checked_sub(1)?;
+            let target = *ids.get(reference)?;
+            targets.entry(i).or_default().push(target);
+            let mut j = target;
+            while j < nodes[target].end {
+                if full[j] {
+                    j = nodes[j].end;
+                    continue;
+                }
+                full[j] = true;
+                if !included[j] {
+                    included[j] = true;
+                    queue.push_back(j);
+                }
+                j += 1;
+            }
+            let mut parent = nodes[target].parent;
+            while let Some(j) = parent {
+                if included[j] {
+                    break;
+                }
+                included[j] = true;
+                queue.push_back(j);
+                parent = nodes[j].parent;
+            }
+            Some(())
+        })?;
+    }
+    // Reject reference cycles (including use -> ancestor -> use) without
+    // recursively expanding references. Iterative DFS bounded by node count.
+    let mut colors = vec![0u8; nodes.len()];
+    let mut costs = vec![0usize; nodes.len()];
+    let mut depths = vec![0usize; nodes.len()];
+    let mut dfs = vec![(0usize, false)];
+    while let Some((i, exit)) = dfs.pop() {
+        if exit {
+            let mut cost = 1usize;
+            let mut depth = 1usize;
+            for target in nodes[i]
+                .children
+                .iter()
+                .copied()
+                .filter(|&c| included[c])
+                .chain(targets.get(&i).into_iter().flatten().copied())
+            {
+                cost = cost.checked_add(costs[target])?;
+                depth = depth.max(depths[target] + 1);
+                if cost > MAX_NODES || depth > MAX_DEPTH {
+                    return None;
+                }
+            }
+            costs[i] = cost;
+            depths[i] = depth;
+            colors[i] = 2;
+            continue;
+        }
+        if colors[i] == 1 {
+            return None;
+        }
+        if colors[i] == 2 {
+            continue;
+        }
+        colors[i] = 1;
+        dfs.push((i, true));
+        for &target in targets.get(&i).into_iter().flatten() {
+            dfs.push((target, false));
+        }
+        for &child in &nodes[i].children {
+            if included[child] {
+                dfs.push((child, false));
+            }
+        }
+    }
     // OpenType sets the initial viewport to the em square, never the advance
     // width, and forbids clipping at the document root. Explicit dimensions
     // retain their meaning; percentages are resolved against that em square.
@@ -612,121 +730,6 @@ pub(super) fn extract_with_units(document: &str, gid: u16, units_per_em: u16) ->
     nodes[0]
         .attrs
         .push(("overflow".to_string(), "visible".to_string()));
-    let mut ids = HashMap::new();
-    let mut selected = None;
-    let mut any_glyph = false;
-    let mut reference_count = 0usize;
-    for (i, node) in nodes.iter().enumerate() {
-        reference_count = reference_count.checked_add(node.refs.len())?;
-        if reference_count > MAX_REFERENCES {
-            return None;
-        }
-        if let Some(id) = attr(node, "id") {
-            if id.is_empty() || id.chars().any(char::is_whitespace) || ids.insert(id, i).is_some() {
-                return None;
-            }
-            if let Some(glyph) = glyph_id(id) {
-                any_glyph = true;
-                if glyph == gid && selected.replace(i).is_some() {
-                    return None;
-                }
-            }
-        }
-    }
-    let selected = selected.or_else(|| (!any_glyph).then_some(0))?;
-    let mut included = vec![false; nodes.len()];
-    let mut visible = vec![false; nodes.len()];
-    let mut full = vec![false; nodes.len()];
-    let mut queue = VecDeque::new();
-    // Retain whole glyph subtree and only skeleton ancestors, not siblings.
-    for i in selected..nodes[selected].end {
-        visible[i] = true;
-        full[i] = true;
-    }
-    let mut parent = nodes[selected].parent;
-    while let Some(i) = parent {
-        visible[i] = true;
-        parent = nodes[i].parent;
-    }
-    for (i, &yes) in visible.iter().enumerate() {
-        if yes {
-            included[i] = true;
-            queue.push_back(i);
-        }
-    }
-    // Each node is processed once, bounding transitive reference expansion.
-    while let Some(i) = queue.pop_front() {
-        for reference in &nodes[i].refs {
-            let target = *ids.get(reference.as_str())?;
-            let mut j = target;
-            while j < nodes[target].end {
-                if full[j] {
-                    j = nodes[j].end;
-                    continue;
-                }
-                full[j] = true;
-                if !included[j] {
-                    included[j] = true;
-                    queue.push_back(j);
-                }
-                j += 1;
-            }
-            let mut parent = nodes[target].parent;
-            while let Some(j) = parent {
-                if included[j] {
-                    break;
-                }
-                included[j] = true;
-                queue.push_back(j);
-                parent = nodes[j].parent;
-            }
-        }
-    }
-    // Reject reference cycles (including use -> ancestor -> use) without
-    // recursively expanding references. Iterative DFS bounded by node count.
-    let mut colors = vec![0u8; nodes.len()];
-    let mut costs = vec![0usize; nodes.len()];
-    let mut depths = vec![0usize; nodes.len()];
-    let mut dfs = vec![(0usize, false)];
-    while let Some((i, exit)) = dfs.pop() {
-        if exit {
-            let mut cost = 1usize;
-            let mut depth = 1usize;
-            for target in nodes[i]
-                .children
-                .iter()
-                .copied()
-                .filter(|&c| included[c])
-                .chain(nodes[i].refs.iter().map(|r| ids[r.as_str()]))
-            {
-                cost = cost.checked_add(costs[target])?;
-                depth = depth.max(depths[target] + 1);
-                if cost > MAX_NODES || depth > MAX_DEPTH {
-                    return None;
-                }
-            }
-            costs[i] = cost;
-            depths[i] = depth;
-            colors[i] = 2;
-            continue;
-        }
-        if colors[i] == 1 {
-            return None;
-        }
-        if colors[i] == 2 {
-            continue;
-        }
-        colors[i] = 1;
-        dfs.push((i, true));
-        for reference in &nodes[i].refs {
-            dfs.push((*ids.get(reference.as_str())?, false));
-        }
-        for &child in &nodes[i].children {
-            if included[child] {
-                dfs.push((child, false));
-            }
-        }
-    }
     let mut output = String::new();
     emit(&nodes, 0, &included, &visible, false, &mut output);
     Some(output)
@@ -949,6 +952,38 @@ mod tests {
         }
         bomb.push_str("</defs><g id='glyph1'><use href='#n23'/></g></svg>");
         assert!(extract(&bomb, 1).is_none());
+    }
+
+    #[test]
+    fn shared_document_budgets_only_reachable_references() {
+        let mut document = String::from("<svg><defs><path id='p' d='M1 1'/><g id='many'>");
+        for _ in 0..MAX_REACHABLE_REFERENCES {
+            document.push_str("<use href='#p'/>");
+        }
+        document.push_str(
+            "</g></defs><g id='glyph1'><use href='#p'/></g><use id='glyph2' href='#many'/></svg>",
+        );
+        let out = extract(&document, 1).unwrap();
+        assert!(out.contains("id=\"p\""));
+        assert!(!out.contains("id=\"many\""));
+        assert!(!out.contains("glyph2"));
+        // The same dense subtree is over budget when it is reachable through
+        // a local dependency, even though its node count is below the limit.
+        assert!(extract(&document, 2).is_none());
+    }
+
+    #[test]
+    fn unselected_nodes_still_receive_passive_validation() {
+        for sibling in [
+            "<use href='https://example.test/x'/>",
+            "<path fill='url(https://example.test/x)'/>",
+            "<style>path{fill:red}</style>",
+            "<g id='glyph1'/>",
+        ] {
+            let document =
+                format!("<svg><path id='glyph1' d='M0 0'/><g id='glyph2'>{sibling}</g></svg>");
+            assert!(extract(&document, 1).is_none(), "{sibling}");
+        }
     }
 
     #[test]
