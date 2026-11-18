@@ -11,11 +11,11 @@ For opt-in single-face, single-line mixed vertical LTR outlines, use
 [recipe](doc/api-recipes.md#mixed-vertical-ltr-shaping-measurement-and-svg) and
 [restricted scope](doc/feature-status.md#opt-in-mixed-vertical-ltr-outlines).
 
-Version 0.0.19 adds original UTF-8 mapped shaping and bounded caret, hard-line,
-BiDi and mixed-vertical layouts. Internal ligature carets are approximate; GDEF
-carets, upper-layout family fallback, automatic wrapping and cross-run joining
-are not implemented. See [scope](doc/bidi-and-mixed-vertical.md).
-Cargo requirements for 0.0.18 do not select 0.0.19; update explicitly.
+Version 0.0.20 adds bounded GDEF ligature carets and self-contained OpenType SVG
+glyph extraction. Raw SVG consumers can obtain explicit placement and scale from
+`FontEngine::shape_with_svg_context`. See [caret scope](doc/gdef-carets/remaining-scope.md)
+and [the SVG renderer contract](doc/svg-extraction/README.md).
+Cargo requirements for 0.0.19 do not select 0.0.20; update explicitly.
 
 ## What To Use First
 
@@ -79,21 +79,21 @@ The minimum supported Rust version (MSRV) is **1.91**, aligned with WML2.
 
 ```toml
 [dependencies]
-fontcore = "0.0.19"
+fontcore = "0.0.20"
 ```
 
 If you need the low-level parser API:
 
 ```toml
 [dependencies]
-fontcore = { version = "0.0.19", features = ["raw"] }
+fontcore = { version = "0.0.20", features = ["raw"] }
 ```
 
 If you also want provisional SVG emoji font support:
 
 ```toml
 [dependencies]
-fontcore = { version = "0.0.19", features = ["svg-fonts"] }
+fontcore = { version = "0.0.20", features = ["svg-fonts"] }
 ```
 
 ## Quick Start
