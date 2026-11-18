@@ -254,27 +254,22 @@ pub struct SvgGlyphLayer {
     pub offset_y: f32,
 }
 
-/// A single-face shaped run with explicit SVG design-unit rendering context.
-///
-/// Construct with [`crate::FontEngine::shape_with_svg_context`]. This companion
-/// does not reinterpret any fields of [`SvgGlyphLayer`] or alter its document.
-/// It does not cover CompositeFont/family fallback or sideways/mixed layout.
+/// The resolved glyphs and their SVG viewport-to-output transforms.
 #[cfg(feature = "svg-fonts")]
 #[derive(Debug, Clone)]
 pub struct SvgGlyphRun {
     pub(crate) run: GlyphRun,
-    pub(crate) scale_x: f32,
-    pub(crate) scale_y: f32,
+    pub(crate) placements: SvgPlacements,
 }
 
 #[cfg(feature = "svg-fonts")]
 impl SvgGlyphRun {
-    /// The unchanged legacy shaped run. Kept immutable so its context stays paired.
+    /// The shaped run, immutable so the SVG transforms stay paired.
     pub fn run(&self) -> &GlyphRun {
         &self.run
     }
 
-    /// Consume the companion and return the unchanged legacy run.
+    /// Consume the companion and return the shaped run without placement metadata.
     pub fn into_run(self) -> GlyphRun {
         self.run
     }
@@ -289,25 +284,85 @@ impl SvgGlyphRun {
     /// fields are layout metadata, not this coordinate transform.
     ///
     /// Returns None for invalid indices, non-SVG layers, or non-finite output.
-    /// Standard LTR/RTL/vertical runs share this contract; vertical placement
-    /// comes from the positioned glyph. Zero horizontal stretch is preserved.
+    /// Zero horizontal stretch is preserved.
     pub fn svg_layer_transform(&self, glyph_index: usize, layer_index: usize) -> Option<[f32; 6]> {
-        let glyph = self.run.glyphs.get(glyph_index)?;
-        let GlyphLayer::Svg(layer) = glyph.glyph.layers.get(layer_index)? else {
-            return None;
+        self.placements.get(glyph_index, layer_index)
+    }
+}
+
+#[cfg(feature = "svg-fonts")]
+#[derive(Debug, Clone, Default)]
+pub(crate) struct SvgPlacements {
+    // Only raw SVG layers take storage. Appends follow glyph/layer order.
+    entries: Vec<(usize, usize, [f32; 6])>,
+}
+
+#[cfg(feature = "svg-fonts")]
+impl SvgPlacements {
+    pub(crate) fn append_run(
+        &mut self,
+        font: &crate::fontreader::Font,
+        options: &FontOptions<'_>,
+        glyphs: &[PositionedGlyph],
+        start: usize,
+        turned: bool,
+    ) -> Result<(), Error> {
+        let mut scale = None;
+        for (glyph_index, glyph) in glyphs.iter().enumerate() {
+            for (layer_index, layer) in glyph.glyph.layers.iter().enumerate() {
+                let GlyphLayer::Svg(layer) = layer else {
+                    continue;
+                };
+                let (sx, sy) = match scale {
+                    Some(scales) => scales,
+                    None => {
+                        let scales = font.glyph_scale_with_options(options)?;
+                        scale = Some(scales);
+                        scales
+                    }
+                };
+                self.append(
+                    start + glyph_index,
+                    layer_index,
+                    glyph,
+                    layer,
+                    sx,
+                    sy,
+                    turned,
+                );
+            }
+        }
+        Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn append(
+        &mut self,
+        glyph_index: usize,
+        layer_index: usize,
+        glyph: &PositionedGlyph,
+        layer: &SvgGlyphLayer,
+        sx: f32,
+        sy: f32,
+        turned: bool,
+    ) {
+        let (x, y) = (glyph.x + layer.offset_x, glyph.y + layer.offset_y);
+        let matrix = if turned {
+            [0.0, sx, -sy, 0.0, x, y]
+        } else {
+            [sx, 0.0, 0.0, sy, x, y]
         };
-        let matrix = [
-            self.scale_x,
-            0.0,
-            0.0,
-            self.scale_y,
-            glyph.x + layer.offset_x,
-            glyph.y + layer.offset_y,
-        ];
-        matrix
-            .iter()
-            .all(|value| value.is_finite())
-            .then_some(matrix)
+        if matrix.iter().all(|value| value.is_finite()) {
+            self.entries.push((glyph_index, layer_index, matrix));
+        }
+    }
+
+    pub(crate) fn get(&self, glyph: usize, layer: usize) -> Option<[f32; 6]> {
+        let index = self
+            .entries
+            .binary_search_by_key(&(glyph, layer), |entry| (entry.0, entry.1))
+            .ok()?;
+        Some(self.entries[index].2)
     }
 }
 
@@ -330,17 +385,19 @@ fn svg_context_ignores_payload_metadata_and_legacy_layout_box() {
         20.0,
         30.0,
     )]);
-    let mut context = SvgGlyphRun {
-        run,
-        scale_x: 0.2,
-        scale_y: 0.1,
+    let glyph = &run.glyphs[0];
+    let GlyphLayer::Svg(svg) = &glyph.glyph.layers[0] else {
+        unreachable!()
     };
+    let mut placements = SvgPlacements::default();
+    placements.append(0, 0, glyph, svg, 0.2, 0.1, false);
+    placements.append(0, 1, glyph, svg, f32::INFINITY, 0.1, false);
+    let context = SvgGlyphRun { run, placements };
     assert_eq!(
         context.svg_layer_transform(0, 0),
         Some([0.2, 0.0, 0.0, 0.1, 23.0, 26.0])
     );
-    context.scale_x = f32::INFINITY;
-    assert_eq!(context.svg_layer_transform(0, 0), None);
+    assert_eq!(context.svg_layer_transform(0, 1), None);
 }
 
 /// Extensible glyph layer model.

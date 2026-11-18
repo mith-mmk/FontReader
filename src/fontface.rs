@@ -274,6 +274,8 @@ struct FamilyLayoutResult {
     sources: Vec<crate::mapped::GlyphSource>,
     ligature_carets: Vec<Option<Vec<f32>>>,
     max_line_width: f32,
+    #[cfg(feature = "svg-fonts")]
+    svg_placements: crate::commands::SvgPlacements,
 }
 
 /// Cache and fallback layer for multiple faces.
@@ -533,6 +535,22 @@ impl FontFamily {
         Ok(self.layout_text_with_fallback(text, options)?.run)
     }
 
+    /// Shapes with the same fallback selection and layout as
+    /// [`Self::text2glyph_run`], retaining the resolved SVG transform for each
+    /// layer from its selected face, including the final segment origin.
+    #[cfg(feature = "svg-fonts")]
+    pub fn shape_with_svg_context<'a>(
+        &'a self,
+        text: &str,
+        options: FontOptions<'a>,
+    ) -> Result<crate::SvgGlyphRun, Error> {
+        let result = self.layout_text_with_fallback(text, options)?;
+        Ok(crate::SvgGlyphRun {
+            run: result.run,
+            placements: result.svg_placements,
+        })
+    }
+
     /// Shapes with original UTF-8 source ranges and fallback-face provenance.
     ///
     /// Face indices identify this family's insertion order; run indices identify
@@ -547,10 +565,11 @@ impl FontFamily {
         }
         let direction = options.text_direction;
         let result = self.layout_text_with_fallback_impl(text, options, true)?;
-        Ok(
-            crate::mapped::ShapedText::new(text, result.run, result.sources, direction)
-                .with_ligature_carets(result.ligature_carets),
-        )
+        let shaped = crate::mapped::ShapedText::new(text, result.run, result.sources, direction)
+            .with_ligature_carets(result.ligature_carets);
+        #[cfg(feature = "svg-fonts")]
+        let shaped = shaped.with_svg_placements(result.svg_placements);
+        Ok(shaped)
     }
 
     /// Alias for [`FontFamily::text2glyph_run`].
@@ -781,6 +800,8 @@ impl FontFamily {
             run: GlyphRun::new(glyphs),
             sources: provenance.sources,
             ligature_carets: provenance.ligature_carets,
+            #[cfg(feature = "svg-fonts")]
+            svg_placements: provenance.svg_placements,
             max_line_width,
         })
     }
@@ -817,7 +838,8 @@ impl FontFamily {
             provenance.finish(mapped.ranges, face_index);
             mapped.run
         } else {
-            face.text2glyph_run(pending_segment, segment_options)?
+            face.font()
+                .text2glyph_run(pending_segment, &segment_options)?
         };
         let (segment_advance_x, segment_advance_y) =
             glyph_run_cursor_delta(&segment_run, options.text_direction);
@@ -826,6 +848,14 @@ impl FontFamily {
             glyph.y += *cursor_y;
         }
 
+        #[cfg(feature = "svg-fonts")]
+        provenance.svg_placements.append_run(
+            face.font(),
+            &segment_options,
+            &segment_run.glyphs,
+            glyphs.len(),
+            false,
+        )?;
         glyphs.extend(segment_run.glyphs);
         *cursor_x += segment_advance_x;
         *cursor_y += segment_advance_y;
@@ -1288,6 +1318,8 @@ pub(crate) struct SegmentProvenance {
     bytes: Vec<std::ops::Range<usize>>,
     pub(crate) sources: Vec<crate::mapped::GlyphSource>,
     pub(crate) ligature_carets: Vec<Option<Vec<f32>>>,
+    #[cfg(feature = "svg-fonts")]
+    pub(crate) svg_placements: crate::commands::SvgPlacements,
     run_index: usize,
 }
 
@@ -1298,6 +1330,8 @@ impl SegmentProvenance {
             bytes: Vec::new(),
             sources: Vec::new(),
             ligature_carets: Vec::new(),
+            #[cfg(feature = "svg-fonts")]
+            svg_placements: Default::default(),
             run_index: 0,
         }
     }

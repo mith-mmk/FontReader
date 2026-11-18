@@ -45,6 +45,8 @@ pub struct ShapedText {
     graphemes: Vec<Range<usize>>,
     direction: TextDirection,
     ligature_carets: Vec<Option<Vec<f32>>>,
+    #[cfg(feature = "svg-fonts")]
+    svg_placements: crate::commands::SvgPlacements,
 }
 impl ShapedText {
     pub(crate) fn new(
@@ -60,6 +62,8 @@ impl ShapedText {
         let ligature_carets = vec![None; run.glyphs.len()];
         Self {
             ligature_carets,
+            #[cfg(feature = "svg-fonts")]
+            svg_placements: Default::default(),
             text: text.to_owned(),
             run,
             sources,
@@ -75,6 +79,22 @@ impl ShapedText {
         self.ligature_carets = carets;
         self
     }
+    #[cfg(feature = "svg-fonts")]
+    pub(crate) fn with_svg_placements(
+        mut self,
+        svg_placements: crate::commands::SvgPlacements,
+    ) -> Self {
+        self.svg_placements = svg_placements;
+        self
+    }
+
+    /// SVG viewport transform in this run's coordinates, using the same
+    /// contract as [`crate::SvgGlyphRun::svg_layer_transform`].
+    #[cfg(feature = "svg-fonts")]
+    pub fn svg_layer_transform(&self, glyph: usize, layer: usize) -> Option<[f32; 6]> {
+        self.svg_placements.get(glyph, layer)
+    }
+
     /// Supported font-authored caret candidates, parallel to output glyphs.
     /// Values are logical inline distances from the glyph's initial pen in
     /// output units, not raw font design units. `None` means absent or unsupported
