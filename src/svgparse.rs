@@ -143,6 +143,10 @@ pub(crate) fn svg_to_path_layers(
         return Vec::new();
     };
 
+    if has_nested_viewport_or_symbol(&root) {
+        return Vec::new();
+    }
+
     let mut defs = HashMap::new();
     collect_definitions(&root, &mut defs);
 
@@ -178,14 +182,37 @@ pub(crate) fn svg_requires_svg_fallback(document: &str) -> bool {
         || lowered.contains("mask:")
 }
 
-// The existing path subset treats svg as a group. Only identity viewports may
-// use that shortcut; preserve non-identity viewport semantics in the SVG layer.
+// Nested SVG establishes a viewport, including default overflow clipping even
+// without a viewBox. A symbol renders only through use, whose dimensions can
+// size its viewport. The path subset cannot represent either case faithfully.
+fn has_nested_viewport_or_symbol(root: &SvgNode) -> bool {
+    let mut pending = vec![(root, false)];
+    while let Some((node, is_document_child)) = pending.pop() {
+        let SvgNode::Element(element) = node else {
+            continue;
+        };
+        if element.name == "symbol" || (element.name == "svg" && !is_document_child) {
+            return true;
+        }
+        let is_document = element.name == "#document";
+        pending.extend(element.children.iter().map(|child| (child, is_document)));
+    }
+    false
+}
+
+// The legacy path subset treats the outer SVG as a group; preserve its source
+// alternative when its viewport is non-identity.
 fn svg_viewports_require_fallback(document: &str) -> bool {
     let Ok(root) = parse_svg_document(document) else {
         return true;
     };
-    let mut pending = vec![&root];
-    while let Some(node) = pending.pop() {
+    if has_nested_viewport_or_symbol(&root) {
+        return true;
+    }
+    let SvgNode::Element(document) = &root else {
+        return true;
+    };
+    for node in &document.children {
         let SvgNode::Element(element) = node else {
             continue;
         };
@@ -220,7 +247,6 @@ fn svg_viewports_require_fallback(document: &str) -> bool {
                 }
             }
         }
-        pending.extend(&element.children);
     }
     false
 }
@@ -451,7 +477,7 @@ fn flatten_node(
     };
 
     match element.name.as_str() {
-        "svg" | "g" | "symbol" => {
+        "svg" | "g" => {
             for child in &element.children {
                 flatten_node(child, defs, &next_state, scale_x, scale_y, out)?;
             }
@@ -1387,7 +1413,7 @@ fn collect_clip_commands(
     ));
 
     match element.name.as_str() {
-        "g" | "svg" | "symbol" | "clippath" => {
+        "g" | "clippath" => {
             for child in &element.children {
                 collect_clip_commands(child, defs, next_transform, scale_x, scale_y, out)?;
             }
@@ -2462,6 +2488,45 @@ mod tests {
         assert!(svg_requires_svg_fallback(
             "<svg><g opacity='.5'><path/></g></svg>"
         ));
+    }
+
+    #[test]
+    fn nested_viewports_and_symbols_return_only_the_complete_svg() {
+        let normal = "<rect width='20' height='20' fill='#f00'/>";
+        let symbol = "<symbol id='s' viewBox='0 0 20 20'><rect width='20' height='20'/></symbol>";
+        let viewport =
+            "<svg width='5' height='5' overflow='hidden'><rect width='20' height='20'/></svg>";
+        for body in [
+            format!("{normal}<g>{viewport}</g>"),
+            format!("{normal}<svg width='5' height='5'><rect width='20' height='20'/></svg>"),
+            format!("{normal}<svg width='5' height='5' viewBox='0 0 5 5'>{normal}</svg>"),
+            format!("{normal}{symbol}"),
+            format!("{normal}<defs>{symbol}</defs><use href='#s' width='5' height='5'/>"),
+            format!("{normal}<defs><svg id='inner' width='5' height='5'>{normal}</svg></defs><use href='#inner'/>"),
+        ] {
+            let payload = format!(
+                "<svg width='100' height='100' viewBox='0 0 100 100' overflow='visible'>{body}</svg>"
+            );
+            assert!(svg_requires_svg_fallback(&payload));
+            let document = crate::opentype::color::svg::SvgGlyphDocument {
+                payload: payload.clone(),
+                view_box_min_x: 0.0,
+                view_box_min_y: 0.0,
+                view_box_width: 100.0,
+                view_box_height: 100.0,
+            };
+            let layers = crate::fontreader::svg_document_to_glyph_layers(&document, 1.0, 1.0);
+            assert!(
+                matches!(layers.as_slice(), [crate::GlyphLayer::Svg(svg)] if svg.document == payload),
+                "{body}: {layers:?}"
+            );
+        }
+
+        let plain = format!(
+            "<svg width='100' height='100' viewBox='0 0 100 100' overflow='visible'>{normal}</svg>"
+        );
+        assert!(!svg_requires_svg_fallback(&plain));
+        assert_eq!(svg_to_path_layers(&plain, 1.0, 1.0).len(), 1);
     }
 
     #[test]

@@ -27,9 +27,12 @@ It must not flatten opacity, nested viewport, clipping, or inherited styles into
 independent paths without preserving their semantics. Existing fontcore path
 commands remain available for their limited subset. For non-identity viewports
 and compositing unsupported by that subset, the SVG source alternative is kept.
-The existing combined Path/Svg fallback behavior is unchanged; this change does
-not define a new cross-library layer-selection contract or implement paintcore's
-raw SVG renderer. CompositeFont SVG serialization still rejects raw SVG layers.
+Nested `svg` viewports and `symbol` elements are kept **raw SVG only**:
+the path subset does not implement nested viewport sizing/clipping or symbol
+instantiation. This holds even for a nested identity viewBox or a symbol in
+`defs` used with `use`. Other legacy combined Path/Svg fallback behavior is
+unchanged. Fontcore does not implement paintcore's raw SVG renderer.
+CompositeFont SVG serialization still rejects raw SVG layers.
 
 ## Accepted and rejected
 
