@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.0.21 - 2026-11-18
+
+### OpenType SVG
+
+- Apply the local-reference budget to the selected glyph and its inherited and transitive dependencies, while retaining passive validation of the whole document. Dense unrelated glyphs no longer consume the selected glyph's budget.
+- Expose typed SVG viewport transforms for family fallback, composite and source-mapped text, and for sideways and mixed vertical LTR layout. Raw SVG remains a whole-glyph alternative to approximation paths. The older outline-only APIs retain their restrictions.
+
 ## 0.0.20 - 2026-11-18
 
 ### OpenType SVG
