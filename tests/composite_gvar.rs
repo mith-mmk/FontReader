@@ -150,11 +150,11 @@ fn composite_size_stretch_measure_and_svg_use_one_scale() {
 }
 
 #[test]
-fn unsupported_inherited_metrics_keep_table_fallback() {
+fn inherited_use_my_metrics_applies_component_phantoms_and_preserves_hvar() {
     let file = FontFile::from_buffer(FONT).unwrap();
-    // U has USE_MY_METRICS. Its own phantom deltas must not be applied as
-    // if inheritance were implemented. The existing hmtx/HVAR fallback stays.
-    for (index, advance) in [(0, 700.0), (2, 700.0), (3, 1000.0)] {
+    // U has USE_MY_METRICS. Face 0 inherits the varied component advance (800.0);
+    // face 2 (mapped-zero HVAR) and face 3 (explicit HVAR) retain HVAR precedence.
+    for (index, advance) in [(0, 800.0), (2, 700.0), (3, 1000.0)] {
         let run = file
             .face(index)
             .unwrap()
@@ -163,14 +163,16 @@ fn unsupported_inherited_metrics_keep_table_fallback() {
             .with_variation("wght", 900.0)
             .shape("U")
             .unwrap();
-        assert_eq!(run.glyphs[0].glyph.metrics.advance_x, advance);
-        assert_eq!(run.glyphs[0].glyph.metrics.bearing_x, 150.0);
+        assert_eq!(
+            run.glyphs[0].glyph.metrics.advance_x, advance,
+            "face {index}"
+        );
         assert_eq!(run.glyphs[0].glyph.metrics.bounds.unwrap().min_x, 210.0);
     }
 }
 
 #[test]
-fn point_attachment_uses_nonempty_legacy_fallback_not_partial_variation() {
+fn point_attachment_applies_matched_point_variation() {
     let file = FontFile::from_buffer(FONT).unwrap();
     let face = file.face(0).unwrap();
     let default = face.engine().with_font_size(1000.0).shape("P").unwrap();
@@ -180,18 +182,11 @@ fn point_attachment_uses_nonempty_legacy_fallback_not_partial_variation() {
         .with_variation("wght", 900.0)
         .shape("P")
         .unwrap();
-    // This is a fallback diagnostic, not a point-attachment correctness claim.
     assert!(!varied.glyphs[0].glyph.layers.is_empty());
     assert!(varied.glyphs[0].glyph.metrics.bounds.is_some());
-    assert_eq!(
-        varied.glyphs[0].glyph.metrics.advance_x,
-        default.glyphs[0].glyph.metrics.advance_x
-    );
-    assert_eq!(
-        varied.glyphs[0].glyph.metrics.bearing_x,
-        default.glyphs[0].glyph.metrics.bearing_x
-    );
-    assert_eq!(
+    assert_eq!(default.glyphs[0].glyph.metrics.advance_x, 1100.0);
+    assert_eq!(varied.glyphs[0].glyph.metrics.advance_x, 1200.0);
+    assert_ne!(
         varied.glyphs[0].glyph.metrics.bounds,
         default.glyphs[0].glyph.metrics.bounds
     );
@@ -240,9 +235,9 @@ fn raw_layout_getters_match_shaped_composite_metrics() {
 
 #[cfg(feature = "layout")]
 #[test]
-fn unsupported_inherited_vertical_metrics_keep_table_fallback() {
+fn inherited_use_my_metrics_applies_component_vertical_phantoms_and_preserves_vvar() {
     let file = FontFile::from_buffer(FONT).unwrap();
-    for (index, advance) in [(0, 1200.0), (2, 1200.0), (3, 1600.0)] {
+    for (index, advance, min_y) in [(0, 1400.0, 120.0), (2, 1200.0, 100.0), (3, 1600.0, 120.0)] {
         let run = file
             .face(index)
             .unwrap()
@@ -252,8 +247,15 @@ fn unsupported_inherited_vertical_metrics_keep_table_fallback() {
             .with_variation("wght", 900.0)
             .shape("UU")
             .unwrap();
-        assert_eq!(run.glyphs[0].glyph.metrics.advance_y, advance);
-        assert_eq!(run.glyphs[0].glyph.metrics.bounds.unwrap().min_y, 100.0);
+        assert_eq!(
+            run.glyphs[0].glyph.metrics.advance_y, advance,
+            "face {index}"
+        );
+        assert_eq!(
+            run.glyphs[0].glyph.metrics.bounds.unwrap().min_y,
+            min_y,
+            "face {index}"
+        );
         assert_eq!(run.glyphs[1].y, advance);
     }
 }
