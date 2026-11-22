@@ -206,10 +206,17 @@ fn flagged_ligature_is_retained_when_gdef_proves_no_exclusions() {
             })
             .unwrap(),
     );
-    // Skip-over-mark matching remains unsupported: never silently ignore flags.
+    // IgnoreMarks ligature skips the intervening mark and preserves it after the ligature.
     same(
         &face.engine().shape("A\u{301}B").unwrap(),
-        &base_face.engine().shape("A\u{301}B").unwrap(),
+        &base_face
+            .engine()
+            .shape(if cfg!(feature = "layout") {
+                "、\u{301}"
+            } else {
+                "A\u{301}B"
+            })
+            .unwrap(),
     );
 }
 

@@ -172,6 +172,40 @@ impl<'a> ApplyState<'a> {
             && (flag & 0xFF18 == 0 || self.class_counts[2] == 0)
     }
 
+    fn lookup_includes_glyph(&self, lookup: &Lookup, glyph_id: usize) -> Option<bool> {
+        let flag = lookup.lookup_flag;
+        if flag & 0xFF1E == 0 {
+            return Some(true);
+        }
+        let gdef = self.gdef?;
+        let glyph_u16 = u16::try_from(glyph_id).ok()?;
+        let class = gdef.glyph_class(glyph_u16)?;
+        match class {
+            GlyphClass::Base => Some(flag & 0x0002 == 0),
+            GlyphClass::Ligature => Some(flag & 0x0004 == 0),
+            GlyphClass::Component => Some(true),
+            GlyphClass::Mark => {
+                if flag & 0x0008 != 0 {
+                    return Some(false);
+                }
+                if flag & 0x0010 != 0 {
+                    let coverage = lookup.mark_filtering_set.and_then(|index| {
+                        gdef.mark_glyph_sets_def
+                            .as_ref()?
+                            .coverages
+                            .get(index as usize)
+                    })?;
+                    return Some(coverage.contains(glyph_id).is_some());
+                }
+                if flag >> 8 != 0 {
+                    let attach = gdef.mark_attachment_class(glyph_u16)?;
+                    return Some(attach == flag >> 8);
+                }
+                Some(true)
+            }
+        }
+    }
+
     fn enter(&mut self) -> bool {
         if self.remaining == 0 {
             self.filtered.fail_if_enabled();
@@ -1374,6 +1408,130 @@ impl Gsub {
         applied
     }
 
+    fn apply_filtered_basic_subtable_at(
+        subtable: &crate::opentype::layouts::lookup::LookupSubstitution,
+        lookup: &Lookup,
+        glyphs: &mut Vec<GsubGlyph>,
+        index: usize,
+        state: &mut ApplyState,
+    ) -> bool {
+        use crate::opentype::layouts::lookup::LookupSubstitution;
+        match subtable {
+            LookupSubstitution::Single(_)
+            | LookupSubstitution::Single2(_)
+            | LookupSubstitution::Multiple(_) => {
+                Self::apply_subtable_at(subtable, glyphs, index, state)
+            }
+            LookupSubstitution::Ligature(ligature) => {
+                let Some(original) = glyphs.get(index).copied() else {
+                    return false;
+                };
+                let Some(coverage_index) = ligature.coverage.contains(original.glyph_id) else {
+                    return false;
+                };
+                let Some(ligature_set) = ligature.ligature_set.get(coverage_index) else {
+                    return false;
+                };
+                for record in &ligature_set.ligature_table {
+                    let expected_len = record.component_count as usize;
+                    if expected_len == 0 || record.component_glyph_ids.len() + 1 != expected_len {
+                        continue;
+                    }
+                    let mut matched_indices = Vec::with_capacity(expected_len);
+                    matched_indices.push(index);
+                    let mut scan = index + 1;
+                    let mut matched = true;
+                    for &expected_glyph in &record.component_glyph_ids {
+                        let mut found = None;
+                        while scan < glyphs.len() {
+                            match state.lookup_includes_glyph(lookup, glyphs[scan].glyph_id) {
+                                Some(true) => {
+                                    found = Some(scan);
+                                    scan += 1;
+                                    break;
+                                }
+                                Some(false) => {
+                                    scan += 1;
+                                }
+                                None => {
+                                    matched = false;
+                                    break;
+                                }
+                            }
+                        }
+                        if !matched {
+                            break;
+                        }
+                        match found {
+                            Some(pos) if glyphs[pos].glyph_id == expected_glyph as usize => {
+                                matched_indices.push(pos);
+                            }
+                            _ => {
+                                matched = false;
+                                break;
+                            }
+                        }
+                    }
+                    if !matched {
+                        continue;
+                    }
+                    let removed: Vec<GsubGlyph> =
+                        matched_indices.iter().map(|&i| glyphs[i]).collect();
+                    let replacement = GsubGlyph {
+                        byte_start: removed.iter().map(|g| g.byte_start).min().unwrap(),
+                        byte_end: removed.iter().map(|g| g.byte_end).max().unwrap(),
+                        glyph_id: record.ligature_glyph as usize,
+                        substituted: true,
+                        mkmk_source_ambiguous: true,
+                        ligature_components: removed.iter().fold(0u16, |count, glyph| {
+                            count.saturating_add(glyph.ligature_components)
+                        }),
+                        ..original
+                    };
+                    state.replace_classes(&removed, &[replacement]);
+                    glyphs[index] = replacement;
+                    for &remove_idx in matched_indices.iter().skip(1).rev() {
+                        glyphs.remove(remove_idx);
+                    }
+                    state.next_index = index + 1;
+                    return true;
+                }
+                false
+            }
+            LookupSubstitution::ExtensionSubstitution(extension) => {
+                if extension.subst_format != 1 || extension.extension_lookup_type == 7 {
+                    return false;
+                }
+                Self::apply_filtered_basic_subtable_at(
+                    &extension.subtable,
+                    lookup,
+                    glyphs,
+                    index,
+                    state,
+                )
+            }
+            _ => false,
+        }
+    }
+
+    fn is_basic_gdef_filterable_subtable(
+        subtable: &crate::opentype::layouts::lookup::LookupSubstitution,
+    ) -> bool {
+        use crate::opentype::layouts::lookup::LookupSubstitution;
+        match subtable {
+            LookupSubstitution::Single(_)
+            | LookupSubstitution::Single2(_)
+            | LookupSubstitution::Multiple(_)
+            | LookupSubstitution::Ligature(_) => true,
+            LookupSubstitution::ExtensionSubstitution(ext) => {
+                ext.subst_format == 1
+                    && ext.extension_lookup_type != 7
+                    && Self::is_basic_gdef_filterable_subtable(&ext.subtable)
+            }
+            _ => false,
+        }
+    }
+
     fn apply_lookup_all_with_tables(
         &self,
         lookup: &Lookup,
@@ -1385,6 +1543,37 @@ impl Gsub {
             return;
         }
         if !state.allows_lookup(lookup) {
+            if state.gdef.is_some()
+                && !lookup.subtables.is_empty()
+                && lookup
+                    .subtables
+                    .iter()
+                    .all(Self::is_basic_gdef_filterable_subtable)
+            {
+                let mut index = 0;
+                while index < glyphs.len() {
+                    if state.lookup_includes_glyph(lookup, glyphs[index].glyph_id) != Some(true) {
+                        index += 1;
+                        continue;
+                    }
+                    state.remaining = MAX_GSUB_LOOKUP_APPLICATIONS;
+                    let old_len = glyphs.len();
+                    let old_index = index;
+                    let applied = lookup.subtables.iter().any(|subtable| {
+                        Self::apply_filtered_basic_subtable_at(
+                            subtable, lookup, glyphs, index, state,
+                        )
+                    });
+                    if applied {
+                        index = state.next_index;
+                    } else {
+                        index += 1;
+                    }
+                    if applied && index <= old_index && glyphs.len() >= old_len {
+                        index = old_index + 1;
+                    }
+                }
+            }
             return;
         }
         let reverse = lookup.lookup_type == LookupType::ReverseChainingContextualSingleSubstitution as u16
@@ -2192,5 +2381,110 @@ mod scalar_feature_tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn gdef_ignore_marks_ligature_skips_intervening_mark_and_preserves_it() {
+        use super::{ApplyState, Gsub, GsubGlyph};
+        use crate::opentype::extentions::gdef::Gdef;
+        use crate::opentype::layouts::classdef::{ClassDef, ClassDefFormat1};
+        use crate::opentype::layouts::coverage::{Coverage, CoverageFormat1};
+        use crate::opentype::layouts::lookup::{
+            LigatureSet, LigatureSubstitutionFormat1, LigatureTable, Lookup, LookupSubstitution,
+            LookupType,
+        };
+        use crate::opentype::layouts::{FeatureList, LookupList, ScriptList};
+        let gdef = Gdef {
+            major_versionn: 1,
+            minor_version: 0,
+            glyph_class_def: Some(ClassDef::Format1(ClassDefFormat1 {
+                class_format: 1,
+                start_glyph_id: 1,
+                glyph_count: 4,
+                class_value_array: vec![1, 3, 1, 2], // 1=Base, 2=Mark, 3=Base, 4=Ligature
+            })),
+            attach_list: None,
+            lig_caret_list: None,
+            mark_attach_class_def: None,
+            mark_glyph_sets_def: None,
+            item_var_store_offset: None,
+            caret_variation_store: None,
+        };
+        let lookup = Lookup {
+            lookup_type: LookupType::LigatureSubstitution as u16,
+            lookup_flag: 0x0008, // IgnoreMarks
+            mark_filtering_set: None,
+            subtables: vec![LookupSubstitution::Ligature(LigatureSubstitutionFormat1 {
+                subst_format: 1,
+                coverage: Coverage::Format1(CoverageFormat1 {
+                    coverage_format: 1,
+                    glyph_count: 1,
+                    glyph_ids: vec![1],
+                }),
+                ligature_set_count: 1,
+                ligature_set: vec![LigatureSet {
+                    ligature_count: 1,
+                    ligature_table: vec![LigatureTable {
+                        ligature_glyph: 4,
+                        component_count: 2,
+                        component_glyph_ids: vec![3],
+                    }],
+                }],
+            })],
+        };
+        let gsub = Gsub {
+            major_version: 1,
+            minor_version: 0,
+            scripts: Box::new(ScriptList {
+                script_count: 0,
+                scripts: vec![],
+            }),
+            features: Box::new(FeatureList {
+                feature_count: 0,
+                features: vec![],
+            }),
+            lookups: Box::new(LookupList {
+                lookups: vec![lookup.clone()],
+            }),
+            feature_variations: None,
+        };
+        let mut glyphs = vec![
+            GsubGlyph {
+                byte_start: 0,
+                byte_end: 1,
+                glyph_id: 1,
+                source_index: 0,
+                substituted: false,
+                mkmk_source_ambiguous: false,
+                ligature_components: 1,
+            },
+            GsubGlyph {
+                byte_start: 1,
+                byte_end: 2,
+                glyph_id: 2, // Mark
+                source_index: 1,
+                substituted: false,
+                mkmk_source_ambiguous: false,
+                ligature_components: 1,
+            },
+            GsubGlyph {
+                byte_start: 2,
+                byte_end: 3,
+                glyph_id: 3,
+                source_index: 2,
+                substituted: false,
+                mkmk_source_ambiguous: false,
+                ligature_components: 1,
+            },
+        ];
+        let mut state = ApplyState::new(Some(&gdef), &glyphs);
+        gsub.apply_lookup_all_with_tables(&lookup, &mut glyphs, &mut state);
+        assert_eq!(glyphs.len(), 2);
+        assert_eq!(glyphs[0].glyph_id, 4);
+        assert_eq!(glyphs[0].ligature_components, 2);
+        assert_eq!((glyphs[0].byte_start, glyphs[0].byte_end), (0, 3));
+        // Intervening mark is preserved right after the ligature!
+        assert_eq!(glyphs[1].glyph_id, 2);
+        assert_eq!((glyphs[1].byte_start, glyphs[1].byte_end), (1, 2));
     }
 }
