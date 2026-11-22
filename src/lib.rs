@@ -51,6 +51,8 @@ pub mod fontfile;
 pub mod limits;
 pub mod lines;
 pub use lines::{HardLine, HardLineLayout, LineCaretPosition};
+pub mod wrapped;
+pub use wrapped::{LineBreakKind, WrapMode, WrappedLine, WrappedLineLayout};
 pub mod vertical_mapped;
 pub use vertical_mapped::{VerticalCaretPosition, VerticalGroup, VerticalMappedLayout};
 pub mod mapped;

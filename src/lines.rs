@@ -4,7 +4,8 @@
 //! or font fallback. Each line is shaped with the same selected engine face.
 //! Line origins follow a fixed baseline step, not inferred ink or line boxes.
 use crate::{
-    CaretLayout, CaretPosition, CaretQuality, FontEngine, ShapedText, TextDirection, TextPosition,
+    CaretLayout, CaretPosition, CaretQuality, CompositeFont, FontEngine, FontFamily, FontOptions,
+    ShapedText, TextDirection, TextPosition,
 };
 use std::io::{Error, ErrorKind};
 use std::ops::Range;
@@ -52,6 +53,23 @@ pub struct LineCaretPosition {
     line_index: usize,
 }
 impl LineCaretPosition {
+    pub(crate) fn new(
+        position: TextPosition,
+        x: f32,
+        y: f32,
+        quality: CaretQuality,
+        source: crate::CaretSource,
+        line_index: usize,
+    ) -> Self {
+        Self {
+            position,
+            x,
+            y,
+            quality,
+            source,
+            line_index,
+        }
+    }
     pub fn text_position(self) -> TextPosition {
         self.position
     }
@@ -93,31 +111,56 @@ impl HardLineLayout {
     /// Bare CR, tabs, other line/control characters and BiDi formatting controls
     /// are rejected, not silently normalized. Empty input produces one line.
     pub fn shape(engine: &FontEngine<'_>, text: &str) -> Result<Self, Error> {
-        // Validate font and options even when no visible glyph is requested.
-        engine.shape_mapped("")?;
         let options = engine.options();
         let line_height = options.line_height.unwrap_or(options.font_size);
         let direction = options.text_direction;
+        Self::shape_with(text, direction, line_height, |slice| {
+            engine.shape_mapped(slice)
+        })
+    }
+
+    /// Shapes each LF/CRLF-delimited slice using [`FontFamily`] fallback.
+    /// The fixed step is `options.line_height.unwrap_or(options.font_size)`.
+    pub fn shape_family(
+        family: &FontFamily,
+        text: &str,
+        options: FontOptions<'_>,
+    ) -> Result<Self, Error> {
+        let line_height = options.line_height.unwrap_or(options.font_size);
+        let direction = options.text_direction;
+        Self::shape_with(text, direction, line_height, |slice| {
+            family.shape_mapped(slice, options.clone())
+        })
+    }
+
+    /// Shapes each LF/CRLF-delimited horizontal LTR slice using [`CompositeFont`].
+    /// The fixed step is `composite.options().line_height.unwrap_or(composite.options().font_size)`.
+    pub fn shape_composite_ltr(composite: &CompositeFont<'_>, text: &str) -> Result<Self, Error> {
+        let options = composite.options();
+        let line_height = options.line_height.unwrap_or(options.font_size);
+        Self::shape_with(text, TextDirection::LeftToRight, line_height, |slice| {
+            composite.shape_mapped_ltr(slice)
+        })
+    }
+
+    fn shape_with<F>(
+        text: &str,
+        direction: TextDirection,
+        line_height: f32,
+        mut shape_line: F,
+    ) -> Result<Self, Error>
+    where
+        F: FnMut(&str) -> Result<ShapedText, Error>,
+    {
+        // Validate font and options even when no visible glyph is requested.
+        shape_line("")?;
         if !line_height.is_finite() || line_height <= 0.0 {
             return Err(Error::new(
                 ErrorKind::InvalidInput,
                 "line height must be positive and finite",
             ));
         }
-        let mut ranges = Vec::new();
-        let mut start = 0;
-        for (index, ch) in text.char_indices() {
-            if ch == '\n' {
-                let content_end = if index > start && text.as_bytes()[index - 1] == b'\r' {
-                    index - 1
-                } else {
-                    index
-                };
-                ranges.push((start..content_end, content_end..index + 1));
-                start = index + 1;
-            }
-        }
-        ranges.push((start..text.len(), text.len()..text.len()));
+        let ranges = split_hard_lines(text);
         let mut lines = Vec::with_capacity(ranges.len());
         for (index, (content, line_break)) in ranges.into_iter().enumerate() {
             let distance = index as f32 * line_height;
@@ -129,7 +172,7 @@ impl HardLineLayout {
             } else {
                 (0.0, distance)
             };
-            let shaped = engine.shape_mapped(&text[content.clone()])?;
+            let shaped = shape_line(&text[content.clone()])?;
             let carets = CaretLayout::new(&shaped)?;
             if shaped
                 .glyph_run()
@@ -208,35 +251,12 @@ impl HardLineLayout {
             ));
         }
         let vertical = self.direction == TextDirection::TopToBottom;
-        let cross = if vertical { -(x as f64) } else { y as f64 };
-        // Compare monotone midpoints rather than subtracting a remote point
-        // from each baseline: even f64 loses small differences near f32::MAX.
-        // <= retains the earlier logical line on exact ties.
-        let mut best_index = self.lines.len() - 1;
-        for (index, pair) in self.lines.windows(2).enumerate() {
-            let first = if vertical {
-                -(pair[0].origin_x as f64)
-            } else {
-                pair[0].origin_y as f64
-            };
-            let next = if vertical {
-                -(pair[1].origin_x as f64)
-            } else {
-                pair[1].origin_y as f64
-            };
-            if cross <= first + (next - first) / 2.0 {
-                best_index = index;
-                break;
-            }
-        }
-        // If f32 rounding makes adjacent origins coincide, preserve the
-        // documented earliest-line tie rule, including outside clamping.
-        while best_index > 0
-            && self.lines[best_index - 1].origin_x == self.lines[best_index].origin_x
-            && self.lines[best_index - 1].origin_y == self.lines[best_index].origin_y
-        {
-            best_index -= 1;
-        }
+        let origins: Vec<(f32, f32)> = self
+            .lines
+            .iter()
+            .map(|line| (line.origin_x, line.origin_y))
+            .collect();
+        let best_index = select_nearest_line_index(&origins, vertical, x, y);
         let line = &self.lines[best_index];
         // Cross-axis distance has already been considered. Pass zero on that
         // axis so subtracting extreme, finite inputs cannot overflow an f32.
@@ -258,18 +278,71 @@ impl HardLineLayout {
                 "translated caret overflow",
             ));
         }
-        Ok(LineCaretPosition {
-            position: TextPosition::new(
+        Ok(LineCaretPosition::new(
+            TextPosition::new(
                 line.content.start + caret.text_position().byte_offset(),
                 caret.text_position().affinity(),
             ),
             x,
             y,
-            quality: caret.quality(),
-            source: caret.source(),
-            line_index: index,
-        })
+            caret.quality(),
+            caret.source(),
+            index,
+        ))
     }
+}
+
+pub(crate) fn split_hard_lines(text: &str) -> Vec<(Range<usize>, Range<usize>)> {
+    let mut ranges = Vec::new();
+    let mut start = 0;
+    for (index, ch) in text.char_indices() {
+        if ch == '\n' {
+            let content_end = if index > start && text.as_bytes()[index - 1] == b'\r' {
+                index - 1
+            } else {
+                index
+            };
+            ranges.push((start..content_end, content_end..index + 1));
+            start = index + 1;
+        }
+    }
+    ranges.push((start..text.len(), text.len()..text.len()));
+    ranges
+}
+
+pub(crate) fn select_nearest_line_index(
+    origins: &[(f32, f32)],
+    vertical: bool,
+    x: f32,
+    y: f32,
+) -> usize {
+    let cross = if vertical { -(x as f64) } else { y as f64 };
+    // Compare monotone midpoints rather than subtracting a remote point
+    // from each baseline: even f64 loses small differences near f32::MAX.
+    // <= retains the earlier logical line on exact ties.
+    let mut best_index = origins.len() - 1;
+    for (index, pair) in origins.windows(2).enumerate() {
+        let first = if vertical {
+            -(pair[0].0 as f64)
+        } else {
+            pair[0].1 as f64
+        };
+        let next = if vertical {
+            -(pair[1].0 as f64)
+        } else {
+            pair[1].1 as f64
+        };
+        if cross <= first + (next - first) / 2.0 {
+            best_index = index;
+            break;
+        }
+    }
+    // If f32 rounding makes adjacent origins coincide, preserve the
+    // documented earliest-line tie rule, including outside clamping.
+    while best_index > 0 && origins[best_index - 1] == origins[best_index] {
+        best_index -= 1;
+    }
+    best_index
 }
 
 #[cfg(test)]

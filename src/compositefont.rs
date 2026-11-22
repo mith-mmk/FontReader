@@ -221,6 +221,17 @@ impl<'a> CompositeFont<'a> {
         self
     }
 
+    /// Sets the common line height used by multi-line layout helpers.
+    pub fn with_line_height(mut self, line_height: f32) -> Self {
+        self.options = self.options.with_line_height(line_height);
+        self
+    }
+
+    /// Returns the shared font options used for layout.
+    pub fn options(&self) -> &FontOptions<'a> {
+        &self.options
+    }
+
     /// Sets the common horizontal stretch (not a per-rule scale).
     pub fn with_font_stretch(mut self, stretch: FontStretch) -> Self {
         self.options = self.options.with_font_stretch(stretch);
