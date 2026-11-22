@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## 0.0.22 - 2026-11-22
+
+### Layout & Multi-Line Wrapping
+
+- Add `WrappedLineLayout` (`WrappedLine`, `WrapOptions`, `WrapMode`) for width-constrained greedy line wrapping across single-face, `FontFamily`, and `CompositeFont` sources, with caret and hit-testing support. See [wrapped line layout](doc/wrapped-line-layout.md).
+- Extend `HardLineLayout` with `shape_family` and `shape_composite_ltr` so explicit LF/CRLF multi-line layouts support family fallback and composite fonts.
+- Add `CompositeFont::with_line_height` and `CompositeFont::options`.
+
+### Variable Fonts, GDEF & Shaping
+
+- Integrate validated GDEF `CaretVariationStore` / `VariationIndex` adjustments into variable-font mapped ligature carets.
+- Generalize GDEF `LookupFlag` filtering (`IgnoreBaseGlyphs`, `IgnoreLigatures`, `IgnoreMarks`, `MarkAttachmentType`, `UseMarkFilteringSet`) across GSUB `Single`, `Multiple`, and `Ligature` lookups, and apply `VariationIndex` deltas to GPOS `ValueRecord` adjustments.
+- Support variable composite glyph matched-point attachment (`ARGS_ARE_XY_VALUES == 0`) and `USE_MY_METRICS` phantom point inheritance in `gvar` outline evaluation.
+- Add GPOS Type 3 `CursivePosFormat1` (`curs`) attachment and suppress standalone default-ignorable control glyphs (`ZWJ`, `ZWNJ`, `CGJ`, `WJ`, `BOM`) when not consumed by GSUB.
+
 ## 0.0.21 - 2026-11-18
 
 ### OpenType SVG
