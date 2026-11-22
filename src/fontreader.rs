@@ -1271,6 +1271,18 @@ impl Font {
         glyph_id: usize,
         coordinates: &[f32],
     ) -> Option<gvar::GlyphVariationResult> {
+        self.current_gvar_variation_with_depth(glyph_id, coordinates, 0)
+    }
+
+    fn current_gvar_variation_with_depth(
+        &self,
+        glyph_id: usize,
+        coordinates: &[f32],
+        depth: usize,
+    ) -> Option<gvar::GlyphVariationResult> {
+        if depth > 16 {
+            return None;
+        }
         let gvar = self.current_gvar()?;
         let glyph = self.current_glyf()?.get_glyph(glyph_id)?;
         let raw_parsed = glyph.parse();
@@ -1302,26 +1314,35 @@ impl Font {
         });
 
         let mut variation = if raw_parsed.number_of_contours < 0 {
-            let (count, inherits_metrics) = glyph.composite_variation_info()?;
+            let (count, metrics_component) = glyph.composite_variation_info()?;
             let deltas = gvar.composite_deltas(glyph_id, coordinates, count)?;
-            // USE_MY_METRICS needs inherited component phantom positions.
-            // Until supported, retain hmtx/HVAR and vmtx/VVAR metrics rather
-            // than treating the composite's own phantoms as authoritative.
-            gvar::Gvar::composite_metrics(
+            let inherited = metrics_component.and_then(|comp_id| {
+                self.current_gvar_variation_with_depth(comp_id, coordinates, depth + 1)
+            });
+            let mut result = gvar::Gvar::composite_metrics(
                 &raw_parsed,
                 component_varied,
                 &deltas,
-                if inherits_metrics {
+                if metrics_component.is_some() {
                     None
                 } else {
                     horizontal_metric
                 },
-                if inherits_metrics {
+                if metrics_component.is_some() {
                     None
                 } else {
                     vertical_metric.clone()
                 },
-            )?
+            )?;
+            if let Some(inherited) = inherited {
+                if let Some(h) = inherited.horizontal_metric {
+                    result.horizontal_metric = Some(h);
+                }
+                if let Some(v) = inherited.vertical_metric {
+                    result.vertical_metric = Some(v);
+                }
+            }
+            result
         } else {
             gvar.apply_to_parsed_glyph_with_metrics(
                 glyph_id,
@@ -2392,6 +2413,11 @@ impl Font {
                 self.current_gdef(),
                 variation_coords,
             );
+            let cursives = if !is_vertical {
+                gpos.cursive_adjustments(&glyphs, locale, self.current_gdef())
+            } else {
+                vec![gpos::SingleAdjustment::default(); glyphs.len()]
+            };
             for (index, pair) in pairs.into_iter().enumerate() {
                 let Some(glyph) = glyphs[index] else { continue };
                 let single = gpos
@@ -2403,12 +2429,19 @@ impl Font {
                         variation_coords,
                     )
                     .unwrap_or_default();
+                let cursive = cursives[index];
                 adjustments[index] = GlyphPositionAdjustment {
                     authored_pair: pair_coverage[index],
-                    placement_x: (pair.x_placement + single.x_placement) as f32 * scale_x,
-                    placement_y: (pair.y_placement + single.y_placement) as f32 * scale_y,
-                    advance_x: (pair.x_advance + single.x_advance) as f32 * scale_x,
-                    advance_y: (pair.y_advance + single.y_advance) as f32 * scale_y,
+                    placement_x: (pair.x_placement + single.x_placement + cursive.x_placement)
+                        as f32
+                        * scale_x,
+                    placement_y: (pair.y_placement + single.y_placement + cursive.y_placement)
+                        as f32
+                        * scale_y,
+                    advance_x: (pair.x_advance + single.x_advance + cursive.x_advance) as f32
+                        * scale_x,
+                    advance_y: (pair.y_advance + single.y_advance + cursive.y_advance) as f32
+                        * scale_y,
                 };
             }
         }
@@ -3148,6 +3181,19 @@ impl Font {
                     let layer_origin = layer_origin_result.unwrap_or((0.0, 0.0));
                     if vertical_outline {
                         translate_glyph_layers(&mut layers, layer_origin.0, layer_origin.1);
+                    }
+                    // Suppress visible fallback/control glyphs for standalone
+                    // default-ignorable join/format controls after shaping while
+                    // keeping zero-advance source ownership intact.
+                    if matches!(
+                        resolved.ch,
+                        '\u{200C}' | '\u{200D}' | '\u{034F}' | '\u{2060}' | '\u{FEFF}'
+                    ) && resolved.byte_end.saturating_sub(resolved.byte_start)
+                        == resolved.ch.len_utf8()
+                    {
+                        layers.clear();
+                        metrics.advance_x = 0.0;
+                        metrics.advance_y = 0.0;
                     }
                     metrics.bounds = glyph_layers_bounds(&layers);
                     layer_origins.push(layer_origin);

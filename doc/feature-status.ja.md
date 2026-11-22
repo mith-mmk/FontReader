@@ -237,10 +237,7 @@ simple glyphの丸めは変更していないため、font unit未満の精度�
 準拠する可変フォントの作成例ではありません。これは1つのface内の複合グリフで、複数フォントのfallbackとは別です。
 [複合グリフのgvar仕様](https://learn.microsoft.com/en-us/typography/opentype/spec/gvar#point-numbers-and-processing-for-composite-glyphs)を参照してください。
 
-制限：点同士で接続する複合グリフは従来の未変形輪郭経路を使い、正しい点の対応付けは未実装です。
-`USE_MY_METRICS`のphantom継承・hintingも未実装のため、親自身のphantom deltaは無視し、
-`hmtx`/HVARと`vmtx`/VVARのfallbackを保持します。対応するXY輪郭は変形します。
-fallbackテストはこの境界を検証するもので、仕様準拠を示しません。任意の回転・斜行を含む複合グリフは今回の検証範囲外です。
+点同士で接続する複合グリフ（`ARGS_ARE_XY_VALUES == 0`）は変形後の親・子輪郭点を用いて位置合わせし、`USE_MY_METRICS` を持つ複合グリフは指定された子コンポーネントの可変メトリクスを継承します（明示的な `HVAR`/`VVAR` エントリがある場合は引き続きそちらを優先します）。hinting および任意の回転・斜行を含む複合グリフの完全検証は対象外です。
 
 ### TrueTypeの可変縦メトリクス
 
@@ -791,11 +788,10 @@ tatweel、ZWJ、ZWNJ から字形を選び、フォント内の字形 feature �
 
 これは基本的な OpenType 経路の修正であり、完全なアラビア語対応ではない。
 接続字形の適用は従来の単一結果 helper のままで、一般的な文脈・複数 lookup
-処理にはしていない。GDEF を用いた GSUB の記号飛ばし、記号を挟む必須合字、
-筆記体接続、全ての記号配置、正規化、default-ignorable glyph の除去、
-Syriac 固有の joining-group 規則は対象外。source_index の継承は一般的な
-cluster 再構成ではない。ZWJ/ZWNJ は接続の意味だけを修正し、一部フォントでは
-送り量ゼロでも制御文字の glyph が描画される場合がある。SFArabic の記号配置は
+処理にはしていない。GPOS Type 3 筆記体接続（`curs`）の縦方向アンカー連結と、
+単独残存する default-ignorable 制御文字（ZWJ/ZWNJ/CGJ/WJ/BOM）の可視グリフ抑止は
+対応済み。全ての記号配置、正規化、Syriac 固有の joining-group 規則は対象外。
+source_index の継承は一般的な cluster 再構成ではない。SFArabic の記号配置は
 HarfBuzz との差が残るため、送り量の一致だけで描画位置の一致とはしない。
 RTL は呼び出し側が指定した run の方向であり、
 Latin・数字混在の Unicode bidi や script 分割は実装していない。

@@ -298,10 +298,17 @@ pub(crate) struct MarkAttachmentAdjustment {
 }
 
 #[derive(Debug, Clone)]
+struct CursivePosFormat1 {
+    coverage: Coverage,
+    records: Vec<(Option<Anchor>, Option<Anchor>)>,
+}
+
+#[derive(Debug, Clone)]
 enum PositioningSubtable {
     Single(SinglePos),
     PairFormat1(PairPosFormat1),
     PairFormat2(PairPosFormat2),
+    CursiveFormat1(CursivePosFormat1),
     MarkToBaseFormat1(MarkToBaseFormat1),
     MarkToLigatureFormat1(MarkToLigatureFormat1),
     MarkToMarkFormat1(MarkToMarkFormat1),
@@ -364,9 +371,21 @@ impl PositioningSubtable {
             }
             PositioningSubtable::Single(_)
             | PositioningSubtable::Unsupported
+            | PositioningSubtable::CursiveFormat1(_)
             | PositioningSubtable::MarkToBaseFormat1(_)
             | PositioningSubtable::MarkToLigatureFormat1(_)
             | PositioningSubtable::MarkToMarkFormat1(_) => None,
+        }
+    }
+
+    fn lookup_cursive_anchors(&self, glyph: u16) -> Option<(Option<Anchor>, Option<Anchor>)> {
+        match self {
+            PositioningSubtable::CursiveFormat1(cursive) => {
+                let index = cursive.coverage.contains(glyph as usize)?;
+                cursive.records.get(index).copied()
+            }
+            PositioningSubtable::Extension(extension) => extension.lookup_cursive_anchors(glyph),
+            _ => None,
         }
     }
 
@@ -395,6 +414,7 @@ impl PositioningSubtable {
             }
             PositioningSubtable::PairFormat1(_)
             | PositioningSubtable::PairFormat2(_)
+            | PositioningSubtable::CursiveFormat1(_)
             | PositioningSubtable::MarkToLigatureFormat1(_)
             | PositioningSubtable::MarkToMarkFormat1(_)
             | PositioningSubtable::Single(_)
@@ -434,6 +454,7 @@ impl PositioningSubtable {
             }
             PositioningSubtable::PairFormat1(_)
             | PositioningSubtable::PairFormat2(_)
+            | PositioningSubtable::CursiveFormat1(_)
             | PositioningSubtable::MarkToBaseFormat1(_)
             | PositioningSubtable::MarkToMarkFormat1(_)
             | PositioningSubtable::Single(_)
@@ -474,6 +495,7 @@ impl PositioningSubtable {
             }
             PositioningSubtable::PairFormat1(_)
             | PositioningSubtable::PairFormat2(_)
+            | PositioningSubtable::CursiveFormat1(_)
             | PositioningSubtable::MarkToBaseFormat1(_)
             | PositioningSubtable::MarkToLigatureFormat1(_)
             | PositioningSubtable::Single(_)
@@ -639,6 +661,7 @@ impl Gpos {
         match lookup_type {
             1 => Self::parse_single_adjustment(reader, offset),
             2 => Self::parse_pair_adjustment(reader, offset),
+            3 => Self::parse_cursive_attachment(reader, offset),
             4 => Self::parse_mark_to_base(reader, offset),
             5 => Self::parse_mark_to_ligature(reader, offset),
             6 => Self::parse_mark_to_mark(reader, offset),
@@ -787,6 +810,44 @@ impl Gpos {
             }
             _ => Ok(PositioningSubtable::Unsupported),
         }
+    }
+
+    fn parse_cursive_attachment<R: BinaryReader>(
+        reader: &mut R,
+        offset: u64,
+    ) -> Result<PositioningSubtable, std::io::Error> {
+        reader.seek(SeekFrom::Start(offset))?;
+        let pos_format = reader.read_u16_be()?;
+        if pos_format != 1 {
+            return Ok(PositioningSubtable::Unsupported);
+        }
+        let coverage_offset = reader.read_u16_be()?;
+        let entry_exit_count = reader.read_u16_be()?;
+        let mut raw_records = Vec::with_capacity(entry_exit_count as usize);
+        for _ in 0..entry_exit_count {
+            let entry_offset = reader.read_u16_be()?;
+            let exit_offset = reader.read_u16_be()?;
+            raw_records.push((entry_offset, exit_offset));
+        }
+        let coverage = Coverage::new(reader, offset + coverage_offset as u64)?;
+        let mut records = Vec::with_capacity(raw_records.len());
+        for (entry_offset, exit_offset) in raw_records {
+            let entry = if entry_offset != 0 {
+                Self::parse_anchor(reader, offset + entry_offset as u64)?
+            } else {
+                None
+            };
+            let exit = if exit_offset != 0 {
+                Self::parse_anchor(reader, offset + exit_offset as u64)?
+            } else {
+                None
+            };
+            records.push((entry, exit));
+        }
+        Ok(PositioningSubtable::CursiveFormat1(CursivePosFormat1 {
+            coverage,
+            records,
+        }))
     }
 
     fn parse_mark_to_base<R: BinaryReader>(
@@ -1580,6 +1641,73 @@ impl Gpos {
         } else {
             None
         }
+    }
+
+    /// Apply GPOS Type 3 Cursive Attachment (`curs`) lookups across consecutive
+    /// GDEF-included glyphs, aligning exit/entry vertical anchors along connected
+    /// cursive chains (honoring LookupFlag `RightToLeft` bit 0x0001).
+    pub(crate) fn cursive_adjustments(
+        &self,
+        glyphs: &[Option<u16>],
+        locale: Option<&str>,
+        gdef: Option<&Gdef>,
+    ) -> Vec<SingleAdjustment> {
+        let mut result = vec![SingleAdjustment::default(); glyphs.len()];
+        for lookup in self.collect_lookups(locale, &[*b"curs"]) {
+            if lookup.lookup_type != 3 && lookup.lookup_type != 9 {
+                continue;
+            }
+            let rtl_flag = lookup.lookup_flag & 0x0001 != 0;
+            // Collect pairs of consecutive included glyphs within contiguous runs.
+            let mut links: Vec<(usize, usize, i32)> = Vec::new();
+            let mut first = 0;
+            while first < glyphs.len() {
+                let Some(left) = glyphs[first].filter(|id| lookup.includes_glyph(*id, gdef)) else {
+                    first += 1;
+                    continue;
+                };
+                let mut second = first + 1;
+                while second < glyphs.len()
+                    && glyphs[second].is_some_and(|id| !lookup.includes_glyph(id, gdef))
+                {
+                    second += 1;
+                }
+                let Some(right) = glyphs.get(second).copied().flatten() else {
+                    first = second + 1;
+                    continue;
+                };
+                let anchors = lookup.subtables.iter().find_map(|subtable| {
+                    let (_, exit) = subtable.lookup_cursive_anchors(left)?;
+                    let (entry, _) = subtable.lookup_cursive_anchors(right)?;
+                    Some((exit?, entry?))
+                });
+                if let Some((exit, entry)) = anchors {
+                    links.push((first, second, i32::from(exit.y) - i32::from(entry.y)));
+                }
+                first = second;
+            }
+            if links.is_empty() {
+                continue;
+            }
+            let mut y_offsets = vec![0i32; glyphs.len()];
+            if rtl_flag {
+                // RTL cursive flag: last glyph anchors to baseline, chain backwards.
+                for &(prev, next, dy) in links.iter().rev() {
+                    y_offsets[prev] = y_offsets[next].saturating_sub(dy);
+                }
+            } else {
+                // LTR cursive flag: first glyph anchors to baseline, chain forwards.
+                for &(prev, next, dy) in &links {
+                    y_offsets[next] = y_offsets[prev].saturating_add(dy);
+                }
+            }
+            for (idx, dy) in y_offsets.into_iter().enumerate() {
+                if dy != 0 {
+                    result[idx].y_placement = result[idx].y_placement.saturating_add(dy);
+                }
+            }
+        }
+        result
     }
 
     pub(crate) fn lookup_mark_to_base_adjustment(
@@ -2667,7 +2795,7 @@ mod extension_header_tests {
                 .is_err());
             }
         }
-        for kind in [3, 7, 8] {
+        for kind in [7, 8] {
             let bytes = header(1, kind, 8);
             let PositioningSubtable::Extension(inner) =
                 Gpos::parse_extension(&mut BytesReader::new(&bytes), 0).unwrap()
@@ -2718,5 +2846,55 @@ mod extension_header_tests {
         let mut oob = raw;
         oob.x_adv_var = Some((99, 99));
         assert_eq!(oob.resolve(Some(gdef), &[1.0]).x_advance, -10);
+    }
+
+    #[test]
+    fn cursive_attachment_format1_chains_vertical_anchors_ltr_and_rtl() {
+        // CursivePosFormat1: format=1, coverageOffset=14, count=2,
+        // rec0(glyph 10): entry=0, exit=22 -> Anchor(x=100, y=50)
+        // rec1(glyph 11): entry=28 -> Anchor(x=0, y=20), exit=0
+        let words: [u16; 17] = [
+            1,  // format 1
+            14, // coverageOffset (byte 14)
+            2,  // entryExitCount
+            0, 22, // rec 0: entry=0, exit=22
+            28, 0, // rec 1: entry=28, exit=0
+            1, 2, 10, 11, // Coverage Format 1: glyphs 10, 11 (8 bytes: 14..22)
+            1, 100, 50, // exit anchor at 22: format 1, x=100, y=50
+            1, 0, 20, // entry anchor at 28: format 1, x=0, y=20
+        ];
+        let bytes: Vec<u8> = words.iter().flat_map(|w| w.to_be_bytes()).collect();
+        let subtable = Gpos::parse_cursive_attachment(&mut BytesReader::new(&bytes), 0).unwrap();
+        let make_gpos = |lookup_flag: u16| {
+            let base = include_bytes!("../../../tests/fixtures/gpos-single.bin");
+            let mut gpos = Gpos::new(&mut BytesReader::new(base), 0, base.len() as u32).unwrap();
+            let feature = gpos
+                .features
+                .features
+                .iter_mut()
+                .find(|f| f.feature_tag == u32::from_be_bytes(*b"kern"))
+                .unwrap();
+            feature.feature_tag = u32::from_be_bytes(*b"curs");
+            let lookup_index = feature.lookup_list_indices[0] as usize;
+            for lookup in &mut gpos.lookups {
+                lookup.subtables.clear();
+            }
+            gpos.lookups[lookup_index] = PositioningLookup {
+                lookup_type: 3,
+                lookup_flag,
+                mark_filtering_set: None,
+                subtables: vec![subtable.clone()],
+            };
+            gpos
+        };
+        // LTR chaining (flag 0): glyph 10 stays at y=0, glyph 11 shifts by exit.y - entry.y = +30.
+        let ltr = make_gpos(0).cursive_adjustments(&[Some(10), Some(11)], None, None);
+        assert_eq!(ltr[0].y_placement, 0);
+        assert_eq!(ltr[1].y_placement, 30);
+
+        // RTL chaining (flag 0x0001): glyph 11 anchors at y=0, glyph 10 shifts by -30.
+        let rtl = make_gpos(0x0001).cursive_adjustments(&[Some(10), Some(11)], None, None);
+        assert_eq!(rtl[0].y_placement, -30);
+        assert_eq!(rtl[1].y_placement, 0);
     }
 }
