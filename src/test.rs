@@ -2245,7 +2245,33 @@ mod tests {
                 });
                 let mut glyphs = with_mark.clone();
                 gsub.apply_feature_glyphs_with_gdef(&mut glyphs, None, &[*b"liga"], Some(&gdef));
-                assert_eq!(glyphs, with_mark);
+                if !nested {
+                    assert_eq!(
+                        glyphs,
+                        vec![
+                            GsubGlyph {
+                                byte_start: 0,
+                                byte_end: 0,
+                                glyph_id: 20,
+                                source_index: 0,
+                                substituted: true,
+                                mkmk_source_ambiguous: true,
+                                ligature_components: 2,
+                            },
+                            GsubGlyph {
+                                byte_start: 0,
+                                byte_end: 0,
+                                glyph_id: 12,
+                                source_index: 2,
+                                substituted: false,
+                                mkmk_source_ambiguous: false,
+                                ligature_components: 1,
+                            },
+                        ]
+                    );
+                } else {
+                    assert_eq!(glyphs, with_mark);
+                }
             }
             gsub.lookups.lookups[usize::from(nested)].lookup_flag = 0x0002;
             let mut glyphs = original.clone();
@@ -2288,25 +2314,25 @@ mod tests {
             )
         };
         for (lookup, input, expected) in [
-            (lookup_single_record(10, 12), vec![10, 13], vec![12, 13]),
+            (lookup_single_record(10, 12), vec![10, 13], vec![12, 15]),
             (lookup_single_record(12, 10), vec![12, 13], vec![10, 15]),
             (
                 lookup_multiple_record(10, &[12, 13]),
                 vec![10, 13],
-                vec![12, 13, 13],
+                vec![12, 15, 15],
             ),
             (lookup_multiple_record(12, &[]), vec![12, 13], vec![15]),
             (
                 lookup_ligature_record(10, &[13], 12),
                 vec![10, 13, 13],
-                vec![12, 13],
+                vec![12, 15],
             ),
             (
                 lookup_ligature_record(12, &[13], 10),
                 vec![12, 13, 13],
                 vec![10, 15],
             ),
-            (reverse(10, 12), vec![10, 13], vec![12, 13]),
+            (reverse(10, 12), vec![10, 13], vec![12, 15]),
             (reverse(12, 10), vec![12, 13], vec![10, 15]),
         ] {
             let mut gsub = parse_gsub(build_gsub_table_with_feature_lookups(
