@@ -2,7 +2,7 @@
 
 ## Opt-in layout と限定された GDEF caret
 
-新しい API は[元文字対応](mapped-shaping.md)、[明示改行](hard-line-layout.md)、[限定 BiDi／混在縦書き](bidi-and-mixed-vertical.md)を参照してください。以下の旧 shaping 経路の制約は、新経路が明示的に扱う範囲以外では維持されます。元範囲は保守的な grapheme envelope です。静的な GDEF Format 1・無調整の Format 3・限定された TrueType Format 2 の caret は、検証できる場合に使用します。対象外は明示的に近似します。上位 layout の family fallback・自動折返し・cross-run joining は未対応で、Unicode／全スクリプト完全対応ではありません。
+新しい API は[元文字対応](mapped-shaping.md)、[明示改行](hard-line-layout.md)、[限定的な自動折返し・複数フェイス複数行](wrapped-line-layout.md)、[限定 BiDi／混在縦書き](bidi-and-mixed-vertical.md)を参照してください。以下の旧 shaping 経路の制約は、新経路が明示的に扱う範囲以外では維持されます。元範囲は保守的な grapheme envelope です。静的な GDEF Format 1・無調整の Format 3・限定された TrueType Format 2 の caret は、検証できる場合に使用します。対象外は明示的に近似します。UAX #14 準拠の禁則・ハイフネーション・均等割付・BiDi 段落の自動折返し・cross-run joining は未対応で、Unicode／全スクリプト完全対応ではありません。
 
 
 このファイルは、以前 `README.ja.md` に置いていた実装メモ寄りの内容を移したものです。
