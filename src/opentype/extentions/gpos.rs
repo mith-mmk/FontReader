@@ -17,6 +17,10 @@ pub(crate) struct ValueRecord {
     pub(crate) y_placement: i16,
     pub(crate) x_advance: i16,
     pub(crate) y_advance: i16,
+    pub(crate) x_pla_var: Option<(u16, u16)>,
+    pub(crate) y_pla_var: Option<(u16, u16)>,
+    pub(crate) x_adv_var: Option<(u16, u16)>,
+    pub(crate) y_adv_var: Option<(u16, u16)>,
 }
 
 impl ValueRecord {
@@ -31,7 +35,69 @@ impl ValueRecord {
         self.y_advance = self.y_advance.saturating_add(other.y_advance);
     }
 
-    fn parse<R: BinaryReader>(reader: &mut R, value_format: u16) -> Result<Self, std::io::Error> {
+    fn resolve(self, gdef: Option<&Gdef>, variation_coords: &[f32]) -> Self {
+        if variation_coords.is_empty() {
+            return self;
+        }
+        let Some(store) = gdef
+            .and_then(|g| g.caret_variation_store.as_ref())
+            .and_then(|res| res.as_ref().ok())
+        else {
+            return self;
+        };
+        let apply = |base: i16, var: Option<(u16, u16)>| -> i16 {
+            let Some((outer, inner)) = var else {
+                return base;
+            };
+            let Ok(delta) = store.delta(outer, inner, variation_coords) else {
+                return base;
+            };
+            if !delta.is_finite() {
+                return base;
+            }
+            let rounded = delta
+                .round()
+                .clamp(f32::from(i16::MIN), f32::from(i16::MAX)) as i16;
+            base.saturating_add(rounded)
+        };
+        Self {
+            x_placement: apply(self.x_placement, self.x_pla_var),
+            y_placement: apply(self.y_placement, self.y_pla_var),
+            x_advance: apply(self.x_advance, self.x_adv_var),
+            y_advance: apply(self.y_advance, self.y_adv_var),
+            x_pla_var: None,
+            y_pla_var: None,
+            x_adv_var: None,
+            y_adv_var: None,
+        }
+    }
+
+    fn parse_variation_index<R: BinaryReader>(
+        reader: &mut R,
+        subtable_offset: u64,
+        device_offset: u16,
+    ) -> Option<(u16, u16)> {
+        if device_offset == 0 {
+            return None;
+        }
+        let saved = reader.offset().ok()?;
+        let target = subtable_offset.checked_add(u64::from(device_offset))?;
+        let parsed = (|| -> Option<(u16, u16)> {
+            reader.seek(SeekFrom::Start(target)).ok()?;
+            let outer = reader.read_u16_be().ok()?;
+            let inner = reader.read_u16_be().ok()?;
+            let delta_format = reader.read_u16_be().ok()?;
+            (delta_format == 0x8000).then_some((outer, inner))
+        })();
+        let _ = reader.seek(SeekFrom::Start(saved));
+        parsed
+    }
+
+    fn parse_with_base<R: BinaryReader>(
+        reader: &mut R,
+        value_format: u16,
+        subtable_offset: u64,
+    ) -> Result<Self, std::io::Error> {
         let mut value = Self::default();
 
         if value_format & 0x0001 != 0 {
@@ -46,10 +112,23 @@ impl ValueRecord {
         if value_format & 0x0008 != 0 {
             value.y_advance = reader.read_i16_be()?;
         }
-
-        for flag in [
-            0x0010u16, 0x0020, 0x0040, 0x0080, 0x0100, 0x0200, 0x0400, 0x0800,
-        ] {
+        if value_format & 0x0010 != 0 {
+            let rel = reader.read_u16_be()?;
+            value.x_pla_var = Self::parse_variation_index(reader, subtable_offset, rel);
+        }
+        if value_format & 0x0020 != 0 {
+            let rel = reader.read_u16_be()?;
+            value.y_pla_var = Self::parse_variation_index(reader, subtable_offset, rel);
+        }
+        if value_format & 0x0040 != 0 {
+            let rel = reader.read_u16_be()?;
+            value.x_adv_var = Self::parse_variation_index(reader, subtable_offset, rel);
+        }
+        if value_format & 0x0080 != 0 {
+            let rel = reader.read_u16_be()?;
+            value.y_adv_var = Self::parse_variation_index(reader, subtable_offset, rel);
+        }
+        for flag in [0x0100u16, 0x0200, 0x0400, 0x0800] {
             if value_format & flag != 0 {
                 let _ = reader.read_u16_be()?;
             }
@@ -592,7 +671,7 @@ impl Gpos {
         };
         let mut values = Vec::with_capacity(count as usize);
         for _ in 0..count {
-            values.push(ValueRecord::parse(reader, value_format)?);
+            values.push(ValueRecord::parse_with_base(reader, value_format, offset)?);
         }
         let coverage = Coverage::new(reader, offset + coverage_offset as u64)?;
         // Validate index arithmetic here before Coverage::contains performs it.
@@ -663,8 +742,8 @@ impl Gpos {
                     let mut pair_value_records = Vec::with_capacity(pair_value_count as usize);
                     for _ in 0..pair_value_count {
                         let second_glyph = reader.read_u16_be()?;
-                        let value1 = ValueRecord::parse(reader, value_format1)?;
-                        let value2 = ValueRecord::parse(reader, value_format2)?;
+                        let value1 = ValueRecord::parse_with_base(reader, value_format1, offset)?;
+                        let value2 = ValueRecord::parse_with_base(reader, value_format2, offset)?;
                         pair_value_records.push(PairValueRecord {
                             second_glyph,
                             value1,
@@ -691,8 +770,8 @@ impl Gpos {
                     let mut class2_records = Vec::with_capacity(class2_count as usize);
                     for _ in 0..class2_count {
                         class2_records.push(Class2Record {
-                            value1: ValueRecord::parse(reader, value_format1)?,
-                            value2: ValueRecord::parse(reader, value_format2)?,
+                            value1: ValueRecord::parse_with_base(reader, value_format1, offset)?,
+                            value2: ValueRecord::parse_with_base(reader, value_format2, offset)?,
                         });
                     }
                     class1_records.push(class2_records);
@@ -1340,14 +1419,25 @@ impl Gpos {
         feature_indices
     }
 
-    /// SinglePos on default spacing and vertical positioning features. Device/variation deltas are
-    /// parsed but not evaluated, consistently with the existing pair path.
+    /// SinglePos on default spacing and vertical positioning features, with
+    /// optional GDEF ItemVariationStore delta evaluation.
     pub(crate) fn lookup_single_adjustment(
         &self,
         glyph: u16,
         is_vertical: bool,
         locale: Option<&str>,
         gdef: Option<&Gdef>,
+    ) -> Option<SingleAdjustment> {
+        self.lookup_single_adjustment_with_coords(glyph, is_vertical, locale, gdef, &[])
+    }
+
+    pub(crate) fn lookup_single_adjustment_with_coords(
+        &self,
+        glyph: u16,
+        is_vertical: bool,
+        locale: Option<&str>,
+        gdef: Option<&Gdef>,
+        variation_coords: &[f32],
     ) -> Option<SingleAdjustment> {
         let feature_tags: &[[u8; 4]] = if is_vertical {
             &[*b"vkrn", *b"dist", *b"vert"]
@@ -1364,7 +1454,7 @@ impl Gpos {
             }
             for subtable in &lookup.subtables {
                 if let Some(value) = subtable.lookup_single_adjustment(glyph) {
-                    result.add_assign(value);
+                    result.add_assign(value.resolve(gdef, variation_coords));
                     matched = true;
                     // Even a zero value is a match, not a fallback opportunity.
                     break;
@@ -1383,6 +1473,17 @@ impl Gpos {
         is_vertical: bool,
         locale: Option<&str>,
         gdef: Option<&Gdef>,
+    ) -> (Vec<SingleAdjustment>, Vec<bool>) {
+        self.pair_adjustments_with_coverage_and_coords(glyphs, is_vertical, locale, gdef, &[])
+    }
+
+    pub(crate) fn pair_adjustments_with_coverage_and_coords(
+        &self,
+        glyphs: &[Option<u16>],
+        is_vertical: bool,
+        locale: Option<&str>,
+        gdef: Option<&Gdef>,
+        variation_coords: &[f32],
     ) -> (Vec<SingleAdjustment>, Vec<bool>) {
         let tags = if is_vertical { [*b"vkrn"] } else { [*b"kern"] };
         let mut result = vec![SingleAdjustment::default(); glyphs.len()];
@@ -1415,8 +1516,8 @@ impl Gpos {
                 if let Some((pair, consumes_second)) = matched {
                     covered[first] = true;
                     covered[second] = true;
-                    result[first].add_assign(pair.first);
-                    result[second].add_assign(pair.second);
+                    result[first].add_assign(pair.first.resolve(gdef, variation_coords));
+                    result[second].add_assign(pair.second.resolve(gdef, variation_coords));
                     // A zero record is still a match. ValueFormat2 == 0 lets
                     // the second glyph start the next pair in this lookup.
                     first = second + usize::from(consumes_second);
@@ -2115,6 +2216,7 @@ mod tests {
             y_placement: -2,
             x_advance: 3,
             y_advance: -4,
+            ..Default::default()
         };
         assert_eq!(single.lookup_single_adjustment(10), Some(expected));
         assert_eq!(single.lookup_single_adjustment(20), Some(expected));
@@ -2574,5 +2676,47 @@ mod extension_header_tests {
             };
             assert!(matches!(*inner, PositioningSubtable::Unsupported));
         }
+    }
+
+    #[test]
+    fn value_record_variation_index_applies_gdef_store_delta() {
+        let font = crate::fontreader::Font::get_font_from_buffer(include_bytes!(
+            "../../../tests/fixtures/gdef-carets.ttc"
+        ))
+        .unwrap();
+        // Face 4 has a valid CaretVariationStore (outer=0, inner=0 -> +25 at 0.25, +100 at 1.0).
+        let gdef = font.more_fonts[3].gdef.as_ref().unwrap();
+        // SinglePos format 1: coverage at 10, valueFormat = 0x0044 (xAdvance + xAdvDevice),
+        // xAdvance = -10, xAdvDevice offset = 16 -> VariationIndex(outer=0, inner=0, format=0x8000).
+        let words: [u16; 11] = [
+            1,      // format 1
+            10,     // coverage offset
+            0x0044, // xAdvance | xAdvDevice
+            (-10i16) as u16,
+            16, // xAdvDevice offset
+            1,
+            1,
+            10, // Coverage Format 1: glyph 10
+            0,
+            0,
+            0x8000, // VariationIndex (outer=0, inner=0, deltaFormat=0x8000)
+        ];
+        let bytes: Vec<u8> = words.iter().flat_map(|w| w.to_be_bytes()).collect();
+        let subtable = Gpos::parse_single_adjustment(&mut BytesReader::new(&bytes), 0).unwrap();
+        let raw = subtable.lookup_single_adjustment(10).unwrap();
+        assert_eq!(raw.x_advance, -10);
+        assert_eq!(raw.x_adv_var, Some((0, 0)));
+        assert_eq!(raw.resolve(Some(gdef), &[]).x_advance, -10);
+        assert_eq!(raw.resolve(Some(gdef), &[0.25]).x_advance, 15);
+        assert_eq!(raw.resolve(Some(gdef), &[1.0]).x_advance, 90);
+        // Malformed store or out-of-bounds VariationIndex fails closed to base value.
+        let mut bad_gdef = gdef.clone();
+        bad_gdef.caret_variation_store = Some(Err(
+            crate::opentype::extentions::gdef_variation::VariationError::Malformed,
+        ));
+        assert_eq!(raw.resolve(Some(&bad_gdef), &[1.0]).x_advance, -10);
+        let mut oob = raw;
+        oob.x_adv_var = Some((99, 99));
+        assert_eq!(oob.resolve(Some(gdef), &[1.0]).x_advance, -10);
     }
 }

@@ -2368,25 +2368,40 @@ impl Font {
         is_vertical: bool,
         scale_x: f32,
         scale_y: f32,
+        variation_coords: &[f32],
     ) -> Vec<GlyphPositionAdjustment> {
         let mut adjustments = vec![GlyphPositionAdjustment::default(); units.len()];
         #[cfg(not(feature = "layout"))]
-        let _ = (locale, is_vertical, scale_x, scale_y, &mut adjustments);
+        let _ = (
+            locale,
+            is_vertical,
+            scale_x,
+            scale_y,
+            variation_coords,
+            &mut adjustments,
+        );
         #[cfg(feature = "layout")]
         if let Some(gpos) = self.current_gpos() {
             let glyphs: Vec<_> = (0..units.len())
                 .map(|index| Self::glyph_unit_at(units, index).map(|unit| unit.glyph_id as u16))
                 .collect();
-            let (pairs, pair_coverage) = gpos.pair_adjustments_with_coverage(
+            let (pairs, pair_coverage) = gpos.pair_adjustments_with_coverage_and_coords(
                 &glyphs,
                 is_vertical,
                 locale,
                 self.current_gdef(),
+                variation_coords,
             );
             for (index, pair) in pairs.into_iter().enumerate() {
                 let Some(glyph) = glyphs[index] else { continue };
                 let single = gpos
-                    .lookup_single_adjustment(glyph, is_vertical, locale, self.current_gdef())
+                    .lookup_single_adjustment_with_coords(
+                        glyph,
+                        is_vertical,
+                        locale,
+                        self.current_gdef(),
+                        variation_coords,
+                    )
                     .unwrap_or_default();
                 adjustments[index] = GlyphPositionAdjustment {
                     authored_pair: pair_coverage[index],
@@ -2838,8 +2853,15 @@ impl Font {
             true,
             bidi_run,
         )?;
-        let adjustments =
-            self.position_adjustments(&shaped_units, options.locale, is_vertical, scale_x, scale_y);
+        let variation_coords = self.normalized_variation_coords(options);
+        let adjustments = self.position_adjustments(
+            &shaped_units,
+            options.locale,
+            is_vertical,
+            scale_x,
+            scale_y,
+            &variation_coords,
+        );
         let mut unit_glyph_indices = vec![None; shaped_units.len()];
 
         for (index, unit) in shaped_units.iter().enumerate() {
@@ -3641,7 +3663,7 @@ impl Font {
             crate::commands::FontVariant::Normal,
         )?;
 
-        let adjustments = self.position_adjustments(&shaped_units, None, false, 1.0, 1.0);
+        let adjustments = self.position_adjustments(&shaped_units, None, false, 1.0, 1.0, &[]);
 
         for (index, unit) in shaped_units.iter().enumerate() {
             match *unit {
@@ -5607,7 +5629,8 @@ mod pair_coordinate_tests {
                             expected
                         );
                         let scaled =
-                            font.position_adjustments(&units, None, vertical, 0.5, 0.25)[index];
+                            font.position_adjustments(&units, None, vertical, 0.5, 0.25, &[])
+                                [index];
                         assert_eq!(scaled.placement_x, expected.0 as f32 * 0.5);
                         assert_eq!(scaled.placement_y, expected.1 as f32 * 0.25);
                         assert_eq!(scaled.advance_x, expected.2 as f32 * 0.5);
