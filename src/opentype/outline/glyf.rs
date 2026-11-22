@@ -153,21 +153,21 @@ impl Glyph {
         }
     }
 
-    /// Count component-domain gvar points without flattening the outline.
-    /// The flag reports inherited phantom metrics, which this unhinted path
-    /// does not implement. Reject truncated component records before parsing.
-    pub(crate) fn composite_variation_info(&self) -> Option<(usize, bool)> {
+    /// Count component-domain gvar points without flattening the outline, and
+    /// return the first component glyph ID carrying `USE_MY_METRICS` if any.
+    /// Reject truncated component records before parsing.
+    pub(crate) fn composite_variation_info(&self) -> Option<(usize, Option<usize>)> {
         let bytes = &self.glyphs;
         if bytes.len() < 10 || i16::from_be_bytes([bytes[0], bytes[1]]) >= 0 {
             return None;
         }
         let mut offset = 10usize;
         let mut count = 0usize;
-        let mut inherits_metrics = false;
+        let mut metrics_component = None;
         loop {
             bytes.get(offset..offset.checked_add(4)?)?;
             let flags = read_u16(bytes, &mut offset);
-            let _ = read_u16(bytes, &mut offset);
+            let component_glyph_id = read_u16(bytes, &mut offset) as usize;
             let argument_bytes = if flags & ARG_1_AND_2_ARE_WORDS != 0 {
                 4
             } else {
@@ -186,9 +186,11 @@ impl Glyph {
             bytes.get(offset..end)?;
             offset = end;
             count += 1;
-            inherits_metrics |= flags & USE_MY_METRICS != 0;
+            if flags & USE_MY_METRICS != 0 && metrics_component.is_none() {
+                metrics_component = Some(component_glyph_id);
+            }
             if flags & MORE_COMPONENTS == 0 {
-                return Some((count, inherits_metrics));
+                return Some((count, metrics_component));
             }
         }
     }
@@ -876,22 +878,44 @@ impl Glyf {
             let args_are_words = flags & ARG_1_AND_2_ARE_WORDS != 0;
             let args_are_xy_values = flags & ARGS_ARE_XY_VALUES != 0;
 
-            let (arg1, arg2) = if args_are_words {
-                if offset + 4 > glyph.glyphs.len() {
-                    break;
-                }
-                (
-                    read_i16(&glyph.glyphs, &mut offset) as f64,
-                    read_i16(&glyph.glyphs, &mut offset) as f64,
-                )
+            let (arg1, arg2, matched_points) = if args_are_xy_values {
+                let (x, y) = if args_are_words {
+                    if offset + 4 > glyph.glyphs.len() {
+                        break;
+                    }
+                    (
+                        read_i16(&glyph.glyphs, &mut offset) as f64,
+                        read_i16(&glyph.glyphs, &mut offset) as f64,
+                    )
+                } else {
+                    if offset + 2 > glyph.glyphs.len() {
+                        break;
+                    }
+                    (
+                        read_i8(&glyph.glyphs, &mut offset) as f64,
+                        read_i8(&glyph.glyphs, &mut offset) as f64,
+                    )
+                };
+                (x, y, None)
             } else {
-                if offset + 2 > glyph.glyphs.len() {
-                    break;
-                }
-                (
-                    read_i8(&glyph.glyphs, &mut offset) as f64,
-                    read_i8(&glyph.glyphs, &mut offset) as f64,
-                )
+                let (parent_pt, child_pt) = if args_are_words {
+                    if offset + 4 > glyph.glyphs.len() {
+                        break;
+                    }
+                    (
+                        read_u16(&glyph.glyphs, &mut offset) as usize,
+                        read_u16(&glyph.glyphs, &mut offset) as usize,
+                    )
+                } else {
+                    if offset + 2 > glyph.glyphs.len() {
+                        break;
+                    }
+                    let p = glyph.glyphs[offset] as usize;
+                    let c = glyph.glyphs[offset + 1] as usize;
+                    offset += 2;
+                    (p, c)
+                };
+                (0.0, 0.0, Some((parent_pt, child_pt)))
             };
 
             let mut transform = CompositeTransform::default();
@@ -900,9 +924,6 @@ impl Glyf {
                 // gvar adjusts raw offsets before optional offset scaling.
                 transform.dx = arg1 + f64::from(dx);
                 transform.dy = arg2 + f64::from(dy);
-            } else {
-                // Point attachment needs point matching, not XY translation.
-                return None;
             }
             component_number += 1;
 
@@ -920,7 +941,7 @@ impl Glyf {
                 transform.yy = read_f2dot14(&glyph.glyphs, &mut offset);
             }
 
-            if flags & SCALED_COMPONENT_OFFSET != 0 {
+            if args_are_xy_values && flags & SCALED_COMPONENT_OFFSET != 0 {
                 let dx = transform.xx * transform.dx + transform.xy * transform.dy;
                 let dy = transform.yx * transform.dx + transform.yy * transform.dy;
                 transform.dx = dx;
@@ -935,6 +956,13 @@ impl Glyf {
                 vary,
                 component_deltas,
             )?;
+            if let Some((parent_pt_idx, child_pt_idx)) = matched_points {
+                let &(px, py, _) = points.get(parent_pt_idx)?;
+                let &(cx, cy, _) = component.points.get(child_pt_idx)?;
+                let (tcx, tcy) = transform_outline_point(cx, cy, transform);
+                transform.dx = px - tcx;
+                transform.dy = py - tcy;
+            }
             let point_base = points.len();
             for (x, y, on_curve) in component.points {
                 let (x, y) = transform_outline_point(x, y, transform);
@@ -1261,7 +1289,7 @@ mod display_tests {
             offset: 0,
             length: bytes.len() as u32,
         };
-        assert_eq!(glyph.composite_variation_info(), Some((1, true)));
+        assert_eq!(glyph.composite_variation_info(), Some((1, Some(1))));
         for length in 0..bytes.len() {
             let truncated = Glyph {
                 glyphs: Box::new(bytes[..length].to_vec()),

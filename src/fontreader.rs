@@ -1271,6 +1271,18 @@ impl Font {
         glyph_id: usize,
         coordinates: &[f32],
     ) -> Option<gvar::GlyphVariationResult> {
+        self.current_gvar_variation_with_depth(glyph_id, coordinates, 0)
+    }
+
+    fn current_gvar_variation_with_depth(
+        &self,
+        glyph_id: usize,
+        coordinates: &[f32],
+        depth: usize,
+    ) -> Option<gvar::GlyphVariationResult> {
+        if depth > 16 {
+            return None;
+        }
         let gvar = self.current_gvar()?;
         let glyph = self.current_glyf()?.get_glyph(glyph_id)?;
         let raw_parsed = glyph.parse();
@@ -1302,26 +1314,35 @@ impl Font {
         });
 
         let mut variation = if raw_parsed.number_of_contours < 0 {
-            let (count, inherits_metrics) = glyph.composite_variation_info()?;
+            let (count, metrics_component) = glyph.composite_variation_info()?;
             let deltas = gvar.composite_deltas(glyph_id, coordinates, count)?;
-            // USE_MY_METRICS needs inherited component phantom positions.
-            // Until supported, retain hmtx/HVAR and vmtx/VVAR metrics rather
-            // than treating the composite's own phantoms as authoritative.
-            gvar::Gvar::composite_metrics(
+            let inherited = metrics_component.and_then(|comp_id| {
+                self.current_gvar_variation_with_depth(comp_id, coordinates, depth + 1)
+            });
+            let mut result = gvar::Gvar::composite_metrics(
                 &raw_parsed,
                 component_varied,
                 &deltas,
-                if inherits_metrics {
+                if metrics_component.is_some() {
                     None
                 } else {
                     horizontal_metric
                 },
-                if inherits_metrics {
+                if metrics_component.is_some() {
                     None
                 } else {
                     vertical_metric.clone()
                 },
-            )?
+            )?;
+            if let Some(inherited) = inherited {
+                if let Some(h) = inherited.horizontal_metric {
+                    result.horizontal_metric = Some(h);
+                }
+                if let Some(v) = inherited.vertical_metric {
+                    result.vertical_metric = Some(v);
+                }
+            }
+            result
         } else {
             gvar.apply_to_parsed_glyph_with_metrics(
                 glyph_id,
