@@ -729,7 +729,7 @@ mod tests {
             );
             assert_eq!(caret.quality(), CaretQuality::Approximate);
         }
-        for index in 2..6 {
+        for index in [2, 3, 5] {
             let face = file.face(index).unwrap();
             let mapped = face
                 .engine()
@@ -742,6 +742,27 @@ mod tests {
                 .unwrap()[0];
             assert_eq!(caret.source(), CaretSource::Approximate, "face {index}");
             assert_eq!(caret.x(), 450.0, "face {index}");
+        }
+        // Face 4 has a valid GDEF CaretVariationStore (wght 400..900 -> +0/+25/+100).
+        let var_face = file.face(4).unwrap();
+        for (wght, expected_x) in [(400.0, 220.0), (650.0, 245.0), (900.0, 320.0)] {
+            let mapped = var_face
+                .engine()
+                .with_font_size(1000.0)
+                .with_variation("wght", wght)
+                .shape_mapped("fi")
+                .unwrap();
+            let caret = CaretLayout::new(&mapped)
+                .unwrap()
+                .caret_positions(TextPosition::new(1, CaretAffinity::Downstream))
+                .unwrap()[0];
+            assert_eq!(caret.source(), CaretSource::FontAuthored, "wght {wght}");
+            assert!(
+                (caret.x() - expected_x).abs() < 0.001,
+                "wght {wght}: {} != {expected_x}",
+                caret.x()
+            );
+            assert_eq!(caret.quality(), CaretQuality::Approximate);
         }
     }
     #[cfg(feature = "layout")]

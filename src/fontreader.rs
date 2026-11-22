@@ -3135,18 +3135,19 @@ impl Font {
                         layers,
                     };
                     #[cfg(feature = "layout")]
-                    let authored_carets = if self.current_fvar().is_none()
-                        && !uses_mark_attachment
-                        && !zero_nominal_advance
-                        && glyph
-                            .layers
-                            .iter()
-                            .all(|layer| matches!(layer, GlyphLayer::Path(_)))
-                        && (!is_vertical || layer_origin_result.is_some())
+                    let authored_carets = if let Some(variation_coords) =
+                        self.validated_caret_variation_coords(options, open_type_glyph)
                     {
-                        self.current_gdef()
-                            .and_then(|gdef| gdef.ligature_carets(glyph_id as u16))
-                            .and_then(|values| {
+                        if !uses_mark_attachment
+                            && !zero_nominal_advance
+                            && glyph
+                                .layers
+                                .iter()
+                                .all(|layer| matches!(layer, GlyphLayer::Path(_)))
+                            && (!is_vertical || layer_origin_result.is_some())
+                        {
+                            self.current_gdef().and_then(|gdef| {
+                                let values = gdef.ligature_carets(glyph_id as u16)?;
                                 // Each Format2 lookup validates the entire glyph.
                                 // Bound repeated decoding before resolving any point;
                                 // larger lists fall back as a whole, never partially.
@@ -3157,10 +3158,12 @@ impl Font {
                                 let mut previous_coordinate = None;
                                 for value in values {
                                     let coordinate = self.authored_caret_design_coordinate(
+                                        gdef,
                                         value,
                                         glyph_id,
                                         open_type_glyph,
                                         is_vertical,
+                                        variation_coords,
                                     )?;
                                     if previous_coordinate
                                         .is_some_and(|previous| coordinate <= previous)
@@ -3191,6 +3194,9 @@ impl Font {
                                 }
                                 Some(distances)
                             })
+                        } else {
+                            None
+                        }
                     } else {
                         None
                     };
@@ -3309,16 +3315,61 @@ impl Font {
             <= MAX_POINT_CARETS
     }
 
+    /// Validates fvar axis bounds and normalized coordinates before resolving
+    /// variable GDEF ligature carets. Returns `Some(&[])` for static faces.
+    #[cfg(feature = "layout")]
+    fn validated_caret_variation_coords<'a>(
+        &self,
+        options: &crate::commands::FontOptions<'_>,
+        glyph: &'a OpenTypeGlyph,
+    ) -> Option<&'a [f32]> {
+        let Some(fvar) = self.current_fvar() else {
+            return Some(&[]);
+        };
+        if fvar.axes.is_empty() || glyph.variation_coords.len() != fvar.axes.len() {
+            return None;
+        }
+        for axis in &fvar.axes {
+            if !axis.min_value.is_finite()
+                || !axis.default_value.is_finite()
+                || !axis.max_value.is_finite()
+                || axis.min_value > axis.default_value
+                || axis.default_value > axis.max_value
+            {
+                return None;
+            }
+            if let Some(setting) = options
+                .variations
+                .iter()
+                .find(|setting| u32::from_be_bytes(setting.tag) == axis.tag)
+            {
+                if !setting.value.is_finite() {
+                    return None;
+                }
+            }
+        }
+        if glyph
+            .variation_coords
+            .iter()
+            .any(|coord| !coord.is_finite() || !(-1.0..=1.0).contains(coord))
+        {
+            return None;
+        }
+        Some(&glyph.variation_coords)
+    }
+
     #[cfg(feature = "layout")]
     fn authored_caret_design_coordinate(
         &self,
+        gdef: &gdef::Gdef,
         value: &gdef::CaretValue,
         glyph_id: usize,
         glyph: &OpenTypeGlyph,
         is_vertical: bool,
+        variation_coords: &[f32],
     ) -> Option<f32> {
         let gdef::CaretValue::Format2(point) = value else {
-            return value.design_coordinate().ok().map(f32::from);
+            return gdef.caret_coordinate(value, variation_coords).ok();
         };
         // A point index is not a design coordinate. Resolve only real points in
         // a static monochrome glyf within the simple/translated-composite subset;
@@ -6072,6 +6123,7 @@ mod authored_caret_plumbing_tests {
             .get_glyph_from_id_with_options(6, false, &options)
             .open_type_glyf
             .unwrap();
+        let gdef = font.current_gdef().unwrap();
         let point = |index| {
             gdef::CaretValue::Format2(gdef::CaretValueFormat2 {
                 caret_value_point: index,
@@ -6080,7 +6132,7 @@ mod authored_caret_plumbing_tests {
         for index in [4, u16::MAX] {
             // Four real points; phantom points excluded.
             assert!(font
-                .authored_caret_design_coordinate(&point(index), 6, &glyph, false)
+                .authored_caret_design_coordinate(gdef, &point(index), 6, &glyph, false, &[])
                 .is_none());
         }
         // Metadata extraction must not bless points whose existing renderer
@@ -6091,21 +6143,21 @@ mod authored_caret_plumbing_tests {
             layout.line_gap = 1;
         }
         assert!(font
-            .authored_caret_design_coordinate(&point(1), 6, &unsafe_baseline, false)
+            .authored_caret_design_coordinate(gdef, &point(1), 6, &unsafe_baseline, false, &[])
             .is_none());
         let mut truncated_baseline = glyph.clone();
         if let super::FontLayout::Horizontal(layout) = &mut truncated_baseline.layout {
             layout.accender = i16::MAX as isize + 1;
         }
         assert!(font
-            .authored_caret_design_coordinate(&point(1), 6, &truncated_baseline, false)
+            .authored_caret_design_coordinate(gdef, &point(1), 6, &truncated_baseline, false, &[])
             .is_none());
         let mut truncated = glyph.clone();
         if let FontData::Glyph(raw) = &mut truncated.glyph {
             raw.glyphs.truncate(10);
         }
         assert!(font
-            .authored_caret_design_coordinate(&point(1), 6, &truncated, false)
+            .authored_caret_design_coordinate(gdef, &point(1), 6, &truncated, false, &[])
             .is_none());
         let mut composite = glyph.clone();
         if let FontData::Glyph(raw) = &mut composite.glyph {
@@ -6113,12 +6165,13 @@ mod authored_caret_plumbing_tests {
             raw.glyphs[1] = 0xff;
         }
         assert!(font
-            .authored_caret_design_coordinate(&point(1), 6, &composite, false)
+            .authored_caret_design_coordinate(gdef, &point(1), 6, &composite, false, &[])
             .is_none());
         let variable = file.face(4).unwrap();
+        let var_gdef = variable.font().current_gdef().unwrap();
         assert!(variable
             .font()
-            .authored_caret_design_coordinate(&point(1), 6, &glyph, false)
+            .authored_caret_design_coordinate(var_gdef, &point(1), 6, &glyph, false, &[0.0])
             .is_none());
         let color =
             FontFile::from_buffer(include_bytes!("../tests/fixtures/colr-vertical-origin.ttc"))
@@ -6127,7 +6180,7 @@ mod authored_caret_plumbing_tests {
                 .unwrap();
         assert!(color
             .font()
-            .authored_caret_design_coordinate(&point(1), 6, &glyph, false)
+            .authored_caret_design_coordinate(gdef, &point(1), 6, &glyph, false, &[])
             .is_none());
     }
 
@@ -6196,9 +6249,9 @@ mod authored_caret_plumbing_tests {
     }
 
     #[test]
-    fn unresolved_devices_and_variable_faces_do_not_claim_authorship() {
+    fn unresolved_devices_and_malformed_variable_faces_do_not_claim_authorship() {
         let file = FontFile::from_buffer(FONT).unwrap();
-        for index in [3, 4, 5] {
+        for index in [3, 5] {
             let face = file.face(index).unwrap();
             let options = FontOptions::new(&face).with_font_size(20.0);
             let out = face
@@ -6207,6 +6260,36 @@ mod authored_caret_plumbing_tests {
                 .unwrap();
             assert_eq!(out.ligature_carets, vec![None, None], "face {index}");
         }
+    }
+
+    #[test]
+    fn variable_variation_index_carets_apply_axis_deltas_and_reject_nonfinite_settings() {
+        let file = FontFile::from_buffer(FONT).unwrap();
+        let face = file.face(4).unwrap(); // wght 400..900, +25 at 650 (0.25), +100 at 900 (1.0)
+        for (wght, expected_fi, expected_fl) in [
+            (400.0, 220.0, 730.0),
+            (650.0, 245.0, 755.0),
+            (900.0, 320.0, 830.0),
+        ] {
+            let options = FontOptions::new(&face)
+                .with_font_size(1000.0)
+                .with_variation("wght", wght);
+            let out = face
+                .font()
+                .text2glyph_run_with_carets("fifl", &options)
+                .unwrap();
+            close(out.ligature_carets[0].as_ref().unwrap()[0], expected_fi);
+            close(out.ligature_carets[1].as_ref().unwrap()[0], expected_fl);
+        }
+        // Non-finite variation setting fails closed to None rather than claiming authorship.
+        let bad = FontOptions::new(&face)
+            .with_font_size(1000.0)
+            .with_variation("wght", f32::NAN);
+        let out = face
+            .font()
+            .text2glyph_run_with_carets("fifl", &bad)
+            .unwrap();
+        assert_eq!(out.ligature_carets, vec![None, None]);
     }
 }
 

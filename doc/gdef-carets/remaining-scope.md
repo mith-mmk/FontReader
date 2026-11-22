@@ -50,11 +50,14 @@ normalized coordinate count. The internal
 explicit normalized coordinates; malformed optional stores do not disable
 static carets or legacy shaping.
 
-These are low-level foundations, not a public variable-caret feature. Mapped
-shaping still rejects variable faces. Integration must validate fvar/avar
-normalization and reconcile varied metrics and rendered geometry before
-relaxing that guard. Fixture face 4 at wght 650/900 (+25/+100) and invalid face 5 provide initial regression
-controls; they are not a real-font variation coverage claim.
+These validated `CaretVariationStore` / `VariationIndex` Format 3 carets are now
+integrated into mapped shaping when `fvar` axis bounds, user variation settings,
+and normalized coordinates (`[-1.0, 1.0]`, finite) pass strict validation.
+Malformed optional stores (such as fixture face 5), non-finite variation
+settings, Device-table adjustments (face 3), and Format 2 contour-point carets
+on variable faces continue to fall back conservatively to `CaretSource::Approximate`.
+Fixture face 4 at wght 400/650/900 (+0/+25/+100) and invalid face 5 provide
+regression controls; they are not a real-font variation coverage claim.
 
 ## RTL Latin is a separate shaping contract
 
