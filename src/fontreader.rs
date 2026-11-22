@@ -2404,17 +2404,29 @@ impl Font {
                 locale,
                 self.current_gdef(),
             );
+            let cursives = if !is_vertical {
+                gpos.cursive_adjustments(&glyphs, locale, self.current_gdef())
+            } else {
+                vec![gpos::SingleAdjustment::default(); glyphs.len()]
+            };
             for (index, pair) in pairs.into_iter().enumerate() {
                 let Some(glyph) = glyphs[index] else { continue };
                 let single = gpos
                     .lookup_single_adjustment(glyph, is_vertical, locale, self.current_gdef())
                     .unwrap_or_default();
+                let cursive = cursives[index];
                 adjustments[index] = GlyphPositionAdjustment {
                     authored_pair: pair_coverage[index],
-                    placement_x: (pair.x_placement + single.x_placement) as f32 * scale_x,
-                    placement_y: (pair.y_placement + single.y_placement) as f32 * scale_y,
-                    advance_x: (pair.x_advance + single.x_advance) as f32 * scale_x,
-                    advance_y: (pair.y_advance + single.y_advance) as f32 * scale_y,
+                    placement_x: (pair.x_placement + single.x_placement + cursive.x_placement)
+                        as f32
+                        * scale_x,
+                    placement_y: (pair.y_placement + single.y_placement + cursive.y_placement)
+                        as f32
+                        * scale_y,
+                    advance_x: (pair.x_advance + single.x_advance + cursive.x_advance) as f32
+                        * scale_x,
+                    advance_y: (pair.y_advance + single.y_advance + cursive.y_advance) as f32
+                        * scale_y,
                 };
             }
         }
@@ -3147,6 +3159,19 @@ impl Font {
                     let layer_origin = layer_origin_result.unwrap_or((0.0, 0.0));
                     if vertical_outline {
                         translate_glyph_layers(&mut layers, layer_origin.0, layer_origin.1);
+                    }
+                    // Suppress visible fallback/control glyphs for standalone
+                    // default-ignorable join/format controls after shaping while
+                    // keeping zero-advance source ownership intact.
+                    if matches!(
+                        resolved.ch,
+                        '\u{200C}' | '\u{200D}' | '\u{034F}' | '\u{2060}' | '\u{FEFF}'
+                    ) && resolved.byte_end.saturating_sub(resolved.byte_start)
+                        == resolved.ch.len_utf8()
+                    {
+                        layers.clear();
+                        metrics.advance_x = 0.0;
+                        metrics.advance_y = 0.0;
                     }
                     metrics.bounds = glyph_layers_bounds(&layers);
                     layer_origins.push(layer_origin);
