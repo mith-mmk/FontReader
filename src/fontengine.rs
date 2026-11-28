@@ -1,9 +1,9 @@
 //! High-level shaping and rendering engine bound to one [`crate::FontFace`].
 
 use crate::commands::{
-    Command, FillRule, FontOptions, FontVariant, FontVariationSetting, GlyphBounds,
-    GlyphGradientSpread, GlyphGradientUnits, GlyphLayer, GlyphLinearGradient, GlyphPaint,
-    GlyphRadialGradient, GlyphRun, PathPaintMode, PositionedGlyph, RasterGlyphLayer,
+    Command, FillRule, FontFeatureSetting, FontOptions, FontVariant, FontVariationSetting,
+    GlyphBounds, GlyphGradientSpread, GlyphGradientUnits, GlyphLayer, GlyphLinearGradient,
+    GlyphPaint, GlyphRadialGradient, GlyphRun, PathPaintMode, PositionedGlyph, RasterGlyphLayer,
     RasterGlyphSource, TextDirection,
 };
 use crate::fontface::FontFace;
@@ -118,6 +118,29 @@ impl<'a> FontEngine<'a> {
     pub fn clear_variations(mut self) -> Self {
         self.options = self.options.clear_variations();
         self
+    }
+
+    /// Sets one explicit OpenType feature override such as `smcp=1` or `liga=0`.
+    pub fn with_feature(mut self, tag: &str, value: u32) -> Self {
+        self.options = self.options.with_feature(tag, value);
+        self
+    }
+
+    /// Replaces the explicit OpenType feature overrides.
+    pub fn with_features(mut self, features: &[FontFeatureSetting]) -> Self {
+        self.options = self.options.with_features(features);
+        self
+    }
+
+    /// Clears all explicit OpenType feature overrides.
+    pub fn clear_features(mut self) -> Self {
+        self.options = self.options.clear_features();
+        self
+    }
+
+    /// Convenience shorthand for `SmallCaps` (`smcp` / `c2sc`).
+    pub fn with_small_caps(self) -> Self {
+        self.with_font_variant(FontVariant::SmallCaps)
     }
 
     /// Convenience shorthand for `jp78`.

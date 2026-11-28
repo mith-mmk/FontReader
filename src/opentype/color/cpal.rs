@@ -5,7 +5,6 @@ use std::io::SeekFrom;
 use bin_rs::reader::BinaryReader;
 
 #[derive(Debug, Clone)]
-
 pub(crate) struct Cpal {
     version: u16,
     num_palette_entries: u16,
@@ -13,12 +12,9 @@ pub(crate) struct Cpal {
     num_color_records: u16,
     color_records: Vec<ColorRecord>,
     color_record_indices: Vec<u16>,
-    // version 1
-    /*
-    palette_types: Vec<PaletteType>,
-    palette_labels: Vec<PaletteLabel>,
-    palette_entry_labels: Vec<PaletteEntryLabel>,
-    */
+    palette_types: Vec<u32>,
+    palette_labels: Vec<u16>,
+    palette_entry_labels: Vec<u16>,
 }
 
 impl Cpal {
@@ -93,6 +89,124 @@ impl Cpal {
             color_records.push(color_record);
         }
 
+        let mut palette_types = Vec::new();
+        let mut palette_labels = Vec::new();
+        let mut palette_entry_labels = Vec::new();
+        if version == 1 {
+            let v1_header_end = index_array_end.checked_add(12).ok_or_else(|| {
+                std::io::Error::new(std::io::ErrorKind::InvalidData, "CPAL v1 header overflow")
+            })?;
+            if v1_header_end > table_end {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::UnexpectedEof,
+                    "CPAL v1 header exceeds table bounds",
+                ));
+            }
+            reader.seek(SeekFrom::Start(index_array_end))?;
+            let palette_types_offset = reader.read_u32_be()?;
+            let palette_labels_offset = reader.read_u32_be()?;
+            let palette_entry_labels_offset = reader.read_u32_be()?;
+
+            if palette_types_offset != 0 {
+                let start = (offset as u64)
+                    .checked_add(palette_types_offset as u64)
+                    .ok_or_else(|| {
+                        std::io::Error::new(
+                            std::io::ErrorKind::InvalidData,
+                            "CPAL palette types offset overflow",
+                        )
+                    })?;
+                let bytes_len = (num_palettes as u64).checked_mul(4).ok_or_else(|| {
+                    std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "CPAL palette types length overflow",
+                    )
+                })?;
+                let end = start.checked_add(bytes_len).ok_or_else(|| {
+                    std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "CPAL palette types end overflow",
+                    )
+                })?;
+                if end > table_end {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::UnexpectedEof,
+                        "CPAL palette types exceed table bounds",
+                    ));
+                }
+                reader.seek(SeekFrom::Start(start))?;
+                for _ in 0..num_palettes {
+                    palette_types.push(reader.read_u32_be()?);
+                }
+            }
+
+            if palette_labels_offset != 0 {
+                let start = (offset as u64)
+                    .checked_add(palette_labels_offset as u64)
+                    .ok_or_else(|| {
+                        std::io::Error::new(
+                            std::io::ErrorKind::InvalidData,
+                            "CPAL palette labels offset overflow",
+                        )
+                    })?;
+                let bytes_len = (num_palettes as u64).checked_mul(2).ok_or_else(|| {
+                    std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "CPAL palette labels length overflow",
+                    )
+                })?;
+                let end = start.checked_add(bytes_len).ok_or_else(|| {
+                    std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "CPAL palette labels end overflow",
+                    )
+                })?;
+                if end > table_end {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::UnexpectedEof,
+                        "CPAL palette labels exceed table bounds",
+                    ));
+                }
+                reader.seek(SeekFrom::Start(start))?;
+                for _ in 0..num_palettes {
+                    palette_labels.push(reader.read_u16_be()?);
+                }
+            }
+
+            if palette_entry_labels_offset != 0 {
+                let start = (offset as u64)
+                    .checked_add(palette_entry_labels_offset as u64)
+                    .ok_or_else(|| {
+                        std::io::Error::new(
+                            std::io::ErrorKind::InvalidData,
+                            "CPAL palette entry labels offset overflow",
+                        )
+                    })?;
+                let bytes_len = (num_palette_entries as u64).checked_mul(2).ok_or_else(|| {
+                    std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "CPAL palette entry labels length overflow",
+                    )
+                })?;
+                let end = start.checked_add(bytes_len).ok_or_else(|| {
+                    std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "CPAL palette entry labels end overflow",
+                    )
+                })?;
+                if end > table_end {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::UnexpectedEof,
+                        "CPAL palette entry labels exceed table bounds",
+                    ));
+                }
+                reader.seek(SeekFrom::Start(start))?;
+                for _ in 0..num_palette_entries {
+                    palette_entry_labels.push(reader.read_u16_be()?);
+                }
+            }
+        }
+
         Ok(Self {
             version,
             num_palette_entries,
@@ -100,6 +214,9 @@ impl Cpal {
             num_color_records,
             color_records,
             color_record_indices,
+            palette_types,
+            palette_labels,
+            palette_entry_labels,
         })
     }
 
@@ -159,6 +276,22 @@ impl Cpal {
     pub(crate) fn get_pallet(&self, index: usize) -> Option<ColorRecord> {
         self.get_palette_color(0, u16::try_from(index).ok()?)
     }
+
+    pub(crate) fn version(&self) -> u16 {
+        self.version
+    }
+
+    pub(crate) fn palette_type(&self, palette_index: usize) -> Option<u32> {
+        self.palette_types.get(palette_index).copied()
+    }
+
+    pub(crate) fn palette_label(&self, palette_index: usize) -> Option<u16> {
+        self.palette_labels.get(palette_index).copied()
+    }
+
+    pub(crate) fn palette_entry_label(&self, entry_index: u16) -> Option<u16> {
+        self.palette_entry_labels.get(entry_index as usize).copied()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -197,6 +330,9 @@ mod tests {
                 num_color_records as usize
             ],
             color_record_indices: vec![0],
+            palette_types: Vec::new(),
+            palette_labels: Vec::new(),
+            palette_entry_labels: Vec::new(),
         }
     }
 

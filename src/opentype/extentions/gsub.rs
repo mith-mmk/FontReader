@@ -299,9 +299,13 @@ impl Gsub {
             length,
         )?);
         let feature_variations = if feature_variations_offset > 0 {
-            FeatureVariationList::new(reader, offset + feature_variations_offset as u64, length)
-                .ok()
-                .map(Box::new)
+            FeatureVariationList::new(
+                reader,
+                offset + feature_variations_offset as u64,
+                offset + length as u64,
+            )
+            .ok()
+            .map(Box::new)
         } else {
             None
         };
@@ -362,11 +366,21 @@ impl Gsub {
         locale: Option<&str>,
         feature_tags: &[[u8; 4]],
     ) -> Vec<&'a Lookup> {
+        self.collect_feature_lookups_with_variations(locale, feature_tags, &[])
+    }
+
+    fn collect_feature_lookups_with_variations<'a>(
+        &'a self,
+        locale: Option<&str>,
+        feature_tags: &[[u8; 4]],
+        normalized_coords: &[f32],
+    ) -> Vec<&'a Lookup> {
         if locale.is_none() {
-            return self.collect_feature_lookups_from_scripts(
+            return self.collect_feature_lookups_from_scripts_with_variations(
                 self.scripts.scripts.iter().collect(),
                 locale,
                 feature_tags,
+                normalized_coords,
             );
         }
 
@@ -375,26 +389,29 @@ impl Gsub {
         let mut seen_lookup_ptrs = HashSet::new();
 
         for feature_tag in feature_tags {
-            let preferred = self.collect_feature_lookups_from_scripts(
+            let preferred = self.collect_feature_lookups_from_scripts_with_variations(
                 preferred_scripts.clone(),
                 locale,
                 std::slice::from_ref(feature_tag),
+                normalized_coords,
             );
             let script_lookups = if !preferred.is_empty() {
                 preferred
             } else {
-                let defaults = self.collect_feature_lookups_from_scripts(
+                let defaults = self.collect_feature_lookups_from_scripts_with_variations(
                     default_scripts.clone(),
                     locale,
                     std::slice::from_ref(feature_tag),
+                    normalized_coords,
                 );
                 if !defaults.is_empty() {
                     defaults
                 } else {
-                    self.collect_feature_lookups_from_scripts(
+                    self.collect_feature_lookups_from_scripts_with_variations(
                         other_scripts.clone(),
                         locale,
                         std::slice::from_ref(feature_tag),
+                        normalized_coords,
                     )
                 }
             };
@@ -416,6 +433,21 @@ impl Gsub {
         locale: Option<&str>,
         feature_tags: &[[u8; 4]],
     ) -> Vec<&'a Lookup> {
+        self.collect_feature_lookups_from_scripts_with_variations(
+            scripts,
+            locale,
+            feature_tags,
+            &[],
+        )
+    }
+
+    fn collect_feature_lookups_from_scripts_with_variations<'a>(
+        &'a self,
+        scripts: Vec<&'a ParsedScript>,
+        locale: Option<&str>,
+        feature_tags: &[[u8; 4]],
+        normalized_coords: &[f32],
+    ) -> Vec<&'a Lookup> {
         let mut lookups = Vec::new();
         let mut seen_lookup_indices = HashSet::new();
 
@@ -424,16 +456,22 @@ impl Gsub {
                 for feature_index in
                     Self::collect_language_system_feature_indices(&language_system.language_system)
                 {
-                    let Some(feature) = self.features.features.get(feature_index as usize) else {
+                    let Some(base_feature) = self.features.features.get(feature_index as usize)
+                    else {
                         continue;
                     };
-                    let feature_tag = feature.feature_tag;
+                    let feature_tag = base_feature.feature_tag;
                     if !feature_tags
                         .iter()
                         .any(|tag| feature_tag == u32::from_be_bytes(*tag))
                     {
                         continue;
                     }
+                    let feature = self
+                        .feature_variations
+                        .as_deref()
+                        .and_then(|fv| fv.substitute_feature(normalized_coords, feature_index))
+                        .unwrap_or(base_feature);
 
                     for lookup_index in feature.lookup_list_indices.iter() {
                         if !seen_lookup_indices.insert(*lookup_index) {
@@ -1698,9 +1736,33 @@ impl Gsub {
         orientation_tag: Option<[u8; 4]>,
         gdef: Option<&Gdef>,
     ) {
-        let mut selected = self.collect_feature_lookups(locale, feature_tags);
+        self.apply_feature_glyphs_with_options(
+            glyphs,
+            locale,
+            feature_tags,
+            orientation_tag,
+            gdef,
+            &[],
+        );
+    }
+
+    pub(crate) fn apply_feature_glyphs_with_options(
+        &self,
+        glyphs: &mut Vec<GsubGlyph>,
+        locale: Option<&str>,
+        feature_tags: &[[u8; 4]],
+        orientation_tag: Option<[u8; 4]>,
+        gdef: Option<&Gdef>,
+        normalized_coords: &[f32],
+    ) {
+        let mut selected =
+            self.collect_feature_lookups_with_variations(locale, feature_tags, normalized_coords);
         if let Some(tag) = orientation_tag {
-            selected.extend(self.collect_feature_lookups(None, &[tag]));
+            selected.extend(self.collect_feature_lookups_with_variations(
+                None,
+                &[tag],
+                normalized_coords,
+            ));
         }
         self.apply_selected_glyphs(glyphs, selected, gdef);
     }

@@ -76,11 +76,11 @@ pub mod woff;
 #[deprecated(note = "use `fontcore::commands` instead")]
 pub use commands as commads;
 pub use commands::{
-    text2commands, Command, FillRule, FontMetrics, FontOptions, FontRef, FontStretch, FontStyle,
-    FontVariant, FontVariationSetting, FontWeight, Glyph, GlyphBounds, GlyphFlow,
-    GlyphGradientSpread, GlyphGradientStop, GlyphGradientUnits, GlyphLayer, GlyphLinearGradient,
-    GlyphMetrics, GlyphPaint, GlyphRadialGradient, GlyphRun, PathGlyphLayer, PathPaintMode,
-    PositionedGlyph, RasterGlyphLayer, RasterGlyphSource, TextDirection,
+    text2commands, Command, FillRule, FontFeatureSetting, FontMetrics, FontOptions, FontRef,
+    FontStretch, FontStyle, FontVariant, FontVariationSetting, FontWeight, Glyph, GlyphBounds,
+    GlyphFlow, GlyphGradientSpread, GlyphGradientStop, GlyphGradientUnits, GlyphLayer,
+    GlyphLinearGradient, GlyphMetrics, GlyphPaint, GlyphRadialGradient, GlyphRun, PathGlyphLayer,
+    PathPaintMode, PositionedGlyph, RasterGlyphLayer, RasterGlyphSource, TextDirection,
 };
 #[cfg(feature = "svg-fonts")]
 pub use commands::{SvgGlyphLayer, SvgGlyphRun};

@@ -1582,6 +1582,7 @@ impl Font {
     }
 
     #[cfg(feature = "layout")]
+    #[allow(clippy::too_many_arguments)]
     fn apply_gsub_sequence_stages(
         &self,
         glyphs: &mut Vec<crate::opentype::extentions::gsub::GsubGlyph>,
@@ -1590,33 +1591,51 @@ impl Font {
         is_right_to_left: bool,
         font_variant: crate::commands::FontVariant,
         orientation: Option<TextRunMode>,
+        custom_features: &[crate::commands::FontFeatureSetting],
+        variation_coords: &[f32],
     ) {
         let Some(gsub) = self.current_gsub() else {
             return;
         };
-        let mut tags = vec![*b"ccmp"];
-        tags.extend_from_slice(font_variant.gsub_feature_tags());
+        let mut base_stage1 = vec![*b"ccmp"];
+        base_stage1.extend_from_slice(font_variant.gsub_feature_tags());
+        let mut tags = crate::commands::resolve_feature_tags(&base_stage1, custom_features, false);
         if is_right_to_left {
             // Joining retains the established composition/variant boundary.
-            gsub.apply_feature_glyphs_with_gdef(glyphs, locale, &tags, self.current_gdef());
+            gsub.apply_feature_glyphs_with_options(
+                glyphs,
+                locale,
+                &tags,
+                None,
+                self.current_gdef(),
+                variation_coords,
+            );
             gsub.apply_joining_glyphs(glyphs, locale, source_forms);
             tags.clear();
         }
         // Contextual features are not specific to RTL scripts. Select them
         // together so font-authored LookupList order can place cleanup after
         // contextual substitutions (including cmap format 14 placeholders).
-        tags.extend_from_slice(&[*b"rlig", *b"rclt", *b"calt", *b"clig", *b"liga"]);
-        let orientation_tag = orientation.map(|mode| match mode {
-            TextRunMode::SidewaysLtr => *b"vrtr",
-            TextRunMode::MixedUpright => gsub.selected_vertical_tag(true),
-            TextRunMode::Standard => gsub.selected_vertical_tag(false),
-        });
-        gsub.apply_feature_glyphs_with_orientation_and_gdef(
+        let stage2 = crate::commands::resolve_feature_tags(
+            &[*b"rlig", *b"rclt", *b"calt", *b"clig", *b"liga"],
+            custom_features,
+            true,
+        );
+        tags.extend_from_slice(&stage2);
+        let orientation_tag = orientation
+            .map(|mode| match mode {
+                TextRunMode::SidewaysLtr => *b"vrtr",
+                TextRunMode::MixedUpright => gsub.selected_vertical_tag(true),
+                TextRunMode::Standard => gsub.selected_vertical_tag(false),
+            })
+            .filter(|tag| !crate::commands::is_feature_disabled(*tag, custom_features));
+        gsub.apply_feature_glyphs_with_options(
             glyphs,
             locale,
             &tags,
             orientation_tag,
             self.current_gdef(),
+            variation_coords,
         );
     }
 
@@ -1631,6 +1650,8 @@ impl Font {
         font_variant: crate::commands::FontVariant,
         orientation: Option<TextRunMode>,
         allow_old_hangul: bool,
+        custom_features: &[crate::commands::FontFeatureSetting],
+        variation_coords: &[f32],
     ) {
         #[cfg(not(feature = "layout"))]
         let _ = (
@@ -1639,6 +1660,8 @@ impl Font {
             font_variant,
             orientation,
             allow_old_hangul,
+            custom_features,
+            variation_coords,
         );
 
         if glyphs.is_empty() {
@@ -1706,6 +1729,8 @@ impl Font {
                 is_right_to_left,
                 font_variant,
                 orientation,
+                custom_features,
+                variation_coords,
             );
             if glyphs.iter().any(Self::is_bounded_composition)
                 && ccmp_glyphs.iter().any(|glyph| {
@@ -1732,6 +1757,8 @@ impl Font {
                         font_variant,
                         orientation,
                         allow_old_hangul,
+                        custom_features,
+                        variation_coords,
                     );
                     glyphs.clear();
                     return;
@@ -1864,8 +1891,43 @@ impl Font {
         _allow_bounded_script_shaping: bool,
         bidi_run: bool,
     ) -> Result<Vec<ResolvedTextUnit>, Error> {
+        self.shape_text_units_with_options(
+            text,
+            is_vert,
+            is_right_to_left,
+            locale,
+            font_variant,
+            mode,
+            _allow_bounded_script_shaping,
+            bidi_run,
+            &[],
+            &[],
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn shape_text_units_with_options(
+        &self,
+        text: &str,
+        is_vert: bool,
+        is_right_to_left: bool,
+        locale: Option<&str>,
+        font_variant: crate::commands::FontVariant,
+        mode: TextRunMode,
+        _allow_bounded_script_shaping: bool,
+        bidi_run: bool,
+        custom_features: &[crate::commands::FontFeatureSetting],
+        variation_coords: &[f32],
+    ) -> Result<Vec<ResolvedTextUnit>, Error> {
         #[cfg(not(feature = "layout"))]
-        let _ = (is_vert, locale, is_right_to_left, font_variant);
+        let _ = (
+            is_vert,
+            locale,
+            is_right_to_left,
+            font_variant,
+            custom_features,
+            variation_coords,
+        );
 
         let orientation = if mode != TextRunMode::Standard || is_vert {
             Some(mode)
@@ -1888,6 +1950,8 @@ impl Font {
                         font_variant,
                         orientation,
                         _allow_bounded_script_shaping,
+                        custom_features,
+                        variation_coords,
                     );
                     output.push(ResolvedTextUnit::Newline);
                 }
@@ -1900,6 +1964,8 @@ impl Font {
                         font_variant,
                         orientation,
                         _allow_bounded_script_shaping,
+                        custom_features,
+                        variation_coords,
                     );
                     output.push(ResolvedTextUnit::Tab);
                 }
@@ -1970,6 +2036,8 @@ impl Font {
                                     font_variant,
                                     orientation,
                                     _allow_bounded_script_shaping,
+                                    custom_features,
+                                    variation_coords,
                                 );
                                 output.push(ResolvedTextUnit::Boundary);
                             }
@@ -2027,6 +2095,8 @@ impl Font {
             font_variant,
             orientation,
             _allow_bounded_script_shaping,
+            custom_features,
+            variation_coords,
         );
         Ok(output)
     }
@@ -2164,7 +2234,7 @@ impl Font {
             .is_some();
         support.has_color = self
             .current_colr()
-            .is_some_and(|colr| !colr.get_layer_record(glyph_id as u16).is_empty())
+            .is_some_and(|colr| colr.has_glyph(glyph_id as u16))
             || self
                 .current_sbix()
                 .and_then(|sbix| sbix.get_raster_glyph(glyph_id as u32, 16.0, "px"))
@@ -2345,7 +2415,7 @@ impl Font {
     ) -> bool {
         if self
             .current_colr()
-            .map(|colr| !colr.get_layer_record(glyph_id as u16).is_empty())
+            .map(|colr| colr.has_glyph(glyph_id as u16))
             .unwrap_or(false)
         {
             return true;
@@ -2391,6 +2461,28 @@ impl Font {
         scale_y: f32,
         variation_coords: &[f32],
     ) -> Vec<GlyphPositionAdjustment> {
+        self.position_adjustments_with_options(
+            units,
+            locale,
+            is_vertical,
+            scale_x,
+            scale_y,
+            variation_coords,
+            &[],
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn position_adjustments_with_options(
+        &self,
+        units: &[ResolvedTextUnit],
+        locale: Option<&str>,
+        is_vertical: bool,
+        scale_x: f32,
+        scale_y: f32,
+        variation_coords: &[f32],
+        custom_features: &[crate::commands::FontFeatureSetting],
+    ) -> Vec<GlyphPositionAdjustment> {
         let mut adjustments = vec![GlyphPositionAdjustment::default(); units.len()];
         #[cfg(not(feature = "layout"))]
         let _ = (
@@ -2399,6 +2491,7 @@ impl Font {
             scale_x,
             scale_y,
             variation_coords,
+            custom_features,
             &mut adjustments,
         );
         #[cfg(feature = "layout")]
@@ -2406,27 +2499,35 @@ impl Font {
             let glyphs: Vec<_> = (0..units.len())
                 .map(|index| Self::glyph_unit_at(units, index).map(|unit| unit.glyph_id as u16))
                 .collect();
-            let (pairs, pair_coverage) = gpos.pair_adjustments_with_coverage_and_coords(
+            let (pairs, pair_coverage) = gpos.pair_adjustments_with_options(
                 &glyphs,
                 is_vertical,
                 locale,
                 self.current_gdef(),
                 variation_coords,
+                custom_features,
             );
             let cursives = if !is_vertical {
-                gpos.cursive_adjustments(&glyphs, locale, self.current_gdef())
+                gpos.cursive_adjustments_with_options(
+                    &glyphs,
+                    locale,
+                    self.current_gdef(),
+                    variation_coords,
+                    custom_features,
+                )
             } else {
                 vec![gpos::SingleAdjustment::default(); glyphs.len()]
             };
             for (index, pair) in pairs.into_iter().enumerate() {
                 let Some(glyph) = glyphs[index] else { continue };
                 let single = gpos
-                    .lookup_single_adjustment_with_coords(
+                    .lookup_single_adjustment_with_options(
                         glyph,
                         is_vertical,
                         locale,
                         self.current_gdef(),
                         variation_coords,
+                        custom_features,
                     )
                     .unwrap_or_default();
                 let cursive = cursives[index];
@@ -2875,8 +2976,9 @@ impl Font {
         let mut cursor_x = 0.0f32;
         let mut cursor_y = 0.0f32;
         let tab_advance = line_height;
+        let variation_coords = self.normalized_variation_coords(options);
         #[allow(unused_mut)]
-        let shaped_units = self.shape_text_units_with_bidi_policy(
+        let shaped_units = self.shape_text_units_with_options(
             text,
             is_vertical && mode == TextRunMode::Standard,
             is_right_to_left,
@@ -2885,15 +2987,17 @@ impl Font {
             mode,
             true,
             bidi_run,
+            &options.features,
+            &variation_coords,
         )?;
-        let variation_coords = self.normalized_variation_coords(options);
-        let adjustments = self.position_adjustments(
+        let adjustments = self.position_adjustments_with_options(
             &shaped_units,
             options.locale,
             is_vertical,
             scale_x,
             scale_y,
             &variation_coords,
+            &options.features,
         );
         let mut unit_glyph_indices = vec![None; shaped_units.len()];
 
@@ -3153,10 +3257,7 @@ impl Font {
                             .iter()
                             .all(|layer| matches!(layer, GlyphLayer::Path(_)))
                         && match self.current_colr() {
-                            Some(colr) => {
-                                static_colr_outline
-                                    || colr.get_layer_record(glyph_id as u16).is_empty()
-                            }
+                            Some(colr) => static_colr_outline || !colr.has_glyph(glyph_id as u16),
                             None => true,
                         };
                     #[cfg(feature = "svg-fonts")]
@@ -3642,6 +3743,14 @@ impl Font {
         ) else {
             return Vec::new();
         };
+
+        if let Some(v1_layers) =
+            colr.resolve_v1_layers(glyph_id as u16, cpal, glyf, layout, scale_x, scale_y)
+        {
+            if !v1_layers.is_empty() {
+                return v1_layers;
+            }
+        }
 
         let mut layers = Vec::new();
         for layer in colr.get_layer_record(glyph_id as u16) {
