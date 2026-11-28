@@ -111,6 +111,9 @@ impl ShapedText {
     pub fn glyph_run(&self) -> &GlyphRun {
         &self.run
     }
+    pub(crate) fn glyph_run_mut(&mut self) -> &mut GlyphRun {
+        &mut self.run
+    }
     /// One entry per glyph, in exactly `glyph_run().glyphs` order.
     pub fn glyph_sources(&self) -> &[GlyphSource] {
         &self.sources

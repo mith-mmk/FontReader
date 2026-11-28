@@ -69,6 +69,28 @@ pub struct CaretPosition {
     source: CaretSource,
 }
 impl CaretPosition {
+    pub(crate) fn new(
+        position: TextPosition,
+        x: f32,
+        y: f32,
+        quality: CaretQuality,
+        source: CaretSource,
+    ) -> Self {
+        Self {
+            position,
+            x,
+            y,
+            quality,
+            source,
+        }
+    }
+    pub(crate) fn shift_inline(&mut self, delta: f32, vertical: bool) {
+        if vertical {
+            self.y += delta;
+        } else {
+            self.x += delta;
+        }
+    }
     pub fn text_position(self) -> TextPosition {
         self.position
     }
@@ -100,8 +122,14 @@ pub struct CaretLayout {
     vertical: bool,
 }
 impl CaretLayout {
+    pub(crate) fn from_stops(stops: Vec<CaretPosition>, vertical: bool) -> Self {
+        Self { stops, vertical }
+    }
     pub(crate) fn stops(&self) -> &[CaretPosition] {
         &self.stops
+    }
+    pub(crate) fn stops_mut(&mut self) -> &mut [CaretPosition] {
+        &mut self.stops
     }
 
     pub fn new(shaped: &ShapedText) -> Result<Self, Error> {
