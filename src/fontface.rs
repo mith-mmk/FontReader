@@ -572,6 +572,264 @@ impl FontFamily {
         Ok(shaped)
     }
 
+    /// Shapes single-line mixed vertical LTR text using [`FontFamily`] fallback.
+    ///
+    /// Each Unicode `Vertical_Orientation` run is segmented by face support,
+    /// preserving original UTF-8 ranges and `face_index` provenance.
+    pub fn shape_vertical_mixed_ltr_mapped<'a>(
+        &'a self,
+        text: &str,
+        mut options: FontOptions<'a>,
+    ) -> Result<crate::vertical_mapped::VerticalMappedLayout, Error> {
+        use crate::vertical_mapped::{VerticalGroup, VerticalMappedLayout};
+        crate::fontengine::validate_single_line(text, "mixed vertical LTR")?;
+        if self.faces.is_empty() {
+            return Err(Error::new(
+                ErrorKind::NotFound,
+                format!("no cached font face matched family={:?}", self.name()),
+            ));
+        }
+        if !options.font_size.is_finite() || options.font_size <= 0.0 {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "font_size must be a positive finite value",
+            ));
+        }
+        if options.font_family.is_none() {
+            options.font_family = Some(self.name());
+        }
+        let candidate_indices = self.face_candidate_indices(
+            options.font_family,
+            options.font_name,
+            options.font_weight,
+            options.font_style,
+            options.font_stretch,
+        );
+        if candidate_indices.is_empty() {
+            return Err(Error::new(
+                ErrorKind::NotFound,
+                format!(
+                    "no cached font face matched family={:?} name={:?}",
+                    options.font_family, options.font_name
+                ),
+            ));
+        }
+
+        let mut glyphs = Vec::new();
+        let mut sources = Vec::new();
+        let mut mapped_groups = Vec::new();
+        let (mut pen_x, mut pen_y) = (0.0f32, 0.0f32);
+        let mut byte_start = 0usize;
+        let mut orient_groups = crate::fontengine::mixed_orientation_groups(text);
+        if orient_groups.is_empty() {
+            orient_groups.push((text, false));
+        }
+
+        let mut group_index = 0usize;
+        for (orient_text, sideways) in orient_groups {
+            let sub_segments =
+                self.partition_orientation_group_by_face(orient_text, &candidate_indices, &options);
+            for (sub_text, face_index) in sub_segments {
+                let face = &self.faces[face_index].font;
+                let mut sub_options = options.clone();
+                sub_options.font = Some(FontRef::Loaded(face));
+                let output = if sideways {
+                    face.font()
+                        .text2glyph_run_sideways_ltr_with_carets(sub_text, &sub_options)?
+                } else {
+                    face.font()
+                        .text2glyph_run_mixed_upright_with_carets(sub_text, &sub_options)?
+                };
+                let local_run = output.run;
+                let ranges = output.ranges;
+                let shift_x = if sideways {
+                    local_run
+                        .glyphs
+                        .first()
+                        .and_then(|glyph| glyph.glyph.font)
+                        .map(|metrics| -(metrics.ascent - metrics.descent) / 2.0)
+                        .unwrap_or(0.0)
+                } else {
+                    0.0
+                };
+                if !shift_x.is_finite() {
+                    return Err(Error::new(
+                        ErrorKind::InvalidInput,
+                        "mixed vertical centering overflow",
+                    ));
+                }
+                let local_sources = ranges
+                    .iter()
+                    .cloned()
+                    .map(|range| crate::GlyphSource::new(range, face_index, group_index))
+                    .collect();
+                let local = crate::ShapedText::new(
+                    sub_text,
+                    local_run.clone(),
+                    local_sources,
+                    if sideways {
+                        TextDirection::LeftToRight
+                    } else {
+                        TextDirection::TopToBottom
+                    },
+                )
+                .with_ligature_carets(output.ligature_carets);
+
+                let mut run = if sideways {
+                    crate::fontengine::rotate_sideways_run(local_run, false)?
+                } else {
+                    let mut run = local_run;
+                    crate::fontengine::validate_vertical_run(
+                        &mut run,
+                        "mixed vertical LTR",
+                        false,
+                    )?;
+                    run
+                };
+                let translation = (pen_x + shift_x, pen_y);
+                if !translation.0.is_finite() || !translation.1.is_finite() {
+                    return Err(Error::new(
+                        ErrorKind::InvalidInput,
+                        "mixed vertical translation overflow",
+                    ));
+                }
+                let (mut advance_x, mut advance_y) = (0.0f32, 0.0f32);
+                for glyph in &mut run.glyphs {
+                    glyph.x += translation.0;
+                    glyph.y += translation.1;
+                    advance_x += glyph.glyph.metrics.advance_x;
+                    advance_y += glyph.glyph.metrics.advance_y;
+                    if !glyph.x.is_finite()
+                        || !glyph.y.is_finite()
+                        || !glyph.glyph.metrics.advance_x.is_finite()
+                        || !glyph.glyph.metrics.advance_y.is_finite()
+                        || !advance_x.is_finite()
+                        || !advance_y.is_finite()
+                    {
+                        return Err(Error::new(
+                            ErrorKind::InvalidInput,
+                            "mixed vertical glyph or advance overflow",
+                        ));
+                    }
+                }
+                mapped_groups.push(VerticalGroup::new(
+                    byte_start..byte_start + sub_text.len(),
+                    local,
+                    sideways,
+                    translation,
+                ));
+                sources.extend(ranges.into_iter().map(|range| {
+                    crate::GlyphSource::new(
+                        byte_start + range.start..byte_start + range.end,
+                        face_index,
+                        group_index,
+                    )
+                }));
+                glyphs.extend(run.glyphs);
+                pen_x += advance_x;
+                pen_y += advance_y;
+                if !pen_x.is_finite() || !pen_y.is_finite() {
+                    return Err(Error::new(
+                        ErrorKind::InvalidInput,
+                        "mixed vertical pen overflow",
+                    ));
+                }
+                byte_start += sub_text.len();
+                group_index += 1;
+            }
+        }
+
+        Ok(VerticalMappedLayout::new(
+            text,
+            GlyphRun::new(glyphs),
+            sources,
+            mapped_groups,
+        ))
+    }
+
+    pub(crate) fn shape_tate_chu_yoko_ltr_with_face<'a>(
+        &'a self,
+        text: &str,
+        mut options: FontOptions<'a>,
+    ) -> Result<(GlyphRun, usize), Error> {
+        if self.faces.is_empty() {
+            return Err(Error::new(
+                ErrorKind::NotFound,
+                format!("no cached font face matched family={:?}", self.name()),
+            ));
+        }
+        if options.font_family.is_none() {
+            options.font_family = Some(self.name());
+        }
+        let candidate_indices = self.face_candidate_indices(
+            options.font_family,
+            options.font_name,
+            options.font_weight,
+            options.font_style,
+            options.font_stretch,
+        );
+        if candidate_indices.is_empty() {
+            return Err(Error::new(
+                ErrorKind::NotFound,
+                format!(
+                    "no cached font face matched family={:?} name={:?}",
+                    options.font_family, options.font_name
+                ),
+            ));
+        }
+        let mut chosen = candidate_indices[0];
+        if let Some(first_unit) = fontreader::Font::parse_text_units_for_fallback(text)
+            .into_iter()
+            .next()
+        {
+            chosen = self.select_face_for_unit(&first_unit, &candidate_indices, &options);
+        }
+        let run = self.faces[chosen]
+            .font
+            .engine()
+            .with_options(options)
+            .shape_tate_chu_yoko_ltr(text)?;
+        Ok((run, chosen))
+    }
+
+    fn partition_orientation_group_by_face<'a>(
+        &self,
+        group_text: &'a str,
+        candidate_indices: &[usize],
+        options: &FontOptions<'_>,
+    ) -> Vec<(&'a str, usize)> {
+        if group_text.is_empty() {
+            return vec![("", candidate_indices[0])];
+        }
+        let mut segments = Vec::new();
+        let mut seg_start = 0usize;
+        let mut offset = 0usize;
+        let mut current_face: Option<usize> = None;
+        for grapheme in crate::unicode::graphemes::extended_graphemes(group_text) {
+            let unit = fontreader::Font::parse_text_units_for_fallback(grapheme)
+                .into_iter()
+                .next();
+            let face_index = match unit {
+                Some(ref u) => {
+                    self.select_face_with_continuity(u, candidate_indices, options, current_face)
+                }
+                None => current_face.unwrap_or(candidate_indices[0]),
+            };
+            if let Some(prev) = current_face {
+                if prev != face_index {
+                    segments.push((&group_text[seg_start..offset], prev));
+                    seg_start = offset;
+                }
+            }
+            current_face = Some(face_index);
+            offset += grapheme.len();
+        }
+        if let Some(prev) = current_face {
+            segments.push((&group_text[seg_start..offset], prev));
+        }
+        segments
+    }
+
     /// Alias for [`FontFamily::text2glyph_run`].
     pub fn text2commands<'a>(
         &'a self,
