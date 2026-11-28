@@ -56,7 +56,15 @@ pub use wrapped::{
     LineBreakKind, ParagraphOptions, TextAlignment, WrapMode, WrappedLine, WrappedLineLayout,
 };
 pub mod vertical_mapped;
-pub use vertical_mapped::{VerticalCaretPosition, VerticalGroup, VerticalMappedLayout};
+pub use vertical_mapped::{
+    VerticalCaretPosition, VerticalColumnCaretPosition, VerticalGroup, VerticalMappedLayout,
+    VerticalWrappedLayout, VerticalWrappedLine,
+};
+pub mod ruby;
+pub use ruby::{
+    AnnotatedLineLayout, EmphasisGlyphPlacement, EmphasisMark, PositionedEmphasis, PositionedRuby,
+    RubyAlignment, RubyAnnotation, RubyLayoutOptions,
+};
 pub mod mapped;
 pub use mapped::{GlyphSource, ShapedText};
 #[cfg(feature = "svg-fonts")]
