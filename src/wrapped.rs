@@ -23,6 +23,12 @@ pub enum WrapMode {
     WordOrGrapheme,
     /// Break at any Unicode 17 extended grapheme cluster boundary.
     Grapheme,
+    /// Apply Japanese Kinsoku line-breaking rules (push-out of line-start/line-end
+    /// prohibited characters and inseparable pairs) on top of EGC boundaries.
+    JapaneseKinsoku,
+    /// Like [`WrapMode::JapaneseKinsoku`], allowing a single trailing Japanese
+    /// punctuation mark (`、。，．`) to hang beyond `max_inline_extent`.
+    JapaneseKinsokuHanging,
 }
 
 /// How a visual line terminates in [`WrappedLineLayout`].
@@ -286,24 +292,44 @@ impl WrappedLineLayout {
                         (1, shaped, carets, advance)
                     };
 
-                if wrap_mode == WrapMode::WordOrGrapheme && chosen_count < remaining_egcs {
-                    if let Some(ws_count) = (1..=chosen_count)
-                        .rev()
-                        .find(|&count| is_wrap_space(&para_text[egcs[egc_idx + count - 1].clone()]))
-                    {
-                        if ws_count != chosen_count {
-                            let end_local = egcs[egc_idx + ws_count - 1].end;
-                            let (shaped, carets, advance) = shape_and_measure(
-                                &mut shape_line,
-                                &para_text[start_local..end_local],
-                                direction,
-                            )?;
-                            if advance <= max_inline_extent {
-                                chosen_count = ws_count;
-                                chosen_shaped = shaped;
-                                chosen_carets = carets;
-                                chosen_advance = advance;
-                            }
+                if chosen_count < remaining_egcs {
+                    let adjusted_count = match wrap_mode {
+                        WrapMode::WordOrGrapheme => (1..=chosen_count)
+                            .rev()
+                            .find(|&count| {
+                                is_wrap_space(&para_text[egcs[egc_idx + count - 1].clone()])
+                            })
+                            .unwrap_or(chosen_count),
+                        WrapMode::Grapheme => chosen_count,
+                        WrapMode::JapaneseKinsoku => resolve_kinsoku_break_count(
+                            para_text,
+                            &egcs[egc_idx..],
+                            chosen_count,
+                            false,
+                        ),
+                        WrapMode::JapaneseKinsokuHanging => resolve_kinsoku_break_count(
+                            para_text,
+                            &egcs[egc_idx..],
+                            chosen_count,
+                            true,
+                        ),
+                    };
+                    if adjusted_count != chosen_count {
+                        let end_local = egcs[egc_idx + adjusted_count - 1].end;
+                        let (shaped, carets, advance) = shape_and_measure(
+                            &mut shape_line,
+                            &para_text[start_local..end_local],
+                            direction,
+                        )?;
+                        let allowed = matches!(
+                            wrap_mode,
+                            WrapMode::JapaneseKinsoku | WrapMode::JapaneseKinsokuHanging
+                        ) || advance <= max_inline_extent;
+                        if allowed {
+                            chosen_count = adjusted_count;
+                            chosen_shaped = shaped;
+                            chosen_carets = carets;
+                            chosen_advance = advance;
                         }
                     }
                 }
@@ -575,4 +601,192 @@ fn caret_inline_advance(carets: &CaretLayout, direction: TextDirection) -> f32 {
 
 fn is_wrap_space(egc: &str) -> bool {
     egc == " " || egc == "\u{3000}"
+}
+
+fn single_char(egc: &str) -> Option<char> {
+    let mut chars = egc.chars();
+    let ch = chars.next()?;
+    if chars.next().is_none() {
+        Some(ch)
+    } else {
+        None
+    }
+}
+
+pub(crate) fn is_line_start_prohibited(egc: &str) -> bool {
+    let Some(ch) = single_char(egc) else {
+        return false;
+    };
+    matches!(
+        ch,
+        '、' | '。'
+            | '，'
+            | '．'
+            | ','
+            | '.'
+            | '：'
+            | '；'
+            | ':'
+            | ';'
+            | '！'
+            | '？'
+            | '!'
+            | '?'
+            | '‼'
+            | '⁇'
+            | '⁈'
+            | '⁉'
+            | '）'
+            | '］'
+            | '｝'
+            | '」'
+            | '』'
+            | '】'
+            | '〕'
+            | '〉'
+            | '》'
+            | '”'
+            | '’'
+            | ')'
+            | ']'
+            | '}'
+            | '"'
+            | '\''
+            | '»'
+            | '›'
+            | '・'
+            | '･'
+            | 'ー'
+            | 'ｰ'
+            | '々'
+            | 'ゝ'
+            | 'ゞ'
+            | 'ヽ'
+            | 'ヾ'
+            | '〜'
+            | '～'
+            | '‐'
+            | '‑'
+            | '–'
+            | '—'
+            | '―'
+            | 'ぁ'
+            | 'ぃ'
+            | 'ぅ'
+            | 'ぇ'
+            | 'ぉ'
+            | 'っ'
+            | 'ゃ'
+            | 'ゅ'
+            | 'ょ'
+            | 'ゎ'
+            | 'ゕ'
+            | 'ゖ'
+            | 'ァ'
+            | 'ィ'
+            | 'ゥ'
+            | 'ェ'
+            | 'ォ'
+            | 'ッ'
+            | 'ャ'
+            | 'ュ'
+            | 'ョ'
+            | 'ヮ'
+            | 'ヵ'
+            | 'ヶ'
+            | 'ｧ'
+            | 'ｨ'
+            | 'ｩ'
+            | 'ｪ'
+            | 'ｫ'
+            | 'ｯ'
+            | 'ｬ'
+            | 'ｭ'
+            | 'ｮ'
+            | 'ㇰ'..='ㇿ' | '°' | '′' | '″' | '℃' | '%' | '％' | '‰'
+    )
+}
+
+pub(crate) fn is_line_end_prohibited(egc: &str) -> bool {
+    let Some(ch) = single_char(egc) else {
+        return false;
+    };
+    matches!(
+        ch,
+        '（' | '［'
+            | '｛'
+            | '「'
+            | '『'
+            | '【'
+            | '〔'
+            | '〈'
+            | '《'
+            | '“'
+            | '‘'
+            | '('
+            | '['
+            | '{'
+            | '«'
+            | '‹'
+            | '￥'
+            | '＄'
+            | '¥'
+            | '$'
+    )
+}
+
+pub(crate) fn is_inseparable_pair(prev: &str, next: &str) -> bool {
+    matches!(
+        (single_char(prev), single_char(next)),
+        (Some('\u{2026}'), Some('\u{2026}'))
+            | (Some('\u{2025}'), Some('\u{2025}'))
+            | (Some('\u{2014}'), Some('\u{2014}'))
+            | (Some('\u{2015}'), Some('\u{2015}'))
+    )
+}
+
+pub(crate) fn is_hanging_punctuation(egc: &str) -> bool {
+    matches!(single_char(egc), Some('、' | '。' | '，' | '．'))
+}
+
+pub(crate) fn resolve_kinsoku_break_count(
+    para_text: &str,
+    units: &[Range<usize>],
+    chosen_count: usize,
+    hanging: bool,
+) -> usize {
+    if chosen_count == 0 || chosen_count >= units.len() {
+        return chosen_count;
+    }
+
+    if hanging {
+        let hang_unit = &para_text[units[chosen_count].clone()];
+        let prev_unit = &para_text[units[chosen_count - 1].clone()];
+        if is_hanging_punctuation(hang_unit) && !is_line_end_prohibited(prev_unit) {
+            if chosen_count + 1 == units.len() {
+                return chosen_count + 1;
+            }
+            let after_hang = &para_text[units[chosen_count + 1].clone()];
+            if !is_line_start_prohibited(after_hang) && !is_inseparable_pair(hang_unit, after_hang)
+            {
+                return chosen_count + 1;
+            }
+        }
+    }
+
+    let mut count = chosen_count;
+    while count > 0 {
+        let last = &para_text[units[count - 1].clone()];
+        let next = &para_text[units[count].clone()];
+        if is_line_end_prohibited(last)
+            || is_line_start_prohibited(next)
+            || is_inseparable_pair(last, next)
+        {
+            count -= 1;
+        } else {
+            return count;
+        }
+    }
+
+    chosen_count
 }

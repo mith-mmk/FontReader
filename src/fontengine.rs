@@ -701,7 +701,7 @@ pub(crate) fn validate_single_line(text: &str, context: &str) -> Result<(), Erro
     Ok(())
 }
 
-fn mixed_orientation_groups(text: &str) -> Vec<(&str, bool)> {
+pub(crate) fn mixed_orientation_groups(text: &str) -> Vec<(&str, bool)> {
     let mut groups = Vec::new();
     let (mut start, mut end) = (0, 0);
     let mut previous = None;
@@ -794,7 +794,7 @@ fn validate_vertical_layers(
     Ok(())
 }
 
-fn validate_vertical_run(
+pub(crate) fn validate_vertical_run(
     run: &mut GlyphRun,
     context: &str,
     allow_raw_svg: bool,
@@ -840,7 +840,10 @@ fn rotate_sideways_ltr(run: GlyphRun) -> Result<GlyphRun, Error> {
     rotate_sideways_run(run, false)
 }
 
-fn rotate_sideways_run(mut run: GlyphRun, allow_raw_svg: bool) -> Result<GlyphRun, Error> {
+pub(crate) fn rotate_sideways_run(
+    mut run: GlyphRun,
+    allow_raw_svg: bool,
+) -> Result<GlyphRun, Error> {
     validate_vertical_run(&mut run, "sideways LTR", allow_raw_svg)?;
     for positioned in &mut run.glyphs {
         (positioned.x, positioned.y) = (-positioned.y, positioned.x);
