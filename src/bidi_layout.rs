@@ -3,7 +3,12 @@
 //! are hidden. Shaping retains logical order; visual runs are translated, never
 //! reversed. No wrapping, vertical layout, overrides, or fallback is performed.
 use crate::caret::{authored_carets, CaretSource};
-use crate::{CaretAffinity, CaretQuality, FontEngine, ShapedText, TextDirection, TextPosition};
+use crate::wrapped::validate_paragraph_options;
+use crate::{
+    CaretAffinity, CaretQuality, FontEngine, FontFamily, FontOptions, GlyphRun, GlyphSource,
+    ParagraphOptions, PositionedGlyph, ShapedText, TextAlignment, TextDirection, TextPosition,
+    WrapMode,
+};
 use std::io::{Error, ErrorKind};
 use std::ops::Range;
 use unicode_bidi::{BidiInfo, Level};
@@ -139,8 +144,159 @@ impl BidiParagraphLayout {
         if engine.options().text_direction == TextDirection::TopToBottom {
             return Err(unsupported("BiDi paragraph layout is horizontal only"));
         }
-        let options = engine.options();
+        let line_height = engine
+            .options()
+            .line_height
+            .unwrap_or(engine.options().font_size);
+        Self::shape_internal(
+            text,
+            base,
+            line_height,
+            None,
+            WrapMode::Grapheme,
+            ParagraphOptions::default(),
+            &mut |slice, direction| engine.shape_bidi_run_mapped(slice, direction),
+        )
+    }
+
+    /// Shapes hard-line horizontal BiDi text using [`FontFamily`] fallback.
+    pub fn shape_family(
+        family: &FontFamily,
+        text: &str,
+        options: FontOptions<'_>,
+        base: BidiBaseDirection,
+    ) -> Result<Self, Error> {
+        if options.text_direction == TextDirection::TopToBottom {
+            return Err(unsupported("BiDi paragraph layout is horizontal only"));
+        }
+        family.shape_bidi_run_mapped("", options.clone(), TextDirection::LeftToRight)?;
         let line_height = options.line_height.unwrap_or(options.font_size);
+        Self::shape_internal(
+            text,
+            base,
+            line_height,
+            None,
+            WrapMode::Grapheme,
+            ParagraphOptions::default(),
+            &mut |slice, direction| family.shape_bidi_run_mapped(slice, options.clone(), direction),
+        )
+    }
+
+    /// Shapes and soft-wraps horizontal BiDi text using a single [`FontEngine`].
+    pub fn shape_wrapped(
+        engine: &FontEngine<'_>,
+        text: &str,
+        base: BidiBaseDirection,
+        max_inline_extent: f32,
+        wrap_mode: WrapMode,
+    ) -> Result<Self, Error> {
+        Self::shape_wrapped_with_options(
+            engine,
+            text,
+            base,
+            max_inline_extent,
+            wrap_mode,
+            ParagraphOptions::default(),
+        )
+    }
+
+    /// Shapes and soft-wraps horizontal BiDi text with [`ParagraphOptions`].
+    pub fn shape_wrapped_with_options(
+        engine: &FontEngine<'_>,
+        text: &str,
+        base: BidiBaseDirection,
+        max_inline_extent: f32,
+        wrap_mode: WrapMode,
+        paragraph: ParagraphOptions,
+    ) -> Result<Self, Error> {
+        engine.shape_mapped("")?;
+        if engine.options().text_direction == TextDirection::TopToBottom {
+            return Err(unsupported("BiDi paragraph layout is horizontal only"));
+        }
+        let line_height = engine
+            .options()
+            .line_height
+            .unwrap_or(engine.options().font_size);
+        Self::shape_internal(
+            text,
+            base,
+            line_height,
+            Some(max_inline_extent),
+            wrap_mode,
+            paragraph,
+            &mut |slice, direction| engine.shape_bidi_run_mapped(slice, direction),
+        )
+    }
+
+    /// Shapes and soft-wraps horizontal BiDi text using [`FontFamily`] fallback.
+    pub fn shape_family_wrapped(
+        family: &FontFamily,
+        text: &str,
+        options: FontOptions<'_>,
+        base: BidiBaseDirection,
+        max_inline_extent: f32,
+        wrap_mode: WrapMode,
+    ) -> Result<Self, Error> {
+        Self::shape_family_wrapped_with_options(
+            family,
+            text,
+            options,
+            base,
+            max_inline_extent,
+            wrap_mode,
+            ParagraphOptions::default(),
+        )
+    }
+
+    /// Shapes and soft-wraps horizontal BiDi text using [`FontFamily`] fallback
+    /// and [`ParagraphOptions`].
+    pub fn shape_family_wrapped_with_options(
+        family: &FontFamily,
+        text: &str,
+        options: FontOptions<'_>,
+        base: BidiBaseDirection,
+        max_inline_extent: f32,
+        wrap_mode: WrapMode,
+        paragraph: ParagraphOptions,
+    ) -> Result<Self, Error> {
+        if options.text_direction == TextDirection::TopToBottom {
+            return Err(unsupported("BiDi paragraph layout is horizontal only"));
+        }
+        family.shape_bidi_run_mapped("", options.clone(), TextDirection::LeftToRight)?;
+        let line_height = options.line_height.unwrap_or(options.font_size);
+        Self::shape_internal(
+            text,
+            base,
+            line_height,
+            Some(max_inline_extent),
+            wrap_mode,
+            paragraph,
+            &mut |slice, direction| family.shape_bidi_run_mapped(slice, options.clone(), direction),
+        )
+    }
+
+    fn shape_internal<F>(
+        text: &str,
+        base: BidiBaseDirection,
+        line_height: f32,
+        max_inline_extent: Option<f32>,
+        wrap_mode: WrapMode,
+        paragraph_options: ParagraphOptions,
+        shape_run: &mut F,
+    ) -> Result<Self, Error>
+    where
+        F: FnMut(&str, TextDirection) -> Result<ShapedText, Error>,
+    {
+        if !line_height.is_finite() || line_height <= 0.0 {
+            return Err(invalid("line height must be positive and finite"));
+        }
+        if let Some(limit) = max_inline_extent {
+            if !limit.is_finite() || limit <= 0.0 {
+                return Err(invalid("max inline extent must be positive and finite"));
+            }
+            validate_paragraph_options(&paragraph_options, limit)?;
+        }
+
         let mut ranges = Vec::new();
         let mut start = 0;
         for (index, ch) in text.char_indices() {
@@ -155,21 +311,22 @@ impl BidiParagraphLayout {
             }
         }
         ranges.push((start..text.len(), text.len()..text.len()));
+
         let mut lines = Vec::new();
         let mut carets = Vec::new();
-        for (line_index, (range, line_break)) in ranges.into_iter().enumerate() {
-            let line_text = &text[range.clone()];
+
+        for (para_range, para_break) in ranges {
+            let line_text = &text[para_range.clone()];
+            let allow_tabs = paragraph_options.tab_width.is_some();
             if line_text.chars().any(|c| {
-                c.is_control() || matches!(c, '\u{2028}' | '\u{2029}' | '\u{202d}' | '\u{202e}')
+                (c.is_control() && !(allow_tabs && c == '\t'))
+                    || matches!(c, '\u{2028}' | '\u{2029}' | '\u{202d}' | '\u{202e}')
             }) {
                 return Err(unsupported(
                     "only LF/CRLF lines without tabs or directional overrides are supported",
                 ));
             }
-            let baseline = line_index as f32 * line_height;
-            if !baseline.is_finite() {
-                return Err(invalid("line baseline overflow"));
-            }
+
             let level = match base {
                 BidiBaseDirection::Auto => None,
                 BidiBaseDirection::LeftToRight => Some(Level::ltr()),
@@ -177,110 +334,203 @@ impl BidiParagraphLayout {
             };
             // Analysis must see controls; filtering them beforehand changes UAX #9.
             let bidi = BidiInfo::new(line_text, level);
-            let mut runs = Vec::new();
-            let mut width = 0.0f32;
-            let mut base_level = level.unwrap_or(Level::ltr()).number();
-            let mut boundaries = vec![0];
-            boundaries.extend(line_text.grapheme_indices(true).map(|(i, g)| i + g.len()));
-            if let Some(paragraph) = bidi.paragraphs.first() {
+            let base_level = if let Some(para) = bidi.paragraphs.first() {
                 if bidi.paragraphs.len() != 1 {
                     return Err(unsupported("unexpected paragraph separator"));
                 }
-                base_level = paragraph.level.number();
-                let (levels, visual) = bidi.visual_runs(paragraph, 0..line_text.len());
-                #[cfg(feature = "layout")]
-                validate_joining_boundaries(line_text, &visual)?;
-                for local in visual {
-                    if boundaries.binary_search(&local.start).is_err()
-                        || boundaries.binary_search(&local.end).is_err()
-                    {
-                        return Err(unsupported("BiDi level run splits an extended grapheme"));
-                    }
-                    let run_level = levels[local.start];
-                    let direction = if run_level.is_rtl() {
-                        TextDirection::RightToLeft
-                    } else {
-                        TextDirection::LeftToRight
-                    };
-                    let shaped =
-                        engine.shape_bidi_run_mapped(&line_text[local.clone()], direction)?;
-                    let (stops, advance) = run_stops(&shaped)?;
-                    let origin_x = if run_level.is_rtl() {
-                        width + advance
-                    } else {
-                        width
-                    };
-                    let next_width = width + advance;
-                    if !origin_x.is_finite() || !next_width.is_finite() {
-                        return Err(invalid("visual run advance overflow"));
-                    }
-                    if shaped
-                        .glyph_run()
-                        .glyphs
-                        .iter()
-                        .any(|g| !(g.x + origin_x).is_finite() || !(g.y + baseline).is_finite())
-                    {
-                        return Err(invalid("translated glyph origin overflow"));
-                    }
-                    for (offset, inline, quality, source) in stops {
-                        let x = origin_x + if run_level.is_rtl() { -inline } else { inline };
-                        if !x.is_finite() {
-                            return Err(invalid("caret coordinate overflow"));
-                        }
-                        let global = range.start + local.start + offset;
-                        // Run edges select their own logical side; internal
-                        // boundaries support either affinity at the same point.
-                        for affinity in [CaretAffinity::Upstream, CaretAffinity::Downstream] {
-                            if (offset == 0
-                                && affinity == CaretAffinity::Upstream
-                                && local.start != 0)
-                                || (offset == shaped.text().len()
-                                    && affinity == CaretAffinity::Downstream
-                                    && local.end != line_text.len())
-                            {
-                                continue;
-                            }
-                            carets.push(BidiCaretPosition {
-                                position: TextPosition::new(global, affinity),
-                                x,
-                                y: baseline,
-                                line_index,
-                                quality,
-                                source,
-                            });
-                        }
-                    }
-                    runs.push(BidiVisualRun {
-                        range: range.start + local.start..range.start + local.end,
-                        level: run_level.number(),
-                        shaped,
-                        origin_x,
-                        origin_y: baseline,
-                    });
-                    width = next_width;
-                }
-            }
+                para.level.number()
+            } else {
+                level.unwrap_or(Level::ltr()).number()
+            };
+
+            let mut boundaries = vec![0];
+            boundaries.extend(line_text.grapheme_indices(true).map(|(i, g)| i + g.len()));
+
             if line_text.is_empty() {
+                let line_index = lines.len();
+                let baseline = line_index as f32 * line_height;
+                if !baseline.is_finite() {
+                    return Err(invalid("line baseline overflow"));
+                }
+                let x_offset = compute_bidi_line_x_offset(
+                    max_inline_extent,
+                    paragraph_options,
+                    base_level,
+                    paragraph_options.first_line_indent,
+                    0.0,
+                );
                 for affinity in [CaretAffinity::Upstream, CaretAffinity::Downstream] {
                     carets.push(BidiCaretPosition {
-                        position: TextPosition::new(range.start, affinity),
-                        x: 0.0,
+                        position: TextPosition::new(para_range.start, affinity),
+                        x: x_offset,
                         y: baseline,
                         line_index,
                         quality: CaretQuality::AdvanceBoundary,
                         source: CaretSource::Advance,
                     });
                 }
+                lines.push(BidiLine {
+                    range: para_range,
+                    line_break: para_break,
+                    runs: Vec::new(),
+                    base_level,
+                    width: 0.0,
+                    baseline,
+                });
+                continue;
             }
-            lines.push(BidiLine {
-                range,
-                line_break,
-                runs,
-                base_level,
-                width,
-                baseline,
-            });
+
+            let para = &bidi.paragraphs[0];
+            let egcs: Vec<Range<usize>> = line_text
+                .grapheme_indices(true)
+                .map(|(i, g)| i..i + g.len())
+                .collect();
+
+            let mut visual_slices: Vec<(Range<usize>, Range<usize>, bool, f32)> = Vec::new();
+            match max_inline_extent {
+                None => {
+                    visual_slices.push((0..line_text.len(), para_break, false, 0.0));
+                }
+                Some(limit) => {
+                    let mut egc_idx = 0usize;
+                    while egc_idx < egcs.len() {
+                        let start_local = egcs[egc_idx].start;
+                        let remaining = egcs.len() - egc_idx;
+                        let indent = if egc_idx == 0 {
+                            paragraph_options.first_line_indent
+                        } else {
+                            0.0
+                        };
+                        let line_limit = limit - indent;
+
+                        let rem_width = measure_bidi_slice_width(
+                            line_text,
+                            &bidi,
+                            para,
+                            &boundaries,
+                            start_local..line_text.len(),
+                            paragraph_options.tab_width,
+                            shape_run,
+                        )?;
+                        if rem_width <= line_limit {
+                            visual_slices.push((
+                                start_local..line_text.len(),
+                                para_break.clone(),
+                                false,
+                                indent,
+                            ));
+                            break;
+                        }
+
+                        let mut best_count: Option<usize> = None;
+                        let mut lo = 1usize;
+                        let mut hi = remaining.saturating_sub(1);
+                        while lo <= hi {
+                            let mid = lo + (hi - lo) / 2;
+                            let end_local = egcs[egc_idx + mid - 1].end;
+                            let w = measure_bidi_slice_width(
+                                line_text,
+                                &bidi,
+                                para,
+                                &boundaries,
+                                start_local..end_local,
+                                paragraph_options.tab_width,
+                                shape_run,
+                            )?;
+                            if w <= line_limit {
+                                best_count = Some(mid);
+                                lo = mid + 1;
+                            } else {
+                                hi = mid.saturating_sub(1);
+                            }
+                        }
+
+                        let mut chosen_count = best_count.unwrap_or(1);
+                        if wrap_mode == WrapMode::WordOrGrapheme && chosen_count < remaining {
+                            if let Some(ws_count) = (1..=chosen_count).rev().find(|&count| {
+                                let g = &line_text[egcs[egc_idx + count - 1].clone()];
+                                g == " " || g == "\u{3000}"
+                            }) {
+                                if ws_count != chosen_count {
+                                    chosen_count = ws_count;
+                                }
+                            }
+                        }
+
+                        let end_local = egcs[egc_idx + chosen_count - 1].end;
+                        let is_last = egc_idx + chosen_count == egcs.len();
+                        let (lbreak, is_soft) = if is_last {
+                            (para_break.clone(), false)
+                        } else {
+                            let g = para_range.start + end_local;
+                            (g..g, true)
+                        };
+                        visual_slices.push((start_local..end_local, lbreak, is_soft, indent));
+                        egc_idx += chosen_count;
+                    }
+                }
+            }
+
+            for (vis_range, vis_break, is_soft_end, indent) in visual_slices {
+                let line_index = lines.len();
+                let baseline = line_index as f32 * line_height;
+                if !baseline.is_finite() {
+                    return Err(invalid("line baseline overflow"));
+                }
+                let is_soft_start = vis_range.start > 0;
+                let (mut runs, mut line_carets, mut width) = shape_bidi_visual_line(
+                    line_text,
+                    para_range.start,
+                    &bidi,
+                    para,
+                    &boundaries,
+                    vis_range.clone(),
+                    line_index,
+                    baseline,
+                    is_soft_start,
+                    is_soft_end,
+                    paragraph_options.tab_width,
+                    shape_run,
+                )?;
+
+                if let Some(limit) = max_inline_extent {
+                    let extra = (limit - indent - width).max(0.0);
+                    if paragraph_options.alignment == TextAlignment::Justify
+                        && is_soft_end
+                        && extra > 0.0
+                        && justify_bidi_line(&mut runs, &mut line_carets, extra)
+                    {
+                        width += extra;
+                    }
+                    let x_offset = compute_bidi_line_x_offset(
+                        Some(limit),
+                        paragraph_options,
+                        base_level,
+                        indent,
+                        width,
+                    );
+                    if x_offset != 0.0 {
+                        for run in &mut runs {
+                            run.origin_x += x_offset;
+                        }
+                        for c in &mut line_carets {
+                            c.x += x_offset;
+                        }
+                    }
+                }
+
+                carets.extend(line_carets);
+                lines.push(BidiLine {
+                    range: (para_range.start + vis_range.start)..(para_range.start + vis_range.end),
+                    line_break: vis_break,
+                    runs,
+                    base_level,
+                    width,
+                    baseline,
+                });
+            }
         }
+
         Ok(Self {
             text: text.to_owned(),
             lines,
@@ -410,6 +660,364 @@ fn affinity_order(affinity: CaretAffinity) -> u8 {
     } else {
         1
     }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn measure_bidi_slice_width<F>(
+    line_text: &str,
+    bidi: &BidiInfo<'_>,
+    para: &unicode_bidi::ParagraphInfo,
+    boundaries: &[usize],
+    vis_range: Range<usize>,
+    tab_width: Option<f32>,
+    shape_run: &mut F,
+) -> Result<f32, Error>
+where
+    F: FnMut(&str, TextDirection) -> Result<ShapedText, Error>,
+{
+    let (_, _, width) = shape_bidi_visual_line(
+        line_text, 0, bidi, para, boundaries, vis_range, 0, 0.0, false, false, tab_width, shape_run,
+    )?;
+    Ok(width)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn shape_bidi_visual_line<F>(
+    line_text: &str,
+    para_global_start: usize,
+    bidi: &BidiInfo<'_>,
+    para: &unicode_bidi::ParagraphInfo,
+    boundaries: &[usize],
+    vis_range: Range<usize>,
+    line_index: usize,
+    baseline: f32,
+    is_soft_start: bool,
+    is_soft_end: bool,
+    tab_width: Option<f32>,
+    shape_run: &mut F,
+) -> Result<(Vec<BidiVisualRun>, Vec<BidiCaretPosition>, f32), Error>
+where
+    F: FnMut(&str, TextDirection) -> Result<ShapedText, Error>,
+{
+    let (levels, visual) = bidi.visual_runs(para, vis_range.clone());
+    #[cfg(feature = "layout")]
+    {
+        let slice_text = &line_text[vis_range.clone()];
+        let slice_runs: Vec<Range<usize>> = visual
+            .iter()
+            .map(|r| (r.start - vis_range.start)..(r.end - vis_range.start))
+            .collect();
+        validate_joining_boundaries(slice_text, &slice_runs)?;
+    }
+
+    let mut runs = Vec::new();
+    let mut carets = Vec::new();
+    let mut width = 0.0f32;
+
+    for local in visual {
+        if boundaries.binary_search(&local.start).is_err()
+            || boundaries.binary_search(&local.end).is_err()
+        {
+            return Err(unsupported("BiDi level run splits an extended grapheme"));
+        }
+        let run_level = levels[local.start];
+        let direction = if run_level.is_rtl() {
+            TextDirection::RightToLeft
+        } else {
+            TextDirection::LeftToRight
+        };
+        let run_text = &line_text[local.clone()];
+        let (shaped, stops, advance) = if let Some(tw) = tab_width {
+            if run_text.contains('\t') {
+                shape_bidi_run_with_tabs(run_text, direction, tw, shape_run)?
+            } else {
+                let shaped = shape_run(run_text, direction)?;
+                let (stops, advance) = run_stops(&shaped)?;
+                (shaped, stops, advance)
+            }
+        } else {
+            let shaped = shape_run(run_text, direction)?;
+            let (stops, advance) = run_stops(&shaped)?;
+            (shaped, stops, advance)
+        };
+
+        let origin_x = if run_level.is_rtl() {
+            width + advance
+        } else {
+            width
+        };
+        let next_width = width + advance;
+        if !origin_x.is_finite() || !next_width.is_finite() {
+            return Err(invalid("visual run advance overflow"));
+        }
+        if shaped
+            .glyph_run()
+            .glyphs
+            .iter()
+            .any(|g| !(g.x + origin_x).is_finite() || !(g.y + baseline).is_finite())
+        {
+            return Err(invalid("translated glyph origin overflow"));
+        }
+        for (offset, inline, quality, source) in stops {
+            let x = origin_x + if run_level.is_rtl() { -inline } else { inline };
+            if !x.is_finite() {
+                return Err(invalid("caret coordinate overflow"));
+            }
+            let global = para_global_start + local.start + offset;
+            for affinity in [CaretAffinity::Upstream, CaretAffinity::Downstream] {
+                let at_run_start = offset == 0;
+                let at_run_end = offset == shaped.text().len();
+                if (at_run_start
+                    && affinity == CaretAffinity::Upstream
+                    && (local.start != vis_range.start || is_soft_start))
+                    || (at_run_end
+                        && affinity == CaretAffinity::Downstream
+                        && (local.end != vis_range.end || is_soft_end))
+                {
+                    continue;
+                }
+                carets.push(BidiCaretPosition {
+                    position: TextPosition::new(global, affinity),
+                    x,
+                    y: baseline,
+                    line_index,
+                    quality,
+                    source,
+                });
+            }
+        }
+        runs.push(BidiVisualRun {
+            range: para_global_start + local.start..para_global_start + local.end,
+            level: run_level.number(),
+            shaped,
+            origin_x,
+            origin_y: baseline,
+        });
+        width = next_width;
+    }
+
+    Ok((runs, carets, width))
+}
+
+fn shape_bidi_run_with_tabs<F>(
+    run_text: &str,
+    direction: TextDirection,
+    tab_width: f32,
+    shape_run: &mut F,
+) -> Result<(ShapedText, Vec<RunStop>, f32), Error>
+where
+    F: FnMut(&str, TextDirection) -> Result<ShapedText, Error>,
+{
+    let sign = if direction == TextDirection::RightToLeft {
+        -1.0f32
+    } else {
+        1.0f32
+    };
+    let mut glyphs: Vec<PositionedGlyph> = Vec::new();
+    let mut sources: Vec<GlyphSource> = Vec::new();
+    let mut stops: Vec<RunStop> =
+        vec![(0, 0.0, CaretQuality::AdvanceBoundary, CaretSource::Advance)];
+    let mut pen = 0.0f32;
+    let mut seg_start = 0usize;
+    let mut run_index = 0usize;
+
+    for (idx, ch) in run_text.char_indices() {
+        if ch == '\t' {
+            if seg_start < idx {
+                let seg_shaped = shape_run(&run_text[seg_start..idx], direction)?;
+                let (seg_stops, seg_advance) = run_stops(&seg_shaped)?;
+                let dx = pen * sign;
+                for mut g in seg_shaped.glyph_run().glyphs.iter().cloned() {
+                    g.x += dx;
+                    glyphs.push(g);
+                }
+                for s in seg_shaped.glyph_sources() {
+                    let r = s.byte_range();
+                    sources.push(GlyphSource::new(
+                        (seg_start + r.start)..(seg_start + r.end),
+                        s.face_index(),
+                        run_index,
+                    ));
+                }
+                for (off, inline, quality, src) in seg_stops.into_iter().skip(1) {
+                    stops.push((seg_start + off, pen + inline, quality, src));
+                }
+                pen += seg_advance;
+                run_index += 1;
+            }
+            let next_tab = ((pen / tab_width).floor() + 1.0) * tab_width;
+            pen = next_tab.max(pen);
+            stops.push((
+                idx + 1,
+                pen,
+                CaretQuality::AdvanceBoundary,
+                CaretSource::Advance,
+            ));
+            seg_start = idx + 1;
+        }
+    }
+    if seg_start < run_text.len() {
+        let seg_shaped = shape_run(&run_text[seg_start..], direction)?;
+        let (seg_stops, seg_advance) = run_stops(&seg_shaped)?;
+        let dx = pen * sign;
+        for mut g in seg_shaped.glyph_run().glyphs.iter().cloned() {
+            g.x += dx;
+            glyphs.push(g);
+        }
+        for s in seg_shaped.glyph_sources() {
+            let r = s.byte_range();
+            sources.push(GlyphSource::new(
+                (seg_start + r.start)..(seg_start + r.end),
+                s.face_index(),
+                run_index,
+            ));
+        }
+        for (off, inline, quality, src) in seg_stops.into_iter().skip(1) {
+            stops.push((seg_start + off, pen + inline, quality, src));
+        }
+        pen += seg_advance;
+    }
+
+    let shaped = ShapedText::new(run_text, GlyphRun::new(glyphs), sources, direction);
+    Ok((shaped, stops, pen))
+}
+
+fn compute_bidi_line_x_offset(
+    max_inline_extent: Option<f32>,
+    options: ParagraphOptions,
+    base_level: u8,
+    indent: f32,
+    width: f32,
+) -> f32 {
+    let Some(limit) = max_inline_extent else {
+        return 0.0;
+    };
+    let is_rtl = base_level % 2 == 1;
+    let extra = (limit - indent - width).max(0.0);
+    match options.alignment {
+        TextAlignment::Start => {
+            if is_rtl {
+                extra
+            } else {
+                indent
+            }
+        }
+        TextAlignment::Center => {
+            if is_rtl {
+                extra / 2.0
+            } else {
+                indent + extra / 2.0
+            }
+        }
+        TextAlignment::End => {
+            if is_rtl {
+                0.0
+            } else {
+                indent + extra
+            }
+        }
+        TextAlignment::Justify => {
+            if is_rtl {
+                extra
+            } else {
+                indent
+            }
+        }
+    }
+}
+
+fn justify_bidi_line(
+    runs: &mut [BidiVisualRun],
+    carets: &mut [BidiCaretPosition],
+    extra: f32,
+) -> bool {
+    let mut space_positions: Vec<(usize, usize)> = Vec::new();
+    let total_runs = runs.len();
+    for (run_idx, run) in runs.iter().enumerate() {
+        let text = run.shaped.text();
+        let egcs: Vec<(usize, &str)> = text.grapheme_indices(true).collect();
+        for (idx, (start, g)) in egcs.iter().enumerate() {
+            let is_last_of_line = run_idx + 1 == total_runs && idx + 1 == egcs.len();
+            if !is_last_of_line && (g == &" " || g == &"\u{3000}") {
+                space_positions.push((run_idx, *start));
+            }
+        }
+    }
+    if space_positions.is_empty() {
+        return false;
+    }
+    let gap = extra / space_positions.len() as f32;
+    let mut cumulative_shifts = Vec::with_capacity(runs.len());
+    let mut spaces_before = 0usize;
+    for (run_idx, run) in runs.iter_mut().enumerate() {
+        let is_rtl = run.level % 2 == 1;
+        let local_spaces: Vec<usize> = space_positions
+            .iter()
+            .filter(|&&(ri, _)| ri == run_idx)
+            .map(|&(_, off)| off)
+            .collect();
+        let run_shift = spaces_before as f32 * gap;
+        run.origin_x += run_shift;
+        if is_rtl {
+            // In RTL runs, visually right-to-left means earlier logical bytes are to the right.
+            // Expanding a space pushes preceding (visually right) glyphs right by +gap per later space,
+            // or equivalently shifts origin_x by local_spaces.len() * gap and pushes later glyphs left.
+            let local_total = local_spaces.len() as f32 * gap;
+            run.origin_x += local_total;
+            let sources: Vec<Range<usize>> = run
+                .shaped
+                .glyph_sources()
+                .iter()
+                .map(|s| s.byte_range())
+                .collect();
+            for (glyph, range) in run.shaped.glyph_run_mut().glyphs.iter_mut().zip(sources) {
+                let spaces_after_in_run =
+                    local_spaces.iter().filter(|&&sp| sp >= range.end).count();
+                glyph.x -= spaces_after_in_run as f32 * gap;
+            }
+        } else {
+            let sources: Vec<Range<usize>> = run
+                .shaped
+                .glyph_sources()
+                .iter()
+                .map(|s| s.byte_range())
+                .collect();
+            for (glyph, range) in run.shaped.glyph_run_mut().glyphs.iter_mut().zip(sources) {
+                let spaces_before_in_run =
+                    local_spaces.iter().filter(|&&sp| range.start > sp).count();
+                glyph.x += spaces_before_in_run as f32 * gap;
+            }
+        }
+        cumulative_shifts.push((run.range.clone(), is_rtl, run_shift, local_spaces.clone()));
+        spaces_before += local_spaces.len();
+    }
+
+    for caret in carets.iter_mut() {
+        let offset = caret.position.byte_offset();
+        if let Some((range, is_rtl, run_shift, local_spaces)) =
+            cumulative_shifts.iter().find(|(r, _, _, _)| {
+                if caret.position.affinity() == CaretAffinity::Upstream {
+                    offset > r.start && offset <= r.end
+                } else {
+                    offset >= r.start && offset < r.end
+                }
+            })
+        {
+            let local_off = offset - range.start;
+            if *is_rtl {
+                let local_total = local_spaces.len() as f32 * gap;
+                let spaces_after = local_spaces.iter().filter(|&&sp| local_off > sp).count();
+                caret.x += run_shift + local_total - spaces_after as f32 * gap;
+            } else {
+                let spaces_before_in_run =
+                    local_spaces.iter().filter(|&&sp| local_off > sp).count();
+                caret.x += run_shift + spaces_before_in_run as f32 * gap;
+            }
+        } else if offset == runs.last().map(|r| r.range.end).unwrap_or(0) {
+            caret.x += spaces_before as f32 * gap;
+        }
+    }
+    true
 }
 fn unsupported(message: &str) -> Error {
     Error::new(ErrorKind::Unsupported, message)

@@ -572,6 +572,149 @@ impl FontFamily {
         Ok(shaped)
     }
 
+    pub(crate) fn shape_bidi_run_mapped<'a>(
+        &'a self,
+        text: &str,
+        mut options: FontOptions<'a>,
+        direction: TextDirection,
+    ) -> Result<crate::mapped::ShapedText, Error> {
+        options.text_direction = direction;
+        if self.faces.is_empty() {
+            return Err(Error::new(
+                ErrorKind::NotFound,
+                format!("no cached font face matched family={:?}", self.name()),
+            ));
+        }
+        if !options.font_size.is_finite() || options.font_size <= 0.0 {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "font_size must be a positive finite value",
+            ));
+        }
+        options.font = Some(FontRef::Family(self));
+        if options.font_family.is_none() {
+            options.font_family = Some(self.name());
+        }
+        let candidate_indices = self.face_candidate_indices(
+            options.font_family,
+            options.font_name,
+            options.font_weight,
+            options.font_style,
+            options.font_stretch,
+        );
+        if candidate_indices.is_empty() {
+            return Err(Error::new(
+                ErrorKind::NotFound,
+                format!(
+                    "no cached font face matched family={:?} name={:?}",
+                    options.font_family, options.font_name
+                ),
+            ));
+        }
+
+        let mut glyphs = Vec::new();
+        let mut provenance = SegmentProvenance::new(true);
+        let mut cursor_x = 0.0f32;
+        let mut cursor_y = 0.0f32;
+        let mut pending_segment = String::new();
+        let mut pending_face: Option<usize> = None;
+
+        for (unit, source) in sourced_text_units(text) {
+            match unit {
+                fontreader::ParsedTextUnit::Newline | fontreader::ParsedTextUnit::Tab => {
+                    return Err(Error::new(
+                        ErrorKind::Unsupported,
+                        "BiDi run cannot contain tabs or line breaks",
+                    ));
+                }
+                fontreader::ParsedTextUnit::Glyph { .. } => {
+                    let face_index = self.select_face_with_continuity(
+                        &unit,
+                        &candidate_indices,
+                        &options,
+                        pending_face,
+                    );
+                    if pending_face != Some(face_index) {
+                        self.flush_bidi_family_segment(
+                            &mut glyphs,
+                            &mut provenance,
+                            &mut pending_segment,
+                            &mut pending_face,
+                            &mut cursor_x,
+                            &mut cursor_y,
+                            &options,
+                        )?;
+                        pending_face = Some(face_index);
+                    }
+                    provenance.append(source);
+                    push_text_unit(&mut pending_segment, &unit);
+                }
+            }
+        }
+
+        self.flush_bidi_family_segment(
+            &mut glyphs,
+            &mut provenance,
+            &mut pending_segment,
+            &mut pending_face,
+            &mut cursor_x,
+            &mut cursor_y,
+            &options,
+        )?;
+
+        Ok(crate::mapped::ShapedText::new(
+            text,
+            GlyphRun::new(glyphs),
+            provenance.sources,
+            direction,
+        )
+        .with_ligature_carets(provenance.ligature_carets))
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn flush_bidi_family_segment<'a>(
+        &'a self,
+        glyphs: &mut Vec<PositionedGlyph>,
+        provenance: &mut SegmentProvenance,
+        pending_segment: &mut String,
+        pending_face: &mut Option<usize>,
+        cursor_x: &mut f32,
+        cursor_y: &mut f32,
+        options: &FontOptions<'a>,
+    ) -> Result<(), Error> {
+        let Some(face_index) = *pending_face else {
+            pending_segment.clear();
+            return Ok(());
+        };
+        if pending_segment.is_empty() {
+            *pending_face = None;
+            return Ok(());
+        }
+
+        let face = &self.faces[face_index].font;
+        let mut segment_options = options.clone();
+        segment_options.font = Some(FontRef::Loaded(face));
+
+        let mut mapped = face
+            .font()
+            .text2glyph_run_bidi_with_carets(pending_segment, &segment_options)?;
+        provenance.ligature_carets.extend(mapped.ligature_carets);
+        provenance.finish(mapped.ranges, face_index);
+
+        let (segment_advance_x, segment_advance_y) =
+            glyph_run_cursor_delta(&mapped.run, options.text_direction);
+        for glyph in mapped.run.glyphs.iter_mut() {
+            glyph.x += *cursor_x;
+            glyph.y += *cursor_y;
+        }
+        glyphs.extend(mapped.run.glyphs);
+        *cursor_x += segment_advance_x;
+        *cursor_y += segment_advance_y;
+        pending_segment.clear();
+        *pending_face = None;
+        Ok(())
+    }
+
     /// Alias for [`FontFamily::text2glyph_run`].
     pub fn text2commands<'a>(
         &'a self,
