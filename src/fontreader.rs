@@ -211,11 +211,6 @@ pub struct Font {
     pub(crate) vvar: Option<vvar::Vvar>,
     pub(crate) vmtx: Option<vmtx::Vmtx>,
     vorg: Option<vorg::Vorg>,
-    hmtx_pos: Option<Pointer>,
-    vmtx_pos: Option<Pointer>,
-    loca_pos: Option<Pointer>, // OpenType font, CFF/CFF2 none
-    glyf_pos: Option<Pointer>, // OpenType font, CFF/CFF2 none
-    sbix_pos: Option<Pointer>,
     pub(crate) more_fonts: Vec<Font>,
     current_font: usize,
 }
@@ -351,11 +346,6 @@ impl Font {
             vvar: None,
             vmtx: None,
             vorg: None,
-            hmtx_pos: None,
-            vmtx_pos: None,
-            loca_pos: None,
-            glyf_pos: None,
-            sbix_pos: None,
             more_fonts: Vec::new(),
             current_font: 0,
         }
@@ -4565,12 +4555,6 @@ pub struct VerticalLayout {
     pub(crate) vhea: Vhea,
 }
 
-#[derive(Debug, Clone)]
-struct Pointer {
-    pub(crate) offset: u32,
-    pub(crate) length: u32,
-}
-
 fn font_load_from_file_with_limits(
     filename: &PathBuf,
     limits: &DecodeLimits,
@@ -4973,7 +4957,6 @@ fn font_load<R: BinaryReader>(file: &mut R, limits: &DecodeLimits) -> Result<Fon
             font
         }
         fontheader::FontHeaders::TTC(header) => {
-            let num_fonts = header.num_fonts;
             let font_collection = &header.font_collection;
             let Some(table) = font_collection.first() else {
                 return Err(Error::new(
@@ -4988,10 +4971,7 @@ fn font_load<R: BinaryReader>(file: &mut R, limits: &DecodeLimits) -> Result<Fon
             }
 
             let mut fonts = Vec::new();
-            for i in 1..num_fonts {
-                let Some(table) = font_collection.get(i as usize) else {
-                    break;
-                };
+            for table in font_collection.iter().skip(1) {
                 if let Ok(font) = from_opentype(file, table, limits) {
                     fonts.push(font);
                 }
@@ -5009,251 +4989,19 @@ fn font_load<R: BinaryReader>(file: &mut R, limits: &DecodeLimits) -> Result<Fon
             let mut font = Font::empty();
             font.font_type = fontheader::FontHeaders::WOFF(header.clone());
             let woff = crate::woff::Woff::from_with_limits(file, header, limits)?;
-
-            let mut hmtx_table = None;
-            let mut loca_table = None;
-            let mut glyf_table = None;
-            let mut sbix_table = None;
-            let mut vmtx_table = None;
-            for table in woff.tables {
-                let tag: [u8; 4] = [
-                    (table.tag >> 24) as u8,
-                    (table.tag >> 16) as u8,
-                    (table.tag >> 8) as u8,
-                    table.tag as u8,
-                ];
-                // println!("tag: {}", crate::util::u32_to_string(table.tag));
-                match &tag {
-                    b"cmap" => {
-                        let mut reader = BytesReader::new(&table.data);
-                        let cmap_encodings =
-                            CmapEncodings::new(&mut reader, 0, table.data.len() as u32)?;
-                        font.cmap = Some(cmap_encodings);
-                    }
-                    b"head" => {
-                        let mut reader = BytesReader::new(&table.data);
-                        let head = head::Head::new(&mut reader, 0, table.data.len() as u32)?;
-                        font.head = Some(head);
-                    }
-                    b"OS/2" => {
-                        let mut reader = BytesReader::new(&table.data);
-                        let os2 = os2::OS2::new(&mut reader, 0, table.data.len() as u32)?;
-                        font.os2 = Some(os2);
-                    }
-                    b"fvar" => {
-                        let mut reader = BytesReader::new(&table.data);
-                        let fvar = fvar::Fvar::new(&mut reader, 0, table.data.len() as u32)?;
-                        font.fvar = Some(fvar);
-                    }
-                    b"gvar" => {
-                        let mut reader = BytesReader::new(&table.data);
-                        let gvar = gvar::Gvar::new(&mut reader, 0, table.data.len() as u32)?;
-                        font.gvar = Some(gvar);
-                    }
-                    b"avar" => {
-                        let mut reader = BytesReader::new(&table.data);
-                        let avar = avar::Avar::new(&mut reader, 0, table.data.len() as u32)?;
-                        font.avar = Some(avar);
-                    }
-                    b"hhea" => {
-                        let mut reader = BytesReader::new(&table.data);
-                        let hhea = hhea::Hhea::new(&mut reader, 0, table.data.len() as u32)?;
-                        font.hhea = Some(hhea);
-                    }
-                    b"maxp" => {
-                        let mut reader = BytesReader::new(&table.data);
-                        let maxp = maxp::Maxp::new(&mut reader, 0, table.data.len() as u32)?;
-                        font.maxp = Some(maxp);
-                    }
-                    b"hmtx" => {
-                        hmtx_table = Some(table);
-                    }
-                    b"name" => {
-                        let mut reader = BytesReader::new(&table.data);
-                        let name = name::Name::new(&mut reader, 0, table.data.len() as u32)?;
-                        let name_table = name::NameTable::new(&name);
-                        font.name = Some(name);
-                        font.name_table = Some(name_table);
-                    }
-                    b"post" => {
-                        let mut reader = BytesReader::new(&table.data);
-                        let post = post::Post::new(&mut reader, 0, table.data.len() as u32)?;
-                        font.post = Some(post);
-                    }
-                    b"loca" => {
-                        loca_table = Some(table);
-                    }
-                    b"glyf" => {
-                        glyf_table = Some(table);
-                    }
-                    b"COLR" => {
-                        let mut reader = BytesReader::new(&table.data);
-                        let colr = colr::Colr::new(&mut reader, 0, table.data.len() as u32)?;
-                        font.colr = Some(colr);
-                    }
-                    b"HVAR" => {
-                        let mut reader = BytesReader::new(&table.data);
-                        let hvar = hvar::Hvar::new(&mut reader, 0, table.data.len() as u32)?;
-                        font.hvar = Some(hvar);
-                    }
-                    b"MVAR" => {
-                        let mut reader = BytesReader::new(&table.data);
-                        let mvar = mvar::Mvar::new(&mut reader, 0, table.data.len() as u32)?;
-                        font.mvar = Some(mvar);
-                    }
-                    b"CPAL" => {
-                        let mut reader = BytesReader::new(&table.data);
-                        let cpal = cpal::Cpal::new(&mut reader, 0, table.data.len() as u32)?;
-                        font.cpal = Some(cpal);
-                    }
-                    b"sbix" => {
-                        sbix_table = Some(table);
-                    }
-                    b"SVG " => {
-                        let mut reader = BytesReader::new(&table.data);
-                        let svg = svg::Svg::new_with_limits(
-                            &mut reader,
-                            0,
-                            table.data.len() as u32,
-                            limits,
-                        )?;
-                        font.svg = Some(svg);
-                    }
-                    #[cfg(feature = "cff")]
-                    b"CFF " => {
-                        let mut reader = BytesReader::new(&table.data);
-                        let cff = cff::Cff::new(&mut reader, 0, table.data.len() as u32).map_err(
-                            |err| Error::new(std::io::ErrorKind::InvalidData, err.to_string()),
-                        )?;
-                        font.cff = Some(cff);
-                        font.outline_format = GlyphFormat::CFF;
-                    }
-                    #[cfg(feature = "cff")]
-                    b"CFF2" => {
-                        let mut reader = BytesReader::new(&table.data);
-                        let cff = cff::Cff::new(&mut reader, 0, table.data.len() as u32).map_err(
-                            |err| Error::new(std::io::ErrorKind::InvalidData, err.to_string()),
-                        )?;
-                        font.cff = Some(cff);
-                        font.outline_format = GlyphFormat::CFF2;
-                    }
-                    #[cfg(feature = "layout")]
-                    b"GPOS" => {
-                        let mut reader = BytesReader::new(&table.data);
-                        let gpos = gpos::Gpos::new(&mut reader, 0, table.data.len() as u32)?;
-                        font.gpos = Some(gpos);
-                    }
-                    #[cfg(feature = "layout")]
-                    b"GSUB" => {
-                        let mut reader = BytesReader::new(&table.data);
-                        let gsub = gsub::Gsub::new(&mut reader, 0, table.data.len() as u32)?;
-                        font.gsub = Some(gsub);
-                    }
-                    #[cfg(feature = "layout")]
-                    b"GDEF" => {
-                        let mut reader = BytesReader::new(&table.data);
-                        let gdef = gdef::Gdef::new(&mut reader, 0, table.data.len())?;
-                        font.gdef = Some(gdef);
-                    }
-                    b"vhea" => {
-                        let mut reader = BytesReader::new(&table.data);
-                        let vhea = vhea::Vhea::new(&mut reader, 0, table.data.len() as u32)?;
-                        font.vhea = Some(vhea);
-                    }
-                    b"VORG" => {
-                        let mut reader = BytesReader::new(&table.data);
-                        font.vorg = vorg::Vorg::new(&mut reader, 0, table.data.len() as u32).ok();
-                    }
-                    b"vmtx" => {
-                        vmtx_table = Some(table);
-                    }
-                    b"VVAR" => {
-                        let mut reader = BytesReader::new(&table.data);
-                        let vvar = vvar::Vvar::new(&mut reader, 0, table.data.len() as u32)?;
-                        font.vvar = Some(vvar);
-                    }
-                    _ => {}
-                }
-            }
-            let hmtx_table = hmtx_table
-                .as_ref()
-                .ok_or_else(|| Error::other("No hmtx table"))?;
-            let hhea = font
-                .hhea
-                .as_ref()
-                .ok_or_else(|| Error::other("No hhea table"))?;
-            let maxp = font
-                .maxp
-                .as_ref()
-                .ok_or_else(|| Error::other("No maxp table"))?;
-            let mut reader = BytesReader::new(&hmtx_table.data);
-            let hmtx = hmtx::Hmtx::new(
-                &mut reader,
-                0,
-                hmtx_table.data.len() as u32,
-                hhea.number_of_hmetrics,
-                maxp.num_glyphs,
-            )?;
-            font.hmtx = Some(hmtx);
-            if let Some(vmtx_table) = vmtx_table {
-                let mut reader = BytesReader::new(&vmtx_table.data);
-                let vhea = font
-                    .vhea
-                    .as_ref()
-                    .ok_or_else(|| Error::other("No vhea table"))?;
-                let vmtx = vmtx::Vmtx::new(
-                    &mut reader,
-                    0,
-                    vmtx_table.data.len() as u32,
-                    vhea.number_of_vmetrics,
-                    maxp.num_glyphs,
-                )?;
-                font.vmtx = Some(vmtx);
-            }
-            if let (Some(loca_table), Some(glyf_table)) = (loca_table.as_ref(), glyf_table.as_ref())
-            {
-                let mut reader = BytesReader::new(&loca_table.data);
-                let head = font
-                    .head
-                    .as_ref()
-                    .ok_or_else(|| Error::other("No head table"))?;
-                let index_to_loc_format = head.index_to_loc_format as usize;
-                let loca = loca::Loca::new_by_size(
-                    &mut reader,
-                    0,
-                    loca_table.data.len() as u32,
-                    index_to_loc_format,
-                )?;
-                font.loca = Some(loca);
-                let mut reader = BytesReader::new(&glyf_table.data);
-                let loca = font
-                    .loca
-                    .as_ref()
-                    .ok_or_else(|| Error::other("No loca table"))?;
-                let glyf = glyf::Glyf::new(&mut reader, 0, glyf_table.data.len() as u32, loca);
-                font.glyf = Some(glyf);
-                font.outline_format = GlyphFormat::OpenTypeGlyph;
-            }
-
-            if let Some(sbix_table) = sbix_table {
-                let mut reader = BytesReader::new(&sbix_table.data);
-                let num_glyphs = maxp.num_glyphs as u32;
-                let sbix =
-                    sbix::Sbix::new(&mut reader, 0, sbix_table.data.len() as u32, num_glyphs)?;
-                font.sbix = Some(sbix);
-            }
-            validate_variation_axis_counts(&font)?;
+            let mut provider = WoffTableProvider::new(woff.tables);
+            load_font_tables(&mut font, &mut provider, limits, true)?;
             #[cfg(debug_assertions)]
             {
                 // font_debug(&font);
             }
             Ok(font)
         }
-        fontheader::FontHeaders::WOFF2(_) => todo!(),
-        fontheader::FontHeaders::Unknown => {
-            //todo!(),
-            Err(Error::other("Unknown font type".to_string()))
-        }
+        fontheader::FontHeaders::WOFF2(_) => Err(Error::new(
+            ErrorKind::Unsupported,
+            "WOFF2 container is not supported",
+        )),
+        fontheader::FontHeaders::Unknown => Err(Error::other("Unknown font type".to_string())),
     }
 }
 
@@ -5269,11 +5017,10 @@ fn validate_variation_axis_counts(font: &Font) -> Result<(), Error> {
     Ok(())
 }
 
-// Isolate nested layout offsets from other tables and trailing container bytes.
+// Isolate table offsets from other tables and trailing container bytes.
 // Check both the limit and physical range before read_bytes_as_vec allocates,
 // even when called independently of the public SFNT directory validation.
-#[cfg(feature = "layout")]
-fn bounded_layout_reader<R: BinaryReader>(
+fn bounded_table_reader<R: BinaryReader>(
     file: &mut R,
     offset: u32,
     length: u32,
@@ -5299,173 +5046,254 @@ fn bounded_layout_reader<R: BinaryReader>(
     Ok(BytesReader::from(file.read_bytes_as_vec(length as usize)?))
 }
 
-fn from_opentype<R: BinaryReader>(
-    file: &mut R,
-    header: &OTFHeader,
-    limits: &DecodeLimits,
-) -> Result<Font, Error> {
-    let mut font = Font::empty();
-    font.font_type = fontheader::FontHeaders::OTF(header.clone());
+trait TableProvider {
+    fn next_table(
+        &mut self,
+        limits: &DecodeLimits,
+    ) -> Result<Option<([u8; 4], BytesReader, u32)>, Error>;
+}
 
-    let records = &header.table_records;
+struct SfntTableProvider<'a, R: BinaryReader> {
+    file: &'a mut R,
+    records: std::slice::Iter<'a, crate::fontheader::TableRecord>,
+    total_bytes_loaded: usize,
+}
 
-    for record in records.iter() {
-        if record.length as usize > limits.max_table_bytes {
+impl<'a, R: BinaryReader> SfntTableProvider<'a, R> {
+    fn new(file: &'a mut R, records: &'a [crate::fontheader::TableRecord]) -> Self {
+        Self {
+            file,
+            records: records.iter(),
+            total_bytes_loaded: 0,
+        }
+    }
+}
+
+impl<R: BinaryReader> TableProvider for SfntTableProvider<'_, R> {
+    fn next_table(
+        &mut self,
+        limits: &DecodeLimits,
+    ) -> Result<Option<([u8; 4], BytesReader, u32)>, Error> {
+        let Some(record) = self.records.next() else {
+            return Ok(None);
+        };
+        let table_len = record.length as usize;
+        if table_len > limits.max_table_bytes {
             return Err(crate::limits::resource_limit(
                 "OpenType table",
-                record.length as usize,
+                table_len,
                 limits.max_table_bytes,
             ));
         }
-        let tag: [u8; 4] = record.table_tag.to_be_bytes();
+        let next_total = self
+            .total_bytes_loaded
+            .checked_add(table_len)
+            .ok_or_else(|| {
+                Error::new(
+                    ErrorKind::InvalidData,
+                    "OpenType tables total size overflow",
+                )
+            })?;
+        if next_total > limits.max_total_decompressed_bytes {
+            return Err(crate::limits::resource_limit(
+                "OpenType tables total",
+                next_total,
+                limits.max_total_decompressed_bytes,
+            ));
+        }
+        self.total_bytes_loaded = next_total;
+        let reader = bounded_table_reader(self.file, record.offset, record.length, limits)?;
+        Ok(Some((
+            record.table_tag.to_be_bytes(),
+            reader,
+            record.length,
+        )))
+    }
+}
+
+struct WoffTableProvider {
+    tables: std::vec::IntoIter<crate::woff::container::WOFFTable>,
+    total_bytes_loaded: usize,
+}
+
+impl WoffTableProvider {
+    fn new(tables: Vec<crate::woff::container::WOFFTable>) -> Self {
+        Self {
+            tables: tables.into_iter(),
+            total_bytes_loaded: 0,
+        }
+    }
+}
+
+impl TableProvider for WoffTableProvider {
+    fn next_table(
+        &mut self,
+        limits: &DecodeLimits,
+    ) -> Result<Option<([u8; 4], BytesReader, u32)>, Error> {
+        let Some(table) = self.tables.next() else {
+            return Ok(None);
+        };
+        let table_len = table.data.len();
+        if table_len > limits.max_table_bytes {
+            return Err(crate::limits::resource_limit(
+                "OpenType table",
+                table_len,
+                limits.max_table_bytes,
+            ));
+        }
+        let next_total = self
+            .total_bytes_loaded
+            .checked_add(table_len)
+            .ok_or_else(|| {
+                Error::new(
+                    ErrorKind::InvalidData,
+                    "OpenType tables total size overflow",
+                )
+            })?;
+        if next_total > limits.max_total_decompressed_bytes {
+            return Err(crate::limits::resource_limit(
+                "OpenType tables total",
+                next_total,
+                limits.max_total_decompressed_bytes,
+            ));
+        }
+        self.total_bytes_loaded = next_total;
+        let len_u32 = u32::try_from(table_len)
+            .map_err(|_| Error::new(ErrorKind::InvalidData, "OpenType table exceeds 4 GiB"))?;
+        let tag = table.tag.to_be_bytes();
+        Ok(Some((tag, BytesReader::from(table.data), len_u32)))
+    }
+}
+
+fn load_font_tables<P: TableProvider>(
+    font: &mut Font,
+    provider: &mut P,
+    limits: &DecodeLimits,
+    load_vertical_metrics: bool,
+) -> Result<(), Error> {
+    let mut hmtx_table: Option<(BytesReader, u32)> = None;
+    let mut loca_table: Option<(BytesReader, u32)> = None;
+    let mut glyf_table: Option<(BytesReader, u32)> = None;
+    let mut sbix_table: Option<(BytesReader, u32)> = None;
+    let mut vmtx_table: Option<(BytesReader, u32)> = None;
+
+    while let Some((tag, mut reader, table_len)) = provider.next_table(limits)? {
         match &tag {
             b"cmap" => {
-                let cmap_encodings = CmapEncodings::new(file, record.offset, record.length)?;
+                let cmap_encodings = CmapEncodings::new(&mut reader, 0, table_len)?;
                 font.cmap = Some(cmap_encodings);
             }
             b"head" => {
-                let head = head::Head::new(file, record.offset, record.length)?;
+                let head = head::Head::new(&mut reader, 0, table_len)?;
                 font.head = Some(head);
             }
+            b"OS/2" => {
+                let os2 = os2::OS2::new(&mut reader, 0, table_len)?;
+                font.os2 = Some(os2);
+            }
             b"fvar" => {
-                let fvar = fvar::Fvar::new(file, record.offset, record.length)?;
+                let fvar = fvar::Fvar::new(&mut reader, 0, table_len)?;
                 font.fvar = Some(fvar);
             }
             b"gvar" => {
-                let gvar = gvar::Gvar::new(file, record.offset, record.length)?;
+                let gvar = gvar::Gvar::new(&mut reader, 0, table_len)?;
                 font.gvar = Some(gvar);
             }
             b"avar" => {
-                let avar = avar::Avar::new(file, record.offset, record.length)?;
+                let avar = avar::Avar::new(&mut reader, 0, table_len)?;
                 font.avar = Some(avar);
             }
             b"hhea" => {
-                let hhea = hhea::Hhea::new(file, record.offset, record.length)?;
+                let hhea = hhea::Hhea::new(&mut reader, 0, table_len)?;
                 font.hhea = Some(hhea);
             }
-            b"hmtx" => {
-                let htmx_pos = Pointer {
-                    offset: record.offset,
-                    length: record.length,
-                };
-                font.hmtx_pos = Some(htmx_pos);
-            }
             b"maxp" => {
-                let maxp = maxp::Maxp::new(file, record.offset, record.length)?;
+                let maxp = maxp::Maxp::new(&mut reader, 0, table_len)?;
                 font.maxp = Some(maxp);
             }
+            b"hmtx" => {
+                hmtx_table = Some((reader, table_len));
+            }
             b"name" => {
-                let name = name::Name::new(file, record.offset, record.length)?;
+                let name = name::Name::new(&mut reader, 0, table_len)?;
                 let name_table = name::NameTable::new(&name);
                 font.name = Some(name);
                 font.name_table = Some(name_table);
             }
-            b"OS/2" => {
-                let os2 = os2::OS2::new(file, record.offset, record.length)?;
-                font.os2 = Some(os2);
-            }
             b"post" => {
-                let post = post::Post::new(file, record.offset, record.length)?;
+                let post = post::Post::new(&mut reader, 0, table_len)?;
                 font.post = Some(post);
             }
             b"loca" => {
-                let loca_pos = Pointer {
-                    offset: record.offset,
-                    length: record.length,
-                };
-                font.loca_pos = Some(loca_pos);
+                loca_table = Some((reader, table_len));
             }
             b"glyf" => {
-                let glyf_pos = Pointer {
-                    offset: record.offset,
-                    length: record.length,
-                };
-                font.glyf_pos = Some(glyf_pos);
+                glyf_table = Some((reader, table_len));
             }
             b"COLR" => {
-                let colr = colr::Colr::new(file, record.offset, record.length)?;
+                let colr = colr::Colr::new(&mut reader, 0, table_len)?;
                 font.colr = Some(colr);
             }
             b"HVAR" => {
-                let hvar = hvar::Hvar::new(file, record.offset, record.length)?;
+                let hvar = hvar::Hvar::new(&mut reader, 0, table_len)?;
                 font.hvar = Some(hvar);
             }
             b"MVAR" => {
-                let mvar = mvar::Mvar::new(file, record.offset, record.length)?;
+                let mvar = mvar::Mvar::new(&mut reader, 0, table_len)?;
                 font.mvar = Some(mvar);
             }
             b"CPAL" => {
-                let cpal = cpal::Cpal::new(file, record.offset, record.length)?;
+                let cpal = cpal::Cpal::new(&mut reader, 0, table_len)?;
                 font.cpal = Some(cpal);
             }
             b"sbix" => {
-                let sbix_pos = Pointer {
-                    offset: record.offset,
-                    length: record.length,
-                };
-                font.sbix_pos = Some(sbix_pos);
+                sbix_table = Some((reader, table_len));
             }
             b"SVG " => {
-                let svg = svg::Svg::new_with_limits(file, record.offset, record.length, limits)?;
+                let svg = svg::Svg::new_with_limits(&mut reader, 0, table_len, limits)?;
                 font.svg = Some(svg);
             }
             #[cfg(feature = "cff")]
             b"CFF " => {
-                let cff = cff::Cff::new(file, record.offset, record.length)
+                let cff = cff::Cff::new(&mut reader, 0, table_len)
                     .map_err(|err| Error::new(std::io::ErrorKind::InvalidData, err.to_string()))?;
                 font.cff = Some(cff);
                 font.outline_format = GlyphFormat::CFF;
             }
             #[cfg(feature = "cff")]
             b"CFF2" => {
-                let cff = cff::Cff::new(file, record.offset, record.length)
+                let cff = cff::Cff::new(&mut reader, 0, table_len)
                     .map_err(|err| Error::new(std::io::ErrorKind::InvalidData, err.to_string()))?;
                 font.cff = Some(cff);
                 font.outline_format = GlyphFormat::CFF2;
             }
             #[cfg(feature = "layout")]
             b"GPOS" => {
-                let mut reader = bounded_layout_reader(file, record.offset, record.length, limits)?;
-                let gpos = gpos::Gpos::new(&mut reader, 0, record.length)?;
+                let gpos = gpos::Gpos::new(&mut reader, 0, table_len)?;
                 font.gpos = Some(gpos);
             }
             #[cfg(feature = "layout")]
             b"GSUB" => {
-                let mut reader = bounded_layout_reader(file, record.offset, record.length, limits)?;
-                let gsub = gsub::Gsub::new(&mut reader, 0, record.length)?;
+                let gsub = gsub::Gsub::new(&mut reader, 0, table_len)?;
                 font.gsub = Some(gsub);
-                #[cfg(debug_assertions)]
-                {
-                    // println!("{}", &font.gsub.as_ref().unwrap().to_string());
-                }
             }
             #[cfg(feature = "layout")]
             b"GDEF" => {
-                let gdef = gdef::Gdef::new(file, record.offset as u64, record.length as usize)?;
+                let gdef = gdef::Gdef::new(&mut reader, 0, table_len as usize)?;
                 font.gdef = Some(gdef);
-                #[cfg(debug_assertions)]
-                {
-                    // println!("{}", &font.gdef.as_ref().unwrap().to_string());
-                }
             }
-            #[cfg(feature = "layout")]
-            b"vhea" => {
-                let vhea = vhea::Vhea::new(file, record.offset, record.length)?;
+            b"vhea" if load_vertical_metrics => {
+                let vhea = vhea::Vhea::new(&mut reader, 0, table_len)?;
                 font.vhea = Some(vhea);
             }
-            #[cfg(feature = "layout")]
-            b"vmtx" => {
-                let vmtx_pos = Pointer {
-                    offset: record.offset,
-                    length: record.length,
-                };
-                font.vmtx_pos = Some(vmtx_pos);
+            b"vmtx" if load_vertical_metrics => {
+                vmtx_table = Some((reader, table_len));
             }
             b"VORG" => {
-                font.vorg = vorg::Vorg::new(file, record.offset, record.length).ok();
+                font.vorg = vorg::Vorg::new(&mut reader, 0, table_len).ok();
             }
             b"VVAR" => {
-                let vvar = vvar::Vvar::new(file, record.offset, record.length)?;
+                let vvar = vvar::Vvar::new(&mut reader, 0, table_len)?;
                 font.vvar = Some(vvar);
             }
             _ => {}
@@ -5482,61 +5310,70 @@ fn from_opentype<R: BinaryReader>(
         .as_ref()
         .ok_or_else(|| Error::other("No hhea table"))?
         .number_of_hmetrics;
-    let hmtx_pointer = font
-        .hmtx_pos
-        .as_ref()
-        .ok_or_else(|| Error::other("No hmtx table pointer"))?;
-    let offset = hmtx_pointer.offset;
-    let length = hmtx_pointer.length;
-
-    let hmtx = hmtx::Hmtx::new(file, offset, length, number_of_hmetrics, num_glyphs)?;
+    let (mut hmtx_reader, hmtx_len) = hmtx_table.ok_or_else(|| Error::other("No hmtx table"))?;
+    let hmtx = hmtx::Hmtx::new(
+        &mut hmtx_reader,
+        0,
+        hmtx_len,
+        number_of_hmetrics,
+        num_glyphs,
+    )?;
     font.hmtx = Some(hmtx);
 
-    if font.vmtx_pos.is_some() {
+    if let Some((mut vmtx_reader, vmtx_len)) = vmtx_table {
         let number_of_vmetrics = font
             .vhea
             .as_ref()
             .ok_or_else(|| Error::other("No vhea table"))?
             .number_of_vmetrics;
-        let vmtx_pointer = font
-            .vmtx_pos
-            .as_ref()
-            .ok_or_else(|| Error::other("No vmtx table pointer"))?;
-        let offset = vmtx_pointer.offset;
-        let length = vmtx_pointer.length;
-        let vmtx = vmtx::Vmtx::new(file, offset, length, number_of_vmetrics, num_glyphs)?;
+        let vmtx = vmtx::Vmtx::new(
+            &mut vmtx_reader,
+            0,
+            vmtx_len,
+            number_of_vmetrics,
+            num_glyphs,
+        )?;
         font.vmtx = Some(vmtx);
     }
 
-    if let Some(offset) = font.loca_pos.as_ref() {
-        let length = offset.length;
+    if let Some((mut loca_reader, loca_len)) = loca_table {
         let index_to_loc_format = font
             .head
             .as_ref()
             .ok_or_else(|| Error::other("No head table"))?
             .index_to_loc_format as usize;
-        let loca = loca::Loca::new_by_size(file, offset.offset, length, index_to_loc_format)?;
+        let loca = loca::Loca::new_by_size(&mut loca_reader, 0, loca_len, index_to_loc_format)?;
         font.loca = Some(loca);
-        let glyf_pointer = font
-            .glyf_pos
-            .as_ref()
-            .ok_or_else(|| Error::other("No glyf table pointer"))?;
-        let offset = glyf_pointer.offset;
-        let length = glyf_pointer.length;
+        let (mut glyf_reader, glyf_len) =
+            glyf_table.ok_or_else(|| Error::other("No glyf table"))?;
         let loca = font
             .loca
             .as_ref()
             .ok_or_else(|| Error::other("No loca table"))?;
-        let glyf = glyf::Glyf::new(file, offset, length, loca);
+        let glyf = glyf::Glyf::new(&mut glyf_reader, 0, glyf_len, loca)?;
         font.glyf = Some(glyf);
         font.outline_format = GlyphFormat::OpenTypeGlyph;
     }
-    if let Some(offset) = font.sbix_pos.as_ref() {
-        let sbix = sbix::Sbix::new(file, offset.offset, offset.length, num_glyphs as u32)?;
+
+    if let Some((mut sbix_reader, sbix_len)) = sbix_table {
+        let sbix = sbix::Sbix::new(&mut sbix_reader, 0, sbix_len, num_glyphs as u32)?;
         font.sbix = Some(sbix);
     }
 
-    validate_variation_axis_counts(&font)?;
+    validate_variation_axis_counts(font)?;
+    Ok(())
+}
+
+fn from_opentype<R: BinaryReader>(
+    file: &mut R,
+    header: &OTFHeader,
+    limits: &DecodeLimits,
+) -> Result<Font, Error> {
+    let mut font = Font::empty();
+    font.font_type = fontheader::FontHeaders::OTF(header.clone());
+
+    let mut provider = SfntTableProvider::new(file, &header.table_records);
+    load_font_tables(&mut font, &mut provider, limits, cfg!(feature = "layout"))?;
 
     if font.cmap.is_none() {
         return Err(Error::other("No cmap table".to_string()));
@@ -5967,8 +5804,8 @@ mod text_control_tests {
     }
 }
 
-#[cfg(all(test, feature = "layout"))]
-mod layout_reader_bounds_tests {
+#[cfg(test)]
+mod table_reader_bounds_tests {
     use super::*;
 
     #[test]
@@ -5976,7 +5813,7 @@ mod layout_reader_bounds_tests {
         let mut source = BytesReader::from(vec![0, 1, 2, 3]);
         let limits = DecodeLimits::default();
         assert_eq!(
-            bounded_layout_reader(&mut source, 0, u32::MAX, &limits)
+            bounded_table_reader(&mut source, 0, u32::MAX, &limits)
                 .err()
                 .unwrap()
                 .kind(),
@@ -5988,17 +5825,17 @@ mod layout_reader_bounds_tests {
         };
         for (offset, length) in [(0, u32::MAX), (u32::MAX, 2), (3, 2)] {
             assert_eq!(
-                bounded_layout_reader(&mut source, offset, length, &unlimited_table)
+                bounded_table_reader(&mut source, offset, length, &unlimited_table)
                     .err()
                     .unwrap()
                     .kind(),
                 ErrorKind::UnexpectedEof
             );
         }
-        let mut bounded = bounded_layout_reader(&mut source, 2, 2, &limits).unwrap();
+        let mut bounded = bounded_table_reader(&mut source, 2, 2, &limits).unwrap();
         assert_eq!(bounded.read_u16_be().unwrap(), 0x0203);
         assert!(bounded.read_u8().is_err());
-        assert!(bounded_layout_reader(&mut source, 4, 0, &limits).is_ok());
+        assert!(bounded_table_reader(&mut source, 4, 0, &limits).is_ok());
     }
 }
 
