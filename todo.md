@@ -84,24 +84,24 @@
 
 ### M2: 段落レイアウト・BiDi・複数行の統合
 
-- [ ] `BidiParagraphLayout` へのソフトラップ統合と `FontFamily` フォールバック対応
-- [ ] 段落アライメント（左・中央・右・両端揃え）、タブ展開、段落字下げ / インデントの設計・実装
+- [x] `BidiParagraphLayout` へのソフトラップ統合と `FontFamily` フォールバック対応
+- [x] 段落アライメント（左・中央・右・両端揃え）、タブ展開、段落字下げ / インデントの設計・実装
 
 受入条件: 混在 LTR / RTL 段落の複数行折り返しとアライメントで視覚順序・joining・`hit_test` 往復が崩れないこと。
 
 ### M3: OpenType カラーフォント・シェイピング拡張
 
-- [ ] COLR v1 / CPAL v1 の実装とグラデーション・合成・可変レイヤーの `GlyphLayer` / bounds 対応
-- [ ] `FeatureVariations` 実行時置換、任意 OpenType feature 指定、`FontVariant::SmallCaps`（`smcp` / `c2sc`）結線
-- [ ] CFF2 再配布可能可変フォント fixture、軸別 outline 署名、malformed corpus 回帰の整備
+- [x] COLR v1 / CPAL v1 の実装とグラデーション・合成・可変レイヤーの `GlyphLayer` / bounds 対応
+- [x] `FeatureVariations` 実行時置換、任意 OpenType feature 指定、`FontVariant::SmallCaps`（`smcp` / `c2sc`）結線
+- [x] CFF2 再配布可能可変フォント fixture、軸別 outline 署名、malformed corpus 回帰の整備
 
 受入条件: COLR v1・`FeatureVariations`・CFF2 可変軸が合成/実フォント fixture で検証され、CI マトリクスを通過すること。
 
 ### M4: 境界検証監査・ファジング・保守
 
-- [ ] 全テーブル loader の統一 bounded reader / `TableProvider` 監査完了と `DecodeLimits` 全展開・確保経路接続
-- [ ] `from_buffer`、face 列挙、metadata、`shape`、`measure`、`render_svg` を対象としたファジングの追加
-- [ ] `unified/` クロスライブラリ結合スイート（`fontcore` + `paintcore` + `wml2`）の継続運用と `doc/implementation-status.md` 同期
+- [x] 全テーブル loader の統一 bounded reader / `TableProvider` 監査完了と `DecodeLimits` 全展開・確保経路接続
+- [x] `from_buffer`、face 列挙、metadata、`shape`、`measure`、`render_svg` を対象としたファジングの追加
+- [x] `unified/` クロスライブラリ結合スイート（`fontcore` + `paintcore` + `wml2`）の継続運用と `doc/implementation-status.md` 同期
 
 受入条件: 任意バイト列で panic せず、上限超過が明示的な resource-limit error で停止すること。
 
