@@ -588,9 +588,13 @@ impl Gpos {
         )?);
         let lookups = Self::parse_lookups(reader, offset + lookup_list_offset as u64)?;
         let feature_variations = if feature_variations_offset > 0 {
-            FeatureVariationList::new(reader, offset + feature_variations_offset as u64, length)
-                .ok()
-                .map(Box::new)
+            FeatureVariationList::new(
+                reader,
+                offset + feature_variations_offset as u64,
+                offset + length as u64,
+            )
+            .ok()
+            .map(Box::new)
         } else {
             None
         };
@@ -1285,11 +1289,21 @@ impl Gpos {
         locale: Option<&str>,
         feature_tags: &[[u8; 4]],
     ) -> Vec<&'a PositioningLookup> {
+        self.collect_lookups_with_variations(locale, feature_tags, &[])
+    }
+
+    fn collect_lookups_with_variations<'a>(
+        &'a self,
+        locale: Option<&str>,
+        feature_tags: &[[u8; 4]],
+        variation_coords: &[f32],
+    ) -> Vec<&'a PositioningLookup> {
         if locale.is_none() {
-            return self.collect_lookups_from_scripts(
+            return self.collect_lookups_from_scripts_with_variations(
                 self.scripts.scripts.iter().collect(),
                 locale,
                 feature_tags,
+                variation_coords,
             );
         }
 
@@ -1299,26 +1313,29 @@ impl Gpos {
 
         for feature_tag in feature_tags {
             let lookups = {
-                let preferred = self.collect_lookups_from_scripts(
+                let preferred = self.collect_lookups_from_scripts_with_variations(
                     preferred_scripts.clone(),
                     locale,
                     std::slice::from_ref(feature_tag),
+                    variation_coords,
                 );
                 if !preferred.is_empty() {
                     preferred
                 } else {
-                    let defaults = self.collect_lookups_from_scripts(
+                    let defaults = self.collect_lookups_from_scripts_with_variations(
                         default_scripts.clone(),
                         locale,
                         std::slice::from_ref(feature_tag),
+                        variation_coords,
                     );
                     if !defaults.is_empty() {
                         defaults
                     } else {
-                        self.collect_lookups_from_scripts(
+                        self.collect_lookups_from_scripts_with_variations(
                             other_scripts.clone(),
                             locale,
                             std::slice::from_ref(feature_tag),
+                            variation_coords,
                         )
                     }
                 }
@@ -1341,6 +1358,16 @@ impl Gpos {
         locale: Option<&str>,
         feature_tags: &[[u8; 4]],
     ) -> Vec<&'a PositioningLookup> {
+        self.collect_lookups_from_scripts_with_variations(scripts, locale, feature_tags, &[])
+    }
+
+    fn collect_lookups_from_scripts_with_variations<'a>(
+        &'a self,
+        scripts: Vec<&'a ParsedScript>,
+        locale: Option<&str>,
+        feature_tags: &[[u8; 4]],
+        variation_coords: &[f32],
+    ) -> Vec<&'a PositioningLookup> {
         let mut result = Vec::new();
         let mut seen_lookup_indices = HashSet::new();
 
@@ -1349,15 +1376,21 @@ impl Gpos {
                 for feature_index in
                     Self::collect_language_system_feature_indices(&language_system.language_system)
                 {
-                    let Some(feature) = self.features.features.get(feature_index as usize) else {
+                    let Some(base_feature) = self.features.features.get(feature_index as usize)
+                    else {
                         continue;
                     };
                     if !feature_tags
                         .iter()
-                        .any(|tag| feature.feature_tag == u32::from_be_bytes(*tag))
+                        .any(|tag| base_feature.feature_tag == u32::from_be_bytes(*tag))
                     {
                         continue;
                     }
+                    let feature = self
+                        .feature_variations
+                        .as_deref()
+                        .and_then(|fv| fv.substitute_feature(variation_coords, feature_index))
+                        .unwrap_or(base_feature);
 
                     for lookup_index in feature.lookup_list_indices.iter() {
                         if !seen_lookup_indices.insert(*lookup_index) {
@@ -1500,14 +1533,35 @@ impl Gpos {
         gdef: Option<&Gdef>,
         variation_coords: &[f32],
     ) -> Option<SingleAdjustment> {
-        let feature_tags: &[[u8; 4]] = if is_vertical {
+        self.lookup_single_adjustment_with_options(
+            glyph,
+            is_vertical,
+            locale,
+            gdef,
+            variation_coords,
+            &[],
+        )
+    }
+
+    pub(crate) fn lookup_single_adjustment_with_options(
+        &self,
+        glyph: u16,
+        is_vertical: bool,
+        locale: Option<&str>,
+        gdef: Option<&Gdef>,
+        variation_coords: &[f32],
+        custom_features: &[crate::commands::FontFeatureSetting],
+    ) -> Option<SingleAdjustment> {
+        let base_tags: &[[u8; 4]] = if is_vertical {
             &[*b"vkrn", *b"dist", *b"vert"]
         } else {
             &[*b"kern", *b"dist"]
         };
+        let feature_tags = crate::commands::resolve_feature_tags(base_tags, custom_features, true);
         let mut result = SingleAdjustment::default();
         let mut matched = false;
-        for lookup in self.collect_lookups(locale, feature_tags) {
+        for lookup in self.collect_lookups_with_variations(locale, &feature_tags, variation_coords)
+        {
             if (lookup.lookup_type != 1 && lookup.lookup_type != 9)
                 || !lookup.includes_glyph(glyph, gdef)
             {
@@ -1546,10 +1600,23 @@ impl Gpos {
         gdef: Option<&Gdef>,
         variation_coords: &[f32],
     ) -> (Vec<SingleAdjustment>, Vec<bool>) {
-        let tags = if is_vertical { [*b"vkrn"] } else { [*b"kern"] };
+        self.pair_adjustments_with_options(glyphs, is_vertical, locale, gdef, variation_coords, &[])
+    }
+
+    pub(crate) fn pair_adjustments_with_options(
+        &self,
+        glyphs: &[Option<u16>],
+        is_vertical: bool,
+        locale: Option<&str>,
+        gdef: Option<&Gdef>,
+        variation_coords: &[f32],
+        custom_features: &[crate::commands::FontFeatureSetting],
+    ) -> (Vec<SingleAdjustment>, Vec<bool>) {
+        let base_tags = if is_vertical { [*b"vkrn"] } else { [*b"kern"] };
+        let tags = crate::commands::resolve_feature_tags(&base_tags, custom_features, true);
         let mut result = vec![SingleAdjustment::default(); glyphs.len()];
         let mut covered = vec![false; glyphs.len()];
-        for lookup in self.collect_lookups(locale, &tags) {
+        for lookup in self.collect_lookups_with_variations(locale, &tags, variation_coords) {
             if lookup.lookup_type != 2 && lookup.lookup_type != 9 {
                 continue;
             }
@@ -1652,8 +1719,20 @@ impl Gpos {
         locale: Option<&str>,
         gdef: Option<&Gdef>,
     ) -> Vec<SingleAdjustment> {
+        self.cursive_adjustments_with_options(glyphs, locale, gdef, &[], &[])
+    }
+
+    pub(crate) fn cursive_adjustments_with_options(
+        &self,
+        glyphs: &[Option<u16>],
+        locale: Option<&str>,
+        gdef: Option<&Gdef>,
+        variation_coords: &[f32],
+        custom_features: &[crate::commands::FontFeatureSetting],
+    ) -> Vec<SingleAdjustment> {
+        let tags = crate::commands::resolve_feature_tags(&[*b"curs"], custom_features, false);
         let mut result = vec![SingleAdjustment::default(); glyphs.len()];
-        for lookup in self.collect_lookups(locale, &[*b"curs"]) {
+        for lookup in self.collect_lookups_with_variations(locale, &tags, variation_coords) {
             if lookup.lookup_type != 3 && lookup.lookup_type != 9 {
                 continue;
             }

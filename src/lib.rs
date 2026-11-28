@@ -52,9 +52,19 @@ pub mod limits;
 pub mod lines;
 pub use lines::{HardLine, HardLineLayout, LineCaretPosition};
 pub mod wrapped;
-pub use wrapped::{LineBreakKind, WrapMode, WrappedLine, WrappedLineLayout};
+pub use wrapped::{
+    LineBreakKind, ParagraphOptions, TextAlignment, WrapMode, WrappedLine, WrappedLineLayout,
+};
 pub mod vertical_mapped;
-pub use vertical_mapped::{VerticalCaretPosition, VerticalGroup, VerticalMappedLayout};
+pub use vertical_mapped::{
+    VerticalCaretPosition, VerticalColumnCaretPosition, VerticalGroup, VerticalMappedLayout,
+    VerticalWrappedLayout, VerticalWrappedLine,
+};
+pub mod ruby;
+pub use ruby::{
+    AnnotatedLineLayout, EmphasisGlyphPlacement, EmphasisMark, PositionedEmphasis, PositionedRuby,
+    RubyAlignment, RubyAnnotation, RubyLayoutOptions,
+};
 pub mod mapped;
 pub use mapped::{GlyphSource, ShapedText};
 #[cfg(feature = "svg-fonts")]
@@ -66,11 +76,11 @@ pub mod woff;
 #[deprecated(note = "use `fontcore::commands` instead")]
 pub use commands as commads;
 pub use commands::{
-    text2commands, Command, FillRule, FontMetrics, FontOptions, FontRef, FontStretch, FontStyle,
-    FontVariant, FontVariationSetting, FontWeight, Glyph, GlyphBounds, GlyphFlow,
-    GlyphGradientSpread, GlyphGradientStop, GlyphGradientUnits, GlyphLayer, GlyphLinearGradient,
-    GlyphMetrics, GlyphPaint, GlyphRadialGradient, GlyphRun, PathGlyphLayer, PathPaintMode,
-    PositionedGlyph, RasterGlyphLayer, RasterGlyphSource, TextDirection,
+    text2commands, Command, FillRule, FontFeatureSetting, FontMetrics, FontOptions, FontRef,
+    FontStretch, FontStyle, FontVariant, FontVariationSetting, FontWeight, Glyph, GlyphBounds,
+    GlyphFlow, GlyphGradientSpread, GlyphGradientStop, GlyphGradientUnits, GlyphLayer,
+    GlyphLinearGradient, GlyphMetrics, GlyphPaint, GlyphRadialGradient, GlyphRun, PathGlyphLayer,
+    PathPaintMode, PositionedGlyph, RasterGlyphLayer, RasterGlyphSource, TextDirection,
 };
 #[cfg(feature = "svg-fonts")]
 pub use commands::{SvgGlyphLayer, SvgGlyphRun};

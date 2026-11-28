@@ -1,9 +1,9 @@
 # FontReader / fontcore 実装状況
 
-更新日: 2026-09-02
+更新日: 2026-11-28
 対象ブランチ: `main`
-基準コミット: `819f677a2363f9e21b71b77a1f5bcf3d2f31b600`
-直近リリースコミット: `0784157` (`fontcore 0.0.13`)
+基準コミット: `b02da19` (`fontcore 0.0.22`)
+直近リリースコミット: `b02da19` (`fontcore 0.0.22`)
 
 ## このファイルの使い方
 
@@ -12,144 +12,176 @@
 - `[x]` 実装と回帰テストが完了
 - `[~]` 部分実装、既知の制限、または追加検証が必要
 - `[ ]` 未実装または延期
-- 仕様判定はOpenType 1.9.1、WOFF File Format 1.0、UAX #9 / #29を基準にする
-- 完了判定の根拠はテスト名、対応規格、`doc/implementation-status.md`、fixture manifestとする
+- 仕様判定は OpenType 1.9.1、WOFF File Format 1.0、UAX #9 / #14 / #29、UAX #50 を基準にする
+- 完了判定の根拠はテスト名、対応規格、`doc/implementation-status.md`、`doc/feature-status.md`、fixture manifest とする
 
 ## 実装済み
 
-### 読み込みと安全性
+### 読み込み・安全性・CI 基盤
 
-- [x] `FontFile` / `FontFace`の公開読み込み入口と`*_with_limits`
-- [x] `DecodeLimits`による入力、表、WOFF、WOFF2、SVG展開量の制限
-- [x] sfnt / TTCの表境界検証と空TTC・不正face選択の拒否
-- [x] WOFFの宣言長、表範囲・重複、圧縮後長、checksum、metadata/private data検証
-- [x] 外部入力由来の今回確認済みpanic経路（TTC、CPAL、GSUB/GPOS indexなど）の修正
+- [x] `FontFile` / `FontFace` の公開読み込み入口と `*_with_limits`
+- [x] `DecodeLimits` による入力、表、WOFF、WOFF2、SVG 展開・参照量の制限
+- [x] `bin-rs 0.1.0` への移行と sfnt / TTC の表境界検証、空 TTC・不正 face 選択の拒否
+- [x] WOFF の宣言長、表範囲・重複、圧縮後長、checksum、metadata/private data 検証
+- [x] Extension parser 検証および layout table 境界検証
+- [x] 外部入力由来の確認済み panic 経路（TTC、CPAL、GSUB/GPOS index 等）の修正
+- [x] CI 整備・緑化（`cargo fmt --all -- --check`、`cargo clippy --all-targets --all-features -- -D warnings`、no-default / default / layout+cff / all-features、examples、doc、MSRV 1.91、`wasm32-unknown-unknown`、Unicode/Grapheme 生成データチェック）
+- [x] `FONTCORE_TEST_FONTS` 指定時だけ外部フォント corpus を有効化する方針と合成 fixture manifest（`tests/fixtures/manifest.toml`）
 
-### OpenType表と整形の既存範囲
+### OpenType 表・可変フォント・整形
 
-- [x] `cmap` Format 4 / 12 / 13 / 14のidDelta、補助平面、既定・非既定UVS
-- [x] `fvar` / `avar`の境界、hidden flag、軸数、順序、必須map点の検証
-- [x] GDEFのAttachList、MarkGlyphSetsDef、ItemVariationStoreに関する相対基点・Offset32修正
-- [x] GSUB Context / ChainingのSequenceLookupRecord保持とFormat 1–3の既存適用経路
-- [x] GSUB Multiple置換の出力上限、自己参照防止、Reverse Chainingの右から左適用
-- [x] GPOS pair / mark系の既存適用と同一lookup内の重複サブテーブル適用防止
-- [x] GSUB / GPOSのlocale、script、required feature、無効indexの安全な処理
-- [x] CPAL v0のパレット相対indexと`0xFFFF` CurrentColor、COLR v0
-- [x] CFF2 charstringの`vsindex` / `blend`とPrivate DICTの既存実装
-- [x] OpenType SVGのgzip ISIZE / CRC、構文allowlist、危険要素・属性・外部参照の拒否
-- [x] `shape()`由来の既存測定経路、font size / stretch回帰
+- [x] `cmap` Format 4 / 12 / 13 / 14 の `idDelta`、補助平面、既定・非既定 UVS、および非対応 UVS/IVS の基底文字フォールバック
+- [x] `fvar` / `avar` の境界・hidden flag・軸数・順序・必須 map 点の検証、`HVAR` / `VVAR` / `MVAR` メトリクス変動
+- [x] `gvar` の composite variation（matched-point 合成および `USE_MY_METRICS` phantom 継承）
+- [x] GDEF の `AttachList`、`MarkGlyphSetsDef`、`ItemVariationStore`、可変フォント対応 `CaretVariationStore`（Static Format 1 / bounded Format 2 / unadjusted Format 3）
+- [x] GDEF による一般 GSUB / GPOS ルックアップフィルタリング（`IgnoreMarks` / `MarkAttachmentType` / `MarkFilteringSet`）
+- [x] GSUB Context / Chaining の `SequenceLookupRecord` 保持と Format 1–3 の適用、Multiple 置換上限・自己参照防止、Reverse Chaining、スカラー `locl` 合字
+- [x] GPOS Pair / Mark / `mkmk`（unanchored mark 原点・先行字検索修正）、Type 3 Cursive Attachment（`curs`）、`VariationIndex` デルタ、Vertical `SinglePos`
+- [x] standalone default-ignorable グリフの出力抑制
+- [x] CPAL v0（パレット相対 index・`0xFFFF` CurrentColor）、COLR v0、sbix の既存実装と vertical origin 対応
+- [x] CFF2 charstring の `vsindex` / `blend` と Private DICT の既存実装
+- [x] OpenType SVG の gzip ISIZE / CRC、構文 allowlist、危険要素・属性・外部参照拒否、自己完結型抽出、および型付きレイアウトコンテキスト（`SvgGlyphRun` / `SvgGlyphLayer`）
 
-### 検証基盤
+### Unicode・スクリプト対応
 
-- [x] 通常push / pull request向けのtest、all-features、examples、doc、WASM check CI
-- [x] `FONTCORE_TEST_FONTS`指定時だけ外部フォントcorpusを有効化
-- [x] 合成fixture manifest（`tests/fixtures/manifest.toml`）
-- [x] HarfBuzzを開発時の差分比較器として利用する方針
+- [x] Unicode 17.0.0 拡張書記素クラスタ分割とクラスタ単位フォールバック
+- [x] Unicode 18.0.0 `Vertical_Orientation`（`U` / `R` / `Tu` / `Tr`）の静的テーブルと公開 API（`vertical_orientation`）
+- [x] 限定正規化・合成（現代ハングル、旧ハングル / 声調、かな濁点・半濁点、ラテン合成、チベット語正規化・積層・母音配置）
+- [x] アラビア語コンテキスト連結（joining）と `curs` 接続
+
+### 上位レイアウト・縦書き・キャレット
+
+- [x] `ShapedText` によるソース位置保持付き整形（mapped shaping）
+- [x] `CaretLayout` / `hit_test` / `visual_carets` / GDEF 合字キャレット・`CaretSource` / `CaretQuality`
+- [x] `HardLineLayout`（LF / CRLF 改行の複数行整形と行間キャレット）
+- [x] `WrappedLineLayout`（貪欲ソフトラップ、`WordOrGrapheme` / `Grapheme` / `JapaneseKinsoku` / `JapaneseKinsokuHanging`、`FontFamily` / `CompositeFont` 複数行、行境界 `Upstream` / `Downstream` affinity）
+- [x] `BidiParagraphLayout`（UAX #9 + `unicode-bidi-mirroring` による段落双方向配置、isolate 境界保護、joining 破断検出）
+- [x] `VerticalMappedLayout`（縦書き混植と座標変換済みキャレット）、`FontFamily::shape_vertical_mixed_ltr_mapped`、`VerticalWrappedLayout`（複数列折り返し・禁則・縦中横統合）
+- [x] `FontEngine::shape_tate_chu_yoko_ltr` による明示的縦中横コンポジション
+- [x] `AnnotatedLineLayout` によるルビ（振り仮名）・傍点（圏点）レイアウト API（縦横両対応、Center / Start / SpaceAround 揃え）
+- [x] `CompositeFont` による `UnicodeRange` ルールベースの合成フォント
 
 ## 部分実装・既知の制限
 
-- [~] 表単位の境界検証は進んでいるが、全表を統一`TableProvider` / bounded readerへ移行する監査は未完了
-- [~] GSUB / GPOSの全Type 1–8 / 1–9共通実行器、lookup flag、MarkFilteringSet、FeatureVariations実行時置換
-- [~] GDEFのglyph class・mark filteringの実行時結線とmark-to-ligatureのcomponent選択
-- [~] GSUB Multipleの入力cursor・固定点反復・巨大出力に対するファジング／包括的回帰
-- [~] 公開API全体のcount・offset・index・確保量に対するpanic／resource-limit監査
-- [~] Reverse Chainingの複数実フォント差分検証
-- [~] CFF2の再配布可能な真の可変フォントfixture、軸別outline署名、malformed corpus回帰
-- [~] `shape()`、`measure()`、`render_svg()`が詳細な同一`GlyphRun`／レイアウト結果を共有するAPI統一
-- [~] CIのstrict fmt / Clippyは既存のリポジトリ全体のformat・lint負債により未緑化
+- [~] 表単位の境界検証は進んでいるが、全表を統一 bounded reader / `TableProvider` へ移行する監査は未完了
+- [~] 公開 API 全体の count・offset・index・確保量に対する網羅的ファジング／resource-limit 監査
+- [~] `WrappedLineLayout` は JIS X 4051 / JLREQ 基本の禁則処理（追い出し・句読点ぶら下げ）に対応済み。完全な UAX #14 行分割および揃え位置（alignment / justification）は未対応
+- [~] `BidiParagraphLayout` は hard line のみ対応で、ソフトラップおよび `FontFamily` フォールバックと未統合
+- [~] COLR v1 / CPAL v1 が未実装（現在は v0 のみ）
+- [~] `FeatureVariations` 実行時置換、任意 OpenType feature 指定、`FontVariant::SmallCaps` の `smcp` / `c2sc` 結線が未完了
+- [~] CFF2 の再配布可能な真の可変フォント fixture、軸別 outline 署名、malformed corpus 回帰が未完了
+- [~] `doc/feature-status*` に比べて `doc/implementation-status.md` の同期が遅れている
 
-## 次の実装項目
+## 次の実装項目（0.0.23+ ロードマップ）
 
-### M1: 境界検証の共通化
+### M1: 日本語組版・縦書き実用化（`noveleditor` GPUI 連携向け）
 
-- [ ] 共通bounded reader / `TableProvider`へ全loaderを移行する
-- [ ] すべてのcount、offset、加算、乗算、slice取得を共通境界APIへ集約する
-- [ ] `DecodeLimits`を全展開・確保経路へ接続する
-- [ ] `from_buffer`、face列挙、metadata、shape、measure、render_svg、raw dumpを対象にpanic・無限ループ・NaN/Infinityのファジングを追加する
+- [x] `WrappedLineLayout` への禁則処理（行頭禁則・行末禁則・分離禁止・句読点ぶら下げ：`JapaneseKinsoku` / `JapaneseKinsokuHanging`）
+- [x] `VerticalMappedLayout` の拡張（`FontFamily::shape_vertical_mixed_ltr_mapped`、複数列折り返し `VerticalWrappedLayout`、縦中横スパンのインライン統合）
+- [x] ルビ（振り仮名）・傍点（圏点）レイアウト API（`AnnotatedLineLayout`：縦横両対応、親文字スパン紐付け、折り返し連携）
 
-受入条件: 任意バイト列でpanicせず、上限超過は明示的なresource-limit errorで停止する。
+受入条件: 日本語小説の縦書き・横書き段落（ルビ・傍点・縦中横・禁則・行長折り返しを含む）を単一または合成フォントでレイアウトし、キャレット位置・ヒットテスト不変条件および `unified/` 視覚回帰を通過すること。
 
-### M2: GSUB / GPOS共通実行器
+### M2: 段落レイアウト・BiDi・複数行の統合
 
-- [ ] `TextRun`、`GlyphInfo`、`GlyphPosition`、`GlyphBuffer`を導入する
-- [ ] lookup index順、lookup flag、MarkFilteringSet、GDEF classを共通実行器で扱う
-- [ ] GSUB Type 1–8とGPOS Type 1–9、Extension、Device / VariationIndexを統合する
-- [ ] Context / Chainingの指定`sequenceIndex`へ入れ子lookupを適用し、置換後もclusterを維持する
-- [ ] 同一lookupの適用回数・置換長に上限を設け、無条件の固定点反復を行わない
+- [ ] `BidiParagraphLayout` へのソフトラップ統合と `FontFamily` フォールバック対応
+- [ ] 段落アライメント（左・中央・右・両端揃え）、タブ展開、段落字下げ / インデントの設計・実装
 
-受入条件: 合字・複数置換・文脈置換・位置調整のglyph ID、cluster、advance、offsetをfixtureで検証できる。
+受入条件: 混在 LTR / RTL 段落の複数行折り返しとアライメントで視覚順序・joining・`hit_test` 往復が崩れないこと。
 
-### M3: Unicode itemizationとfallback
+### M3: OpenType カラーフォント・シェイピング拡張
 
-- [ ] UAX #29拡張書記素cluster分割を整形入力へ導入する
-- [ ] UAX #9の段落、埋め込みlevel、視覚順を導入する
-- [ ] script / language / direction / face単位の`TextRun`分割を行う
-- [ ] Latin、日本語、Arabic、Syriac、Hebrew、Tibetan、Emoji/VS/ZWJのfixtureを整備する
-- [ ] `FontFamily`と家族列を分離し、`FontFallbackList` / `LastResortFace`を追加する
-- [ ] Unicode caseless matchingとcluster単位fallbackを実装する
-- [ ] `FontVariant::SmallCaps`を`smcp` / `c2sc`へ接続し、任意feature指定を追加する
+- [ ] COLR v1 / CPAL v1 の実装とグラデーション・合成・可変レイヤーの `GlyphLayer` / bounds 対応
+- [ ] `FeatureVariations` 実行時置換、任意 OpenType feature 指定、`FontVariant::SmallCaps`（`smcp` / `c2sc`）結線
+- [ ] CFF2 再配布可能可変フォント fixture、軸別 outline 署名、malformed corpus 回帰の整備
 
-受入条件: 混在LTR / RTL、VS/ZWJ、mark clusterでface分割やcluster分断が発生しない。
+受入条件: COLR v1・`FeatureVariations`・CFF2 可変軸が合成/実フォント fixture で検証され、CI マトリクスを通過すること。
 
-### M4: 測定・出力・色フォント
+### M4: 境界検証監査・ファジング・保守
 
-- [ ] `shape()`、`measure()`、`render_svg()`を同一の詳細整形結果から生成する
-- [ ] logical advance、logical bounds、ink bounds、line boundsを分離する
-- [ ] size、stretch、variationの適用を一度に統一する
-- [ ] SVGを安全化済みsceneへ変換し、ID、transform、clip、gradient、mask座標を統一する
-- [ ] 実レイヤーからboundsを算出し、COLR v0 / SVG / sbixで描画範囲を一致させる
-- [ ] COLR v1 / CPAL v1を段階実装する
+- [ ] 全テーブル loader の統一 bounded reader / `TableProvider` 監査完了と `DecodeLimits` 全展開・確保経路接続
+- [ ] `from_buffer`、face 列挙、metadata、`shape`、`measure`、`render_svg` を対象としたファジングの追加
+- [ ] `unified/` クロスライブラリ結合スイート（`fontcore` + `paintcore` + `wml2`）の継続運用と `doc/implementation-status.md` 同期
 
-受入条件: shape末尾cursorとmeasureが一致し、サイズ倍・stretch倍・色レイヤーboundsの回帰が通る。
-
-### M5: 整理と回帰拡充
-
-- [ ] sfnt / WOFF / WOFF2の表dispatchを共通化する
-- [ ] `cff2` featureを実コードとCI検証へ結線する
-- [ ] 実フォント回帰とHarfBuzz差分比較を定期検査へ移行する
-- [ ] `doc/feature-status*`の「パース済み」「実行可能」「実フォント回帰済み」を現行コードへ同期する
-- [ ] strict fmt / Clippyの既存負債を段階的に解消する
+受入条件: 任意バイト列で panic せず、上限超過が明示的な resource-limit error で停止すること。
 
 ## 保留する項目
-
-整形コア完成後に扱う。現在の残実装の完了条件には含めない。
 
 - [ ] TrueType hinting（`cvt `、`fpgm`、`prep`、`gasp`）
 - [ ] BASE / JSTF / MATH
 - [ ] EBDT / EBLC / EBSC、CBDT / CBLC
 - [ ] DSIG / PCLT / VDMX / LTSH / MERG
-- [ ] 複雑なSVG pattern / filterの完全描画
-- [ ] rich text、ruby、OS固有のインストール済みフォント探索
+- [ ] 複雑な SVG pattern / filter の完全描画
+- [ ] rich text 全般、OS 固有のインストール済みフォント探索
+
+## 未実装・限定対応の言語 / スクリプト一覧
+
+現行の `locale_to_script_tags` / `locale_to_language_system_tags`（`src/opentype/extentions/gsub.rs` 等）および `src/fontreader/` のスクリプト別整形実装を調査した結果、未実装または限定対応にとどまる言語・スクリプトは以下の通り。
+
+### 南アジア系（Indic / USE — 未実装）
+
+- [ ] デーヴァナーガリー（`deva` / `dev2`: ヒンディー語、マラーティー語、ネパール語、サンスクリット語）— 音節分割・`rphf`/`half`/`pstf`/`blwf` 再配置未実装
+- [ ] ベンガル語（`beng` / `bng2`）— 二分割母音・結合子音処理未実装
+- [ ] グルムキー文字（`guru` / `gur2`: パンジャーブ語）
+- [ ] グジャラーティー文字（`gujr` / `gjr2`）
+- [ ] オリヤー文字（`orya` / `ory2`）
+- [ ] タミル語（`taml` / `tml2`）
+- [ ] テルグ語（`telu` / `tel2`）
+- [ ] カンナダ語（`knda` / `knd2`）
+- [ ] マラヤーラム文字（`mlym` / `mlm2`）
+- [ ] シンハラ文字（`sinh`）
+
+### 東南アジア系（未実装）
+
+- [ ] タイ語（`thai`）— 上下母音/声調配置・Sara Am (`U+0E33`) 分解・辞書ベース単語分割未実装
+- [ ] ラーオ語（`lao `）
+- [ ] クメール語（`khmr`）— Coeng 結合・`pref`/`blwf`/`abvf`/`pstf` 未実装
+- [ ] ミャンマー語（`mymr` / `mym2`）— Kinzi・Medial・USE 再配置未実装
+- [ ] ジャワ文字（`java`）・バリ文字（`bali`）・フィリピン系文字（`tglg` 等）
+
+### 東アジア・中央アジアの未対応 / 限定対応
+
+- [ ] モンゴル文字（`mong`）— 縦書き専用接続・FVS1–3 / MVS 異体字選択・joining 未実装
+- [ ] 中国語ロケール変種マッピング（`ZHS` / `ZHT` / `ZHH`）および注音符号（`bopo`）
+- [ ] アイヌ語仮名（`U+31F0–31FF`、セ+309A 等小書き仮名+半濁点の専用配置・`locl` 連携未対応）
+- [ ] チベット語（`tibt`）— 現在は限定プランのみ。汎用スクリプト分割・複合母音（`U+0F73`/`U+0F81` 等）・`bo`/`dz` ロケール自動マッピング未対応
+
+### 欧州・コーカサス・アフリカ・その他
+
+- [ ] ギリシャ語（`grek`）・キリル文字（`cyrl`: `BGR`/`SRB` 等の `locl` マッピングおよびスクリプトタグ自動対応）
+- [ ] アルメニア語（`armn`）・ジョージア語（`geor`: `mtvr` 等含む）
+- [ ] エチオピア文字（`ethi`）
+- [ ] ンコ文字（`nko `）・アドラム文字（`adlm`）・ターナ文字（`thaa`: RTL/joining 汎用スクリプト分割未実装）
+- [ ] チェロキー文字（`cher`）・カナダ先住民音節文字（`cans`）
 
 ## 検証コマンド
 
-必須テスト（外部フォント不要）:
+必須テスト（外部フォント・ネットワーク不要）:
 
 ```text
 cargo test --all-features --lib
 ```
 
-外部corpus（明示指定時のみ）:
+外部 corpus（明示指定時のみ）:
 
 ```text
 FONTCORE_TEST_FONTS=<path> cargo test --all-features --lib
 ```
 
-補助検証:
+補助・CI 検証:
 
 ```text
+cargo fmt --all -- --check
+cargo clippy --all-targets --all-features -- -D warnings
 cargo test --no-default-features
 cargo test --no-default-features --features "layout,cff"
+cargo test --all-features
 cargo check --examples --all-features
 cargo check --target wasm32-unknown-unknown --all-features
 cargo doc --all-features --no-deps
 ```
 
-直近の検証結果（2026-09-02）:
+直近の検証結果（2026-11-28 / `fontcore 0.0.22` `b02da19` 時点）:
 
-- clean相当 all-feature: 108 passed
-- 外部corpus: 240 passed、3 ignored
-- no-default: 32 passed
-- layout/cff: 39 passed
-- examples、WASM check、doc生成: 成功
-- strict fmt / Clippy: 既存のformat・lint負債により未成功
+- `cargo test --all-features --lib`（サンドボックス / オフライン環境）: 380 テスト中 375 passed、4 ignored、1 failed（`test::tests::fontload_from_net_works` がオフライン環境のソケット拒否 os error 10013 により失敗）
+- 統合テスト（`tests/*.rs`）: 52 ファイル配置済み（今回未実行）
