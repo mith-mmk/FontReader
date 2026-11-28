@@ -2,6 +2,32 @@
 
 ## Unreleased
 
+## 0.0.23 - 2026-11-28
+
+### Japanese Typesetting & Vertical Layout
+
+- Add Japanese kinsoku line-breaking modes `WrapMode::JapaneseKinsoku` and `WrapMode::JapaneseKinsokuHanging` (start/end prohibitions, inseparable pairs, hanging punctuation) to `WrappedLineLayout`.
+- Add `FontFamily::shape_vertical_mixed_ltr_mapped` and multi-column `VerticalWrappedLayout` with inline tate-chu-yoko support.
+- Add `AnnotatedLineLayout` (`src/ruby.rs`) for horizontal and vertical ruby (furigana) and emphasis marks (bouten) attached to parent spans.
+
+### BiDi & Paragraph Layout
+
+- Add `TextAlignment` and `ParagraphOptions` (alignment, first-line/hanging indent, tab stops) to `WrappedLineLayout` (`shape_with_paragraph`, `shape_family_with_paragraph`).
+- Add `FontFamily::shape_bidi_run_mapped` and `BidiParagraphLayout` family/wrapped/options-aware APIs (`shape_family`, `shape_wrapped`, `shape_family_wrapped`, `*_with_options`).
+
+### OpenType Color Fonts, Features & CFF2
+
+- Implement CPAL v1 palette type/label/entry-label parsing and COLR v1 `BaseGlyphList` / `LayerList` / `ClipList` / Paint resolution (`PaintColrLayers`, `PaintSolid`, `PaintLinearGradient`, `PaintRadialGradient`, transforms, `PaintColrGlyph` with cycle/depth guard).
+- Implement GSUB / GPOS v1.1 `FeatureVariations` (`ConditionSet` Format 1, `FeatureTableSubstitution`, alternate `Feature`) applied against normalized variation axis coordinates.
+- Add public `FontFeatureSetting`, `FontOptions::with_feature` / `with_features` / `clear_features`, and `FontEngine::with_feature` / `with_features` / `clear_features` / `with_small_caps`.
+- Add CFF2 variable-axis outline coordinate sensitivity and truncated-container regression coverage.
+
+### Safety, Bounded Loading & Fuzzing
+
+- Unify SFNT and WOFF table loading behind `TableProvider` (`SfntTableProvider`, `WoffTableProvider`), `bounded_table_reader`, and `load_font_tables`, enforcing cumulative `DecodeLimits::max_total_decompressed_bytes` across SFNT tables and replacing `todo!()` on `FontHeaders::WOFF2` fallback with `ErrorKind::Unsupported`.
+- Harden `cmap::try_get_subtable` across subtable formats 0/2/4/6/8/10/12/13/14 and `Glyph::try_parse` / `get_glyf` against out-of-bounds, non-monotonic `loca` offsets, and overflow/truncated inputs.
+- Add `tests/fuzz_and_limits.rs` covering `DecodeLimits`, invalid/non-finite options, cross-table read isolation, deterministic random/magic-prefixed buffers, and truncated/mutated fixture fuzzing.
+
 ## 0.0.22 - 2026-11-22
 
 ### Layout & Multi-Line Wrapping
