@@ -196,31 +196,30 @@ impl Glyph {
     }
 
     pub fn parse(&self) -> ParsedGlyph {
-        if self.length < 10 {
-            return self.empty_parsed();
+        self.try_parse().unwrap_or_else(|| self.empty_parsed())
+    }
+
+    fn try_parse(&self) -> Option<ParsedGlyph> {
+        let buf = self.glyphs.as_slice();
+        if self.length < 10 || buf.len() < 10 {
+            return None;
         }
-        let buf = self.glyphs.clone();
-        let mut offset = 0;
-        let high_byte = buf[offset] as u16;
-        let low_byte = buf[offset + 1] as u16;
-        let number_of_contours = ((high_byte << 8) + low_byte) as i16;
-        offset += 2;
-        let high_byte = buf[offset] as u16;
-        let low_byte = buf[offset + 1] as u16;
-        let x_min = ((high_byte << 8) + low_byte) as i16;
-        offset += 2;
-        let high_byte = buf[offset] as u16;
-        let low_byte = buf[offset + 1] as u16;
-        let y_min = ((high_byte << 8) + low_byte) as i16;
-        offset += 2;
-        let high_byte = buf[offset] as u16;
-        let low_byte = buf[offset + 1] as u16;
-        let x_max = ((high_byte << 8) + low_byte) as i16;
-        offset += 2;
-        let high_byte = buf[offset] as u16;
-        let low_byte = buf[offset + 1] as u16;
-        let y_max = ((high_byte << 8) + low_byte) as i16;
-        offset += 2;
+        let read_u8_at = |offset: &mut usize| -> Option<u8> {
+            let b = *buf.get(*offset)?;
+            *offset += 1;
+            Some(b)
+        };
+        let read_u16_at = |offset: &mut usize| -> Option<u16> {
+            let slice = buf.get(*offset..(*offset).checked_add(2)?)?;
+            *offset += 2;
+            Some(u16::from_be_bytes([slice[0], slice[1]]))
+        };
+        let mut offset = 0usize;
+        let number_of_contours = read_u16_at(&mut offset)? as i16;
+        let x_min = read_u16_at(&mut offset)? as i16;
+        let y_min = read_u16_at(&mut offset)? as i16;
+        let x_max = read_u16_at(&mut offset)? as i16;
+        let y_max = read_u16_at(&mut offset)? as i16;
 
         let mut instructions = Vec::new();
         let mut flags = Vec::new();
@@ -229,90 +228,74 @@ impl Glyph {
         let mut on_curves = Vec::new();
         let mut coutour = Vec::new();
 
-        if number_of_contours >= 0 {
-            for _ in 0..number_of_contours as usize {
-                let high_byte = self.glyphs[offset] as u16;
-                let low_byte = self.glyphs[offset + 1] as u16;
-                offset += 2;
-                let number = (high_byte << 8) + low_byte;
-                coutour.push(number as usize);
+        if number_of_contours > 0 {
+            let contour_count = number_of_contours as usize;
+            if buf.len().saturating_sub(offset) < contour_count.checked_mul(2)?.checked_add(2)? {
+                return None;
             }
-            let last_end_pts_of_contours = coutour[number_of_contours as usize - 1] + 1;
-            let high_byte = self.glyphs[offset] as u16;
-            let low_byte = self.glyphs[offset + 1] as u16;
-            let instruction_length = (high_byte << 8) + low_byte;
-            offset += 2;
+            coutour.reserve(contour_count);
+            for _ in 0..contour_count {
+                coutour.push(read_u16_at(&mut offset)? as usize);
+            }
+            let last_end_pts_of_contours = coutour.last()?.checked_add(1)?;
+            if last_end_pts_of_contours > 65_536 {
+                return None;
+            }
+            let instruction_length = read_u16_at(&mut offset)? as usize;
+            let instr_end = offset.checked_add(instruction_length)?;
+            instructions = buf.get(offset..instr_end)?.to_vec();
+            offset = instr_end;
 
-            for _ in 0..instruction_length {
-                let instruction = self.glyphs[offset];
-                instructions.push(instruction);
-                offset += 1;
-            }
-            let mut i = 0;
+            let mut i = 0usize;
             while i < last_end_pts_of_contours {
-                // flags
-                let flag = self.glyphs[offset];
-                offset += 1;
+                let flag = read_u8_at(&mut offset)?;
                 flags.push(flag);
-                let mut repeat = 0;
+                let mut repeat = 0usize;
                 if flag & 0x08 != 0 {
-                    repeat = self.glyphs[offset];
-                    offset += 1;
+                    repeat = read_u8_at(&mut offset)? as usize;
                 }
-                for _ in 0..repeat {
-                    flags.push(flag);
-                    i += 1;
-                }
-                i += 1;
+                let add = repeat.min(last_end_pts_of_contours.saturating_sub(i + 1));
+                flags.extend(std::iter::repeat_n(flag, add));
+                i = i.checked_add(1 + add)?;
             }
+            on_curves.reserve(flags.len());
             for flag in flags.iter() {
-                let on_curve = flag & 0x01 != 0;
-                on_curves.push(on_curve);
+                on_curves.push(flag & 0x01 != 0);
             }
 
+            xs.reserve(flags.len());
             for flag in flags.iter() {
-                let mut x = 0;
+                let mut x = 0i16;
                 if flag & 0x2 != 0 {
-                    let byte = self.glyphs[offset];
-                    offset += 1;
+                    let byte = read_u8_at(&mut offset)? as i16;
                     if flag & 0x10 != 0 {
-                        x += byte as i16;
+                        x = byte;
                     } else {
-                        x -= byte as i16;
+                        x = -byte;
                     }
                 } else if flag & 0x10 == 0 {
-                    let hi_byte = self.glyphs[offset] as u16;
-                    let lo_byte = self.glyphs[offset + 1] as u16;
-                    offset += 2;
-                    let byte = (hi_byte << 8) + lo_byte;
-                    x = byte as i16;
+                    x = read_u16_at(&mut offset)? as i16;
                 }
                 xs.push(x);
             }
+            ys.reserve(flags.len());
             for flag in flags.iter() {
-                let mut y = 0;
+                let mut y = 0i16;
                 if flag & 0x4 != 0 {
-                    let byte = self.glyphs[offset];
-                    offset += 1;
+                    let byte = read_u8_at(&mut offset)? as i16;
                     if flag & 0x20 != 0 {
-                        y += byte as i16;
+                        y = byte;
                     } else {
-                        y -= byte as i16;
+                        y = -byte;
                     }
                 } else if flag & 0x20 == 0 {
-                    let hi_byte = self.glyphs[offset] as u16;
-                    let lo_byte = self.glyphs[offset + 1] as u16;
-                    offset += 2;
-                    let byte = (hi_byte << 8) + lo_byte;
-                    y = byte as i16;
+                    y = read_u16_at(&mut offset)? as i16;
                 }
                 ys.push(y);
             }
-        } else {
-            // TODO: composite glyph
         }
 
-        ParsedGlyph {
+        Some(ParsedGlyph {
             number_of_contours,
             x_min,
             y_min,
@@ -326,7 +309,7 @@ impl Glyph {
             xs,
             ys,
             on_curves,
-        }
+        })
     }
 
     pub(crate) fn get_svg_heder(
@@ -705,7 +688,7 @@ impl Glyf {
         offset: u32,
         length: u32,
         loca: &loca::Loca,
-    ) -> Self {
+    ) -> Result<Self, std::io::Error> {
         get_glyf(file, offset, length, loca)
     }
 
@@ -1246,35 +1229,67 @@ fn path_commands_to_svg_path(commands: &[PathCommand]) -> String {
     d.trim_end().to_string()
 }
 
-fn get_glyf<R: BinaryReader>(file: &mut R, offset: u32, _length: u32, loca: &loca::Loca) -> Glyf {
-    let loca = loca.clone();
-    file.seek(SeekFrom::Start(offset as u64)).unwrap();
-    let offsets = loca.offsets.clone();
-    let mut glyphs = Vec::new();
-    for i in 0..offsets.len() - 1 {
-        let offset = offsets[i];
-        let length = offsets[i + 1] - offset;
-        let glyph = get_glyph(file, offset, length);
+fn get_glyf<R: BinaryReader>(
+    file: &mut R,
+    offset: u32,
+    table_length: u32,
+    loca: &loca::Loca,
+) -> Result<Glyf, std::io::Error> {
+    if loca.offsets.len() < 2 {
+        return Ok(Glyf { griphs: Vec::new() });
+    }
+    let mut glyphs = Vec::with_capacity(loca.offsets.len() - 1);
+    for window in loca.offsets.windows(2) {
+        let glyph_offset = window[0];
+        let next_offset = window[1];
+        if next_offset < glyph_offset {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "non-monotonic loca offset",
+            ));
+        }
+        let glyph_length = next_offset - glyph_offset;
+        let end = u64::from(glyph_offset)
+            .checked_add(u64::from(glyph_length))
+            .ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "glyf entry offset overflow",
+                )
+            })?;
+        if end > u64::from(table_length) {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::UnexpectedEof,
+                "glyf glyph exceeds table length",
+            ));
+        }
+        let glyph = get_glyph(file, offset, glyph_offset, glyph_length)?;
         glyphs.push(glyph);
     }
-    Glyf { griphs: glyphs }
+    Ok(Glyf { griphs: glyphs })
 }
 
-fn get_glyph<R: BinaryReader>(file: &mut R, offset: u32, length: u32) -> Glyph {
+fn get_glyph<R: BinaryReader>(
+    file: &mut R,
+    table_offset: u32,
+    offset: u32,
+    length: u32,
+) -> Result<Glyph, std::io::Error> {
     if length == 0 {
-        return Glyph {
+        return Ok(Glyph {
             offset,
             length,
             glyphs: Box::<Vec<u8>>::default(),
-        };
+        });
     }
-
-    let glyphs = file.read_bytes_as_vec(length as usize).unwrap();
-    Glyph {
+    let start = u64::from(table_offset) + u64::from(offset);
+    file.seek(SeekFrom::Start(start))?;
+    let glyphs = file.read_bytes_as_vec(length as usize)?;
+    Ok(Glyph {
         glyphs: Box::new(glyphs),
         offset,
         length,
-    }
+    })
 }
 
 #[cfg(test)]
