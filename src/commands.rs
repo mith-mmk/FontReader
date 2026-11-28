@@ -516,12 +516,44 @@ impl FontVariationSetting {
     /// Creates one axis setting from a four-character OpenType tag.
     pub fn new(tag: &str, value: f32) -> Result<Self, Error> {
         Ok(Self {
-            tag: parse_variation_tag(tag)?,
+            tag: parse_four_cc_tag(tag, "variation tag")?,
             value,
         })
     }
 
     /// Returns the OpenType tag as a string such as `"wght"`.
+    pub fn tag_string(&self) -> String {
+        String::from_utf8_lossy(&self.tag).into_owned()
+    }
+}
+
+/// One explicit OpenType feature toggle such as `smcp=1` or `liga=0`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FontFeatureSetting {
+    pub tag: [u8; 4],
+    pub value: u32,
+}
+
+impl FontFeatureSetting {
+    /// Creates one feature setting from a four-character OpenType tag.
+    pub fn new(tag: &str, value: u32) -> Result<Self, Error> {
+        Ok(Self {
+            tag: parse_four_cc_tag(tag, "feature tag")?,
+            value,
+        })
+    }
+
+    /// Enables a feature (`value = 1`).
+    pub fn enabled(tag: &str) -> Result<Self, Error> {
+        Self::new(tag, 1)
+    }
+
+    /// Disables a feature (`value = 0`).
+    pub fn disabled(tag: &str) -> Result<Self, Error> {
+        Self::new(tag, 0)
+    }
+
+    /// Returns the OpenType tag as a string such as `"smcp"`.
     pub fn tag_string(&self) -> String {
         String::from_utf8_lossy(&self.tag).into_owned()
     }
@@ -571,6 +603,7 @@ pub struct FontOptions<'a> {
     pub font_weight: FontWeight,
     pub line_height: Option<f32>,
     pub variations: Vec<FontVariationSetting>,
+    pub features: Vec<FontFeatureSetting>,
 }
 
 impl<'a> FontOptions<'a> {
@@ -608,6 +641,7 @@ impl<'a> FontOptions<'a> {
                 font_weight: FontWeight::default(),
                 line_height: None,
                 variations: Vec::new(),
+                features: Vec::new(),
             }
         }
     }
@@ -626,6 +660,7 @@ impl<'a> FontOptions<'a> {
             font_weight: FontWeight::default(),
             line_height: None,
             variations: Vec::new(),
+            features: Vec::new(),
         }
     }
 
@@ -724,6 +759,31 @@ impl<'a> FontOptions<'a> {
         self
     }
 
+    pub fn with_feature(mut self, tag: &str, value: u32) -> Self {
+        if let Ok(setting) = FontFeatureSetting::new(tag, value) {
+            if let Some(existing) = self
+                .features
+                .iter_mut()
+                .find(|existing| existing.tag == setting.tag)
+            {
+                existing.value = value;
+            } else {
+                self.features.push(setting);
+            }
+        }
+        self
+    }
+
+    pub fn with_features(mut self, features: &[FontFeatureSetting]) -> Self {
+        self.features = features.to_vec();
+        self
+    }
+
+    pub fn clear_features(mut self) -> Self {
+        self.features.clear();
+        self
+    }
+
     pub fn with_vertical_flow(self) -> Self {
         self.with_text_direction(TextDirection::TopToBottom)
     }
@@ -764,15 +824,51 @@ pub fn text2commands(text: &str, options: FontOptions<'_>) -> Result<GlyphRun, E
     font.text2glyph_run(text, &options)
 }
 
-pub(crate) fn parse_variation_tag(tag: &str) -> Result<[u8; 4], Error> {
+pub(crate) fn parse_four_cc_tag(tag: &str, label: &str) -> Result<[u8; 4], Error> {
     let bytes = tag.as_bytes();
     if bytes.len() != 4 {
         return Err(Error::new(
             ErrorKind::InvalidInput,
-            format!("variation tag must be 4 ASCII bytes, got {tag:?}"),
+            format!("{label} must be 4 ASCII bytes, got {tag:?}"),
         ));
     }
     let mut result = [0u8; 4];
     result.copy_from_slice(bytes);
     Ok(result)
+}
+
+#[cfg_attr(not(feature = "layout"), allow(dead_code))]
+pub(crate) fn resolve_feature_tags(
+    base_tags: &[[u8; 4]],
+    custom_features: &[FontFeatureSetting],
+    include_custom_enabled: bool,
+) -> Vec<[u8; 4]> {
+    let mut resolved = Vec::with_capacity(base_tags.len() + custom_features.len());
+    for &tag in base_tags {
+        let disabled = custom_features
+            .iter()
+            .rev()
+            .find(|f| f.tag == tag)
+            .is_some_and(|f| f.value == 0);
+        if !disabled && !resolved.contains(&tag) {
+            resolved.push(tag);
+        }
+    }
+    if include_custom_enabled {
+        for feature in custom_features {
+            if feature.value > 0 && !resolved.contains(&feature.tag) {
+                resolved.push(feature.tag);
+            }
+        }
+    }
+    resolved
+}
+
+#[cfg_attr(not(feature = "layout"), allow(dead_code))]
+pub(crate) fn is_feature_disabled(tag: [u8; 4], custom_features: &[FontFeatureSetting]) -> bool {
+    custom_features
+        .iter()
+        .rev()
+        .find(|f| f.tag == tag)
+        .is_some_and(|f| f.value == 0)
 }
